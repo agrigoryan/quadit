@@ -11,12 +11,40 @@ import (
 	"strings"
 )
 
-// unzippedLimit is the most of one file unpacked from a zip.
-const unzippedLimit = 2 << 30
+// unzipLimits bound what one export unpacks to, the files of the zips
+// nested in it included; a nested zip itself is held to the limit of one
+// file, and is gone once unpacked. An export over any limit is refused
+// whole: a file is never cut short to fit.
+type unzipLimits struct {
+	fileBytes  int64 // one file
+	totalBytes int64 // every file
+	files      int   // how many files
+	depth      int   // how many zips deep: 1 is the export alone
+}
+
+// exportLimits are the limits of every import: room for a large export,
+// none for a zip made to unpack to far more than it is.
+var exportLimits = unzipLimits{fileBytes: 2 << 30, totalBytes: 8 << 30, files: 200_000, depth: 3}
 
 // unzip unpacks src into the folder dst, and any zip inside it beside
-// itself.
-func unzip(src, dst string) (err error) {
+// itself, within limits.
+func unzip(src, dst string, limits unzipLimits) error {
+	u := &unzipping{limits: limits, bytesLeft: limits.totalBytes, filesLeft: limits.files}
+	return u.unzip(src, dst, 1)
+}
+
+// unzipping is one run of unzip: its limits, and what is left of them.
+type unzipping struct {
+	limits    unzipLimits
+	bytesLeft int64
+	filesLeft int
+}
+
+// unzip unpacks one zip, depth zips deep.
+func (u *unzipping) unzip(src, dst string, depth int) (err error) {
+	if depth > u.limits.depth {
+		return fmt.Errorf("the export holds zips nested more than %d deep", u.limits.depth)
+	}
 	zr, err := zip.OpenReader(src)
 	if err != nil {
 		return fmt.Errorf("%s is not a zip file: %w", src, err)
@@ -37,39 +65,58 @@ func unzip(src, dst string) (err error) {
 			}
 			continue
 		}
-		if err := unzipOne(f, p); err != nil {
-			return err
-		}
 		// A Notion export nests one zip inside another.
 		if strings.HasSuffix(strings.ToLower(p), ".zip") {
-			if err := unzip(p, strings.TrimSuffix(p, filepath.Ext(p))); err != nil {
+			if _, err := u.unzipOne(f, p, u.limits.fileBytes); err != nil {
+				return err
+			}
+			if err := u.unzip(p, strings.TrimSuffix(p, filepath.Ext(p)), depth+1); err != nil {
 				return err
 			}
 			os.Remove(p)
+			continue
 		}
+		if u.filesLeft--; u.filesLeft < 0 {
+			return fmt.Errorf("the export holds more than %d files", u.limits.files)
+		}
+		n, err := u.unzipOne(f, p, min(u.limits.fileBytes, u.bytesLeft))
+		if err != nil {
+			return err
+		}
+		u.bytesLeft -= n
 	}
 	return nil
 }
 
-// unzipOne unpacks one file of a zip to the path to, making its folder.
-func unzipOne(f *zip.File, to string) error {
+// unzipOne unpacks one file of a zip to the path to, making its folder,
+// and gives its size. A file larger than room is refused: the bytes are
+// counted as they are written, as the sizes a zip states can be false.
+func (u *unzipping) unzipOne(f *zip.File, to string, room int64) (int64, error) {
 	if err := os.MkdirAll(filepath.Dir(to), 0o750); err != nil {
-		return err
+		return 0, err
 	}
 	in, err := f.Open()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer in.Close()
 	out, err := os.Create(to)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	if _, err := io.Copy(out, io.LimitReader(in, unzippedLimit)); err != nil {
-		out.Close()
-		return err
+	n, err := io.Copy(out, io.LimitReader(in, room+1))
+	if closeErr := out.Close(); err == nil {
+		err = closeErr
 	}
-	return out.Close()
+	switch {
+	case err != nil:
+		return 0, err
+	case n > u.limits.fileBytes:
+		return 0, fmt.Errorf("%s unpacks to more than %d bytes, the most one file of an export may be", f.Name, u.limits.fileBytes)
+	case n > room:
+		return 0, fmt.Errorf("the export unpacks to more than %d bytes, the most an export may be", u.limits.totalBytes)
+	}
+	return n, nil
 }
 
 // unzipToTemp unpacks a zip into a new temporary folder.
@@ -78,7 +125,7 @@ func unzipToTemp(src, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := unzip(src, dir); err != nil {
+	if err := unzip(src, dir, exportLimits); err != nil {
 		os.RemoveAll(dir)
 		return "", err
 	}

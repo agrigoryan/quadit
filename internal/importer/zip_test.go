@@ -44,7 +44,7 @@ func TestUnzip(t *testing.T) {
 	t.Run("files and folders", func(t *testing.T) {
 		dst := t.TempDir()
 		src := writeZip(t, map[string][]byte{"a.md": []byte("A"), "sub/": nil, "sub/b.md": []byte("B")})
-		if err := unzip(src, dst); err != nil {
+		if err := unzip(src, dst, exportLimits); err != nil {
 			t.Fatal(err)
 		}
 		for name, want := range map[string]string{"a.md": "A", "sub/b.md": "B"} {
@@ -58,7 +58,7 @@ func TestUnzip(t *testing.T) {
 		parent := t.TempDir()
 		dst := filepath.Join(parent, "in")
 		src := writeZip(t, map[string][]byte{"../out.md": []byte("escaped")})
-		err := unzip(src, dst)
+		err := unzip(src, dst, exportLimits)
 		if err == nil || !strings.Contains(err.Error(), "climbs out") {
 			t.Fatalf("err = %v", err)
 		}
@@ -70,7 +70,7 @@ func TestUnzip(t *testing.T) {
 		dst := t.TempDir()
 		inner := zipOf(t, map[string][]byte{"page.md": []byte("inner")})
 		src := writeZip(t, map[string][]byte{"part/Export-1.zip": inner})
-		if err := unzip(src, dst); err != nil {
+		if err := unzip(src, dst, exportLimits); err != nil {
 			t.Fatal(err)
 		}
 		got, err := os.ReadFile(filepath.Join(dst, "part", "Export-1", "page.md"))
@@ -83,7 +83,7 @@ func TestUnzip(t *testing.T) {
 	})
 	t.Run("an empty archive", func(t *testing.T) {
 		dst := t.TempDir()
-		if err := unzip(writeZip(t, nil), dst); err != nil {
+		if err := unzip(writeZip(t, nil), dst, exportLimits); err != nil {
 			t.Fatal(err)
 		}
 		if entries, err := os.ReadDir(dst); err != nil || len(entries) != 0 {
@@ -92,7 +92,7 @@ func TestUnzip(t *testing.T) {
 	})
 	t.Run("a file that is not a zip", func(t *testing.T) {
 		src := writeFile(t, "export.zip", "not a zip")
-		if err := unzip(src, t.TempDir()); err == nil || !strings.Contains(err.Error(), "is not a zip file") {
+		if err := unzip(src, t.TempDir(), exportLimits); err == nil || !strings.Contains(err.Error(), "is not a zip file") {
 			t.Fatalf("err = %v", err)
 		}
 	})
@@ -101,9 +101,55 @@ func TestUnzip(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dst, "sub"), []byte("a file where the folder goes"), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if err := unzip(writeZip(t, map[string][]byte{"sub/": nil}), dst); err == nil {
+		if err := unzip(writeZip(t, map[string][]byte{"sub/": nil}), dst, exportLimits); err == nil {
 			t.Fatal("no error when a folder of the zip could not be made")
 		}
+	})
+}
+
+// TestUnzipStaysWithinItsLimits: an export that would unpack to more than
+// its limits allow (one file too large, too much in all, too many files,
+// zips nested too deep) is refused whole, never cut short.
+func TestUnzipStaysWithinItsLimits(t *testing.T) {
+	small := unzipLimits{fileBytes: 1000, totalBytes: 25, files: 4, depth: 2}
+	refused := func(t *testing.T, entries map[string][]byte, want string) {
+		t.Helper()
+		err := unzip(writeZip(t, entries), t.TempDir(), small)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Fatalf("err = %v, want one that says %q", err, want)
+		}
+	}
+	t.Run("within them, everything is unpacked", func(t *testing.T) {
+		dst := t.TempDir()
+		inner := zipOf(t, map[string][]byte{"c.md": []byte("0123456789")})
+		if err := unzip(writeZip(t, map[string][]byte{"a.md": []byte("0123456789"), "b.zip": inner}), dst, small); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := os.ReadFile(filepath.Join(dst, "b", "c.md")); err != nil || string(got) != "0123456789" {
+			t.Fatalf("%q, %v", got, err)
+		}
+	})
+	t.Run("a file over the limit is refused, not cut short", func(t *testing.T) {
+		dst := t.TempDir()
+		err := unzip(writeZip(t, map[string][]byte{"big.md": bytes.Repeat([]byte("x"), 1001)}), dst, unzipLimits{fileBytes: 1000, totalBytes: 5000, files: 4, depth: 1})
+		if err == nil || !strings.Contains(err.Error(), "big.md") {
+			t.Fatalf("err = %v", err)
+		}
+	})
+	t.Run("files over the limit in all are refused", func(t *testing.T) {
+		refused(t, map[string][]byte{"a.md": []byte("0123456789"), "b.md": []byte("0123456789"), "c.md": []byte("0123456789")}, "more than")
+	})
+	t.Run("the zips inside count toward the limit in all", func(t *testing.T) {
+		inner := zipOf(t, map[string][]byte{"c.md": []byte("0123456789"), "d.md": []byte("0123456789")})
+		refused(t, map[string][]byte{"a.md": []byte("0123456789"), "b.zip": inner}, "more than")
+	})
+	t.Run("too many files are refused", func(t *testing.T) {
+		refused(t, map[string][]byte{"a": nil, "b": nil, "c": nil, "d": nil, "e": nil}, "files")
+	})
+	t.Run("zips nested too deep are refused", func(t *testing.T) {
+		deepest := zipOf(t, map[string][]byte{"x.md": []byte("x")})
+		middle := zipOf(t, map[string][]byte{"c.zip": deepest})
+		refused(t, map[string][]byte{"b.zip": middle}, "nested")
 	})
 }
 
