@@ -18,8 +18,10 @@ test("a backup is copied to a folder on the server, and its archive says so", as
     await expect(page.getByText("Saved")).toBeVisible();
 
     await page.getByRole("button", { name: "Back up now" }).click();
-    await expect.poll(() => readdirSync(folder)).toHaveLength(1);
-    const [copy] = readdirSync(folder);
+    // Saving marked the folder as chosen (.quadit-backups); the copy is the archive beside it.
+    const archives = () => readdirSync(folder).filter((name) => name.endsWith(".tar.gz"));
+    await expect.poll(archives).toHaveLength(1);
+    const [copy] = archives();
     const archive = page.getByText(copy ?? "", { exact: true }).locator("xpath=ancestor::div[1]");
     await expect(archive.getByText("Copied", { exact: true })).toBeVisible();
   } finally {
