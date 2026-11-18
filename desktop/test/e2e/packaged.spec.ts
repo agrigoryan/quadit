@@ -115,6 +115,12 @@ test("the packaged app claims quadit:// links and has the fuses that keep other 
   });
 });
 
+test("the packaged app carries the licences of Electron and of Chromium", () => {
+  for (const file of ["LICENSE.electron.txt", "LICENSES.chromium.html"]) {
+    expect(existsSync(join(APP, "Contents/Resources", file)), file).toBe(true);
+  }
+});
+
 test("the packaged app starts and opens the server that was open, as the app", async () => {
   const server = await ownServer();
   const { app } = start([], {}, [{ id: "a1b2c3d4e5f6", name: "Own", origin: server.origin, open: true, handoff: 1 }]);
