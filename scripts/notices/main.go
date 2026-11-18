@@ -285,6 +285,7 @@ the work of others, under their own licenses, which follow.
   2. JavaScript packages bundled into the web app inside the binary
   3. Programs the Docker image adds
   4. Fonts of the website
+  5. The desktop app, released apart
 
 This file is made by go run ./scripts/notices; do not edit it by hand.
 
@@ -316,6 +317,16 @@ at the branch of the image's Alpine release. The archives and the .deb and
 The website (website/ in the repository; not part of a release) uses IBM
 Plex Mono and Newsreader, under the SIL Open Font License 1.1. Their
 licenses are beside them, in website/fonts/.
+
+` + rule + `5. THE DESKTOP APP, RELEASED APART
+
+The Quadit desktop app (desktop/ in the repository) is released apart from
+the server, on its own desktop-v tags, and none of it is in a release of
+the server. It is built on Electron (MIT), which contains Chromium
+(BSD-3-Clause and others): their licenses are the LICENSE and
+LICENSES.chromium.html of Electron's release at the version
+desktop/package.json names, which the Windows and Linux packages carry
+beside the app. The app's own code bundles no other package.
 `)
 	return b.String()
 }
