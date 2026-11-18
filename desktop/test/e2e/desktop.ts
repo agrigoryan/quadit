@@ -94,13 +94,11 @@ export class Desktop {
     }, text);
   }
 
-  /** Chooses the application menu's item `id`, as a person choosing it. */
+  /** Chooses the application menu's item `id`, as a person choosing it, once the app has put its menu up. */
   async chooseMenuItem(id: string) {
-    await this.app.evaluate(({ Menu }, item) => {
-      const found = Menu.getApplicationMenu()?.getMenuItemById(item);
-      if (!found) throw new Error(`no menu item ${item}`);
-      found.click();
-    }, id);
+    const item = () => this.app.evaluate(({ Menu }, id) => !!Menu.getApplicationMenu()?.getMenuItemById(id), id);
+    await expect.poll(item, { message: `the menu item ${id}` }).toBe(true);
+    await this.app.evaluate(({ Menu }, id) => Menu.getApplicationMenu()?.getMenuItemById(id)?.click(), id);
   }
 
   /** One of the app's own pages (`file` in out/pages), waiting for it to appear. */
