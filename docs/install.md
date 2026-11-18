@@ -69,7 +69,7 @@ Everything else is set in the admin area of the web app. Each setting can also c
 | `auth.password`, `auth.passkeys` | `true` or `false`: turn a sign-in method on or off |
 | `auth.registration` | `true` lets anyone make an account. Off by default: people join by invitation |
 | `auth.allowed_domains` | `["example.com"]` limits new accounts to these email domains |
-| `auth.require_2fa` | `true` requires every sign-in to take two steps: a passkey, or a password or outside account followed by an app's code or the person's passkey. Someone with no second step is sent to set one up; sessions that signed in with one step before are asked for the second |
+| `auth.require_2fa` | `true` requires every sign-in to take two steps: a passkey, or a password or outside account followed by an app's code or the person's passkey. A session of one step reaches nothing until it has two (no workspace, no install administration, no change to the account's password, email, passkeys or codes): someone with no second step reaches only setting one up; sessions that signed in with one step before are asked for the second. A passkey counts as two steps because every passkey ceremony requires the device to check who holds it (a fingerprint, a face, a PIN): a security key with no PIN cannot be added or used |
 | `auth.google`, `auth.github` | `{"enabled": true, "client_id": "…", "client_secret": "…"}`. Redirect address: `<url>/api/v1/auth/oauth/google/callback` |
 | `auth.oidc` | The same, plus `"issuer"` and a `"name"` for the button. Any OpenID Connect provider. Add `"trust_email": true` only if the provider checks every address but does not say so: an address it does not call verified is otherwise not enough to sign in to the account that has it |
 | `mail` | `{"host", "port", "username", "password", "from", "tls"}`. `tls` is `starttls` (default), `tls` or `none` |
@@ -117,6 +117,8 @@ An archive is the install at one moment, taken while it runs: every table as it 
 - `--secret-key FILE` gives the original secret. The restore checks that it opens the archive's secrets, and the restored install keeps it as its `secret.key` (the one the new, empty install made for itself is kept beside it as `secret.key.before-restore-…`). With `QUADIT_SECRET`, set it as it was set before and leave the flag out.
 - Without the flag, the restore uses the install's own secret, and refuses, changing nothing, when that is not the one the archive was made with.
 - `--without-secret-key` is for a secret that is lost for good: everything else is restored, and two-step sign-in, vault secrets, integrations, mail and file storage settings must be set up again.
+
+An archive made before archives carried their own check of the secret (by Quadit before 0.1.0) is checked on what it holds: the restore tries the secret on the encrypted values in its rows, and refuses as above when it opens none of them. An archive with no encrypted value in it has nothing a wrong secret could lose, and is restored.
 
 A full restore goes into an empty install. It reads the whole archive first and refuses a damaged one before writing anything; then it loads every row in one transaction. When it fails, the database is left empty and the files it stored are taken out again, so it can simply be run again.
 
