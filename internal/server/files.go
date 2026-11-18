@@ -497,8 +497,8 @@ func (s *Server) fileOut(x *c, f core.File) core.File {
 // ready. The bytes put together must be the file the upload was started
 // as: as many as its size, and matching the checksum given, if one was;
 // when they are not, a part listed is gone from file storage, or a file
-// received whole is not on this machine, what was received is let go and the caller is told to send the file again
-// from the start. What was received (the parts, or the file on this
+// received whole is not on this machine, what was received is let go and
+// the caller is told to send the file again from the start. What was received (the parts, or the file on this
 // machine) is removed only once the file is stored and marked: until then
 // a failure leaves it all, and finishing again starts from it.
 func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
@@ -558,18 +558,21 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 	// One whose upload was started over meanwhile (startUploadOver) stored
 	// bytes the upload no longer stands for, under the key it had then: the
 	// key fences it, so its late store cannot replace the bytes the new start
-	// stores, and its row is not marked; what it stored is removed.
+	// stores, and its row is not marked; what it received and stored is
+	// removed.
 	changed, err := x.db.Update(ctx, "files", set, store.Eq("id", f.ID), store.Eq("state", core.FileUploading), store.Eq("storage_key", f.StorageKey))
 	if err != nil {
 		return err
 	}
 	if changed == 0 {
-		published := ready
+		stale := *f
 		if err := x.db.Get(ctx, f, store.Eq("id", f.ID)); err != nil {
 			return err
 		}
-		if f.StorageKey != published.StorageKey {
-			s.dropParts(ctx, slices.DeleteFunc([]string{published.StorageKey, published.PreviewKey}, func(key string) bool { return key == "" })...)
+		if f.StorageKey != stale.StorageKey {
+			in.Close()
+			s.dropReceived(ctx, stale)
+			s.dropParts(ctx, slices.DeleteFunc([]string{ready.StorageKey, ready.PreviewKey}, func(key string) bool { return key == "" })...)
 		}
 		return nil
 	}
