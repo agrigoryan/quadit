@@ -117,6 +117,13 @@ func TestVault(t *testing.T) {
 		if res.Status != 302 {
 			t.Fatalf("a redirect was followed: %+v", res)
 		}
+		// Header names are not case-sensitive: one named twice, in two cases,
+		// is refused, not sent with one of its values picked by chance.
+		before := len(seen)
+		twice := M{"url": api.URL + "/deploy", "headers": M{"Authorization": "Bearer {{secret}}", "authorization": "Basic {{basic:bot}}"}}
+		if out := s.call(nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", twice, 400, nil); !strings.Contains(out, `\"Authorization\" and \"authorization\"`) || len(seen) != before {
+			t.Fatalf("a header named twice: %s; the service saw %v", out, seen[before:])
+		}
 		// Every use is on the record, without the value.
 		if out := s.call(s.owner, "", "GET", w+"/audit?action=secret.used", nil, 200, nil); strings.Count(out, "secret.used") < 3 || strings.Contains(out, key) || !strings.Contains(out, "/deploy") {
 			t.Fatalf("audit of secret use: %s", out)

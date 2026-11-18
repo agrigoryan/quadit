@@ -269,8 +269,19 @@ func newSecretRequest(x *c, sec core.Secret, use *secretUse, b secretRequest) (*
 	if err != nil {
 		return nil, &engine.Error{Code: engine.CodeInvalid, Field: "method", Message: err.Error()}
 	}
-	for k, v := range b.Headers {
-		req.Header.Set(k, use.fill(v))
+	// Header names are not case-sensitive: two that differ only in case are
+	// one header, and which of their values went out would be left to
+	// chance. It is refused rather than merged: the caller meant one of
+	// them, and an approval names exactly what was asked.
+	given := map[string]string{}
+	for _, k := range slices.Sorted(maps.Keys(b.Headers)) {
+		name := http.CanonicalHeaderKey(k)
+		if first, twice := given[name]; twice {
+			return nil, &engine.Error{Code: engine.CodeInvalid, Field: "headers",
+				Message: fmt.Sprintf("the header %s is given twice (%q and %q); header names are not case-sensitive, so give it once", name, first, k)}
+		}
+		given[name] = k
+		req.Header.Set(k, use.fill(b.Headers[k]))
 	}
 	// The answer must come back as the service wrote it, for the secret to
 	// be found in it: the client asks for compression itself and undoes it.
