@@ -59,8 +59,10 @@ func configPath() string {
 	return filepath.Join(dir, "quadit", "config.json")
 }
 
-// NewClient reads the server address and token from the environment
-// (QUADIT_URL, QUADIT_TOKEN) or from the file `quadit login` wrote.
+// NewClient reads the server address and token from the environment when
+// both are set (QUADIT_URL, QUADIT_TOKEN), otherwise from the file `quadit
+// login` wrote. The two are never mixed: a token saved for one server is
+// not sent to another.
 func NewClient() (*Client, error) {
 	c := &Client{URL: os.Getenv("QUADIT_URL"), Token: os.Getenv("QUADIT_TOKEN"), HTTP: &http.Client{Timeout: requestTimeout}}
 	if c.URL == "" || c.Token == "" {
@@ -70,12 +72,7 @@ func NewClient() (*Client, error) {
 				return nil, fmt.Errorf("%s: %w", configPath(), err)
 			}
 		}
-		if c.URL == "" {
-			c.URL = sc.URL
-		}
-		if c.Token == "" {
-			c.Token = sc.Token
-		}
+		c.URL, c.Token = sc.URL, sc.Token
 	}
 	if c.URL == "" || c.Token == "" {
 		return nil, errors.New("not connected: set QUADIT_URL and QUADIT_TOKEN, or run: quadit login <url> <token>")

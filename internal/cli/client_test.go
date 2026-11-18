@@ -137,3 +137,34 @@ func TestABrokenConfigFileIsSaid(t *testing.T) {
 		t.Fatalf("err = %v, want the config file's syntax error", err)
 	}
 }
+
+// TestTheServerAndTokenComeAsAPair: the environment is used only when it
+// names both the server and the token; otherwise the saved login is used
+// whole, so a token saved for one server is never sent to another.
+func TestTheServerAndTokenComeAsAPair(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"url":"https://a.example","token":"qd_a"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("QUADIT_CONFIG", path)
+	for _, tc := range []struct {
+		name, url, token string
+		want             Client
+	}{
+		{"both set", "https://b.example", "qd_b", Client{URL: "https://b.example", Token: "qd_b"}},
+		{"only the server set", "https://b.example", "", Client{URL: "https://a.example", Token: "qd_a"}},
+		{"only the token set", "", "qd_b", Client{URL: "https://a.example", Token: "qd_a"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("QUADIT_URL", tc.url)
+			t.Setenv("QUADIT_TOKEN", tc.token)
+			c, err := NewClient()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.URL != tc.want.URL || c.Token != tc.want.Token {
+				t.Fatalf("got %s with %s, want %s with %s", c.URL, c.Token, tc.want.URL, tc.want.Token)
+			}
+		})
+	}
+}
