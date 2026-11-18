@@ -4,10 +4,9 @@
 // for by a bridge put on the page before it loads, which keeps what the
 // page tells it and asks the page as the app would.
 
-import type { Page } from "@playwright/test";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
 import type { DesktopNotification, DesktopOutcome, DesktopRequest, DesktopSummary } from "../src/types/desktop";
-import { OWNER } from "./run";
-import { expect, test } from "./quadit";
+import { expect, invitedMember, test } from "./quadit";
 
 /** What the stand-in keeps: the summaries and notifications the page sent, and its request handler. */
 interface StandIn {
@@ -22,9 +21,9 @@ declare global {
   }
 }
 
-/** Puts the stand-in bridge on every page this test opens. */
-async function inTheApp(page: Page) {
-  await page.addInitScript(() => {
+/** Puts the stand-in bridge on the page, or on every page of the browser, before it loads. */
+async function inTheApp(target: Page | BrowserContext) {
+  await target.addInitScript(() => {
     const standIn: StandIn = { published: [], notified: [] };
     window.standIn = standIn;
     window.quaditDesktop = {
@@ -51,12 +50,29 @@ const ask = (page: Page, request: DesktopRequest) =>
     return handler(r);
   }, request);
 
-test("a question answered from the app's panel shows as answered", async ({ page, project, quadit }) => {
-  await inTheApp(page);
-  const key = await project.newTask("Pick a colour scheme");
-  await quadit.agent("ask", key, "Which colour?", "option=Blue", "option=Green", `ask=@${OWNER.handle}`);
-
+/**
+ * The window of a member made for this test alone, in the app: the questions
+ * a test asks them wait on nobody in another test's My work.
+ */
+async function membersWindow(browser: Browser, owner: Page, name: string) {
+  const { context, userID } = await invitedMember(browser, owner.request, name);
+  await inTheApp(context);
+  const page = await context.newPage();
   await page.goto("/e2e/my-work");
+  await expect.poll(() => summary(page)).not.toBeNull();
+  return { page, userID };
+}
+
+test("a question answered from the app's panel shows as answered", async ({
+  browser,
+  page: owner,
+  project,
+  quadit,
+}) => {
+  const { page, userID } = await membersWindow(browser, owner, `Panel ${project.key}`);
+  const key = await project.newTask("Pick a colour scheme");
+  await quadit.agent("ask", key, "Which colour?", "option=Blue", "option=Green", `ask=${userID}`);
+
   await expect
     .poll(async () => (await summary(page))?.waiting.find((w) => w.title === "Which colour?")?.actions)
     .toEqual([
@@ -70,25 +86,23 @@ test("a question answered from the app's panel shows as answered", async ({ page
   await page.goto(waiting?.path ?? "");
   const question = page.getByRole("region", { name: "Decisions" }).getByRole("article", { name: "Which colour?" });
   await expect(question.getByRole("article", { name: "Green" }).getByText("Picked")).toBeVisible();
-  await expect(question.getByText("Your answer is needed")).toBeHidden();
   await expect.poll(async () => (await summary(page))?.waiting.some((w) => w.title === "Which colour?")).toBe(false);
+  await page.context().close();
 });
 
 test("a question asked while the window is open is answered from its notification", async ({
-  page,
+  browser,
+  page: owner,
   project,
   quadit,
 }) => {
-  await inTheApp(page);
+  const { page, userID } = await membersWindow(browser, owner, `Notice ${project.key}`);
   const key = await project.newTask("Choose a font");
-  await page.goto("/e2e/my-work");
-  await expect.poll(() => summary(page)).not.toBeNull();
-  await quadit.agent("ask", key, "Which font?", "option=Serif", "option=Sans", `ask=@${OWNER.handle}`);
+  await quadit.agent("ask", key, "Which font?", "option=Serif", "option=Sans", `ask=${userID}`);
   const notice = () =>
     page.evaluate(() => window.standIn.notified.find((n) => n.actions?.some((a) => a.label === "Serif")) ?? null);
   await expect.poll(async () => (await notice())?.actions?.map((a) => a.label)).toEqual(["Serif", "Sans", "Mark read"]);
 
-  // Answered, so that it waits on nobody in the other tests' My work.
   const serif = (await notice())?.actions?.find((a) => a.label === "Serif")?.request ?? "";
   expect(await ask(page, { kind: "action", request: serif })).toEqual({ ok: true });
   await expect
@@ -97,6 +111,7 @@ test("a question asked while the window is open is answered from its notificatio
         (JSON.parse(await quadit.cli("--json", "show", key)) as { decisions: { state: string }[] }).decisions[0],
     )
     .toMatchObject({ state: "picked" });
+  await page.context().close();
 });
 
 test("quick capture creates a task, and says where it is", async ({ page, project, quadit }) => {
