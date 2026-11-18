@@ -12,7 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/importer"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
@@ -255,9 +254,7 @@ func TestImports(t *testing.T) {
 // makes is known by the name the import is given as well as by each file's
 // place in the folder, so two exports that both hold README.md, under the
 // same file name, make two pages, while the same export imported again
-// under its name adds nothing. An uploaded folder must be named. An import
-// made before imports had names is gone on with only when that is asked
-// for: a name given is never taken for it.
+// under its name adds nothing. An uploaded folder must be named.
 func TestImportsFromDifferentPlacesDoNotMeet(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
@@ -298,28 +295,9 @@ func TestImportsFromDifferentPlacesDoNotMeet(t *testing.T) {
 		if n := strings.Count(pages(), "README"); n != 2 {
 			t.Fatalf("%d README pages, want 2:\n%s", n, pages())
 		}
-		if out := s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "markdown", "file": upload(t, "Unnamed.")}, 400, nil); !strings.Contains(out, "origin") {
+		if out := s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "markdown", "file": upload(t, "No name.")}, 400, nil); !strings.Contains(out, "origin") {
 			t.Fatalf("an uploaded folder with no name: %s", out)
 		}
 
-		t.Run("an import made before imports had names", func(t *testing.T) {
-			s.change(t, s.owner, "", "doc.create", M{"id": id.From("import", "obsidian", "doc", "README"), "title": "README"})
-			t.Run("is not met by an import given a name", func(t *testing.T) {
-				if got := run(t, "obsidian", "Team B's readme.", M{"origin": "team-b"}); got.Made.Pages != 1 || got.AlreadyThere != 0 {
-					t.Fatalf("another vault named team-b made %d pages and took %d for already there", got.Made.Pages, got.AlreadyThere)
-				}
-			})
-			t.Run("is gone on with when that is asked for", func(t *testing.T) {
-				if got := run(t, "obsidian", "The vault's readme.", M{"unnamed": "true"}); got.Made.Pages != 0 || got.AlreadyThere != 1 {
-					t.Fatalf("going on with the import from before names made %d pages and found %d there", got.Made.Pages, got.AlreadyThere)
-				}
-			})
-			t.Run("is not gone on with under a name", func(t *testing.T) {
-				out := s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "obsidian", "file": upload(t, "Both."), "options": M{"origin": "team-c", "unnamed": "true"}}, 400, nil)
-				if !strings.Contains(out, "origin") {
-					t.Fatalf("a name and going on with the unnamed import, both: %s", out)
-				}
-			})
-		})
 	})
 }

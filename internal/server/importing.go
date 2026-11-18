@@ -29,7 +29,7 @@ import (
 // importRoutes is the route of importing work.
 func (s *Server) importRoutes() []route {
 	return []route{
-		{"POST /api/v1/w/{ws}/import", s.workspaceMember(s.handleImportWork), "Import work from an uploaded export or a service. Body: {kind, file | source, options: {project, token, workspace, session, origin, unnamed}, dry_run}. origin names an import of a folder (obsidian, markdown): importing again under the same name adds only what is new; unnamed set to true goes on instead with one made before imports had names. Kinds: linear, asana, trello, notion, obsidian, markdown, github, orbit. Admins.", "", "admin"},
+		{"POST /api/v1/w/{ws}/import", s.workspaceMember(s.handleImportWork), "Import work from an uploaded export or a service. Body: {kind, file | source, options: {project, token, workspace, session, origin}, dry_run}. origin names an import of a folder (obsidian, markdown): importing again under the same name adds only what is new. Kinds: linear, asana, trello, notion, obsidian, markdown, github, orbit. Admins.", "", "admin"},
 	}
 }
 
@@ -43,7 +43,7 @@ type importBody struct {
 	// the kinds that are read from a service (github: owner/repo; orbit: its URL).
 	File    string            `json:"file"`
 	Source  string            `json:"source"`
-	Options map[string]string `json:"options"` // project, token, workspace, session, api, origin, unnamed
+	Options map[string]string `json:"options"` // project, token, workspace, session, api, origin
 	DryRun  bool              `json:"dry_run"`
 }
 

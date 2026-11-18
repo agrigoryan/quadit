@@ -120,8 +120,8 @@ type row struct {
 }
 
 // uid is the id a thing of the source has here: always the same one, which
-// is what lets an import be run again. A plan with an origin names it too;
-// one without keeps the ids imports had before origins were known.
+// is what lets an import be run again. A plan with an origin names it too
+// (Plan.Origin).
 func (a *applier) uid(kind, ext string) string {
 	if a.plan.Origin != "" {
 		return id.From("import", a.plan.Source, a.plan.Origin, kind, ext)

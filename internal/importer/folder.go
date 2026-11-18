@@ -20,9 +20,8 @@ type folder struct{ kind string }
 // Kind is "markdown" or "obsidian".
 func (f folder) Kind() string { return f.kind }
 
-// OriginError refuses how an import of a folder is named (the origin
-// option): a zip must be named, and an import that goes on with one made
-// before imports had names takes no name.
+// OriginError refuses an import of a zipped folder that is not named (the
+// origin option).
 type OriginError struct{ Reason string }
 
 func (e OriginError) Error() string { return e.Reason }
@@ -32,24 +31,18 @@ func (e OriginError) Error() string { return e.Reason }
 // origin option, the name the person gives the import and gives again to
 // import the folder again; or, for a folder on this machine given none,
 // its full path. A zip says nothing about where it came from, so it must
-// be given a name. The option unnamed=true goes on instead with an import
-// made before imports had names, whose ids name no folder: it is asked
-// for, never guessed, since every such import of a kind shares those ids.
+// be given a name.
 func (f folder) Read(source string, opts Options, _ *http.Client) (Plan, error) {
 	origin := strings.TrimSpace(opts["origin"])
-	unnamed := opts["unnamed"] == "true"
-	if unnamed && origin != "" {
-		return Plan{}, OriginError{"an import that goes on with one made before imports had names (unnamed=true) takes no name (origin)"}
-	}
 	dir, tmp, err := unpacked(source, f.kind, zipByName)
 	if err != nil {
 		return Plan{}, err
 	}
-	if origin == "" && tmp != "" && !unnamed {
+	if origin == "" && tmp != "" {
 		os.RemoveAll(tmp)
-		return Plan{}, OriginError{"name this import (origin): importing again under the same name adds only what is new, and another name makes pages of its own; to go on with an import made before imports had names, give unnamed=true instead"}
+		return Plan{}, OriginError{"name this import (origin): importing again under the same name adds only what is new, and another name makes pages of its own"}
 	}
-	if origin == "" && !unnamed {
+	if origin == "" {
 		if origin, err = filepath.Abs(source); err != nil {
 			return Plan{}, err
 		}
