@@ -5,8 +5,17 @@
 // state of a flow this app started, for that flow's server, is redeemed;
 // the verifier never leaves the app until the server's own window loads
 // /desktop/finish with it, so a code seen by anyone else is useless.
+//
+// That load is the only way into /desktop/finish (server-windows.ts,
+// finishSignIn): it carries HANDOFF_HEADER, which the server asks for and
+// which no link, redirect or page can add to a navigation. A code someone
+// made for their own account, put in a link, therefore never signs the app
+// in as them (login CSRF).
 
 import { createHash, randomBytes } from "node:crypto";
+
+/** The header the app's own load of /desktop/finish carries, with the value "1" (the desktop contract, section 2). */
+export const HANDOFF_HEADER = "X-Quadit-Handoff";
 
 /** How long a started sign-in waits for the browser; the server's code itself lasts two minutes. */
 const FLOW_LIFETIME_MS = 15 * 60 * 1000;

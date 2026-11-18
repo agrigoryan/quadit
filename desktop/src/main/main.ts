@@ -125,7 +125,7 @@ function start() {
     if (!link) return;
     if (link.kind === "connect") {
       const redeemed = flows.redeem(link);
-      if (redeemed.ok) windows.load(redeemed.serverId, redeemed.finishUrl);
+      if (redeemed.ok) windows.finishSignIn(redeemed.serverId, redeemed.finishUrl);
       else void dialog.showMessageBox({ type: "warning", message: "Sign-in not finished", detail: redeemed.reason });
       return;
     }

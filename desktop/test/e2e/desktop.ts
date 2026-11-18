@@ -7,6 +7,7 @@
 //   Notification.prototype.show records the notification instead of showing it
 //   dialog.showMessageBox       records the message and answers "Later"
 
+import { createHash, randomBytes } from "node:crypto";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -30,10 +31,20 @@ export class Desktop {
     readonly run: Run,
   ) {}
 
-  /** Starts the app (from out/, or `executable` when given) on the data folder `data`, with the stand-ins in place. */
-  static async launch(data: string, run: Run, executable?: string): Promise<Desktop> {
+  /**
+   * Starts the app (from out/, or `executable` when given) on the data
+   * folder `data`, with the stand-ins in place. `args` are given to it as a
+   * system gives a link that starts the app (Windows and Linux; macOS reads
+   * the same argument at start).
+   */
+  static async launch(
+    data: string,
+    run: Run,
+    options: { args?: string[]; executable?: string } = {},
+  ): Promise<Desktop> {
+    const args = options.args ?? [];
     const app = await electron.launch({
-      ...(executable ? { executablePath: executable, args: [] } : { args: [APP_DIR] }),
+      ...(options.executable ? { executablePath: options.executable, args } : { args: [APP_DIR, ...args] }),
       env: { ...process.env, QUADIT_DESKTOP_DATA: data },
     });
     await app.evaluate(({ dialog, Notification, shell }) => {
@@ -159,6 +170,49 @@ export class Desktop {
   async close() {
     await this.app.close();
   }
+}
+
+/**
+ * A sign-in code someone made for their own account, with a verifier of
+ * their own: what an attacker who has an account on the server can put in
+ * a link to sign the app in as themselves.
+ */
+export async function attackersCode(run: Run): Promise<{ code: string; verifier: string }> {
+  const verifier = randomBytes(48).toString("base64url");
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
+  const state = randomBytes(32).toString("base64url");
+  let answer: Response;
+  if (run.server === run.fake) {
+    answer = await fetch(`${run.fake}/desktop/connect?state=${state}&challenge=${challenge}`, { redirect: "manual" });
+  } else {
+    const cookie = `${run.session.name}=${run.session.value}`;
+    const me = (await (await fetch(`${run.server}/api/v1/auth/me`, { headers: { cookie } })).json()) as {
+      user: { id: string };
+    };
+    answer = await fetch(`${run.server}/desktop/connect`, {
+      method: "POST",
+      redirect: "manual",
+      headers: {
+        cookie,
+        "content-type": "application/x-www-form-urlencoded",
+        "sec-fetch-site": "same-origin",
+        origin: run.server,
+      },
+      body: new URLSearchParams({ state, challenge, user: me.user.id }),
+    });
+  }
+  const code = new URL(answer.headers.get("location") ?? "quadit://connect").searchParams.get("code") ?? "";
+  expect(code).not.toBe("");
+  return { code, verifier };
+}
+
+/** Whether a code is still unspent: trades it, as the app's own hand-off does, and says whether that signed in. */
+export async function stillRedeemable(run: Run, code: string, verifier: string): Promise<boolean> {
+  const answer = await fetch(`${run.server}/desktop/finish?${new URLSearchParams({ code, verifier })}`, {
+    redirect: "manual",
+    headers: { "user-agent": "Mozilla/5.0 Chrome/142.0 QuaditDesktop/0.1.0", "x-quadit-handoff": "1" },
+  });
+  return answer.status === 302;
 }
 
 /** Signs in with the owner's password on the sign-in page `page` shows, and waits for the workspace. */

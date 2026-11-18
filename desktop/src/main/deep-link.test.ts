@@ -23,13 +23,13 @@ describe("parseDeepLink", () => {
   });
 
   it("accepts the action as host or as path", () => {
-    expect(parseDeepLink(`quadit:open?server=${server}&path=/x`)).toMatchObject({ kind: "open" });
-    expect(parseDeepLink(`quadit:///open/?server=${server}&path=/x`)).toMatchObject({ kind: "open" });
+    expect(parseDeepLink(`quadit:open?server=${server}&path=/e2e`)).toMatchObject({ kind: "open" });
+    expect(parseDeepLink(`quadit:///open/?server=${server}&path=/e2e`)).toMatchObject({ kind: "open" });
   });
 
   it("keeps the server to an origin", () => {
     const link = parseDeepLink(
-      `quadit://open?server=${encodeURIComponent("https://quadit.example.com/sub/path?q=1")}&path=/x`,
+      `quadit://open?server=${encodeURIComponent("https://quadit.example.com/sub/path?q=1")}&path=/e2e`,
     );
     expect(link).toMatchObject({ server: "https://quadit.example.com" });
   });
@@ -43,6 +43,9 @@ describe("parseDeepLink", () => {
       `quadit://connect?server=${encodeURIComponent("javascript:alert(1)")}&code=Z&state=S`,
       `quadit://open?server=${server}&path=${encodeURIComponent("//evil.com/x")}`,
       `quadit://open?server=${server}&path=${encodeURIComponent("https://evil.com/")}`,
+      // Someone else's sign-in code: followed, the app would be signed in to their account.
+      `quadit://open?server=${server}&path=${encodeURIComponent("/desktop/finish?code=Z&verifier=V")}`,
+      `quadit://open?server=${server}&path=${encodeURIComponent("/api/v1/auth/logout")}`,
       `quadit://delete?server=${server}`,
       "quadit://",
       "not a link",

@@ -12,6 +12,10 @@
 //   - a navigation to another origin is stopped and that address goes to the
 //     system browser (http and https only); from the sign-in page it starts
 //     the browser sign-in instead, since providers refuse embedded windows;
+//   - nothing reaches the server's /desktop/ addresses (the sign-in finish)
+//     but the app's own hand-off (finishSignIn): not a page's navigation,
+//     a redirect, a frame or window.open, and not a link or a notification,
+//     which may only open pages of the web app (origins.ts, appPage);
 //   - window.open of the same origin opens another window held to the same
 //     rules; anything else goes to the system browser;
 //   - only the server's own pages get the bridge, and each message on it is
@@ -30,7 +34,8 @@ import {
   type WebPreferences,
 } from "electron";
 import { giveContextMenu } from "@/main/context-menu";
-import { browserAddress, isOwnPage, pageAt } from "@/main/origins";
+import { HANDOFF_HEADER } from "@/main/handoff";
+import { appPage, browserAddress, isHandoffPage, isOwnPage } from "@/main/origins";
 import { HANDOFF_VERSION } from "@/main/probe";
 import type { Server, ServerStore } from "@/main/servers";
 import { BRIDGE_BADGE, BRIDGE_NOTIFY, ORIGIN_SWITCH, VERSION_SWITCH } from "@/shared/bridge";
@@ -89,11 +94,11 @@ export class ServerWindows {
     return this.store.list().some((server) => server.open);
   }
 
-  /** Shows and focuses a server's window, at `path` when given. */
+  /** Shows and focuses a server's window, at `path` when given and a page of the web app. */
   show(serverId: string, path?: string) {
     const server = this.store.get(serverId);
     if (!server) return;
-    const target = pageAt(server.origin, path ?? "/") ?? server.origin + "/";
+    const target = appPage(server.origin, path ?? "/") ?? server.origin + "/";
     const known = this.windows.get(serverId);
     const win = known ?? this.ensure(server, target, true);
     if (known && path !== undefined) this.goTo(win.webContents, server, target);
@@ -102,12 +107,17 @@ export class ServerWindows {
     win.focus();
   }
 
-  /** Loads a full address of the server in its window, shown: for addresses the server must answer itself (the sign-in finish). */
-  load(serverId: string, url: string) {
+  /**
+   * The last step of the hand-off: loads the server's sign-in finish
+   * (`finishUrl`, made by SignInFlows.redeem for a flow this app started) in
+   * its window, shown. The only way the app ever loads a /desktop/ address,
+   * and the only load that carries the hand-off header the server asks for.
+   */
+  finishSignIn(serverId: string, finishUrl: string) {
     const server = this.store.get(serverId);
-    if (!server || !isOwnPage(url, server.origin)) return;
+    if (!server || !isHandoffPage(finishUrl, server.origin)) return;
     this.show(serverId);
-    void this.windows.get(serverId)?.webContents.loadURL(url);
+    void this.windows.get(serverId)?.webContents.loadURL(finishUrl, { extraHeaders: `${HANDOFF_HEADER}: 1\n` });
   }
 
   /** The server whose window is in front, if one is. */
@@ -231,7 +241,10 @@ export class ServerWindows {
 
     const stopIfAway = (event: { preventDefault(): void }, url: string) => {
       const server = this.store.get(serverId);
-      if (!server || isOwnPage(url, server.origin)) return;
+      if (!server) return;
+      // Only finishSignIn loads the hand-off's pages, and it is no navigation of the page's.
+      if (isHandoffPage(url, server.origin)) return event.preventDefault();
+      if (isOwnPage(url, server.origin)) return;
       event.preventDefault();
       this.leave(contents, server, url);
     };
@@ -241,10 +254,10 @@ export class ServerWindows {
 
     contents.setWindowOpenHandler(({ url }) => {
       const server = this.store.get(serverId);
-      if (server && isOwnPage(url, server.origin)) {
+      if (server && isOwnPage(url, server.origin) && !isHandoffPage(url, server.origin)) {
         return { action: "allow", overrideBrowserWindowOptions: { webPreferences: this.preferencesFor(server) } };
       }
-      if (server) this.leave(contents, server, url);
+      if (server && !isHandoffPage(url, server.origin)) this.leave(contents, server, url);
       return { action: "deny" };
     });
     contents.on("did-create-window", (child) => this.guard(child.webContents, serverId));
@@ -296,7 +309,7 @@ export class ServerWindows {
     const key = n.tag ? `${server.id}:${n.tag}` : `${server.id}:${Date.now()}:${Math.random()}`;
     this.notifications.get(key)?.close();
     const note = new Notification({ title: n.title.slice(0, 200), body: n.body.slice(0, 1000) });
-    const path = pageAt(server.origin, n.path) ? n.path : "/";
+    const path = appPage(server.origin, n.path) ? n.path : "/";
     note.on("click", () => {
       this.notifications.delete(key);
       this.show(server.id, path);

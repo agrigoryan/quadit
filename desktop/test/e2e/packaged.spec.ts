@@ -13,7 +13,9 @@ const PACKAGED = join(
 
 test("the packaged app starts, adds a server and gives its pages the bridge", async ({ run }) => {
   test.skip(process.platform !== "darwin" || !existsSync(PACKAGED), "no packaged app: run pnpm dist first");
-  const desktop = await Desktop.launch(mkdtempSync(join(tmpdir(), "quadit-desktop-packaged-")), run, PACKAGED);
+  const desktop = await Desktop.launch(mkdtempSync(join(tmpdir(), "quadit-desktop-packaged-")), run, {
+    executable: PACKAGED,
+  });
   try {
     expect(
       await desktop.app.evaluate(({ app }) => ({

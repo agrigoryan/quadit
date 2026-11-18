@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { browserAddress, isOwnPage, pageAt, serverOrigin } from "@/main/origins";
+import { appPage, browserAddress, isHandoffPage, isOwnPage, serverOrigin } from "@/main/origins";
 
 describe("serverOrigin", () => {
   it("takes a bare host name as https", () => {
@@ -41,18 +41,71 @@ describe("isOwnPage", () => {
   });
 });
 
-describe("pageAt", () => {
+describe("appPage", () => {
   const origin = "https://quadit.example.com";
 
-  it("joins an absolute path to the origin", () => {
-    expect(pageAt(origin, "/e2e/tasks/ABC-1?tab=activity#c4")).toBe(
+  it("joins a page of the web app to the origin", () => {
+    expect(appPage(origin, "/e2e/tasks/ABC-1?tab=activity#c4")).toBe(
       "https://quadit.example.com/e2e/tasks/ABC-1?tab=activity#c4",
     );
+    for (const path of ["/", "/e2e", "/my-team/inbox", "/admin", "/admin/members", "/account/security"]) {
+      expect(appPage(origin, path), path).toBe(origin + path);
+    }
   });
 
   it("refuses paths that would leave the origin or are not absolute", () => {
     for (const path of ["//evil.com/x", "/\\evil.com", "https://evil.com/", "e2e/inbox", "", "javascript:alert(1)"]) {
-      expect(pageAt(origin, path), path).toBeNull();
+      expect(appPage(origin, path), path).toBeNull();
+    }
+  });
+
+  it("refuses what the server answers itself, the sign-in finish above all, however it is spelled", () => {
+    for (const path of [
+      "/desktop/finish?code=Z&verifier=V",
+      "/desktop/connect?state=S&challenge=C",
+      "/desktop",
+      "/e2e/../desktop/finish?code=Z",
+      "/e2e/%2e%2e/desktop/finish?code=Z",
+      "/e2e/..%2fdesktop/finish?code=Z",
+      "/%64esktop/finish?code=Z",
+      "/Desktop/finish",
+      "/api/v1/auth/logout",
+      "/f/abc/file.png",
+      "/mcp",
+      "/oauth/authorize",
+      "/.well-known/oauth-authorization-server",
+      "/hooks/github/x",
+      "/metrics",
+      "/healthz",
+      "/assets/index.js",
+      "/sw.js",
+      "/login",
+      "/invite/token",
+      "/reset/token",
+      "/register",
+      "/setup",
+      "/account/sessions",
+    ]) {
+      expect(appPage(origin, path), path).toBeNull();
+    }
+  });
+});
+
+describe("isHandoffPage", () => {
+  const origin = "https://quadit.example.com";
+
+  it("is every address under /desktop/ of that server, however it is spelled", () => {
+    for (const path of [
+      "/desktop/finish?code=Z",
+      "/desktop/connect",
+      "/desktop",
+      "/%64esktop/finish",
+      "/DESKTOP/finish",
+    ]) {
+      expect(isHandoffPage(origin + path, origin), path).toBe(true);
+    }
+    for (const url of [`${origin}/e2e/desktop`, `${origin}/desktops`, "https://other.example.com/desktop/finish"]) {
+      expect(isHandoffPage(url, origin), url).toBe(false);
     }
   });
 });

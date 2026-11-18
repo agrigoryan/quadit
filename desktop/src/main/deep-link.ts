@@ -1,16 +1,17 @@
 // quadit:// links (the desktop contract, section 4): what each one asks for,
 // read from a URL any web page or other app may have made. Nothing here is
 // trusted yet: the sign-in hand-off checks a connect link against the flow
-// it started, and an open link's path is held to its server's origin.
+// it started, and an open link may only open a page of the web app on its
+// server (origins.ts, appPage), never an address the server answers itself.
 
-import { pageAt, serverOrigin } from "@/main/origins";
+import { appPage, serverOrigin } from "@/main/origins";
 
 export const SCHEME = "quadit";
 
 export type DeepLink =
   /** The browser finished its part of a sign-in: `code` is to be redeemed on `server`. */
   | { kind: "connect"; server: string; code: string; state: string }
-  /** Open `path` (absolute, on `server`) in that server's window. */
+  /** Open `path` (a page of the web app on `server`) in that server's window. */
   | { kind: "open"; server: string; path: string };
 
 /** The link `raw` asks for, or null when it is not a well-formed quadit:// link. `server` is an origin. */
@@ -34,7 +35,7 @@ export function parseDeepLink(raw: string): DeepLink | null {
   }
   if (action === "open") {
     const path = url.searchParams.get("path") || "/";
-    return pageAt(server, path) ? { kind: "open", server, path } : null;
+    return appPage(server, path) ? { kind: "open", server, path } : null;
   }
   return null;
 }

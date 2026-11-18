@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { chromium } from "@playwright/test";
-import { expect, signInWithPassword, test } from "./desktop";
+import { attackersCode, Desktop, expect, signInWithPassword, stillRedeemable, test } from "./desktop";
 import type { HandoffEvent } from "./handoff-fake";
 import { OWNER, type Run } from "./run";
 
@@ -117,4 +120,57 @@ test("a quadit://connect link the app did not start, or for another server, is r
   if (run.server !== run.fake) return;
   const log = (await (await fetch(`${run.fake}/__fake/log`)).json()) as HandoffEvent[];
   expect(log.filter((event) => event.step === "finish" && event.detail === link.searchParams.get("state"))).toEqual([]);
+});
+
+/** A quadit://open link whose path is the page that finishes a sign-in, with someone else's code: login CSRF if followed. */
+function finishLink(run: Run, code: string, verifier: string): string {
+  const path = `/desktop/finish?${new URLSearchParams({ code, verifier })}`;
+  return `quadit://open?server=${encodeURIComponent(run.server)}&path=${encodeURIComponent(path)}`;
+}
+
+test("a quadit://open link to the sign-in finish does not sign in the app that it starts", async ({ run }) => {
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  let desktop = await Desktop.launch(data, run);
+  await expect(await desktop.addServer(run.server)).toHaveURL(/\/login/);
+  await desktop.close();
+
+  // The attacker's link starts the app: its window is still loading when the link is read.
+  const { code, verifier } = await attackersCode(run);
+  desktop = await Desktop.launch(data, run, { args: [finishLink(run, code, verifier)] });
+  try {
+    const page = await desktop.pageOf(run.server);
+    await expect(page).toHaveURL(/\/login/);
+    await page.waitForLoadState("networkidle");
+    expect(page.url()).toMatch(/\/login/);
+    expect(await stillRedeemable(run, code, verifier)).toBe(true);
+  } finally {
+    await desktop.close();
+  }
+});
+
+test("nothing but the app's own hand-off reaches the sign-in finish: not a link, a notification or the page", async ({
+  desktop,
+  run,
+}) => {
+  const page = await desktop.addServer(run.server);
+  await expect(page).toHaveURL(/\/login/);
+  const { code, verifier } = await attackersCode(run);
+  const finish = `/desktop/finish?${new URLSearchParams({ code, verifier })}`;
+
+  // A link, while the app runs.
+  await desktop.openLink(finishLink(run, code, verifier));
+  // A notification pointing there.
+  await page.evaluate((path) => window.quaditDesktop?.notify({ title: "t", body: "b", path }), finish);
+  await expect.poll(async () => (await desktop.recorded()).notes.length).toBe(1);
+  await desktop.clickLastNotification();
+  // The page itself going there, and a window it opens.
+  await page.evaluate((path) => (location.href = path), finish);
+  await page.evaluate((path) => window.open(path, "_blank"), finish);
+
+  await page.waitForLoadState("networkidle");
+  expect(await page.evaluate(() => location.pathname)).toBe("/login");
+  expect(desktop.app.windows().some((p) => p.url().startsWith(`${run.server}/desktop`))).toBe(false);
+  // Nor is it handed to the system browser: it is no page for anyone but the app's hand-off.
+  expect((await desktop.recorded()).opened).toEqual([]);
+  expect(await stillRedeemable(run, code, verifier)).toBe(true);
 });
