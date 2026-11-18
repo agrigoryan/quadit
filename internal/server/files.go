@@ -128,42 +128,67 @@ func (s *Server) handleUploadFile(x *c) error {
 	if err != nil {
 		return err
 	}
-	size := int64(x.intParam("size", 0))
+	q := x.r.URL.Query()
+	sized := q.Get("size") != ""
+	var size int64
+	if sized {
+		if size, err = strconv.ParseInt(q.Get("size"), 10, 64); err != nil || size < 0 {
+			return errBad("size must be the file's size in bytes")
+		}
+	}
 	if size > maxSize {
 		return errBad("files can be up to %d MB; this one is %d MB", maxSize>>20, size>>20)
 	}
 	// The caller may name the file's id itself (?id=): if the answer to this
 	// first request is lost, asking for that file says how far it got, and
-	// starting again with the same id does not make a second one. An upload
-	// whose bytes all came but could not be stored is finished now.
-	fid := x.r.URL.Query().Get("id")
+	// starting again with the same id does not make a second one. Going on
+	// needs the size the upload ends at.
+	fid := q.Get("id")
 	if fid == "" {
 		fid = id.New()
 	} else {
-		had, there, err := s.startedUpload(x, fid)
+		if !id.Valid(fid) {
+			return errBad("id must be a UUID made by the caller")
+		}
+		if !sized {
+			return errBad("give the file's size (?size=) with an id of your own, so that the upload can go on from where it stops")
+		}
+		if had, there, err := s.ownUpload(x, fid); err != nil || there {
+			if err != nil {
+				return err
+			}
+			return s.startedAgain(x, had)
+		}
+	}
+	// The row is made before a byte is taken, and it is what makes this
+	// request the one that receives the upload's first part: another first
+	// request under the same id that comes meanwhile finds the row and is
+	// told how far the upload has got, as a retry would be.
+	f := core.File{ID: fid, WorkspaceID: x.ws.ID, Name: up.name, ContentType: up.ctype, Size: size, State: core.FileUploading,
+		Parts: []string{}, UploadedBy: x.member.UserID, CreatedAt: time.Now().UnixMilli()}
+	f.StorageKey = x.ws.ID + "/" + f.ID
+	if err := x.db.Insert(ctx, f); err != nil {
+		if !errors.Is(err, store.ErrConflict) || q.Get("id") == "" {
+			return err
+		}
+		had, there, err := s.ownUpload(x, fid)
 		if err != nil {
 			return err
 		}
-		if there {
-			if had.State == core.FileUploading && had.Received == had.Size {
-				if err := s.finishUpload(ctx, x, &had); err != nil {
-					return err
-				}
-			}
-			return x.ok(s.fileOut(x, had))
+		if !there {
+			// The request whose row it was gave up between the two looks.
+			return &httpError{Status: 409, Code: "conflict", Message: "another first request under this id was just given up; send this one again"}
 		}
+		return s.startedAgain(x, had)
 	}
-	f := core.File{ID: fid, WorkspaceID: x.ws.ID, Name: up.name, ContentType: up.ctype, Size: size, State: core.FileUploading,
-		UploadedBy: x.member.UserID, CreatedAt: time.Now().UnixMilli()}
-	f.StorageKey = x.ws.ID + "/" + f.ID
-	if err := s.receiveFirstPart(ctx, &f, up.src, maxSize); err != nil {
+	kept, err := s.receiveFirstPart(ctx, x.db, &f, up.src, sized, maxSize)
+	if err != nil {
 		return err
 	}
-	if err := x.db.Insert(ctx, f); err != nil {
-		s.dropReceived(ctx, f)
-		return err
+	if !kept {
+		return x.ok(s.fileOut(x, f))
 	}
-	if f.Received >= f.Size {
+	if f.Received == f.Size {
 		if err := s.finishUpload(ctx, x, &f); err != nil {
 			return err
 		}
@@ -171,14 +196,11 @@ func (s *Server) handleUploadFile(x *c) error {
 	return x.json(201, s.fileOut(x, f))
 }
 
-// startedUpload finds the file a caller named by its own id, when a first
+// ownUpload finds the file a caller named by its own id, when a first
 // request with that id came before; it is the caller's own or the id is
 // taken.
-func (s *Server) startedUpload(x *c, fid string) (core.File, bool, error) {
+func (s *Server) ownUpload(x *c, fid string) (core.File, bool, error) {
 	var had core.File
-	if !id.Valid(fid) {
-		return had, false, errBad("id must be a UUID made by the caller")
-	}
 	there, err := store.Find(x.ctx(), x.db, &had, store.Eq("id", fid))
 	if err != nil || !there {
 		return had, false, err
@@ -189,53 +211,105 @@ func (s *Server) startedUpload(x *c, fid string) (core.File, bool, error) {
 	return had, true, nil
 }
 
-// receiveFirstPart takes in what the first request of an upload carries
-// and sets how much arrived. The whole file waits on this machine
-// (partPath); the first of several parts waits in file storage instead,
-// where the next part may be sent from any server.
-func (s *Server) receiveFirstPart(ctx context.Context, f *core.File, src io.Reader, maxSize int64) error {
-	if err := os.MkdirAll(filepath.Dir(s.partPath(f.ID)), 0o750); err != nil {
-		return err
+// startedAgain answers a first request under the id of an upload that
+// was started before with the upload as it stands, which the caller goes
+// on from. One whose bytes all came but could not be stored is finished
+// now.
+func (s *Server) startedAgain(x *c, f core.File) error {
+	if f.State == core.FileUploading {
+		if f.Received == f.Size {
+			if err := s.finishUpload(x.ctx(), x, &f); err != nil {
+				return err
+			}
+		}
 	}
-	out, err := os.Create(s.partPath(f.ID))
+	return x.ok(s.fileOut(x, f))
+}
+
+// receiveFirstPart takes in what the first request of an upload carries,
+// for the row f made for it, and says whether it was kept. The whole file
+// waits on this machine (partPath); the first of several parts waits in
+// file storage instead, where the next part may be sent from any server.
+// Either is kept only if nothing came for the upload since the row was
+// made (another caller may have gone on from its start meanwhile);
+// otherwise f is the upload as it stands. Bytes are counted as they
+// arrive, never more than the size given, or the largest file taken.
+//
+// A request that brings nothing to keep takes its row away with it, so
+// that a first request sent again starts afresh.
+func (s *Server) receiveFirstPart(ctx context.Context, db store.DB, f *core.File, src io.Reader, sized bool, maxSize int64) (kept bool, err error) {
+	defer func() {
+		if err != nil {
+			if _, derr := db.Delete(ctx, "files", store.Eq("id", f.ID), store.Eq("state", core.FileUploading), store.Eq("received", 0)); derr != nil {
+				s.log.Warn("upload: removing the row of one that brought nothing", "file", f.ID, "err", derr)
+			}
+		}
+	}()
+	dir := filepath.Dir(s.partPath(f.ID))
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return false, err
+	}
+	// A file of this request's own: another request for the same upload
+	// never writes into it, nor removes it.
+	out, err := os.CreateTemp(dir, f.ID+".*.receiving")
 	if err != nil {
-		return err
+		return false, err
 	}
-	n, err := io.Copy(out, io.LimitReader(src, maxSize+1))
+	defer os.Remove(out.Name()) // gone once moved or stored; a leftover after a failure
+	limit := maxSize
+	if sized {
+		limit = f.Size
+	}
+	n, err := io.Copy(out, io.LimitReader(src, limit+1))
 	cerr := out.Close()
-	if err != nil {
-		os.Remove(s.partPath(f.ID))
-		return errBad("upload interrupted: %v", err)
-	}
-	if cerr != nil {
+	switch {
+	case err != nil:
+		return false, errBad("upload interrupted: %v", err)
+	case cerr != nil:
 		// What was received did not all reach the disk.
-		os.Remove(s.partPath(f.ID))
-		return fmt.Errorf("saving the upload: %w", cerr)
+		return false, fmt.Errorf("saving the upload: %w", cerr)
+	case n > limit && sized:
+		return false, errBad("more bytes than the size given (%d)", f.Size)
+	case n > limit:
+		return false, errBad("files can be up to %d MB", maxSize>>20)
 	}
-	if n > maxSize {
-		os.Remove(s.partPath(f.ID))
-		return errBad("files can be up to %d MB", maxSize>>20)
-	}
-	f.Received = n
-	if f.Size == 0 {
+	if !sized {
 		f.Size = n
 	}
-	if f.Received >= f.Size {
-		return nil
+	set := map[string]any{"received": n, "size": f.Size}
+	received := core.File{ID: f.ID, Parts: []string{}}
+	if n == f.Size {
+		err = os.Rename(out.Name(), s.partPath(f.ID))
+	} else {
+		received.Parts = []string{partKey(*f, 0)}
+		set["parts"] = received.Parts
+		if err = s.putLocal(ctx, received.Parts[0], out.Name()); err != nil {
+			err = fmt.Errorf("file storage: %w", err)
+		}
 	}
-	in, err := os.Open(s.partPath(f.ID))
+	if err == nil {
+		var changed int64
+		if changed, err = db.Update(ctx, "files", set, store.Eq("id", f.ID), store.Eq("state", core.FileUploading), store.Eq("received", 0)); err == nil && changed == 0 {
+			s.dropReceived(ctx, received)
+			return false, db.Get(ctx, f, store.Eq("id", f.ID))
+		}
+	}
+	if err != nil {
+		s.dropReceived(ctx, received)
+		return false, err
+	}
+	f.Received, f.Parts = n, received.Parts
+	return true, nil
+}
+
+// putLocal stores the file at path in file storage under key.
+func (s *Server) putLocal(ctx context.Context, key, path string) error {
+	in, err := os.Open(path)
 	if err != nil {
 		return err
 	}
-	key := partKey(*f, 0)
-	err = s.fileStore().Put(ctx, key, in, "application/octet-stream")
-	in.Close()
-	os.Remove(s.partPath(f.ID))
-	if err != nil {
-		return fmt.Errorf("file storage: %w", err)
-	}
-	f.Parts = []string{key}
-	return nil
+	defer in.Close()
+	return s.fileStore().Put(ctx, key, in, "application/octet-stream")
 }
 
 // handleUploadFilePart appends the next part of a file. offset must be where the
@@ -278,6 +352,12 @@ func (s *Server) handleUploadFilePart(x *c) error {
 		if f.Received+body.n > f.Size {
 			s.dropParts(ctx, key)
 			return errBad("more bytes than the size given when the upload started")
+		}
+		if body.n == 0 {
+			// Nothing to keep, and nothing changes: the count stays where it
+			// is, so a first request still arriving keeps its place.
+			s.dropParts(ctx, key)
+			return x.ok(s.fileOut(x, f))
 		}
 		parts := append(slices.Clip(f.Parts), key)
 		n, err := x.db.Update(ctx, "files", map[string]any{"received": f.Received + body.n, "parts": parts},

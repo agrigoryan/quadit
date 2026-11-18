@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -92,10 +94,11 @@ func TestAnUploadWhoseStoringFailsCanBeFinishedLater(t *testing.T) {
 		t.Run("in one request", func(t *testing.T) {
 			fid := id.New()
 			files.failing.Store(true)
-			s.call(s.owner, "", "POST", w+"/files?name=notes.txt&id="+fid, data, 500, nil)
+			path := fmt.Sprintf(w+"/files?name=notes.txt&size=%d&id=%s", len(data), fid)
+			s.call(s.owner, "", "POST", path, data, 500, nil)
 			files.failing.Store(false)
 			var f uploaded
-			s.call(s.owner, "", "POST", w+"/files?name=notes.txt&id="+fid, data, 200, &f)
+			s.call(s.owner, "", "POST", path, data, 200, &f)
 			if f.State != "ready" || f.SHA256 != sumOf(data) {
 				t.Fatalf("finished again, the file is %+v, want the sum %s", f, sumOf(data))
 			}
@@ -178,6 +181,81 @@ func TestPartsOfOneUploadSentAtOnceTakeTurns(t *testing.T) {
 		s.call(s.owner, "", "PATCH", fmt.Sprintf(w+"/files/%s?offset=%d", f.ID, f.Received), data[f.Received:], 200, &f)
 		if f.State != "ready" || f.SHA256 != sumOf(data) {
 			t.Fatalf("the file ended as %+v, want the sum %s", f, sumOf(data))
+		}
+	})
+}
+
+// TestFirstRequestsUnderOneIDDoNotShareWhatTheyReceive: two first requests
+// under the same id, one still arriving when the other comes, do not write
+// into, or clean up, what the other received. The first to come is the
+// upload; the other is told how far it has got. When storing the file then
+// fails, asking again finishes it from what the first request brought.
+func TestFirstRequestsUnderOneIDDoNotShareWhatTheyReceive(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		disk, err := blob.NewDisk(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		files := &failingFiles{Store: disk}
+		s := newSiteWithFiles(t, st, files)
+		data := []byte(strings.Repeat("0123456789", 1000))
+		fid := id.New()
+		path := fmt.Sprintf(w+"/files?name=notes.txt&size=%d&id=%s", len(data), fid)
+		files.failing.Store(true)
+
+		// The slow one: half its bytes, then a pause while the other comes.
+		body, send := io.Pipe()
+		t.Cleanup(func() { send.Close() }) // a test that fails half way leaves no request hanging
+		slow := make(chan int, 1)
+		go func() {
+			req, _ := http.NewRequest(http.MethodPost, s.url+path, body)
+			req.Header.Set("Content-Type", "text/plain") // a body with no type is read whole before it is sent
+			resp, err := s.owner.Do(req)
+			if err != nil {
+				t.Error(err)
+				slow <- 0
+				return
+			}
+			resp.Body.Close()
+			slow <- resp.StatusCode
+		}()
+		if _, err := send.Write(data[:len(data)/2]); err != nil {
+			t.Fatal(err)
+		}
+		for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+			resp, err := s.owner.Get(s.url + w + "/files/" + fid)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("the first request is not there: %d", resp.StatusCode)
+			}
+		}
+		var other uploaded
+		s.call(s.owner, "", "POST", path, data, 200, &other)
+		if other.State != "uploading" || other.Received != 0 {
+			t.Fatalf("the second first request, while the first is arriving: %+v", other)
+		}
+		if _, err := send.Write(data[len(data)/2:]); err != nil {
+			t.Fatal(err)
+		}
+		send.Close()
+		if code := <-slow; code != http.StatusInternalServerError {
+			t.Fatalf("the first request, with storage down: %d", code)
+		}
+
+		files.failing.Store(false)
+		var f uploaded
+		s.call(s.owner, "", "POST", path, data, 200, &f)
+		if f.State != "ready" || f.SHA256 != sumOf(data) {
+			t.Fatalf("finished again, the file is %+v, want the sum %s", f, sumOf(data))
+		}
+		if left, _ := os.ReadDir(filepath.Join(s.dir, "uploads")); len(left) > 0 {
+			t.Fatalf("left on this machine once the file is stored: %v", left)
 		}
 	})
 }

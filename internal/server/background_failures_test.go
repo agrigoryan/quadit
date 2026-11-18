@@ -203,7 +203,7 @@ func TestARequestThatMeetsAnOutageSaysSo(t *testing.T) {
 	}{
 		{"the next part of an upload", "PATCH", w + "/files/" + started.ID + "?offset=4", []byte("567890"),
 			fault{op: "get", table: "files", match: idIs(started.ID)}},
-		{"an upload started again with its own id", "POST", w + "/files?name=again.txt&id=" + repeat, []byte("x"),
+		{"an upload started again with its own id", "POST", w + "/files?name=again.txt&size=1&id=" + repeat, []byte("x"),
 			fault{op: "get", table: "files", match: idIs(repeat)}},
 		{"an import of an uploaded file", "POST", w + "/import", M{"kind": "markdown", "file": ready.ID},
 			fault{op: "get", table: "files", match: idIs(ready.ID)}},

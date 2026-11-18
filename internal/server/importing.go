@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -169,7 +170,7 @@ func (k selfAPI) SendFile(fileID, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	q := url.Values{"name": {filepath.Base(path)}}
+	q := url.Values{"name": {filepath.Base(path)}, "size": {strconv.Itoa(len(raw))}}
 	if fileID != "" {
 		q.Set("id", fileID)
 	}
