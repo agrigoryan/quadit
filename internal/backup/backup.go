@@ -351,7 +351,7 @@ func Verify(r io.Reader) (Manifest, error) {
 
 // check is Verify, handing what the first member says to first, when the
 // archive has one, before it reads further, and each value its rows hold
-// sealed (auth.LooksSealed) to sawSealed. Either may be nil.
+// sealed (sealedIn) to sawSealed. Either may be nil.
 func check(r io.Reader, first func(madeBy) error, sawSealed func(string)) (Manifest, error) {
 	sums := map[string]Entry{}
 	rows := &consistency{seq: map[string]int64{}, lastEvent: map[string]int64{}, named: map[string]bool{}, sawSealed: sawSealed}
@@ -417,8 +417,7 @@ type consistency struct {
 	seq       map[string]int64 // workspace id -> its sequence
 	lastEvent map[string]int64 // workspace id -> the number of its last event
 	named     map[string]bool  // storage keys
-	// sawSealed is given every value of every row that looks sealed, at any
-	// depth of a JSON column (a setting keeps its password inside); nil
+	// sawSealed is given every value the rows hold sealed (sealedIn); nil
 	// when nobody asked.
 	sawSealed func(string)
 }
@@ -443,7 +442,11 @@ func (c *consistency) read(table string, body io.Reader) error {
 			}
 		}
 	}
-	if take == nil && c.sawSealed == nil {
+	sealed := sealedIn[table]
+	if c.sawSealed == nil {
+		sealed = nil
+	}
+	if take == nil && sealed == nil {
 		return nil
 	}
 	return lines(body, 1000, func(rows []map[string]any) error {
@@ -451,32 +454,47 @@ func (c *consistency) read(table string, body io.Reader) error {
 			if take != nil {
 				take(row)
 			}
-			if c.sawSealed != nil {
-				eachString(row, func(v string) {
-					if auth.LooksSealed(v) {
-						c.sawSealed(v)
-					}
-				})
+			if sealed != nil {
+				for _, v := range sealed(row) {
+					c.sawSealed(v)
+				}
 			}
 		}
 		return nil
 	})
 }
 
-// eachString calls fn with every string in v, a value as JSON decodes, as
-// deep as it goes.
-func eachString(v any, fn func(string)) {
-	switch v := v.(type) {
-	case string:
-		fn(v)
-	case map[string]any:
-		for _, inner := range v {
-			eachString(inner, fn)
+// sealedIn is where Quadit keeps values sealed with the install secret: for
+// each table that holds some, the values of a row (as an archive holds it)
+// that are sealed. Only these say which secret an archive was sealed with:
+// what people write may look sealed, or be, and says nothing of it.
+var sealedIn = map[string]func(row map[string]any) []string{
+	"users":        sealedColumn("totp_secret"),
+	"secrets":      sealedColumn("value"),
+	"integrations": sealedColumn("secret"),
+	// A setting's value is JSON, an object for one with secret fields:
+	// package settings seals those at its top level, and its other fields
+	// are the install's configuration, never anything that looks sealed.
+	"settings": func(row map[string]any) []string {
+		value, _ := row["value"].(map[string]any)
+		var out []string
+		for _, field := range value {
+			if v, ok := field.(string); ok && auth.LooksSealed(v) {
+				out = append(out, v)
+			}
 		}
-	case []any:
-		for _, inner := range v {
-			eachString(inner, fn)
+		return out
+	},
+}
+
+// sealedColumn is the value of a column that holds a sealed value, when
+// it holds one.
+func sealedColumn(col string) func(row map[string]any) []string {
+	return func(row map[string]any) []string {
+		if v, _ := row[col].(string); v != "" {
+			return []string{v}
 		}
+		return nil
 	}
 }
 

@@ -122,9 +122,9 @@ func (s *Sealer) Seal(plain string) (string, error) {
 }
 
 // LooksSealed reports whether a stored value has the form Seal gives, so
-// that sealed values can be found among others (in a backup's rows)
-// without a list of where they are kept. Whether one opens is Open's to
-// say.
+// that the sealed fields can be told from the others where a JSON object
+// keeps both (a setting's value, in a backup's rows). Whether one opens is
+// Open's to say.
 func LooksSealed(v string) bool {
 	rest, ok := strings.CutPrefix(v, "v1:")
 	if !ok {
