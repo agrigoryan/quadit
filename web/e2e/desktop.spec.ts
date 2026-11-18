@@ -59,13 +59,15 @@ test("a browser signed out signs in, confirms, and the app's window comes out si
   await plain.goto(`/desktop/finish?code=${code}&verifier=${flow.verifier}`);
   await expect(plain.getByRole("heading", { level: 1, name: "Open this in the Quadit app" })).toBeVisible();
 
-  // The app's window: a browser of its own, signed in by nothing but the code and the verifier.
+  // The app's window: a browser of its own, signed in by nothing but the code and the verifier,
+  // loaded as the app's own hand-off loads it, with its header.
   const appWindow = async () => {
     const app = await browser.newContext({
       baseURL: currentRun().url,
       storageState: { cookies: [], origins: [] },
       serviceWorkers: "block",
       userAgent: `${await page.evaluate(() => navigator.userAgent)} QuaditDesktop/0.1.0`,
+      extraHTTPHeaders: { "X-Quadit-Handoff": "1" },
     });
     const window = await app.newPage();
     await window.goto(`/desktop/finish?code=${code}&verifier=${flow.verifier}`);

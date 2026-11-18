@@ -47,10 +47,24 @@ func noRedirects() *http.Client {
 // agent, that stops at redirects.
 type desktopApp struct{ hc *http.Client }
 
+// appUserAgent is the user agent of the app's windows.
+const appUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/142.0 Safari/537.36 QuaditDesktop/0.1.0"
+
+// get loads a page as the app's own hand-off does: the main process loads
+// it in the window, with the hand-off header, and no page sent it there.
 func (a desktopApp) get(t *testing.T, rawURL string) (*http.Response, string) {
 	t.Helper()
+	return a.getWith(t, rawURL, map[string]string{"X-Quadit-Handoff": "1", "Sec-Fetch-Site": "none"})
+}
+
+// getWith loads a page in the app's window with these headers besides its user agent.
+func (a desktopApp) getWith(t *testing.T, rawURL string, header map[string]string) (*http.Response, string) {
+	t.Helper()
 	req, _ := http.NewRequest(http.MethodGet, rawURL, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/142.0 Safari/537.36 QuaditDesktop/0.1.0")
+	req.Header.Set("User-Agent", appUserAgent)
+	for k, v := range header {
+		req.Header.Set(k, v)
+	}
 	resp, err := a.hc.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -241,19 +255,36 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 				t.Fatalf("a browser: status %d, cookie %q", resp.StatusCode, resp.Header.Get("Set-Cookie"))
 			}
 			a := app()
-			req, _ = http.NewRequest(http.MethodGet, finishURL(s, code, f.verifier), nil)
-			req.Header.Set("User-Agent", "Mozilla/5.0 Chrome/142.0 QuaditDesktop/0.1.0")
-			req.Header.Set("Sec-Fetch-Site", "cross-site")
-			if resp, err = a.hc.Do(req); err != nil {
-				t.Fatal(err)
-			}
-			resp.Body.Close()
-			if resp.StatusCode != http.StatusForbidden {
-				t.Fatalf("sent by another site: status %d", resp.StatusCode)
+			for name, header := range map[string]map[string]string{
+				"sent by another site":          {"X-Quadit-Handoff": "1", "Sec-Fetch-Site": "cross-site"},
+				"sent by a sibling site":        {"X-Quadit-Handoff": "1", "Sec-Fetch-Site": "same-site"},
+				"sent by the server's own page": {"X-Quadit-Handoff": "1", "Sec-Fetch-Site": "same-origin"},
+				// A quadit://open link, or anything else that makes the app's window load the
+				// address: it looks like the app, but only the app's own hand-off adds the header.
+				"loaded in the app's window by a link": {"Sec-Fetch-Site": "none"},
+				"with another hand-off header":         {"X-Quadit-Handoff": "yes"},
+			} {
+				if resp, body := a.getWith(t, finishURL(s, code, f.verifier), header); resp.StatusCode != http.StatusForbidden || resp.Header.Get("Set-Cookie") != "" {
+					t.Fatalf("%s: status %d, cookie %q: %s", name, resp.StatusCode, resp.Header.Get("Set-Cookie"), body)
+				}
 			}
 			// Refused before it was spent: the app's own window still gets in.
 			if resp, _ := a.get(t, finishURL(s, code, f.verifier)); resp.StatusCode != http.StatusFound {
 				t.Fatalf("the app after the refusals: status %d", resp.StatusCode)
+			}
+		})
+
+		t.Run("what is refused as not the app counts against no one's sign-ins", func(t *testing.T) {
+			// More than an address's sign-ins allowed: refusing them must not lock the app out.
+			f := newDesktopFlow()
+			code := approve(t, s, s.owner, f, ownerID)
+			for range 40 {
+				if resp, _ := app().getWith(t, finishURL(s, code, f.verifier), nil); resp.StatusCode != http.StatusForbidden {
+					t.Fatalf("not the hand-off: status %d", resp.StatusCode)
+				}
+			}
+			if resp, body := app().get(t, finishURL(s, code, f.verifier)); resp.StatusCode != http.StatusFound {
+				t.Fatalf("the app after the refusals: status %d: %s", resp.StatusCode, body)
 			}
 		})
 

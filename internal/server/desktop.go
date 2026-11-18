@@ -120,23 +120,23 @@ func (s *Server) handleApproveDesktopSignIn(x *c) error {
 }
 
 // handleFinishDesktopSignIn trades a code and its verifier for a session in
-// the app's window. Only the app's window is answered: its user agent says
-// it is the app, and no other site sent it here. Otherwise a code made for
-// one account, opened in someone else's browser by a link or a page, would
-// sign that browser in as the account (login CSRF). The code is spent before
-// the verifier is checked, so a code someone else caught is good for one
-// wrong guess at most; of two windows racing with one code, one gets the
-// session. Every failure of the code is the same plain page: which check
-// failed is not said.
+// the app's window. Only the app's own hand-off is answered (isDesktopHandoff).
+// Otherwise a code made for one account, opened in someone else's browser or
+// app by a link or a page, would sign it in as that account (login CSRF).
+// The code is spent before the verifier is checked, so a code someone else
+// caught is good for one wrong guess at most; of two windows racing with one
+// code, one gets the session. Every failure of the code is the same plain
+// page: which check failed is not said.
 func (s *Server) handleFinishDesktopSignIn(x *c) error {
 	x.w.Header().Set("Cache-Control", "no-store")
 	ctx := x.ctx()
+	// Refused before it counts: what is not the app costs no one a sign-in.
+	if !isDesktopHandoff(x.r) {
+		return s.showDesktopPage(x, http.StatusForbidden, desktopNotTheApp)
+	}
 	// A finish is a sign-in: it counts against the address as one does.
 	if err := s.throttle(ctx, "login:ip:"+s.clientIP(x.r), signInsPerIP, signInWindow); err != nil {
 		return s.showDesktopFailure(x, err)
-	}
-	if !strings.Contains(x.r.UserAgent(), " QuaditDesktop/") || x.r.Header.Get("Sec-Fetch-Site") == "cross-site" || x.r.Header.Get("Sec-Fetch-Site") == "same-site" {
-		return s.showDesktopPage(x, http.StatusForbidden, desktopNotTheApp)
 	}
 	q := x.r.URL.Query()
 	verifier := q.Get("verifier")
@@ -171,6 +171,21 @@ func (s *Server) handleFinishDesktopSignIn(x *c) error {
 	}
 	http.Redirect(x.w, x.r, "/", http.StatusFound)
 	return nil
+}
+
+// isDesktopHandoff reports whether a request for /desktop/finish is the
+// desktop app's own hand-off: the app's main process loading the address in
+// its window, which it does only for a sign-in it started and checked. That
+// load, and nothing else, carries the header X-Quadit-Handoff: 1: a link, a
+// redirect or a page cannot add a header to a navigation, and a page's
+// fetch, which can, is no navigation the browser started (Sec-Fetch-Site
+// "none"). The user agent says it is the app's window at all. A browser
+// that sends no Fetch Metadata is judged by the header alone.
+func isDesktopHandoff(r *http.Request) bool {
+	site := r.Header.Get("Sec-Fetch-Site")
+	return r.Header.Get("X-Quadit-Handoff") == "1" &&
+		strings.Contains(r.UserAgent(), " QuaditDesktop/") &&
+		(site == "" || site == "none")
 }
 
 // desktopWords are what a plain page of the hand-off says.

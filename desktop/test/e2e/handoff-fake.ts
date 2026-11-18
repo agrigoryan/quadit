@@ -8,8 +8,9 @@
 // does not ask "Sign in to the Quadit app as …?" but answers at once, and
 // finish makes its session by signing in to the real server with the
 // owner's password. The checks the app depends on are real: the code is
-// single use and bound to the challenge and state, and finish refuses a
-// verifier whose SHA-256 is not the challenge.
+// single use and bound to the challenge and state, finish refuses a
+// verifier whose SHA-256 is not the challenge, and it answers only a load
+// that carries the hand-off header.
 //
 // GET /__fake/log gives what happened, for the tests to check, and
 // GET /__fake/provider redirects to another site, as a sign-in provider's start does.
@@ -73,6 +74,11 @@ export function startHandoffFake(
       return answer(res, 302, "", { location: back.href });
     }
     if (url.pathname === "/desktop/finish") {
+      // Only the app's own hand-off carries the header (the contract, section 2).
+      if (req.headers["x-quadit-handoff"] !== "1") {
+        log.push({ step: "finish", ok: false, detail: "not the app's hand-off" });
+        return answer(res, 403, "Open this in the Quadit app.");
+      }
       void finish(url, res);
       return;
     }
