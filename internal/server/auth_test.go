@@ -275,11 +275,15 @@ func TestALimitsWindowsAreClearedOnlyWhenOver(t *testing.T) {
 // address is the last one in the list that no such proxy added, so a
 // caller cannot pick its own by writing the header.
 func TestTheCallersAddressIsTakenFromTrustedProxiesOnly(t *testing.T) {
-	// 31 failed sign-ins, each for another account and with its own
-	// X-Forwarded-For: the limit for one address is 30 in 15 minutes.
-	refused := func(t *testing.T, s *site, tag string, forwarded func(i int) string) (n int) {
+	// Failed sign-ins, each for another account and with its own
+	// X-Forwarded-For: the limit for one address is 30 in 15 minutes. The
+	// counts start again each window, and a run may cross into the next:
+	// where at least one refusal is expected, twice the limit and one more
+	// (overLimit) puts one window over it, however the tries fall.
+	const limit, overLimit = 30, 2*30 + 1
+	refused := func(t *testing.T, s *site, tag string, tries int, forwarded func(i int) string) (n int) {
 		t.Helper()
-		for i := range 31 {
+		for i := range tries {
 			login := M{"email": fmt.Sprintf("%s%d@example.com", tag, i), "password": "not-a-password"}
 			if postFrom127(t, s, "/api/v1/auth/login", login, forwarded(i)) == http.StatusTooManyRequests {
 				n++
@@ -290,7 +294,7 @@ func TestTheCallersAddressIsTakenFromTrustedProxiesOnly(t *testing.T) {
 	t.Run("no proxy is trusted: the header is the caller's own words", func(t *testing.T) {
 		testdb.Each(t, func(t *testing.T, st store.Store) {
 			s := newSiteWith(t, st, func(*server.Config) {})
-			if n := refused(t, s, "a", func(i int) string { return fmt.Sprintf("203.0.113.%d", i) }); n == 0 {
+			if n := refused(t, s, "a", overLimit, func(i int) string { return fmt.Sprintf("203.0.113.%d", i) }); n == 0 {
 				t.Fatal("an address written in X-Forwarded-For escaped the limit of the caller's own")
 			}
 		})
@@ -298,11 +302,11 @@ func TestTheCallersAddressIsTakenFromTrustedProxiesOnly(t *testing.T) {
 	t.Run("the loopback is a trusted proxy", func(t *testing.T) {
 		testdb.Each(t, func(t *testing.T, st store.Store) {
 			s := newSiteWith(t, st, func(cfg *server.Config) { cfg.TrustedProxies = loopback })
-			if n := refused(t, s, "b", func(i int) string { return fmt.Sprintf("203.0.113.%d", i) }); n != 0 {
+			if n := refused(t, s, "b", limit+1, func(i int) string { return fmt.Sprintf("203.0.113.%d", i) }); n != 0 {
 				t.Fatalf("callers the proxy forwarded for were counted as one: %d refused", n)
 			}
 			// A caller's own X-Forwarded-For comes first; the proxy adds the address it saw last.
-			if n := refused(t, s, "c", func(i int) string { return fmt.Sprintf("198.51.100.%d, 192.0.2.7", i) }); n == 0 {
+			if n := refused(t, s, "c", overLimit, func(i int) string { return fmt.Sprintf("198.51.100.%d, 192.0.2.7", i) }); n == 0 {
 				t.Fatal("a caller picked its address by writing X-Forwarded-For before the proxy's")
 			}
 		})
