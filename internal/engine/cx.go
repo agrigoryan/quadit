@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	// scanLimit is the most rows of one kind a change reads in one go.
-	scanLimit = 5000
+	// taskPage is how many tasks eachTask reads at a time.
+	taskPage = 500
 	// msPerMinute turns minutes into the Unix milliseconds times are kept
 	// in (cx.at and every stored time).
 	msPerMinute = 60_000
@@ -103,6 +103,30 @@ type event struct {
 	place    place
 	audience string // the one member who may see it; "" for all who may see its place
 	data     core.EventData
+}
+
+// eachTask calls fn with every task the filter selects, however many there
+// are. They are read a page at a time in id order, each page starting
+// after the last task of the one before, so fn may change a task, even so
+// that the filter no longer selects it, and no task is missed or met twice.
+// The filter's sort and limit are its own.
+func (c *cx) eachTask(f store.TaskFilter, fn func(t core.Task) error) error {
+	f.Sort, f.Limit, f.Offset = "", taskPage, 0
+	for {
+		page, err := c.tx.Tasks(c.ctx, f)
+		if err != nil {
+			return err
+		}
+		for _, t := range page {
+			if err := fn(t); err != nil {
+				return err
+			}
+		}
+		if len(page) < taskPage {
+			return nil
+		}
+		f.After = []any{page[len(page)-1].ID}
+	}
 }
 
 // emit records an event, after checking that the actor may write where it

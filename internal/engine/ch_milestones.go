@@ -97,16 +97,13 @@ func milestoneDelete(c *cx, a idArgs) error {
 	if err != nil {
 		return err
 	}
-	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{MilestoneID: m.ID, Archived: true, Limit: scanLimit})
-	if err != nil {
-		return err
-	}
-	for _, t := range tasks {
+	err = c.eachTask(store.TaskFilter{MilestoneID: m.ID, Archived: true}, func(t core.Task) error {
 		tp := newPatch()
 		tp.put("milestone_id", t.MilestoneID, "")
-		if err := c.saveOther(t, tp, core.EventData{}); err != nil {
-			return err
-		}
+		return c.saveOther(t, tp, core.EventData{})
+	})
+	if err != nil {
+		return err
 	}
 	return c.trash(target{table: "milestones", entity: "milestone", id: m.ID, place: inProject(e.ProjectID)})
 }

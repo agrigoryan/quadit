@@ -204,20 +204,14 @@ func projectSettings(p *patch, settings Opt[core.ProjectSettings], pr core.Proje
 // project's new key. Task keys follow the project key. The old keys stop
 // resolving.
 func (c *cx) rekeyTasks(pr core.Project) error {
-	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{ProjectIDs: []string{pr.ID}, Archived: true, Limit: scanLimit})
-	if err != nil {
+	rekey := func(t core.Task) error {
+		_, err := c.tx.Update(c.ctx, "tasks", map[string]any{"key": pr.Key + "-" + strconv.Itoa(t.Number)}, store.Eq("id", t.ID))
 		return err
 	}
-	trashed, err := c.tx.Tasks(c.ctx, store.TaskFilter{ProjectIDs: []string{pr.ID}, InTrash: true, Limit: scanLimit})
-	if err != nil {
+	if err := c.eachTask(store.TaskFilter{ProjectIDs: []string{pr.ID}, Archived: true}, rekey); err != nil {
 		return err
 	}
-	for _, t := range append(tasks, trashed...) {
-		if _, err := c.tx.Update(c.ctx, "tasks", map[string]any{"key": pr.Key + "-" + strconv.Itoa(t.Number)}, store.Eq("id", t.ID)); err != nil {
-			return err
-		}
-	}
-	return nil
+	return c.eachTask(store.TaskFilter{ProjectIDs: []string{pr.ID}, InTrash: true}, rekey)
 }
 
 func projectDelete(c *cx, a memberRefArgs) error {

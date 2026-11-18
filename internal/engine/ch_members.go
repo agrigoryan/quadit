@@ -340,18 +340,11 @@ func memberRemove(c *cx, a memberRefArgs) error {
 	if _, err := c.tx.Update(c.ctx, "api_tokens", map[string]any{"revoked_at": c.at}, store.Eq("user_id", m.UserID), store.Null("revoked_at")); err != nil {
 		return err
 	}
-	open, err := c.tx.Tasks(c.ctx, store.TaskFilter{AssigneeIDs: []string{m.UserID}, Open: true, Limit: scanLimit})
-	if err != nil {
-		return err
-	}
-	for _, t := range open {
+	return c.eachTask(store.TaskFilter{AssigneeIDs: []string{m.UserID}, Open: true}, func(t core.Task) error {
 		tp := newPatch()
 		tp.put("assignee_id", t.AssigneeID, "")
-		if err := c.saveOther(t, tp, core.EventData{}); err != nil {
-			return err
-		}
-	}
-	return nil
+		return c.saveOther(t, tp, core.EventData{})
+	})
 }
 
 // scopeArgs sets limits. In an update, a part that is left out stays as it

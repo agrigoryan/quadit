@@ -139,28 +139,31 @@ func statusDelete(c *cx, a statusDeleteArgs) error {
 	if err := c.tx.Get(c.ctx, &pr, store.Eq("id", st.ProjectID)); err != nil {
 		return err
 	}
-	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{StatusIDs: []string{st.ID}, Archived: true, Limit: scanLimit})
-	if err != nil {
-		return err
+	// Its tasks are those in the trash as well, which would otherwise come
+	// back with a status that is gone.
+	onIt := []store.TaskFilter{{StatusIDs: []string{st.ID}, Archived: true}, {StatusIDs: []string{st.ID}, InTrash: true}}
+	n := 0
+	for _, f := range onIt {
+		count, err := c.tx.CountTasks(c.ctx, f)
+		if err != nil {
+			return err
+		}
+		n += count
 	}
-	trashed, err := c.tx.Tasks(c.ctx, store.TaskFilter{StatusIDs: []string{st.ID}, InTrash: true, Limit: scanLimit})
-	if err != nil {
-		return err
-	}
-	tasks = append(tasks, trashed...)
-	if len(tasks) > 0 || st.IsDefault {
-		if err := c.moveOffStatus(st, pr, a.MoveTo, tasks); err != nil {
+	if n > 0 || st.IsDefault {
+		if err := c.moveOffStatus(st, pr, a.MoveTo, onIt, n); err != nil {
 			return err
 		}
 	}
 	return c.trash(target{table: "statuses", entity: "status", id: st.ID, place: inProject(pr.ID)})
 }
 
-// moveOffStatus moves the tasks of a status being deleted to another, which
-// also takes over being the default when the deleted one was.
-func (c *cx) moveOffStatus(st core.Status, pr core.Project, moveTo string, tasks []core.Task) error {
+// moveOffStatus moves the n tasks the filters select, those of a status
+// being deleted, to another, which also takes over being the default when
+// the deleted one was.
+func (c *cx) moveOffStatus(st core.Status, pr core.Project, moveTo string, onIt []store.TaskFilter, n int) error {
 	if moveTo == "" {
-		return invalid("move_to", "%d tasks have this status: say where they go with move_to", len(tasks))
+		return invalid("move_to", "%d tasks have this status: say where they go with move_to", n)
 	}
 	to, err := c.status(pr, "move_to", moveTo)
 	if err != nil {
@@ -169,10 +172,13 @@ func (c *cx) moveOffStatus(st core.Status, pr core.Project, moveTo string, tasks
 	if to.ID == st.ID {
 		return invalid("move_to", "move_to must be another status")
 	}
-	for _, t := range tasks {
-		tp := newPatch()
-		c.setStatus(tp, &t, to)
-		if err := c.saveOther(t, tp, core.EventData{}); err != nil {
+	for _, f := range onIt {
+		err := c.eachTask(f, func(t core.Task) error {
+			tp := newPatch()
+			c.setStatus(tp, &t, to)
+			return c.saveOther(t, tp, core.EventData{})
+		})
+		if err != nil {
 			return err
 		}
 	}

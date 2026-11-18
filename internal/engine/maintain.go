@@ -208,13 +208,9 @@ func (run *purge) delete(rows ...rowsOf) error {
 // tasks removes tasks trashed before the cutoff with everything on them.
 func (run *purge) tasks() error {
 	tx := run.c.tx
-	tasks, err := tx.Tasks(run.ctx, store.TaskFilter{InTrash: true, Limit: scanLimit})
-	if err != nil {
-		return err
-	}
-	for _, t := range tasks {
+	return run.c.eachTask(store.TaskFilter{InTrash: true}, func(t core.Task) error {
 		if t.DeletedAt > run.cutoff {
-			continue
+			return nil
 		}
 		var ds []core.Decision
 		if err := tx.List(run.ctx, &ds, store.Where(store.Eq("task_id", t.ID))); err != nil {
@@ -238,8 +234,8 @@ func (run *purge) tasks() error {
 			return err
 		}
 		run.purged++
-	}
-	return nil
+		return nil
+	})
 }
 
 // docs removes pages trashed before the cutoff with everything in them.

@@ -321,9 +321,10 @@ func (l *linker) wikiLinks(text string) error {
 			return err
 		}
 		if len(ds) == 0 {
-			// Written in another case than the page's title.
+			// Written in another case than the page's title: every page is
+			// compared, as SQLite's LOWER knows the case of ASCII only.
 			var all []core.Doc
-			if err := l.c.tx.List(l.c.ctx, &all, store.Q{Where: []store.Cond{store.Live, store.Ne("kind", core.DocRow)}, Limit: scanLimit}); err != nil {
+			if err := l.c.tx.List(l.c.ctx, &all, store.Where(store.Live, store.Ne("kind", core.DocRow))); err != nil {
 				return err
 			}
 			for _, doc := range all {

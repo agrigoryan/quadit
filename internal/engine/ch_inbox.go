@@ -66,8 +66,10 @@ func notificationRead(c *cx, a notificationReadArgs) error {
 		conds = append(conds, store.Null("read_at"))
 		set = map[string]any{"read_at": c.at}
 	}
+	// Every notification the conditions select, read and then changed by
+	// the same conditions: no other write to the workspace runs between.
 	var rows []core.Notification
-	if err := c.tx.List(c.ctx, &rows, store.Q{Where: conds, Limit: scanLimit}); err != nil {
+	if err := c.tx.List(c.ctx, &rows, store.Where(conds...)); err != nil {
 		return err
 	}
 	if len(rows) == 0 {
@@ -77,7 +79,7 @@ func notificationRead(c *cx, a notificationReadArgs) error {
 	for i, r := range rows {
 		ids[i] = r.ID
 	}
-	if _, err := c.tx.Update(c.ctx, "notifications", set, store.In("id", ids)); err != nil {
+	if _, err := c.tx.Update(c.ctx, "notifications", set, conds...); err != nil {
 		return err
 	}
 	changes := map[string]core.FieldChange{}

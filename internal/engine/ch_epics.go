@@ -158,17 +158,14 @@ func epicDelete(c *cx, a idArgs) error {
 		return err
 	}
 	// Its tasks stay, without an epic.
-	tasks, err := c.tx.Tasks(c.ctx, store.TaskFilter{EpicIDs: []string{e.ID}, Archived: true, Limit: scanLimit})
-	if err != nil {
-		return err
-	}
-	for _, t := range tasks {
+	err = c.eachTask(store.TaskFilter{EpicIDs: []string{e.ID}, Archived: true}, func(t core.Task) error {
 		tp := newPatch()
 		tp.put("epic_id", t.EpicID, "")
 		tp.put("milestone_id", t.MilestoneID, "")
-		if err := c.saveOther(t, tp, core.EventData{}); err != nil {
-			return err
-		}
+		return c.saveOther(t, tp, core.EventData{})
+	})
+	if err != nil {
+		return err
 	}
 	if err := c.tx.Unindex(c.ctx, e.ID); err != nil {
 		return err
