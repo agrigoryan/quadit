@@ -195,6 +195,14 @@ Download it from [Releases](https://github.com/agrigoryan/quadit/releases), unde
 
 The app does not update itself: it tells you when a newer version is out, and you download it the same way.
 
+What the app adds to the web app:
+
+- **Connect your agents.** Set Up Quadit… in the app menu finds the agent harnesses on the computer (Claude Code, Codex, Gemini CLI, Cursor, opencode, pi, GitHub Copilot) and sets each up to work in Quadit: with the `quadit` command and the skill, through Quadit's MCP server with the harness's own sign-in, or both. It shows every file it will change before changing it, keeps a copy of each, and Disconnect puts them back. [Connect from the desktop app](agents.md#connect-from-the-desktop-app) says what each choice writes.
+- **Answer from a notification.** On macOS, a question's notification carries its options, and a mention's has a reply field.
+- **The menu-bar icon** lists the questions waiting on you, which you can answer there, and what each agent is doing.
+- **Quick capture.** Alt+Cmd+N (Alt+Ctrl+N on Windows and Linux) opens a small window that makes a task or a page from anywhere; the shortcut can be turned off in Set Up Quadit….
+- **Open in desktop app**, in the web app's user menu in a browser, opens the same page in the app.
+
 
 - Adding a server, the app asks `GET /api/v1/version` (no sign-in needed) whether the address is a Quadit server and which version of the sign-in hand-off it speaks.
 - Passkeys and Google, GitHub or OpenID Connect sign-in do not work inside the app's window, so the app signs in through the system browser: it opens `/desktop/connect` there, the person signs in as usual (second step included) and presses Continue, and the browser hands the app a code that works once, for two minutes. The app trades it at `/desktop/finish` for a session of its own, of the steps the browser's session took: a browser signed in with one step hands over a session that still owes the second, where one is owed. That address answers only the app's own windows, so no link or page can sign a browser in with a code made for another account.

@@ -454,7 +454,7 @@ quadit upgrade --undo                <span class="c"># back to the copy made bef
       <dl class="facts-list">
         <div><dt>Sign-in</dt><dd>Password, passkeys, two-step codes, Google, GitHub and any OpenID Connect provider.</dd></div>
         <div><dt>Files</dt><dd>On disk, or S3-compatible storage, Google Cloud Storage or Azure. Move to a bucket with no downtime.</dd></div>
-        <div><dt>Backups</dt><dd>Scheduled from the admin area, each read back and checked before it counts. Bring back one task or one page.</dd></div>
+        <div><dt>Backups</dt><dd>Scheduled from the admin area, each read back and checked before it counts, and copied to a folder or a bucket of your choice. Bring back one task or one page.</dd></div>
         <div><dt>Upgrades</dt><dd>Replace the binary and start it. A copy of the database is made before the schema changes.</dd></div>
         <div><dt>Watching it</dt><dd><code>/healthz</code>, <code>/readyz</code>, Prometheus counters at <code>/metrics</code>, and a health panel.</dd></div>
       </dl>
@@ -484,7 +484,7 @@ quadit upgrade --undo                <span class="c"># back to the copy made bef
       </details>
       <details>
         <summary>Is there a desktop app?</summary>
-        <p>Yes, for macOS, Windows and Linux. It opens your server in a window of its own, signs in through your browser, and shows notifications and an unread count on its icon. Download it from the <a href="https://github.com/agrigoryan/quadit/releases">Releases page</a>. Current builds are pre-releases and are not signed yet, so macOS and Windows ask you to confirm the first time you open one; <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md#the-desktop-app">docs/install.md</a> says how.</p>
+        <p>Yes, for macOS, Windows and Linux. It opens your server in a window of its own and signs in through your browser. It sets up Claude Code, Codex and the other agent harnesses on your computer to work in Quadit, showing every file it changes first. You can answer a question from its notification or from the menu bar, and capture a task from anywhere with a shortcut. Download it from the <a href="https://github.com/agrigoryan/quadit/releases">Releases page</a>. Current builds are pre-releases and are not signed yet, so macOS and Windows ask you to confirm the first time you open one; <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md#the-desktop-app">docs/install.md</a> says how.</p>
       </details>
       <details>
         <summary>Can I get my data out?</summary>
