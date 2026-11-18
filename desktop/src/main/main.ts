@@ -195,7 +195,7 @@ function start() {
     }
     const server = store.byOrigin(link.server);
     if (server) windows.show(server.id, link.path);
-    else list.invite(link.server, link.path);
+    else void offerToAdd(link.server).then((add) => add && list.invite(link.server, link.path));
   };
 
   app.on("second-instance", (_event, argv) => {
@@ -231,6 +231,22 @@ function start() {
   // the server list a second time while the first is still being made.
   handleLink = handleReadyLink;
   for (const link of earlyLinks.splice(0)) handleLink(link);
+}
+
+/**
+ * A link asked to open a server the app is not connected to. It is never
+ * added on a link's word: the person is told and may add it themselves.
+ */
+async function offerToAdd(origin: string): Promise<boolean> {
+  const { response } = await dialog.showMessageBox({
+    type: "warning",
+    message: `This app is not connected to ${origin}`,
+    detail: "A link asked to open a page there. Add the server only if you know it and want to use it in this app.",
+    buttons: ["Add It…", "Cancel"],
+    defaultId: 1,
+    cancelId: 1,
+  });
+  return response === 0;
 }
 
 /** The quadit command packaged in the app's resources (macOS and Linux), or null without one (run from source, Windows). */
