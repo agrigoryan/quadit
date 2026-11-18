@@ -37,14 +37,15 @@ func (s *Server) Run(ctx context.Context) {
 	defer loops.Wait()
 	var fc blob.Config
 	err := s.settings.Checked(ctx, "files", &fc)
-	if err == nil {
-		if err = s.useFiles(ctx, fc); err != nil {
-			s.filesMu.Lock()
-			s.files = blob.Unusable{Set: fc.Kind, Err: err}
-			s.filesMu.Unlock()
-		}
+	if err != nil {
+		fc.Kind = "unknown"
+	} else {
+		err = s.useFiles(ctx, fc)
 	}
 	if err != nil {
+		s.filesMu.Lock()
+		s.files = blob.Unusable{Set: fc.Kind, Err: err}
+		s.filesMu.Unlock()
 		s.log.Error("file storage cannot be used as set; no file is stored or read, and the server is not ready, until it can; trying again", "err", err)
 		loops.Go(func() { s.reachFiles(ctx) })
 	}

@@ -13,7 +13,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agrigoryan/quadit/internal/auth"
+	"github.com/agrigoryan/quadit/internal/blob"
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/server"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -180,5 +183,55 @@ func TestFileStorageWaitsForItsSettingToBeRead(t *testing.T) {
 			}
 		}
 		s.call(t, s.owner, "", "POST", w+"/files?name=notes.txt", []byte("hello"), 201, nil)
+	})
+}
+
+// TestFileStorageStopsWhenRunCannotReadItsSetting: a server that read the
+// "files" setting when it was made (the disk) but cannot read it again
+// when its background work starts, after that read is no longer kept,
+// does not go on with the disk: another server may have set a cloud store
+// meanwhile. It stores and reads no file until the setting can be read.
+func TestFileStorageStopsWhenRunCannotReadItsSetting(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		fs := newFaultyStore(st)
+		dir := t.TempDir()
+		disk, err := blob.NewDisk(dir + "/files")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
+		hs, base := localhostServer(t)
+		ctx, stop := context.WithCancel(context.Background())
+		srv := server.New(ctx, server.Config{DataDir: dir, BaseURL: base, Version: "test"}, fs, disk, sealer)
+		hs.Config.Handler = srv.Handler()
+		hs.Start()
+		ran := make(chan struct{})
+		t.Cleanup(func() { stop(); <-ran; hs.Close() })
+		ready := func() int {
+			resp, err := http.Get(base + "/readyz")
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			return resp.StatusCode
+		}
+
+		time.Sleep(3500 * time.Millisecond) // past the three seconds a setting read is kept
+		fs.faults.arm(fault{op: "get", table: "settings", match: func(_ map[string]any, where []store.Cond) bool { return whereHas(where, "name", "files") }})
+		go func() {
+			defer close(ran)
+			srv.Run(ctx)
+		}()
+		for deadline := time.Now().Add(5 * time.Second); ready() != http.StatusServiceUnavailable; time.Sleep(50 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatal("/readyz is still ready on the disk with the files setting unreadable")
+			}
+		}
+		fs.faults.clear()
+		for deadline := time.Now().Add(20 * time.Second); ready() != http.StatusOK; time.Sleep(100 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatal("/readyz once the files setting reads again is not ready")
+			}
+		}
 	})
 }
