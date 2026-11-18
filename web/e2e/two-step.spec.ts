@@ -6,7 +6,7 @@
 
 import { createHmac } from "node:crypto";
 import { type Browser, type BrowserContext, expect, type Page, test } from "@playwright/test";
-import { OWNER, WORKSPACE } from "./run";
+import { fromOwnPage, OWNER, WORKSPACE } from "./run";
 import { type Server, startServer } from "./server";
 
 let server: Server;
@@ -76,12 +76,18 @@ test("a password sign-in is followed by the second step the person has", async (
     await page.getByRole("button", { name: "Add a passkey" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Continue" }).click();
     await expect(page.getByRole("dialog")).toBeHidden();
-    const required = await page.request.put("/api/v1/admin/settings/auth.require_2fa", { data: true });
+    const required = await page.request.put("/api/v1/admin/settings/auth.require_2fa", {
+      data: true,
+      headers: fromOwnPage(server.url),
+    });
     expect(required.ok()).toBe(true);
   });
 
   await test.step("a member sets up an authenticator app", async () => {
-    const invite = await page.request.post(`/api/v1/w/${WORKSPACE.slug}/invites`, { data: { role: "member" } });
+    const invite = await page.request.post(`/api/v1/w/${WORKSPACE.slug}/invites`, {
+      data: { role: "member" },
+      headers: fromOwnPage(server.url),
+    });
     expect(invite.ok()).toBe(true);
     const { link } = (await invite.json()) as { link: string };
     const joining = await browser.newContext({ baseURL: server.url });
@@ -89,16 +95,19 @@ test("a password sign-in is followed by the second step the person has", async (
       data: { name: "Mia", email: member.email, password: member.password },
     });
     expect(accepted.ok()).toBe(true);
-    const start = await joining.request.post("/api/v1/auth/totp/start", { data: {} });
+    const start = await joining.request.post("/api/v1/auth/totp/start", { data: {}, headers: fromOwnPage(server.url) });
     const { secret } = (await start.json()) as { secret: string };
-    const enabled = await joining.request.post("/api/v1/auth/totp/enable", { data: { code: totp(secret) } });
+    const enabled = await joining.request.post("/api/v1/auth/totp/enable", {
+      data: { code: totp(secret) },
+      headers: fromOwnPage(server.url),
+    });
     expect(enabled.ok()).toBe(true);
     member.secret = secret;
     await joining.close();
   });
 
   await test.step("the password of a person with a passkey is followed by the passkey", async () => {
-    await page.request.post("/api/v1/auth/logout");
+    await page.request.post("/api/v1/auth/logout", { headers: fromOwnPage(server.url) });
     await signInWithPassword(page, OWNER.email, OWNER.password);
     await expect(page.getByRole("heading", { name: "One more step" })).toBeVisible();
     await expect(page.getByText("Confirm it is you with your passkey.")).toBeVisible();
