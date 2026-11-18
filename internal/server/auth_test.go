@@ -363,6 +363,17 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
 		login := M{"email": "owner@example.com", "password": ownerPassword}
 
+		t.Run("a passkey is no second step where passkeys are off", func(t *testing.T) {
+			s := s.in(t)
+			// The owner's session reaches the install's settings, which are no workspace's.
+			s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.passkeys", false, 200, nil)
+			defer s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.passkeys", true, 200, nil)
+			b := browser()
+			s.call(b, "", "POST", "/api/v1/auth/login", login, 200, nil)
+			if out := s.call(b, "", "GET", w+"/me", nil, 403, nil); !strings.Contains(out, "second_step_required") {
+				t.Fatalf("a person whose only second step is turned off is not sent to set one up: %s", out)
+			}
+		})
 		t.Run("a password is one step: the passkey is asked for next", func(t *testing.T) {
 			s := s.in(t)
 			b := browser()

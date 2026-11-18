@@ -38,10 +38,13 @@ func (s *Server) checkSecond(ctx context.Context, u core.User, code string) bool
 }
 
 // hasSecondStep reports whether a person has a second step to give: an
-// authenticator app, or a passkey.
+// authenticator app, or a passkey while the install takes passkeys.
 func (s *Server) hasSecondStep(ctx context.Context, u core.User) (bool, error) {
 	if u.TOTPAt != 0 {
 		return true, nil
+	}
+	if !s.settings.Bool(ctx, "auth.passkeys", true) {
+		return false, nil
 	}
 	n, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", u.ID))
 	return n > 0, err
@@ -101,11 +104,15 @@ func (s *Server) tookTwoSteps(ctx context.Context, x *c, hadOne bool) error {
 // give it: a code from the app, a passkey, or both.
 func (s *Server) handleShowSecondSteps(x *c) error {
 	ctx := x.ctx()
-	passkeys, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID))
-	if err != nil {
-		return err
+	passkey := false
+	if s.settings.Bool(ctx, "auth.passkeys", true) {
+		n, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID))
+		if err != nil {
+			return err
+		}
+		passkey = n > 0
 	}
-	return x.ok(map[string]any{"code": x.user.TOTPAt != 0, "passkey": passkeys > 0 && s.settings.Bool(ctx, "auth.passkeys", true)})
+	return x.ok(map[string]any{"code": x.user.TOTPAt != 0, "passkey": passkey})
 }
 
 type codeBody struct {
