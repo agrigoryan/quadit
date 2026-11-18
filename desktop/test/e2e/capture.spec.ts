@@ -15,7 +15,7 @@ test("quick capture makes a task in the chosen project and remembers where", asy
   await expect(capture.getByLabel("Workspace")).toContainText("E2E");
   await capture.getByLabel("Project").selectOption(project);
   await capture.getByLabel("Title").fill("Captured from anywhere");
-  await capture.getByLabel(/^Text/).fill("With a few words.");
+  await capture.getByRole("textbox", { name: "Text (optional)" }).fill("With a few words.");
   await capture.getByRole("button", { name: "Create" }).click();
   await expect(capture.getByRole("status")).toContainText("Task created.");
   await expect.poll(async () => await quadit(run, ["--json", "tasks"])).toContain("Captured from anywhere");
