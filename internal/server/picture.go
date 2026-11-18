@@ -2,14 +2,18 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/auth"
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/picture"
 )
@@ -47,8 +51,14 @@ func (s *Server) handleTakePicture(x *c) error {
 	if err != nil {
 		return err
 	}
-	// The browser signs in with a link that works once and can only read.
-	token, err := s.oneTime(x.ctx(), core.OneTimeRender, x.user.ID, nil, time.Minute)
+	// The browser signs in with a link that works once, as the caller with
+	// no more reach than this request has: this workspace, the projects the
+	// caller may read here, and reading only.
+	reach := pictureReach{WorkspaceID: x.ws.ID, Scopes: "read"}
+	for _, p := range x.projects {
+		reach.Scopes += " project:" + p
+	}
+	token, err := s.oneTime(x.ctx(), core.OneTimeRender, x.user.ID, reach, time.Minute)
 	if err != nil {
 		return err
 	}
@@ -56,7 +66,7 @@ func (s *Server) handleTakePicture(x *c) error {
 	target := base + "/api/v1/auth/render-session?token=" + url.QueryEscape(token) + "&next=" + url.QueryEscape(path)
 	ctx, cancel := context.WithTimeout(x.ctx(), pictureTimeout)
 	defer cancel()
-	png, whole, err := picture.Take(ctx, picture.Request{Target: target,
+	png, whole, err := s.cfg.TakePicture(ctx, picture.Request{Target: target,
 		Width: width, Height: height, Dark: q.Get("theme") == "dark", Full: truthyParam(q, "full") && height == 0})
 	if errors.Is(err, picture.ErrNoBrowser) {
 		return &httpError{Status: 501, Code: "no_browser", Message: "the server has no Chrome or Chromium to take pictures with; install one, or set QUADIT_CHROME to its path"}
@@ -89,41 +99,76 @@ func pictureSize(x *c) (width, height int, err error) {
 	return width, height, nil
 }
 
+// pictureReach is what a picture's browser may reach, carried by the
+// one-time link it signs in with to the session it gets (core.Session's
+// WorkspaceID and Scopes).
+type pictureReach struct {
+	WorkspaceID string `json:"workspace_id"`
+	Scopes      string `json:"scopes"`
+}
+
 // picturePath is the web app's address of what the picture is of: a task,
-// a page, or any path in the workspace.
+// a page, or a path in the workspace. A task or a page, however it is
+// named, is one the caller may read; a path stays inside the workspace.
 func picturePath(x *c) (string, error) {
 	q := x.r.URL.Query()
-	path := "/" + x.ws.Slug
+	task, doc := q.Get("task"), q.Get("doc")
+	query := ""
+	if p := q.Get("path"); p != "" {
+		u, err := url.Parse(p)
+		segments := strings.Split(u.Path, "/")
+		if err != nil || u.Scheme != "" || u.Host != "" || u.Opaque != "" || strings.Contains(u.Path, "\\") || slices.ContainsFunc(segments, func(seg string) bool {
+			return seg == "" || seg == "." || seg == ".."
+		}) {
+			return "", errBad("path is a page of the workspace, like tasks or docs/ID, with no .. or // in it")
+		}
+		switch {
+		case len(segments) == 2 && segments[0] == "task":
+			task = segments[1]
+		case len(segments) == 2 && segments[0] == "docs":
+			doc = segments[1]
+		default:
+			if u.RawQuery != "" {
+				query = "?" + u.RawQuery
+			}
+			return "/" + x.ws.Slug + "/" + u.Path + query, nil
+		}
+	}
 	switch {
-	case q.Get("task") != "":
-		t, err := x.taskByRef(x.ctx(), q.Get("task"))
+	case task != "":
+		t, err := x.taskByRef(x.ctx(), task)
 		if err != nil {
 			return "", err
 		}
-		return path + "/task/" + t.Key, nil
-	case q.Get("doc") != "":
-		d, err := x.docByID(x.ctx(), q.Get("doc"))
+		return "/" + x.ws.Slug + "/task/" + t.Key, nil
+	case doc != "":
+		d, err := x.docByID(x.ctx(), doc)
 		if err != nil {
 			return "", err
 		}
-		return path + "/docs/" + d.ID, nil
-	case q.Get("path") != "":
-		return path + "/" + q.Get("path"), nil
+		return "/" + x.ws.Slug + "/docs/" + d.ID, nil
 	}
 	return "", errBad("say what to picture: task=KEY, doc=ID or path=…")
 }
 
 // handleSignInPictureBrowser signs the picture-taking browser in for two minutes,
-// read-only, and sends it to the page.
+// read-only and with the reach of the request that asked for the picture,
+// and sends it to the page.
 func (s *Server) handleSignInPictureBrowser(x *c) error {
 	q := x.r.URL.Query()
 	ot, err := s.useOneTime(x.ctx(), core.OneTimeRender, q.Get("token"), false)
 	if err != nil {
 		return err
 	}
+	var reach pictureReach
+	if err := json.Unmarshal(ot.Data, &reach); err != nil || reach.WorkspaceID == "" {
+		// A link with no reach written in it lets the browser into nothing.
+		return &engine.Error{Code: engine.CodeNotFound, Message: "this link is no longer valid; ask for a new one"}
+	}
 	token := auth.Random(32)
 	now := time.Now()
-	sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: ot.UserID, Stage: core.SessionRender, IP: s.clientIP(x.r), UserAgent: "render check",
+	sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: ot.UserID, Stage: core.SessionRender, WorkspaceID: reach.WorkspaceID,
+		Scopes: reach.Scopes, IP: s.clientIP(x.r), UserAgent: "render check",
 		CreatedAt: now.UnixMilli(), LastSeenAt: now.UnixMilli(), ExpiresAt: now.Add(2 * time.Minute).UnixMilli()}
 	if err := s.st.Insert(x.ctx(), sess); err != nil {
 		return err

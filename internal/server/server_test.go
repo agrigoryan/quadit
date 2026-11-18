@@ -70,7 +70,9 @@ func newSiteOf(t *testing.T, st store.Store, files blob.Store, configure func(*s
 	sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
 	hs, base := localhostServer(t)
 	cfg := server.Config{DataDir: dir, BaseURL: base, Version: "test"}
-	configure(&cfg)
+	if configure != nil {
+		configure(&cfg)
+	}
 	srv := server.New(cfg, st, files, sealer)
 	hs.Config.Handler = srv.Handler()
 	hs.Start()

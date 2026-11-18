@@ -27,16 +27,21 @@ const (
 
 // Session is one browser signed in as a person.
 type Session struct {
-	ID         string `json:"id" db:"id"`
-	TokenHash  string `json:"-" db:"token_hash"`
-	UserID     string `json:"user_id" db:"user_id"`
-	Stage      string `json:"stage" db:"stage"` // one of the Session* stages
-	IP         string `json:"ip,omitempty" db:"ip"`
-	UserAgent  string `json:"user_agent,omitempty" db:"user_agent"`
-	CreatedAt  int64  `json:"created_at" db:"created_at"`
-	LastSeenAt int64  `json:"last_seen_at" db:"last_seen_at"`
-	ExpiresAt  int64  `json:"expires_at" db:"expires_at"`
-	RevokedAt  int64  `json:"revoked_at,omitempty" db:"revoked_at,null"`
+	ID        string `json:"id" db:"id"`
+	TokenHash string `json:"-" db:"token_hash"`
+	UserID    string `json:"user_id" db:"user_id"`
+	Stage     string `json:"stage" db:"stage"` // one of the Session* stages
+	// WorkspaceID and Scopes, on a session made to take a picture, are the
+	// reach of the request that asked for it: the workspace, and the scopes
+	// of its credential as a token's are written ("read", "project:ID").
+	WorkspaceID string `json:"workspace_id,omitempty" db:"workspace_id,null"`
+	Scopes      string `json:"scopes,omitempty" db:"scopes"`
+	IP          string `json:"ip,omitempty" db:"ip"`
+	UserAgent   string `json:"user_agent,omitempty" db:"user_agent"`
+	CreatedAt   int64  `json:"created_at" db:"created_at"`
+	LastSeenAt  int64  `json:"last_seen_at" db:"last_seen_at"`
+	ExpiresAt   int64  `json:"expires_at" db:"expires_at"`
+	RevokedAt   int64  `json:"revoked_at,omitempty" db:"revoked_at,null"`
 }
 
 // Identity is a person's account at a sign-in provider.

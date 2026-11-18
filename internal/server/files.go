@@ -636,24 +636,19 @@ func (s *Server) handleServeFile(x *c) error {
 		return errNotFound("file")
 	}
 	// The route names no workspace: the file's own is found here, and the
-	// caller read as the member of it that they are. Not a member, or not
-	// through this token, the file is not there.
+	// caller entered into it as into any workspace. Not a member, or not
+	// through this credential, the file is not there.
 	var ws core.Workspace
-	var member core.Member
-	if there, err := store.Find(ctx, s.st, &ws, store.Eq("id", f.WorkspaceID)); err != nil || !there {
+	if there, err := store.Find(ctx, s.st, &ws, store.Eq("id", f.WorkspaceID), store.Live); err != nil || !there {
 		return errNotFound("file")
 	}
-	if there, err := store.Find(ctx, s.st.In(ws.ID), &member, store.Eq("user_id", x.user.ID), store.Null("removed_at"), store.Null("suspended_at")); err != nil || !there {
-		return errNotFound("file")
+	if err := s.enter(ctx, x, ws); err != nil {
+		if _, refused := errors.AsType[*engine.Error](err); refused {
+			return errNotFound("file")
+		}
+		return err
 	}
-	if x.token != nil && x.token.WorkspaceID != f.WorkspaceID {
-		return errNotFound("file")
-	}
-	who := s.viewerFor(ws, member)
-	if x.token != nil {
-		who.limitTo(tokenProjects(x.token))
-	}
-	if !who.canSeeFile(ctx, f) {
+	if !x.canSeeFile(ctx, f) {
 		return errNotFound("file")
 	}
 	key, ctype, name := f.StorageKey, f.ContentType, f.Name

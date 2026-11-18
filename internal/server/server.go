@@ -90,6 +90,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/mcp"
 	"github.com/agrigoryan/quadit/internal/outbound"
+	"github.com/agrigoryan/quadit/internal/picture"
 	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/reposync"
 	"github.com/agrigoryan/quadit/internal/settings"
@@ -114,6 +115,10 @@ type Config struct {
 	// connection from one of them may say whom it forwards for
 	// (X-Forwarded-For). None means the caller is who connected.
 	TrustedProxies []netip.Prefix
+	// TakePicture opens a page in a browser and returns a PNG of it, and
+	// the page's whole height. nil means picture.Take, with the Chrome or
+	// Chromium of this machine.
+	TakePicture func(context.Context, picture.Request) (png []byte, whole int, err error)
 }
 
 // Server holds everything a request needs. New sets every field except
@@ -179,6 +184,9 @@ func (s *Server) keptOpenContext(parent context.Context) (context.Context, conte
 func New(cfg Config, st store.Store, files blob.Store, sealer *auth.Sealer) *Server {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
+	}
+	if cfg.TakePicture == nil {
+		cfg.TakePicture = picture.Take
 	}
 	s := &Server{cfg: cfg, st: st, eng: engine.New(st, sealer.Seal), hub: hub.New(), files: files, disk: files, sealer: sealer, log: cfg.Log,
 		seen: map[string]int64{}, limits: newLimiter(), quit: make(chan struct{}), outbound: outbound.Client(cfg.PrivateNetworks), origin: originOf(cfg.BaseURL)}
@@ -738,27 +746,6 @@ func (s *Server) loadAccount(ctx context.Context, x *c, userID, disabledMsg stri
 // the workspace of the token used. It fills in the viewer (x.ws, x.db,
 // x.member, x.projects) and x.actor, and records the member's presence.
 func (s *Server) enterWorkspace(ctx context.Context, x *c, ref string) error {
-	if err := s.loadMembership(ctx, x, ref); err != nil {
-		return err
-	}
-	if x.sess != nil && s.settings.Bool(ctx, "auth.require_2fa", false) && x.user.TOTPAt == 0 {
-		// Fails closed: when the passkeys cannot be counted, the answer is no.
-		if n, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID)); err != nil || n == 0 {
-			return &httpError{Status: 403, Code: "second_step_required", Message: "this install requires two-step verification: set it up in your profile first"}
-		}
-	}
-	x.actor = engine.Actor{UserID: x.user.ID}
-	if x.token != nil {
-		x.applyTokenScopes()
-	}
-	s.touchPresence(ctx, x, "")
-	return nil
-}
-
-// loadMembership finds the workspace ref names and the caller's membership
-// in it, and makes the request's viewer of them. A workspace the caller is
-// not a member of is not found, as if it did not exist.
-func (s *Server) loadMembership(ctx context.Context, x *c, ref string) error {
 	cond := store.Eq("slug", ref)
 	if ref == "-" {
 		if x.token == nil {
@@ -774,38 +761,67 @@ func (s *Server) loadMembership(ctx context.Context, x *c, ref string) error {
 	if !there {
 		return errNotFound("workspace " + ref)
 	}
-	if x.token != nil && x.token.WorkspaceID != ws.ID {
-		return errForbidden("this token belongs to another workspace")
+	return s.enter(ctx, x, ws)
+}
+
+// enter makes the request one of the caller as a member of ws: it loads
+// the membership (a workspace the caller is not a member of is not found,
+// as if it did not exist), holds the request to its credential (the
+// workspace a token or a picture's session is for, and how its scopes
+// narrow the account: x.actor, and the viewer's projects) and to the
+// install's two-step rule, and records the member's presence.
+func (s *Server) enter(ctx context.Context, x *c, ws core.Workspace) error {
+	workspaceID, scopes := x.credential()
+	if workspaceID != "" && workspaceID != ws.ID {
+		return errForbidden("this credential belongs to another workspace")
 	}
 	var member core.Member
-	if there, err = store.Find(ctx, s.st.In(ws.ID), &member, store.Eq("user_id", x.user.ID), store.Null("removed_at")); err != nil {
+	there, err := store.Find(ctx, s.st.In(ws.ID), &member, store.Eq("user_id", x.user.ID), store.Null("removed_at"))
+	if err != nil {
 		return err
 	}
 	if !there {
-		return errNotFound("workspace " + ref) // not a member: it does not exist for them
+		return errNotFound("workspace " + ws.Slug) // not a member: it does not exist for them
 	}
 	if member.SuspendedAt != 0 {
 		return errForbidden("your membership in this workspace is suspended")
 	}
 	x.viewer = *s.viewerFor(ws, member)
+	if x.sess != nil && s.settings.Bool(ctx, "auth.require_2fa", false) && x.user.TOTPAt == 0 {
+		// Fails closed: when the passkeys cannot be counted, the answer is no.
+		if n, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID)); err != nil || n == 0 {
+			return &httpError{Status: 403, Code: "second_step_required", Message: "this install requires two-step verification: set it up in your profile first"}
+		}
+	}
+	// The credential narrows the account: "read" makes the actor
+	// read-only, and "project:ID" limits the actor to those projects, and
+	// what the caller may read to those of them the membership allows.
+	x.actor = engine.Actor{UserID: x.user.ID, ReadOnly: slices.Contains(strings.Fields(scopes), "read"), Projects: scopeProjects(scopes)}
+	x.limitTo(x.actor.Projects)
+	s.touchPresence(ctx, x, "")
 	return nil
 }
 
-// applyTokenScopes narrows the actor and the viewer by the token's scopes:
-// "read" makes the actor read-only, and "project:ID" limits the actor to
-// those projects, and what the caller may read to those of them the
-// membership allows.
-func (x *c) applyTokenScopes() {
-	x.actor.ReadOnly = slices.Contains(strings.Fields(x.token.Scopes), "read")
-	x.actor.Projects = tokenProjects(x.token)
-	x.limitTo(x.actor.Projects)
+// credential is what the caller signed in with says of its reach: the
+// workspace it is for ("" for any) and its scopes, written as a token's
+// are ("read", "project:ID"; "" narrows nothing). A token says it, and so
+// does a session made to take a picture, which carries the reach of the
+// request that asked for the picture; a person's own session says nothing.
+func (x *c) credential() (workspaceID, scopes string) {
+	switch {
+	case x.token != nil:
+		return x.token.WorkspaceID, x.token.Scopes
+	case x.sess != nil:
+		return x.sess.WorkspaceID, x.sess.Scopes
+	}
+	return "", ""
 }
 
-// tokenProjects are the ids of the projects a token is made for; none
-// means every project its member may use.
-func tokenProjects(token *core.APIToken) []string {
+// scopeProjects are the ids of the projects scopes are limited to; none
+// means every project the member may use.
+func scopeProjects(scopes string) []string {
 	var projects []string
-	for scope := range strings.FieldsSeq(token.Scopes) {
+	for scope := range strings.FieldsSeq(scopes) {
 		if projectID, ok := strings.CutPrefix(scope, "project:"); ok {
 			projects = append(projects, projectID)
 		}
