@@ -125,6 +125,7 @@ async function openTab() {
     signedOut,
     mutate,
     onEvents: store.onEvents,
+    onStreamEvents: sync.onStreamEvents,
     async start() {
       sync.startSync("acme");
       await settle();
@@ -249,6 +250,23 @@ describe("the tabs of one workspace", () => {
     a.stream.end();
     await settle();
     expect(b.state().stream).toBe("down");
+  });
+
+  it("only the tab that leads hears what it reads off the stream, so what is told outside the page is told once", async () => {
+    const a = await openLeader();
+    const b = await openTab();
+    await b.start();
+    const heardByA: FeedEvent[][] = [];
+    const heardByB: FeedEvent[][] = [];
+    a.onStreamEvents((events) => heardByA.push(events));
+    b.onStreamEvents((events) => heardByB.push(events));
+
+    const event = retitle(11, "t1", "b");
+    a.stream.events(event);
+    await settle();
+    expect(b.title("t1")).toBe("b");
+    expect(heardByA).toEqual([[event]]);
+    expect(heardByB).toEqual([]);
   });
 
   it("shows a change made in one tab in the others at once, without moving their place in the stream", async () => {

@@ -462,6 +462,24 @@ function listen(s: Session) {
 
 // ---- the stream (held by the tab that leads) ----
 
+type StreamListener = (events: FeedEvent[]) => void;
+/** Who hears the events read off the stream. Written by onStreamEvents. */
+const streamListeners = new Set<StreamListener>();
+
+/**
+ * Hear the events as this tab reads them off the live stream, after they
+ * are in the store. Only the tab that leads the tabs of a workspace holds
+ * the stream, so of all the person's tabs (or windows of the desktop app)
+ * that have the workspace open, exactly one hears each event: what is told
+ * outside the page, such as a notification, is told from here. A follower
+ * hears nothing, nor does any tab hear what a copy or a catch-up brings.
+ * Returns the function that stops the listening.
+ */
+export function onStreamEvents(listener: StreamListener): () => void {
+  streamListeners.add(listener);
+  return () => streamListeners.delete(listener);
+}
+
 /** Lets go of the stream, and of whatever was waiting to reopen it. */
 function dropStream(s: Session) {
   s.stream?.abort();
@@ -508,6 +526,7 @@ async function followStream(s: Session, held: AbortSignal) {
           const from = getState().seq;
           applyEvents(events, true);
           if (s.leads) s.tabs?.post({ t: "ev", from, events });
+          for (const listener of streamListeners) listener(events);
         },
 
         onSignal(name) {
