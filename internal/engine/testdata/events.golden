@@ -86,7 +86,7 @@ session.updated {"changes":{"ended_at":{"from":0,"to":1767603665000},"state":{"f
 task.updated {"changes":{"key":{"from":"SVA-3","to":"OPS-1"},"number":{"from":3,"to":1},"project_id":{"from":"#5","to":"#14"},"status_id":{"from":"#7","to":"#16"}},"from_project_id":"#5","id":"#34","key":"OPS-1","moved_from":"SVA-3"}
 task.updated {"changes":{"deleted_at":{"from":0,"to":1767603667000}},"deleted":true,"id":"#32","key":"SVA-2"}
 task.updated {"changes":{"deleted_at":{"from":1767603667000,"to":0}},"id":"#32","key":"SVA-2","restored":true,"row":{"id":"#32","project_id":"#5","number":2,"key":"SVA-2","title":"Sword sound","status_id":"#7","priority":0,"waiting_on_note":"pick one","rank":"00000001kw","created_by":"#3","created_at":1767603630000,"updated_at":1767603668000,"created_seq":43,"updated_seq":88,"activity_seq":88}}
-member.created {"row":{"workspace_id":"#1","user_id":"#55","role":"member","handle":"helper","kind":"agent","name":"Helper","scope":{"projects":["#5"],"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete"]},"created_at":1767603669000,"updated_seq":89,"delegated_by":"#3","delegated_task":"#32","responsible_id":"#3"}}
+member.created {"row":{"workspace_id":"#1","user_id":"#55","role":"member","handle":"helper","kind":"agent","name":"Helper","scope":{"projects":["#5"],"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete","secret.send"]},"created_at":1767603669000,"updated_seq":89,"delegated_by":"#3","delegated_task":"#32","responsible_id":"#3"}}
 task.updated {"changes":{"completed_at":{"from":0,"to":1767603670000},"started_at":{"from":0,"to":1767603670000},"status_id":{"from":"#7","to":"#10"},"waiting_on_note":{"from":"pick one","to":null}},"id":"#32","key":"SVA-2"}
 member.updated {"changes":{"suspended_at":{"from":null,"to":1767603670000}},"id":"#55","reason":"its task SVA-2 is closed","user_id":"#55"}
 rule.created {"row":{"id":"#56","name":"Ping","active":true,"match":{"event_types":["task.updated"]},"action":{"kind":"notify","user_id":"#3","message":"x"},"created_by":"#3","created_at":1767603671000,"updated_seq":92}}
@@ -113,91 +113,91 @@ integration.updated {"changes":{"active":{"from":true,"to":false}},"id":"#63"}
 integration.deleted {"changes":{"deleted_at":{"from":null,"to":1768986092000}},"id":"#63"}
 secret.created {"row":{"id":"#64","name":"TOKEN","env":false,"created_by":"#3","created_at":1768986093000,"updated_at":1768986093000,"updated_seq":114}}
 secret.updated {"changes":{"description":{"from":null,"to":"for builds"},"updated_at":{"from":1768986093000,"to":1768986094000}},"id":"#64"}
-secret.deleted {"changes":{"deleted_at":{"from":null,"to":1768986095000}},"id":"#64","name":"TOKEN"}
-doc.created {"blocks":[{"id":"#65","doc_id":"#66","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":117},{"id":"#67","doc_id":"#66","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":117}],"row":{"id":"#66","kind":"page","title":"Plan","project_id":"#5","rank":"00000000sg","created_by":"#3","created_at":1768986096000,"updated_by":"#3","updated_at":1768986096000,"created_seq":117,"updated_seq":117,"content_seq":117}}
-doc.created {"row":{"id":"#68","kind":"page","title":"Empty","rank":"i","created_by":"#3","created_at":1768986097000,"updated_by":"#3","updated_at":1768986097000,"created_seq":118,"updated_seq":118,"content_seq":118}}
-doc.edited {"blocks":[{"id":"#69","doc_id":"#66","rank":"i","type":"paragraph","content":"Second para.","created_by":"#3","updated_by":"#3","created_seq":119,"updated_seq":119}],"changes":{"content_seq":{"from":null,"to":119},"updated_at":{"from":null,"to":1768986098000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#66"}
-doc.edited {"blocks":null,"changes":{"content_seq":{"from":null,"to":120},"updated_at":{"from":null,"to":1768986099000},"updated_by":{"from":null,"to":"#3"}},"deleted":["#69"],"id":"#66"}
-version.created {"row":{"id":"#70","doc_id":"#66","seq":121,"label":"v1","title":"Plan","created_by":"#3","created_at":1768986100000}}
-doc.edited {"blocks":[{"id":"#71","doc_id":"#66","rank":"i","type":"paragraph","content":[{"type":"text","text":"All new."}],"created_by":"#3","updated_by":"#3","created_seq":122,"updated_seq":122}],"changes":{"content_seq":{"from":null,"to":122},"updated_at":{"from":null,"to":1768986101000},"updated_by":{"from":null,"to":"#3"}},"deleted":["#67"],"id":"#66"}
-doc.edited {"blocks":[{"id":"#65","doc_id":"#66","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":123},{"id":"#67","doc_id":"#66","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":123}],"changes":{"content_seq":{"from":null,"to":123},"updated_at":{"from":null,"to":1768986102000}},"deleted":["#71"],"id":"#66","reverted_to":"#70"}
+secret.deleted {"changes":{"deleted_at":{"from":null,"to":1768986096000}},"id":"#64","name":"TOKEN"}
+doc.created {"blocks":[{"id":"#65","doc_id":"#66","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":117},{"id":"#67","doc_id":"#66","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":117}],"row":{"id":"#66","kind":"page","title":"Plan","project_id":"#5","rank":"00000000sg","created_by":"#3","created_at":1768986097000,"updated_by":"#3","updated_at":1768986097000,"created_seq":117,"updated_seq":117,"content_seq":117}}
+doc.created {"row":{"id":"#68","kind":"page","title":"Empty","rank":"i","created_by":"#3","created_at":1768986098000,"updated_by":"#3","updated_at":1768986098000,"created_seq":118,"updated_seq":118,"content_seq":118}}
+doc.edited {"blocks":[{"id":"#69","doc_id":"#66","rank":"i","type":"paragraph","content":"Second para.","created_by":"#3","updated_by":"#3","created_seq":119,"updated_seq":119}],"changes":{"content_seq":{"from":null,"to":119},"updated_at":{"from":null,"to":1768986099000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#66"}
+doc.edited {"blocks":null,"changes":{"content_seq":{"from":null,"to":120},"updated_at":{"from":null,"to":1768986100000},"updated_by":{"from":null,"to":"#3"}},"deleted":["#69"],"id":"#66"}
+version.created {"row":{"id":"#70","doc_id":"#66","seq":121,"label":"v1","title":"Plan","created_by":"#3","created_at":1768986101000}}
+doc.edited {"blocks":[{"id":"#71","doc_id":"#66","rank":"i","type":"paragraph","content":[{"type":"text","text":"All new."}],"created_by":"#3","updated_by":"#3","created_seq":122,"updated_seq":122}],"changes":{"content_seq":{"from":null,"to":122},"updated_at":{"from":null,"to":1768986102000},"updated_by":{"from":null,"to":"#3"}},"deleted":["#67"],"id":"#66"}
+doc.edited {"blocks":[{"id":"#65","doc_id":"#66","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":123},{"id":"#67","doc_id":"#66","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":123}],"changes":{"content_seq":{"from":null,"to":123},"updated_at":{"from":null,"to":1768986103000}},"deleted":["#71"],"id":"#66","reverted_to":"#70"}
 doc.updated {"changes":{"title":{"from":"Plan","to":"The plan"}},"id":"#66"}
-comment.created {"row":{"id":"#72","doc_id":"#66","subject_type":"doc","subject_id":"#66","kind":"comment","author_id":"#3","body":"on the page","created_at":1768986104000,"created_seq":125,"updated_seq":125}}
-comment.created {"row":{"id":"#73","doc_id":"#66","subject_type":"doc","subject_id":"#66","kind":"comment","author_id":"#3","body":"another","created_at":1768986105000,"created_seq":126,"updated_seq":126}}
-comment.updated {"changes":{"resolved_at":{"from":0,"to":1768986106000}},"id":"#73","key":""}
-comment.deleted {"changes":{"deleted_at":{"from":null,"to":1768986107000}},"id":"#73","key":""}
-attachment.created {"row":{"id":"#74","file_id":"#75","subject_type":"doc","subject_id":"#66","rank":"00000000sg","created_by":"#3","created_at":1768986109000,"file":{"id":"#75","name":"d.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1768986108000,"url":"/f/#75/d.png"}}}
-doc.created {"row":{"id":"#76","kind":"page","title":"Mine","owner_id":"#3","rank":"r","created_by":"#3","created_at":1768986110000,"updated_by":"#3","updated_at":1768986110000,"created_seq":130,"updated_seq":130,"content_seq":130}}
-doc.updated {"changes":{"shared_with":{"from":null,"to":["#2"]}},"id":"#76","row":{"id":"#76","kind":"page","title":"Mine","owner_id":"#3","shared_with":["#2"],"rank":"r","created_by":"#3","created_at":1768986110000,"updated_by":"#3","updated_at":1768986111000,"created_seq":130,"updated_seq":131,"content_seq":130}}
+comment.created {"row":{"id":"#72","doc_id":"#66","subject_type":"doc","subject_id":"#66","kind":"comment","author_id":"#3","body":"on the page","created_at":1768986105000,"created_seq":125,"updated_seq":125}}
+comment.created {"row":{"id":"#73","doc_id":"#66","subject_type":"doc","subject_id":"#66","kind":"comment","author_id":"#3","body":"another","created_at":1768986106000,"created_seq":126,"updated_seq":126}}
+comment.updated {"changes":{"resolved_at":{"from":0,"to":1768986107000}},"id":"#73","key":""}
+comment.deleted {"changes":{"deleted_at":{"from":null,"to":1768986108000}},"id":"#73","key":""}
+attachment.created {"row":{"id":"#74","file_id":"#75","subject_type":"doc","subject_id":"#66","rank":"00000000sg","created_by":"#3","created_at":1768986110000,"file":{"id":"#75","name":"d.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1768986109000,"url":"/f/#75/d.png"}}}
+doc.created {"row":{"id":"#76","kind":"page","title":"Mine","owner_id":"#3","rank":"r","created_by":"#3","created_at":1768986111000,"updated_by":"#3","updated_at":1768986111000,"created_seq":130,"updated_seq":130,"content_seq":130}}
+doc.updated {"changes":{"shared_with":{"from":null,"to":["#2"]}},"id":"#76","row":{"id":"#76","kind":"page","title":"Mine","owner_id":"#3","shared_with":["#2"],"rank":"r","created_by":"#3","created_at":1768986111000,"updated_by":"#3","updated_at":1768986112000,"created_seq":130,"updated_seq":131,"content_seq":130}}
 doc.updated {"changes":{"shared_with":{"from":["#2"],"to":null}},"id":"#76"}
 doc.unshared {"gone":true,"id":"#76"}
-doc.created {"row":{"id":"#77","parent_id":"#66","kind":"page","title":"Details","project_id":"#5","rank":"00000000sg","created_by":"#3","created_at":1768986113000,"updated_by":"#3","updated_at":1768986113000,"created_seq":134,"updated_seq":134,"content_seq":134}}
+doc.created {"row":{"id":"#77","parent_id":"#66","kind":"page","title":"Details","project_id":"#5","rank":"00000000sg","created_by":"#3","created_at":1768986114000,"updated_by":"#3","updated_at":1768986114000,"created_seq":134,"updated_seq":134,"content_seq":134}}
 doc.updated {"changes":{"project_id":{"from":"#5","to":"#14"}},"id":"#66"}
-doc.updated {"row":{"id":"#66","kind":"page","title":"The plan","project_id":"#14","rank":"00000000sg","created_by":"#3","created_at":1768986096000,"updated_by":"#3","updated_at":1768986114000,"created_seq":117,"updated_seq":135,"content_seq":123}}
+doc.updated {"row":{"id":"#66","kind":"page","title":"The plan","project_id":"#14","rank":"00000000sg","created_by":"#3","created_at":1768986097000,"updated_by":"#3","updated_at":1768986115000,"created_seq":117,"updated_seq":135,"content_seq":123}}
 doc.updated {"changes":{"project_id":{"from":"#5","to":"#14"}},"id":"#77"}
-doc.updated {"row":{"id":"#77","parent_id":"#66","kind":"page","title":"Details","project_id":"#14","rank":"00000000sg","created_by":"#3","created_at":1768986113000,"updated_by":"#3","updated_at":1768986113000,"created_seq":134,"updated_seq":137,"content_seq":134}}
-doc.created {"row":{"id":"#78","kind":"database","title":"Assets","rank":"v","created_by":"#3","created_at":1768986115000,"updated_by":"#3","updated_at":1768986115000,"created_seq":139,"updated_seq":139,"content_seq":139}}
+doc.updated {"row":{"id":"#77","parent_id":"#66","kind":"page","title":"Details","project_id":"#14","rank":"00000000sg","created_by":"#3","created_at":1768986114000,"updated_by":"#3","updated_at":1768986114000,"created_seq":134,"updated_seq":137,"content_seq":134}}
+doc.created {"row":{"id":"#78","kind":"database","title":"Assets","rank":"v","created_by":"#3","created_at":1768986116000,"updated_by":"#3","updated_at":1768986116000,"created_seq":139,"updated_seq":139,"content_seq":139}}
 property.created {"row":{"id":"#79","database_id":"#78","name":"Kind","type":"select","rank":"00000000sg","updated_seq":140}}
 property.updated {"changes":{"name":{"from":"Kind","to":"Sort"}},"id":"#79"}
-doc.created {"row":{"id":"#80","parent_id":"#78","kind":"row","title":"Sword","rank":"00000000sg","created_by":"#3","created_at":1768986118000,"updated_by":"#3","updated_at":1768986118000,"created_seq":142,"updated_seq":142,"content_seq":142}}
+doc.created {"row":{"id":"#80","parent_id":"#78","kind":"row","title":"Sword","rank":"00000000sg","created_by":"#3","created_at":1768986119000,"updated_by":"#3","updated_at":1768986119000,"created_seq":142,"updated_seq":142,"content_seq":142}}
 property.updated {"changes":{"config":{"from":null,"to":{"options":[{"color":"gray","name":"blade"}]}}},"id":"#79"}
 doc.updated {"changes":{"props":{"from":null,"to":{"#79":"blade"}}},"id":"#80"}
 property.updated {"changes":{"config":{"from":{"options":[{"color":"gray","name":"blade"}]},"to":{"options":[{"color":"gray","name":"edge"}]}}},"id":"#79"}
 doc.updated {"changes":{"props":{"from":null,"to":{"#79":"edge"}}},"id":"#80"}
 dbview.created {"row":{"id":"#81","database_id":"#78","name":"Board","type":"board","rank":"00000000sg","updated_seq":147}}
 dbview.updated {"changes":{"name":{"from":"Board","to":"Kanban"}},"id":"#81"}
-dbview.deleted {"changes":{"deleted_at":{"from":null,"to":1768986123000}},"id":"#81"}
-property.deleted {"changes":{"deleted_at":{"from":null,"to":1768986124000}},"id":"#79"}
-doc.created {"row":{"id":"#82","kind":"page","title":"Docs","icon":"git","props":null,"rank":"x","created_by":"#3","created_at":1768986125000,"updated_by":"#3","updated_at":1768986125000,"created_seq":151,"updated_seq":151,"content_seq":151}}
-source.created {"row":{"id":"#83","root_doc_id":"#82","repo":"/tmp/nowhere","authority":"repo","write_mode":"commit","created_by":"#3","created_at":1768986125000,"updated_seq":152}}
+dbview.deleted {"changes":{"deleted_at":{"from":null,"to":1768986124000}},"id":"#81"}
+property.deleted {"changes":{"deleted_at":{"from":null,"to":1768986125000}},"id":"#79"}
+doc.created {"row":{"id":"#82","kind":"page","title":"Docs","icon":"git","props":null,"rank":"x","created_by":"#3","created_at":1768986126000,"updated_by":"#3","updated_at":1768986126000,"created_seq":151,"updated_seq":151,"content_seq":151}}
+source.created {"row":{"id":"#83","root_doc_id":"#82","repo":"/tmp/nowhere","authority":"repo","write_mode":"commit","created_by":"#3","created_at":1768986126000,"updated_seq":152}}
 source.updated {"changes":{"branch":{"from":null,"to":"main"}},"id":"#83"}
-source.deleted {"changes":{"deleted_at":{"from":null,"to":1768986127000}},"id":"#83"}
-doc.deleted {"changes":{"deleted_at":{"from":null,"to":1768986128000}},"id":"#76"}
-doc.deleted {"changes":{"deleted_at":{"from":null,"to":1768986129000}},"id":"#80"}
-doc.restored {"changes":{"deleted_at":{"from":null,"to":null}},"row":{"id":"#80","parent_id":"#78","kind":"row","title":"Sword","props":{"#79":"edge"},"rank":"00000000sg","created_by":"#3","created_at":1768986118000,"updated_by":"#3","updated_at":1768986119000,"created_seq":142,"updated_seq":157,"content_seq":142}}
+source.deleted {"changes":{"deleted_at":{"from":null,"to":1768986128000}},"id":"#83"}
+doc.deleted {"changes":{"deleted_at":{"from":null,"to":1768986129000}},"id":"#76"}
+doc.deleted {"changes":{"deleted_at":{"from":null,"to":1768986130000}},"id":"#80"}
+doc.restored {"changes":{"deleted_at":{"from":null,"to":null}},"row":{"id":"#80","parent_id":"#78","kind":"row","title":"Sword","props":{"#79":"edge"},"rank":"00000000sg","created_by":"#3","created_at":1768986119000,"updated_by":"#3","updated_at":1768986120000,"created_seq":142,"updated_seq":157,"content_seq":142}}
 task.updated {"changes":{"label_ids":{"from":["#22","#23"],"to":["#22"]}},"id":"#30","key":"SVA-1"}
-label.deleted {"changes":{"deleted_at":{"from":null,"to":1768986131000}},"id":"#23"}
+label.deleted {"changes":{"deleted_at":{"from":null,"to":1768986132000}},"id":"#23"}
 task.updated {"changes":{"milestone_id":{"from":"#25","to":null}},"id":"#30","key":"SVA-1"}
-milestone.deleted {"changes":{"deleted_at":{"from":null,"to":1768986132000}},"id":"#25"}
+milestone.deleted {"changes":{"deleted_at":{"from":null,"to":1768986133000}},"id":"#25"}
 task.updated {"changes":{"epic_id":{"from":"#24","to":null}},"id":"#30","key":"SVA-1"}
-epic.deleted {"changes":{"deleted_at":{"from":null,"to":1768986133000}},"id":"#24"}
-status.deleted {"changes":{"deleted_at":{"from":null,"to":1768986134000}},"id":"#21"}
-cycle.deleted {"changes":{"deleted_at":{"from":null,"to":1768986135000}},"id":"#26"}
-template.deleted {"changes":{"deleted_at":{"from":null,"to":1768986136000}},"id":"#27"}
-view.deleted {"changes":{"deleted_at":{"from":null,"to":1768986137000}},"id":"#28"}
-preference.deleted {"changes":{"deleted_at":{"from":null,"to":1768986138000}},"id":"#29"}
-rule.deleted {"changes":{"deleted_at":{"from":null,"to":1768986139000}},"id":"#56"}
-project.deleted {"changes":{"deleted_at":{"from":null,"to":1768986140000}},"id":"#14","key":"OPS"}
-task.created {"row":{"id":"#84","project_id":"#5","number":5,"key":"SVA-5","title":"Restored","status_id":"#7","priority":0,"rank":"00000003y8","created_by":"#3","created_at":1768986141000,"updated_at":1768986141000,"created_seq":171,"updated_seq":171,"activity_seq":171}}
-task.created {"row":{"id":"#85","project_id":"#5","number":6,"key":"SVA-6","title":"Thrown away","status_id":"#7","priority":0,"rank":"00000004qo","created_by":"#3","created_at":1768986142000,"updated_at":1768986142000,"created_seq":172,"updated_seq":172,"activity_seq":172}}
-task.updated {"changes":{"deleted_at":{"from":0,"to":1768986143000}},"deleted":true,"id":"#85","key":"SVA-6"}
-task.restored {"from_backup":true,"key":"SVA-5","row":{"id":"#84","project_id":"#5","number":5,"key":"SVA-5","title":"Restored","status_id":"#7","priority":0,"rank":"00000003y8","created_by":"#3","created_at":1768986141000,"updated_at":1768986141000,"created_seq":171,"updated_seq":174,"activity_seq":174}}
-doc.restored {"from_backup":true,"row":{"id":"#66","kind":"page","title":"The plan","project_id":"#14","rank":"00000000sg","created_by":"#3","created_at":1768986096000,"updated_by":"#3","updated_at":1768986114000,"created_seq":117,"updated_seq":175,"content_seq":176}}
+epic.deleted {"changes":{"deleted_at":{"from":null,"to":1768986134000}},"id":"#24"}
+status.deleted {"changes":{"deleted_at":{"from":null,"to":1768986135000}},"id":"#21"}
+cycle.deleted {"changes":{"deleted_at":{"from":null,"to":1768986136000}},"id":"#26"}
+template.deleted {"changes":{"deleted_at":{"from":null,"to":1768986137000}},"id":"#27"}
+view.deleted {"changes":{"deleted_at":{"from":null,"to":1768986138000}},"id":"#28"}
+preference.deleted {"changes":{"deleted_at":{"from":null,"to":1768986139000}},"id":"#29"}
+rule.deleted {"changes":{"deleted_at":{"from":null,"to":1768986140000}},"id":"#56"}
+project.deleted {"changes":{"deleted_at":{"from":null,"to":1768986141000}},"id":"#14","key":"OPS"}
+task.created {"row":{"id":"#84","project_id":"#5","number":5,"key":"SVA-5","title":"Restored","status_id":"#7","priority":0,"rank":"00000003y8","created_by":"#3","created_at":1768986142000,"updated_at":1768986142000,"created_seq":171,"updated_seq":171,"activity_seq":171}}
+task.created {"row":{"id":"#85","project_id":"#5","number":6,"key":"SVA-6","title":"Thrown away","status_id":"#7","priority":0,"rank":"00000004qo","created_by":"#3","created_at":1768986143000,"updated_at":1768986143000,"created_seq":172,"updated_seq":172,"activity_seq":172}}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1768986144000}},"deleted":true,"id":"#85","key":"SVA-6"}
+task.restored {"from_backup":true,"key":"SVA-5","row":{"id":"#84","project_id":"#5","number":5,"key":"SVA-5","title":"Restored","status_id":"#7","priority":0,"rank":"00000003y8","created_by":"#3","created_at":1768986142000,"updated_at":1768986142000,"created_seq":171,"updated_seq":174,"activity_seq":174}}
+doc.restored {"from_backup":true,"row":{"id":"#66","kind":"page","title":"The plan","project_id":"#14","rank":"00000000sg","created_by":"#3","created_at":1768986097000,"updated_by":"#3","updated_at":1768986115000,"created_seq":117,"updated_seq":175,"content_seq":176}}
 doc.edited {"blocks":[{"id":"#65","doc_id":"#66","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":176},{"id":"#67","doc_id":"#66","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":176}],"changes":{"content_seq":{"from":null,"to":176}},"deleted":["#69","#71"],"from_backup":true,"id":"#66"}
 task.deleted {"gone":true,"id":"#85"}
 doc.deleted {"gone":true,"id":"#76"}
-notification.updated {"changes":{"archived_at":{"from":null,"to":1774170149000},"read_at":{"from":null,"to":1774170149000}},"ids":["#31","#33","#41","#49","#51","#52","#61"]}
+notification.updated {"changes":{"archived_at":{"from":null,"to":1774170150000},"read_at":{"from":null,"to":1774170150000}},"ids":["#31","#33","#41","#49","#51","#52","#61"]}
 notification.updated {"changes":{"archived_at":{"from":null,"to":0}},"ids":["#31","#33","#41","#49","#51","#52","#61"]}
-epic.created {"row":{"id":"#86","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170151000,"updated_at":1774170151000,"updated_seq":181}}
-milestone.created {"row":{"id":"#87","epic_id":"#86","name":"Beta","rank":"00000000sg","created_at":1774170152000,"updated_seq":182}}
-cycle.created {"row":{"id":"#88","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170153000,"updated_seq":183}}
-epic.deleted {"changes":{"deleted_at":{"from":null,"to":1774170154000}},"id":"#86"}
-milestone.deleted {"changes":{"deleted_at":{"from":null,"to":1774170155000}},"id":"#87"}
-cycle.deleted {"changes":{"deleted_at":{"from":null,"to":1774170156000}},"id":"#88"}
-epic.restored {"row":{"id":"#86","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170151000,"updated_at":1774170151000,"updated_seq":187}}
-milestone.restored {"row":{"id":"#87","epic_id":"#86","name":"Beta","rank":"00000000sg","created_at":1774170152000,"updated_seq":188}}
-cycle.restored {"row":{"id":"#88","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170153000,"updated_seq":189}}
-task.created {"row":{"id":"#89","project_id":"#5","number":7,"key":"SVA-7","title":"Made by mistake","status_id":"#7","priority":0,"assignee_id":"#2","asked_by":"#3","rank":"00000005j4","created_by":"#3","created_at":1774170160000,"updated_at":1774170160000,"created_seq":190,"updated_seq":190,"activity_seq":190}}
-notification.created {"row":{"id":"#90","user_id":"#2","seq":191,"type":"assigned","actor_id":"#3","task_id":"#89","entity_type":"task","entity_id":"#89","title":"SVA-7 Made by mistake","created_at":1774170160000}}
+epic.created {"row":{"id":"#86","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170152000,"updated_at":1774170152000,"updated_seq":181}}
+milestone.created {"row":{"id":"#87","epic_id":"#86","name":"Beta","rank":"00000000sg","created_at":1774170153000,"updated_seq":182}}
+cycle.created {"row":{"id":"#88","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170154000,"updated_seq":183}}
+epic.deleted {"changes":{"deleted_at":{"from":null,"to":1774170155000}},"id":"#86"}
+milestone.deleted {"changes":{"deleted_at":{"from":null,"to":1774170156000}},"id":"#87"}
+cycle.deleted {"changes":{"deleted_at":{"from":null,"to":1774170157000}},"id":"#88"}
+epic.restored {"row":{"id":"#86","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170152000,"updated_at":1774170152000,"updated_seq":187}}
+milestone.restored {"row":{"id":"#87","epic_id":"#86","name":"Beta","rank":"00000000sg","created_at":1774170153000,"updated_seq":188}}
+cycle.restored {"row":{"id":"#88","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170154000,"updated_seq":189}}
+task.created {"row":{"id":"#89","project_id":"#5","number":7,"key":"SVA-7","title":"Made by mistake","status_id":"#7","priority":0,"assignee_id":"#2","asked_by":"#3","rank":"00000005j4","created_by":"#3","created_at":1774170161000,"updated_at":1774170161000,"created_seq":190,"updated_seq":190,"activity_seq":190}}
+notification.created {"row":{"id":"#90","user_id":"#2","seq":191,"type":"assigned","actor_id":"#3","task_id":"#89","entity_type":"task","entity_id":"#89","title":"SVA-7 Made by mistake","created_at":1774170161000}}
 notification.deleted {"gone":true,"id":"#90","undoes":"#91"}
-task.updated {"changes":{"deleted_at":{"from":0,"to":1774170161000}},"deleted":true,"id":"#89","key":"SVA-7","undoes":"#91"}
-doc.created {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has three phases."}],"created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":194}],"row":{"id":"#93","kind":"page","title":"Notes","rank":"y","created_by":"#3","created_at":1774170162000,"updated_by":"#3","updated_at":1774170162000,"created_seq":194,"updated_seq":194,"content_seq":194}}
-comment.created {"row":{"id":"#94","doc_id":"#93","subject_type":"doc_block","subject_id":"#92","kind":"comment","author_id":"#3","body":"Four?","quote":"three phases","created_at":1774170163000,"created_seq":195,"updated_seq":195}}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1774170162000}},"deleted":true,"id":"#89","key":"SVA-7","undoes":"#91"}
+doc.created {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has three phases."}],"created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":194}],"row":{"id":"#93","kind":"page","title":"Notes","rank":"y","created_by":"#3","created_at":1774170163000,"updated_by":"#3","updated_at":1774170163000,"created_seq":194,"updated_seq":194,"content_seq":194}}
+comment.created {"row":{"id":"#94","doc_id":"#93","subject_type":"doc_block","subject_id":"#92","kind":"comment","author_id":"#3","body":"Four?","quote":"three phases","created_at":1774170164000,"created_seq":195,"updated_seq":195}}
 doc.edited {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has "},{"type":"text","text":"three phases","styles":{"comment":"#94"}},{"type":"text","text":"."}],"created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":196}],"changes":{"content_seq":{"from":null,"to":196}},"deleted":null,"id":"#93"}
-comment.updated {"changes":{"detached_at":{"from":0,"to":1774170164000},"subject_id":{"from":"#92","to":"#93"},"subject_type":{"from":"doc_block","to":"doc"}},"id":"#94","key":""}
-doc.edited {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":"The boss is gone.","created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":198}],"changes":{"content_seq":{"from":null,"to":198},"updated_at":{"from":null,"to":1774170164000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#93"}
-comment.updated {"changes":{"detached_at":{"from":1774170164000,"to":0},"subject_id":{"from":"#93","to":"#92"},"subject_type":{"from":"doc","to":"doc_block"}},"id":"#94","key":""}
-doc.edited {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has "},{"type":"text","text":"three phases","styles":{"comment":"#94"}},{"type":"text","text":"."}],"created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":200}],"changes":{"content_seq":{"from":null,"to":200},"updated_at":{"from":null,"to":1774170165000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#93"}
-comment.deleted {"changes":{"deleted_at":{"from":null,"to":1774170166000}},"id":"#94","key":""}
+comment.updated {"changes":{"detached_at":{"from":0,"to":1774170165000},"subject_id":{"from":"#92","to":"#93"},"subject_type":{"from":"doc_block","to":"doc"}},"id":"#94","key":""}
+doc.edited {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":"The boss is gone.","created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":198}],"changes":{"content_seq":{"from":null,"to":198},"updated_at":{"from":null,"to":1774170165000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#93"}
+comment.updated {"changes":{"detached_at":{"from":1774170165000,"to":0},"subject_id":{"from":"#93","to":"#92"},"subject_type":{"from":"doc","to":"doc_block"}},"id":"#94","key":""}
+doc.edited {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has "},{"type":"text","text":"three phases","styles":{"comment":"#94"}},{"type":"text","text":"."}],"created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":200}],"changes":{"content_seq":{"from":null,"to":200},"updated_at":{"from":null,"to":1774170166000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#93"}
+comment.deleted {"changes":{"deleted_at":{"from":null,"to":1774170167000}},"id":"#94","key":""}
 doc.edited {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has three phases."}],"created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":202}],"changes":{"content_seq":{"from":null,"to":202}},"deleted":null,"id":"#93"}
 workspace.deleted {"gone":true,"id":"#1","slug":"events"}

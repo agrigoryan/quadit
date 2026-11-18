@@ -17,7 +17,7 @@ import (
 // request has the server make an HTTP request with a secret written into
 // it, and prints the answer.
 func (r *runner) request(in input) error {
-	req := map[string]any{"url": in.pos[1], "method": firstValue(in.f["method"])}
+	req := map[string]any{"url": in.pos[1], "method": firstValue(in.f["method"]), "approval": firstValue(in.f["approval"])}
 	headers := map[string]string{}
 	for _, h := range in.f["header"] {
 		k, v, ok := strings.Cut(h, ":")

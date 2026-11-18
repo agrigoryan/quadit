@@ -282,6 +282,7 @@ func missingScenario(t *testing.T, st store.Store) *probes {
 	do("integration.update", M{"id": integ, "active": false})
 	do("integration.delete", M{"id": integ})
 	secret := do("secret.set", M{"name": "TOKEN", "value": "s3cret"}).Ref
+	do("secret.send", M{"name": "TOKEN", "method": "POST", "url": "https://example.com/{{secret}}"})
 	do("secret.delete", M{"id": secret})
 
 	// Pages, databases and their history.

@@ -33,6 +33,7 @@ const GROUPS: { key: "deleting" | "people" | "outside"; asks: Ask[] }[] = [
       { key: "webhook", types: ["webhook.create", "webhook.update"] },
       { key: "integration", types: ["integration.create", "integration.update"] },
       { key: "source", types: ["source.create", "source.update"] },
+      { key: "secret.send", types: ["secret.send"] },
     ],
   },
 ];

@@ -974,3 +974,64 @@ func must[T any](v T, err error) T {
 	}
 	return v
 }
+
+// TestARequestThatChangesSomethingIsHeldAsAChangeIs: a request sent with a
+// secret that can change something at the far end (a POST, a DELETE) is
+// held as a change is: not by a member who may only read, and only with an
+// approval from an agent that must ask before it. A GET only looks.
+func TestARequestThatChangesSomethingIsHeldAsAChangeIs(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(s.owner, "", "task.create", M{"project": "SVA", "title": "Deploy"})
+		var calls []string
+		api := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			calls = append(calls, r.Method+" "+r.URL.Path)
+			rw.Header().Set("Content-Type", "application/json")
+			rw.Write([]byte(`{"ok":true}`))
+		}))
+		defer api.Close()
+		host := "http://" + strings.TrimPrefix(api.URL, "http://")
+		s.change(s.owner, "", "secret.set", M{"name": "DEPLOY_KEY", "value": "sk-held-1234", "hosts": []string{host}})
+		agent := func(handle string, scope M) string {
+			s.change(s.owner, "", "agent.create", M{"name": handle, "handle": handle, "scope": scope})
+			var out struct{ Token string }
+			s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@" + handle}, 201, &out)
+			return out.Token
+		}
+		send := func(token, method string, approval string, want int) string {
+			t.Helper()
+			body := M{"method": method, "url": api.URL + "/deploy", "headers": M{"Authorization": "Bearer {{secret}}"}}
+			if approval != "" {
+				body["approval"] = approval
+			}
+			return s.call(nil, token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", body, want, nil)
+		}
+
+		t.Run("not by a member who may only read", func(t *testing.T) {
+			reader := agent("reader", M{"read_only": true, "needs_approval": []string{}})
+			send(reader, "POST", "", 403)
+			send(reader, "GET", "", 403)
+		})
+		t.Run("with an approval when the agent must ask", func(t *testing.T) {
+			asker := agent("asker", nil) // a new agent asks before what reaches outside
+			before := len(calls)
+			send(asker, "GET", "", 200)
+			if out := send(asker, "POST", "", 403); !strings.Contains(out, "needs_approval") {
+				t.Fatalf("a POST with a secret went without the approval it needs: %s", out)
+			}
+			if len(calls) != before+1 {
+				t.Fatalf("calls made: %v", calls[before:])
+			}
+			ask := s.change(nil, asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "secret.send",
+				"args": M{"name": "DEPLOY_KEY", "method": "POST", "url": api.URL + "/deploy"}, "question": "Deploy?"})["ref"].(string)
+			s.change(s.owner, "", "decision.pick", M{"id": ask, "outcome": "approved"})
+			send(asker, "DELETE", ask, 403)
+			send(asker, "POST", ask, 200)
+			send(asker, "POST", ask, 403)
+			if got := calls[len(calls)-1]; got != "POST /deploy" || len(calls) != before+2 {
+				t.Fatalf("calls made: %v", calls[before:])
+			}
+		})
+	})
+}

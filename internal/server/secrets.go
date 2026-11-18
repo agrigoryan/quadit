@@ -34,6 +34,8 @@ import (
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -54,12 +56,7 @@ const secretRequestTimeout = 30 * time.Second
 const secretMask = "•••"
 
 // mayUseSecret reports whether the caller is among those a secret is for.
-func (who *viewer) mayUseSecret(sec core.Secret) bool {
-	if len(sec.Agents) == 0 || who.member.Kind != core.KindAgent {
-		return true
-	}
-	return slices.Contains(sec.Agents, who.member.UserID)
-}
+func (who *viewer) mayUseSecret(sec core.Secret) bool { return engine.MayUseSecret(sec, who.member) }
 
 // handleListSecrets lists the secrets the caller may use: names and what they are
 // for, never values.
@@ -107,8 +104,8 @@ func (s *Server) secret(x *c, name string) (core.Secret, string, error) {
 	if !x.mayUseSecret(sec) {
 		return sec, "", errForbidden("the secret %s is not for you; an admin decides who may use it", sec.Name)
 	}
-	if x.actor.ReadOnly {
-		return sec, "", errForbidden("this credential is read-only")
+	if err := x.mayWrite(); err != nil {
+		return sec, "", err
 	}
 	value, err := s.sealer.Open(sec.Value)
 	if err != nil || value == "" {
@@ -144,6 +141,9 @@ type secretRequest struct {
 	Body    string            `json:"body"`
 	// BodyBase64 is the body when it is not text.
 	BodyBase64 string `json:"body_base64"`
+	// Approval is an approved decision for the secret.send this request
+	// stands for, from one who must get approval before it.
+	Approval string `json:"approval"`
 }
 
 // handleSendRequestWithSecret makes an HTTP request for the caller with the secret put
@@ -160,6 +160,9 @@ func (s *Server) handleSendRequestWithSecret(x *c) error {
 	use := &secretUse{value: value}
 	req, err := newSecretRequest(x, sec, use, b)
 	if err != nil {
+		return err
+	}
+	if err := s.permitSending(x, sec, req.Method, b); err != nil {
 		return err
 	}
 	started := time.Now()
@@ -203,6 +206,20 @@ func (s *Server) handleSendRequestWithSecret(x *c) error {
 		return x.text(secretAnswerText(resp.StatusCode, headers, out))
 	}
 	return x.ok(out)
+}
+
+// permitSending holds a request that can change something at the far end
+// (any method but GET, HEAD and OPTIONS) as a change is held: it is applied
+// as secret.send, {"name", "method", "url"} with the URL as the caller
+// wrote it, so a member who may only read cannot send it and an agent that
+// must ask first needs an approval of exactly that.
+func (s *Server) permitSending(x *c, sec core.Secret, method string, b secretRequest) error {
+	if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
+		return nil
+	}
+	args := plainjson.Marshal(map[string]string{"name": sec.Name, "method": method, "url": b.URL})
+	_, err := s.eng.Apply(x.ctx(), x.ws.ID, x.actor, engine.Change{ID: id.New(), Type: "secret.send", Args: args, Approval: b.Approval})
+	return err
 }
 
 // newSecretRequest builds the request the vault sends: the secret filled in

@@ -103,7 +103,8 @@ var tools = []tool{
 	{Name: "secret_request", Desc: "Make an HTTP request with a secret I cannot read: write {{secret}} where the value belongs (a header, the URL or the body); {{basic:USER}} gives base64 of USER:secret. " +
 		"It goes only to the secret's hosts, and the value is blanked out of the answer; an answer that is not text comes back without its body (body_omitted).",
 		Props: map[string]arg{"!name": text("the secret's name"), "!url": text("full https address"), "method": text("GET (default), POST, PUT, PATCH, DELETE"),
-			"headers": headers(`JSON object, e.g. {"Authorization": "Bearer {{secret}}"}`), "body": text("request body, as text")},
+			"headers": headers(`JSON object, e.g. {"Authorization": "Bearer {{secret}}"}`), "body": text("request body, as text"),
+			"approval": text(`for a method other than GET, when I must ask first: an approved decision for secret.send with args {"name", "method", "url"}`)},
 		Run: toolSecretRequest},
 	{Name: "upload", Desc: "Store a file and get its id and address. A large file goes in parts: first name, size and the first part; then id, offset and the next part, until the answer says ready. Attach it with change attachment.add {file, task|comment|decision|option}, or name it in comment.create {attachments:[{file}]}.",
 		Props: map[string]arg{"name": text("file name with its extension"), "text": text("the content, as text"), "base64": text("or the content, base64-encoded"),

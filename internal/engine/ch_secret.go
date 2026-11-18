@@ -1,9 +1,11 @@
-// secret.set and secret.delete.
+// secret.set, secret.delete, and secret.send: a request made with a secret
+// that can change something outside.
 
 package engine
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -13,6 +15,7 @@ import (
 func init() {
 	register("secret.set", core.RoleAdmin, secretSet)
 	register("secret.delete", core.RoleAdmin, secretDelete)
+	register("secret.send", core.RoleMember, secretSend)
 }
 
 type secretArgs struct {
@@ -146,4 +149,37 @@ func secretDelete(c *cx, a idArgs) error {
 		return err
 	}
 	return c.trash(target{table: "secrets", entity: "secret", id: s.ID, place: inWorkspace(c.ws), extra: core.EventData{Name: s.Name}})
+}
+
+type secretSendArgs struct {
+	// Name is the secret's name.
+	Name string `json:"name" quadit:"required,handler"`
+	// Method and URL are the request's as the caller writes them: the URL
+	// with {{secret}} where the value goes, never the value.
+	Method string `json:"method"`
+	URL    string `json:"url"`
+}
+
+// secretSend stands for a request the server sends with a secret that can
+// change something at the far end: any method but GET, HEAD and OPTIONS.
+// The server makes the request once this change is allowed, so it is held
+// to what every change is (a member who may only read, an approval for an
+// agent that must ask before it reaches outside). It writes nothing but
+// its own record.
+func secretSend(c *cx, a secretSendArgs) error {
+	var sec core.Secret
+	if err := c.tx.Get(c.ctx, &sec, store.Eq("name", a.Name), store.Live); err != nil {
+		return missing(err, "secret", a.Name)
+	}
+	if !MayUseSecret(sec, c.actor) {
+		return forbidden("the secret %s is not for you; an admin decides who may use it", sec.Name)
+	}
+	c.ref = sec.ID
+	return nil
+}
+
+// MayUseSecret reports whether a member is among those a secret is for:
+// every member, unless the secret names the agents that may use it.
+func MayUseSecret(sec core.Secret, m core.Member) bool {
+	return len(sec.Agents) == 0 || m.Kind != core.KindAgent || slices.Contains(sec.Agents, m.UserID)
 }

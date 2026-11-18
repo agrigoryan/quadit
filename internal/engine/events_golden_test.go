@@ -281,6 +281,7 @@ func eventScenario(t *testing.T, st store.Store, quiet bool) (evs []core.Event, 
 	do("integration.delete", M{"id": integ})
 	secret := do("secret.set", M{"name": "TOKEN", "value": "s3cret"}).Ref
 	do("secret.set", M{"id": secret, "name": "TOKEN", "description": "for builds"})
+	do("secret.send", M{"name": "TOKEN", "method": "POST", "url": "https://example.com/build"})
 	do("secret.delete", M{"id": secret})
 
 	// Pages, databases and their history.

@@ -341,6 +341,7 @@ export interface Invite {
   workspace_id: string;
   email?: string;
   role: string;
+  scope?: Scope;
   created_by: string;
   created_at: number;
   expires_at: number;

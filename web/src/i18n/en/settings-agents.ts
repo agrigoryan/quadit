@@ -69,6 +69,7 @@ export const agentStrings = {
   "agent.asks.item.webhook": "Adding or changing a webhook",
   "agent.asks.item.integration": "Adding or changing an integration",
   "agent.asks.item.source": "Adding or changing a repository source",
+  "agent.asks.item.secret.send": "Sending a request with a secret that changes something (not a GET)",
   "agent.asks.else": "Anything else",
   "agent.asks.elseNone": "Nothing else",
   "agent.handoffLimit": "Hand-offs per week",

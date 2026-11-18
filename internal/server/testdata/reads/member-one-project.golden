@@ -171,6 +171,7 @@ rule.create (admin): id, name, active, match, action
 rule.delete (admin): id (required)
 rule.update (admin): id, name, active, match, action
 secret.delete (admin): id (required)
+secret.send (member): name (required), method, url
 secret.set (admin): id, name (required), description, value, hosts, agents, env
 session.start (member): id, task, title, instructions
 session.update (member): id (required), title, summary, state, add_steps, add_links
@@ -6753,7 +6754,8 @@ doc  doc <id #194>  Vault — Third shelf.
        "source.create",
        "source.update",
        "secret.set",
-       "secret.delete"
+       "secret.delete",
+       "secret.send"
       ],
       "projects": [
        "<project SVA>"
@@ -6796,7 +6798,8 @@ doc  doc <id #194>  Vault — Third shelf.
        "source.create",
        "source.update",
        "secret.set",
-       "secret.delete"
+       "secret.delete",
+       "secret.send"
       ]
      },
      "updated_seq": 36,
@@ -12909,7 +12912,8 @@ seq: 262
      "source.create",
      "source.update",
      "secret.set",
-     "secret.delete"
+     "secret.delete",
+     "secret.send"
     ],
     "projects": [
      "<project SVA>"
@@ -12981,7 +12985,8 @@ seq: 262
      "source.create",
      "source.update",
      "secret.set",
-     "secret.delete"
+     "secret.delete",
+     "secret.send"
     ]
    },
    "updated_seq": 36,
@@ -14025,7 +14030,8 @@ seq: 262
      "source.create",
      "source.update",
      "secret.set",
-     "secret.delete"
+     "secret.delete",
+     "secret.send"
     ],
     "projects": [
      "<project SVA>"
@@ -14097,7 +14103,8 @@ seq: 262
      "source.create",
      "source.update",
      "secret.set",
-     "secret.delete"
+     "secret.delete",
+     "secret.send"
     ]
    },
    "updated_seq": 36,
@@ -15476,7 +15483,8 @@ seq: 262
      "source.create",
      "source.update",
      "secret.set",
-     "secret.delete"
+     "secret.delete",
+     "secret.send"
     ],
     "projects": [
      "<project SVA>"
@@ -15548,7 +15556,8 @@ seq: 262
      "source.create",
      "source.update",
      "secret.set",
-     "secret.delete"
+     "secret.delete",
+     "secret.send"
     ]
    },
    "updated_seq": 36,
@@ -15606,7 +15615,8 @@ seq: 262
      "source.create",
      "source.update",
      "secret.set",
-     "secret.delete"
+     "secret.delete",
+     "secret.send"
     ],
     "projects": [
      "<project SVA>"
@@ -15678,7 +15688,8 @@ seq: 262
      "source.create",
      "source.update",
      "secret.set",
-     "secret.delete"
+     "secret.delete",
+     "secret.send"
     ]
    },
    "updated_seq": 36,
@@ -16978,7 +16989,8 @@ stale  Stale  id=<view Stale>
      "source.create",
      "source.update",
      "secret.set",
-     "secret.delete"
+     "secret.delete",
+     "secret.send"
     ],
     "projects": [
      "<project SVA>"
@@ -17050,7 +17062,8 @@ stale  Stale  id=<view Stale>
      "source.create",
      "source.update",
      "secret.set",
-     "secret.delete"
+     "secret.delete",
+     "secret.send"
     ]
    },
    "updated_seq": 36,
@@ -17099,7 +17112,8 @@ stale  Stale  id=<view Stale>
      "source.create",
      "source.update",
      "secret.set",
-     "secret.delete"
+     "secret.delete",
+     "secret.send"
     ],
     "projects": [
      "<project SVA>"
@@ -17171,7 +17185,8 @@ stale  Stale  id=<view Stale>
      "source.create",
      "source.update",
      "secret.set",
-     "secret.delete"
+     "secret.delete",
+     "secret.send"
     ]
    },
    "updated_seq": 36,
@@ -21325,10 +21340,10 @@ id: 34
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #221>","data":{"changes":{"removed_at":{"from":0,"to":1700000000000}},"id":"<@dee>"},"entity_id":"<@dee>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":34,"type":"member.updated"}
 
 id: 35
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #222>","data":{"row":{"created_at":1700000000000,"handle":"artist","handoff_limit":5,"kind":"agent","name":"Artist","responsible_id":"<@aram>","role":"member","scope":{"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete"],"projects":["<project SVA>"]},"updated_seq":35,"user_id":"<@artist>","workspace_id":"<id #153>"}},"entity_id":"<@artist>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":35,"type":"member.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #222>","data":{"row":{"created_at":1700000000000,"handle":"artist","handoff_limit":5,"kind":"agent","name":"Artist","responsible_id":"<@aram>","role":"member","scope":{"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete","secret.send"],"projects":["<project SVA>"]},"updated_seq":35,"user_id":"<@artist>","workspace_id":"<id #153>"}},"entity_id":"<@artist>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":35,"type":"member.created"}
 
 id: 36
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #223>","data":{"row":{"created_at":1700000000000,"handle":"ops","kind":"agent","name":"Ops bot","responsible_id":"<@aram>","role":"member","scope":{"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete"]},"updated_seq":36,"user_id":"<@ops>","workspace_id":"<id #153>"}},"entity_id":"<@ops>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":36,"type":"member.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #223>","data":{"row":{"created_at":1700000000000,"handle":"ops","kind":"agent","name":"Ops bot","responsible_id":"<@aram>","role":"member","scope":{"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete","secret.send"]},"updated_seq":36,"user_id":"<@ops>","workspace_id":"<id #153>"}},"entity_id":"<@ops>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":36,"type":"member.created"}
 
 id: 37
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #224>","data":{"row":{"category":"started","id":"<status Review>","name":"Review","project_id":"<project SVA>","rank":"00000002o","updated_seq":37}},"entity_id":"<status Review>","entity_type":"status","project_id":"<project SVA>","scope_id":"<project SVA>","scope_type":"project","seq":37,"type":"status.created"}

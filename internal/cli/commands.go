@@ -83,7 +83,7 @@ var commands = []command{
 
 	// secrets (cmd_secrets.go)
 	{names: []string{"secrets"}, run: readCommand("/secrets")},
-	{names: []string{"request"}, args: 2, noDryRun: true, usage: "request NAME URL [method=POST] [header=K:V ...] [body=TEXT|-]", run: (*runner).request},
+	{names: []string{"request"}, args: 2, noDryRun: true, usage: "request NAME URL [method=POST] [header=K:V ...] [body=TEXT|-] [approval=DECISION_ID]", run: (*runner).request},
 	{names: []string{"run"}, noDryRun: true, run: (*runner).runWithSecrets},
 
 	// docs (cmd_docs.go)

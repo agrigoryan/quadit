@@ -648,7 +648,7 @@ OPS Todo: 2
 // is kept, size and SHA-256 of what it holds.
 const shapeExport = `
 README.txt | deflated | 705 | d5b732b4d9a9139d7f738562f7ec1e6cf4e8effb96421f59172f5fc9e8842929
-data/members.json | deflated | 774 | 2b805133015a47587ef2c143641d297c3fc48d8f3cd109dca65f4fd81a97104b
+data/members.json | deflated | 793 | dcadb865160b87d782178ca6360ced7278410374bd8400932a7a3563d245bbf9
 data/projects.json | deflated | 344 | 1a512062438cf547ca5c3ca4e586922b433dbae258976396509ef55816a7ad50
 data/statuses.json | deflated | 1893 | ecfd23fa6bd35d948c79a0b54cc139a81b5281dc6f0b0e4e39e72f6638807230
 data/labels.json | deflated | 82 | 567b1a7ec9b5e4759d6098424545c609521bd45e4cb7c9f4947324702894d335
@@ -668,7 +668,7 @@ data/properties.json | deflated | 397 | be182b84fd472a4df5f7d24cde2617677310c71a
 data/preferences.json | deflated | 134 | 24085cc7c3325fa74f3db6d810f23fc525110007139aca3048b1ddb24680ee02
 data/views.json | deflated | 3 | 37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570
 data/tasks.json | deflated | 2312 | e3f0e10264f8fd8d9f14defa6a7f07c18ab66c84dc0599a042c7731db627a68b
-data/events.json | deflated | 31611 | a47b891c6662250738b65e5b02c2aa72a2773e5d1605ef062a52cc32fbe9b743
+data/events.json | deflated | 31632 | 44ec99c96d9c573dcd95375dd44c111faefb7f258a9e09522b441be0896318bd
 tasks/SVA/SVA-1 Boss design.md | deflated | 731 | 5d296083ad02d6137e3286fcbd56d91dabae98b173d0bb44f46e3d86e43dafef
 tasks/SVA/SVA-2 Boss music.md | deflated | 139 | d991d93cc46ce7ed7bea1d59521d4a9f5d5ba75d5747e9e5316bd34fbd30250e
 tasks/SVA/SVA-3 Explosion effect.md | deflated | 176 | 34046b56614aed05d3b99776206bf73d6dea854f8a1079c9637db83e6d8cc8a1

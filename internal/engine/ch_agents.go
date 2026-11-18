@@ -40,7 +40,7 @@ type agentCreateArgs struct {
 var AsksFirst = []string{
 	"project.delete", "member.remove", "member.add", "workspace.update",
 	"webhook.create", "webhook.update", "integration.create", "integration.update", "source.create", "source.update",
-	"secret.set", "secret.delete",
+	"secret.set", "secret.delete", "secret.send",
 }
 
 // agentCreate makes an agent: a standing one, which an admin makes, or a

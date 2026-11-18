@@ -173,7 +173,7 @@ If the answer does not settle the question, say so in one line with `decision.un
 
 For a plain yes or no, `quadit approval SVA-12 "Merge this?"`.
 
-Some changes need approval first. A new agent asks before anything that cannot be taken back or that reaches outside (deleting a project, adding or removing people, webhooks, integrations, repository sources, secrets); the person responsible for it can change that list. A refused change says so (`needs_approval`). Ask with the exact change:
+Some changes need approval first. A new agent asks before anything that cannot be taken back or that reaches outside (deleting a project, adding or removing people, webhooks, integrations, repository sources, secrets, and requests made with a secret that change something); the person responsible for it can change that list. A refused change says so (`needs_approval`). Ask with the exact change:
 
 ```bash
 quadit approval SVA-12 "Delete the duplicate SVA-14?" action=task.delete args='{"id":"SVA-14"}'
@@ -302,6 +302,8 @@ quadit request DEPLOY_KEY https://api.example.com/deploy method=POST \
 What the agent gets back is blanked: every form the value went out in (as is, in base64, inside the Basic base64), and each of those as an address, JSON or HTML would escape it, is replaced by `•••` in the answer's headers and body, before the body is cut at 1 MB. An answer that is not text (bytes, or in an encoding other than UTF-8) is not passed on at all: the agent gets its status, headers and size, and `body_omitted` saying why. The vault asks for compressed answers itself and undoes the compression, so an agent's `Accept-Encoding` is dropped.
 
 That is what the vault can promise; the rest rests on the hosts a secret is bound to. A service that hands the value back changed in some other way (cut in pieces, reversed, hashed weakly, in another encoding) or that keeps it and shows it elsewhere gives it away, and the vault cannot see that. So an admin binds a secret only to services trusted with it, the way one would hand them the key directly, and prefers keys those services scope to the work at hand.
+
+A request that can change something at the far end (any method but GET, HEAD and OPTIONS) is held as a change is: a member who may only read cannot send one, and an agent that asks before `secret.send` asks for exactly `{"name": NAME, "method": METHOD, "url": URL}` (the URL as written, with `{{secret}}`) and sends the request with `approval=DECISION_ID`.
 
 For tools on the agent's own machine (git, a deploy script) a secret can be marked `env`. A companion holding a token made for secrets (`quadit admin token --secrets WORKSPACE @agent`, or `POST tokens {"user":"@agent","secrets":true}` as a signed-in admin) starts commands with it in their environment and blanks it out of what they print:
 

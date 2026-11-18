@@ -448,6 +448,11 @@ export interface Changes {
   "secret.delete": {
     id: string;
   };
+  "secret.send": {
+    name: string;
+    method?: string;
+    url?: string;
+  };
   "secret.set": {
     id?: string;
     name: string;

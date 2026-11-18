@@ -174,7 +174,7 @@ func toolRender(c caller, a map[string]any) (string, bool) {
 }
 
 func toolSecretRequest(c caller, a map[string]any) (string, bool) {
-	req := map[string]any{"method": argText(a, "method"), "url": argText(a, "url"), "body": argText(a, "body")}
+	req := map[string]any{"method": argText(a, "method"), "url": argText(a, "url"), "body": argText(a, "body"), "approval": argText(a, "approval")}
 	switch h := a["headers"].(type) {
 	case map[string]any:
 		req["headers"] = h

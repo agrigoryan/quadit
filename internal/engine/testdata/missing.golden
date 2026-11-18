@@ -272,6 +272,11 @@ secret.set -name: invalid [name] a secret's name is letters, digits and _, start
 secret.set -name others wrong: invalid [name] a secret's name is letters, digits and _, starting with a letter (like GITHUB_TOKEN)
 secret.set -value: invalid [value] a new secret needs its value
 secret.set -value others wrong: not_found [agents] member "zz" does not exist in this workspace
+secret.send {}: not_found [] secret "" does not exist in this workspace
+secret.send -method: ok
+secret.send -name: not_found [] secret "" does not exist in this workspace
+secret.send -name others wrong: not_found [] secret "" does not exist in this workspace
+secret.send -url: ok
 secret.delete {}: not_found [] secret "" does not exist in this workspace
 secret.delete -id: not_found [] secret "" does not exist in this workspace
 secret.delete -id others wrong: not_found [] secret "" does not exist in this workspace
