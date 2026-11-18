@@ -12,6 +12,7 @@ import { app, BrowserWindow, dialog, Menu, net, shell } from "electron";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
 import { SignInFlows } from "@/main/handoff";
 import { menuTemplate } from "@/main/menu";
+import { ServerChecks } from "@/main/server-checks";
 import { ServerList } from "@/main/server-list";
 import { ServerWindows } from "@/main/server-windows";
 import { ServerStore } from "@/main/servers";
@@ -60,10 +61,17 @@ function start() {
 
   enablePasskeys();
 
-  const signIn = (serverId: string) => {
-    const server = store.get(serverId);
-    if (server) void shell.openExternal(flows.begin(server.id, server.origin));
-  };
+  const fetcher = (url: string, init?: RequestInit) => net.fetch(url, init);
+  const checks = new ServerChecks(store, fetcher, (words) => void warn(words));
+  // Every way to start the browser sign-in (the bar, the server list, the
+  // menu, a provider's address on the sign-in page) comes here, and only a
+  // server that speaks this app's hand-off gets it.
+  const signIn = (serverId: string) =>
+    void checks.whyNoSignIn(serverId).then((refused) => {
+      const server = store.get(serverId);
+      if (refused) void warn(refused);
+      else if (server) void shell.openExternal(flows.begin(server.id, server.origin));
+    });
 
   let refreshMenu = () => {};
   const unread = new Unread(store, {
@@ -83,14 +91,15 @@ function start() {
   const list = new ServerList(store, windows, {
     pagesPreload: join(outDir, "preload-pages.js"),
     pagesUrl,
-    fetcher: (url, init) => net.fetch(url, init),
+    fetcher,
+    checks,
     signIn,
   });
 
   const updates = new UpdateWatch(
     join(app.getPath("userData"), "update-check.json"),
     version,
-    (url, init) => net.fetch(url, init),
+    fetcher,
     () => refreshMenu(),
     (release) => void tellAboutUpdate(release),
   );
@@ -160,8 +169,15 @@ function start() {
 
   unread.start();
   if (!windows.restore()) list.show();
+  // Servers upgrade and downgrade while the app is away: ask each again.
+  void checks.checkAll();
   if (app.isPackaged || process.env.QUADIT_DESKTOP_CHECK_UPDATES) updates.start();
   for (const link of earlyLinks.splice(0)) handleLink(link);
+}
+
+/** Tells the person something that went wrong or needs them, in a dialog of its own. */
+async function warn(words: { title: string; detail: string }) {
+  await dialog.showMessageBox({ type: "warning", message: words.title, detail: words.detail });
 }
 
 /** Says a newer version is out and how to get it; the app installs nothing itself. */

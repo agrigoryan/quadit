@@ -6,6 +6,7 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
 import { serverOrigin, transportOf } from "@/main/origins";
 import { type Fetch, probe } from "@/main/probe";
+import type { ServerChecks } from "@/main/server-checks";
 import type { ServerWindows } from "@/main/server-windows";
 import type { Server, ServerStore } from "@/main/servers";
 import {
@@ -22,8 +23,10 @@ export interface ServerListSetup {
   pagesPreload: string;
   /** The file URL of the folder holding the bundled pages; frames from anywhere else are not answered. */
   pagesUrl: string;
-  /** The network the probes go through (Electron's net.fetch). */
+  /** The network the probes of servers being added go through (Electron's net.fetch). */
   fetcher: Fetch;
+  /** What asks added servers what they are and keeps the answer. */
+  checks: ServerChecks;
   signIn(serverId: string): void;
 }
 
@@ -127,16 +130,15 @@ export class ServerList {
     const answer = await probe(origin, this.setup.fetcher);
     if (!answer.reachable) return { ok: false, error: answer.reason };
     const server = this.store.add(origin, name, answer.handoff);
+    this.store.change(server.id, { version: answer.version });
     this.windows.show(server.id);
     return { ok: true, server: view(server) };
   }
 
   private async check(id: string): Promise<ServerStatus> {
-    const server = this.store.get(id);
-    if (!server) return { reachable: false, reason: "This server was removed." };
-    const answer = await probe(server.origin, this.setup.fetcher);
+    const answer = await this.setup.checks.check(id);
+    if (!answer) return { reachable: false, reason: "This server was removed." };
     if (!answer.reachable) return answer;
-    this.store.change(server.id, { handoff: answer.handoff });
     return { reachable: true, version: answer.version, fit: answer.fit };
   }
 }

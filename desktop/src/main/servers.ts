@@ -18,9 +18,13 @@ export interface Server {
   open: boolean;
   /** The sign-in hand-off version the server last said it speaks (0 when it has none). */
   handoff: number;
+  /** The Quadit version the server last said it runs ("" until it has answered). */
+  version: string;
+  /** The version and fit the person was last told about when the server did not fit the app ("" when it fit). */
+  warned: string;
 }
 
-type Change = Partial<Pick<Server, "name" | "open" | "handoff">>;
+type Change = Partial<Pick<Server, "name" | "open" | "handoff" | "version" | "warned">>;
 
 export class ServerStore {
   private servers: Server[];
@@ -51,7 +55,15 @@ export class ServerStore {
       this.change(known.id, { handoff, ...(name.trim() ? { name: named } : {}) });
       return this.get(known.id) ?? known;
     }
-    const server: Server = { id: randomBytes(6).toString("hex"), name: named, origin, open: false, handoff };
+    const server: Server = {
+      id: randomBytes(6).toString("hex"),
+      name: named,
+      origin,
+      open: false,
+      handoff,
+      version: "",
+      warned: "",
+    };
     this.servers = [...this.servers, server];
     this.save();
     return server;
@@ -107,6 +119,8 @@ function readServers(file: string): Server[] {
             origin: item.origin,
             open: item.open === true,
             handoff: Number(item.handoff) || 0,
+            version: typeof item.version === "string" ? item.version : "",
+            warned: typeof item.warned === "string" ? item.warned : "",
           },
         ]
       : [],

@@ -84,6 +84,37 @@ test("an older Quadit without the hand-off is added, and says to sign in with a 
   await expect(list.getByRole("button", { name: "Sign in to Old with your browser" })).toBeDisabled();
 });
 
+test("at start the app asks each server again, says when one became too new for it, and starts no sign-in there", async ({
+  run,
+}) => {
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  let desktop = await Desktop.launch(data, run);
+  await desktop.addServer(run.fake, "Fake");
+  await desktop.close();
+
+  await fetch(`${run.fake}/__fake/handoff?version=2`);
+  desktop = await Desktop.launch(data, run);
+  try {
+    await expect
+      .poll(async () => (await desktop.recorded()).dialogs)
+      .toEqual([expect.stringMatching(/^Fake needs a newer Quadit app .*Quadit e2e-fake/)]);
+    // Any way to start the browser sign-in (here the server list's, which the menu's and the bar's share) is refused.
+    const id = desktop.serverId(run.fake);
+    await desktop.app.evaluate(({ Menu }) =>
+      Menu.getApplicationMenu()
+        ?.items.find((item) => item.label === "File")
+        ?.submenu?.items.find((item) => item.label === "Servers…")
+        ?.click(),
+    );
+    await (await desktop.serverList()).evaluate((server) => window.quaditPages?.signIn(server), id);
+    await expect.poll(async () => (await desktop.recorded()).dialogs).toHaveLength(2);
+    expect((await desktop.recorded()).opened).toEqual([]);
+  } finally {
+    await fetch(`${run.fake}/__fake/handoff?version=1`);
+    await desktop.close();
+  }
+});
+
 test("the app reopens the server windows that were open, where they were, still signed in", async ({ run }) => {
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   let desktop = await Desktop.launch(data, run);

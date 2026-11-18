@@ -74,7 +74,8 @@ class Moved extends Error {
   }
 }
 
-function fitOf(handoff: number): Fit {
+/** How a server that speaks hand-off version `handoff` (0: none) fits this app. */
+export function fitOf(handoff: number): Fit {
   if (handoff === 0) return "old-server";
   return handoff > HANDOFF_VERSION ? "new-server" : "ok";
 }

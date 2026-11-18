@@ -36,7 +36,7 @@ import {
 import { giveContextMenu } from "@/main/context-menu";
 import { HANDOFF_HEADER } from "@/main/handoff";
 import { appPage, browserAddress, isHandoffPage, isOwnPage } from "@/main/origins";
-import { HANDOFF_VERSION } from "@/main/probe";
+import { fitOf } from "@/main/probe";
 import type { Server, ServerStore } from "@/main/servers";
 import { BRIDGE_BADGE, BRIDGE_NOTIFY, ORIGIN_SWITCH, VERSION_SWITCH } from "@/shared/bridge";
 
@@ -79,6 +79,10 @@ export class ServerWindows {
     ipcMain.on(BRIDGE_NOTIFY, (event, n: { title: string; body: string; path: string; tag?: string }) => {
       const server = this.bridgeSender(event);
       if (server) this.notify(server, n);
+    });
+    // A server's answer changed (its hand-off at start, say): the sign-in bar may come or go.
+    store.onChange(() => {
+      for (const [serverId, win] of this.windows) this.placeBar(win, serverId);
     });
     ipcMain.on(BRIDGE_BADGE, (event, count: unknown) => {
       const server = this.bridgeSender(event);
@@ -371,5 +375,5 @@ function onSignInPage(contents: WebContents, server: Server): boolean {
 
 /** Whether the server speaks the hand-off this app knows. */
 function handoffWorks(server: Server): boolean {
-  return server.handoff >= 1 && server.handoff <= HANDOFF_VERSION;
+  return fitOf(server.handoff) === "ok";
 }
