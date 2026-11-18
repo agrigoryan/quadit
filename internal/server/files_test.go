@@ -522,3 +522,86 @@ func TestFirstRequestsUnderOneIDDoNotShareWhatTheyReceive(t *testing.T) {
 		}
 	})
 }
+
+// heldFiles is file storage that holds the first whole file stored (not a
+// part of an upload) until release is closed, as a server slow to publish
+// an upload would: held is closed once that store has begun.
+type heldFiles struct {
+	blob.Store
+	once    sync.Once
+	held    chan struct{}
+	release chan struct{}
+}
+
+func (f *heldFiles) Put(ctx context.Context, key string, r io.Reader, ct string) error {
+	if !strings.Contains(key, ".upload-parts/") {
+		first := false
+		f.once.Do(func() { first = true })
+		if first {
+			close(f.held)
+			<-f.release
+		}
+	}
+	return f.Store.Put(ctx, key, r, ct)
+}
+
+// TestAnUploadStartedAgainIsNotOverwrittenByOneStillBeingStored: while one
+// request is storing an upload whole, another (as on a server without its
+// bytes) starts it again and the caller sends different bytes, which are
+// stored and made ready. The first store, landing late, does not replace
+// them: the file served is the bytes its checksum says, and the late copy
+// is not left behind in file storage.
+func TestAnUploadStartedAgainIsNotOverwrittenByOneStillBeingStored(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		disk, err := blob.NewDisk(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		files := &heldFiles{Store: disk, held: make(chan struct{}), release: make(chan struct{})}
+		s := newSiteWithFiles(t, st, files)
+		before, after := []byte("the first bytes"), []byte("the other bytes")
+		fid := id.New()
+		path := fmt.Sprintf(w+"/files?name=notes.txt&size=%d&id=%s", len(before), fid)
+
+		slow := make(chan int, 1)
+		go func() {
+			resp, err := s.owner.Post(s.url+path, "text/plain", bytes.NewReader(before))
+			if err != nil {
+				t.Error(err)
+				slow <- 0
+				return
+			}
+			resp.Body.Close()
+			slow <- resp.StatusCode
+		}()
+		<-files.held
+		// The bytes the slow request is storing are open already; asked
+		// again, this server no longer has them, as another would not.
+		if err := os.Remove(filepath.Join(s.dir, "uploads", fid+".part")); err != nil {
+			t.Fatal(err)
+		}
+		s.call(t, s.owner, "", "POST", path, before, 409, nil)
+		var f struct {
+			uploaded
+			URL string
+		}
+		s.call(t, s.owner, "", "PATCH", w+"/files/"+fid+"?offset=0", after, 200, &f)
+		if f.State != "ready" || f.SHA256 != sumOf(after) {
+			t.Fatalf("sent again from the start, the file is %+v", f)
+		}
+		close(files.release)
+		<-slow
+
+		s.call(t, s.owner, "", "GET", w+"/files/"+fid, nil, 200, &f)
+		if got := s.call(t, s.owner, "", "GET", strings.TrimPrefix(f.URL, s.url), nil, 200, nil); got != string(after) || f.SHA256 != sumOf(after) {
+			t.Fatalf("the file serves %q with the sum %s, want %q with %s", got, f.SHA256, after, sumOf(after))
+		}
+		var stored []string
+		if err := disk.List(context.Background(), "", func(k string, _ int64) error { stored = append(stored, k); return nil }); err != nil {
+			t.Fatal(err)
+		}
+		if len(stored) != 1 {
+			t.Fatalf("file storage holds %v, want the file alone", stored)
+		}
+	})
+}

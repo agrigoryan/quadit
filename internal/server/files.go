@@ -550,12 +550,23 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 	s.addPreview(ctx, &ready, path, set)
 	// Two requests may finish the same upload at once; the file is the same
 	// bytes either way, and the first to mark it ready is the one that counts.
-	changed, err := x.db.Update(ctx, "files", set, store.Eq("id", f.ID), store.Eq("state", core.FileUploading))
+	// One whose upload was started over meanwhile (startUploadOver) stored
+	// bytes the upload no longer stands for, under the key it had then: the
+	// key fences it, so its late store cannot replace the bytes the new start
+	// stores, and its row is not marked; what it stored is removed.
+	changed, err := x.db.Update(ctx, "files", set, store.Eq("id", f.ID), store.Eq("state", core.FileUploading), store.Eq("storage_key", f.StorageKey))
 	if err != nil {
 		return err
 	}
 	if changed == 0 {
-		return x.db.Get(ctx, f, store.Eq("id", f.ID))
+		published := ready
+		if err := x.db.Get(ctx, f, store.Eq("id", f.ID)); err != nil {
+			return err
+		}
+		if f.StorageKey != published.StorageKey {
+			s.dropParts(ctx, slices.DeleteFunc([]string{published.StorageKey, published.PreviewKey}, func(key string) bool { return key == "" })...)
+		}
+		return nil
 	}
 	in.Close()
 	s.dropReceived(ctx, *f)
@@ -565,10 +576,13 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 
 // startUploadOver lets go of what an upload received when it is not the
 // file the upload was started as (why says how), and refuses the request
-// with where to continue from: the start.
+// with where to continue from: the start. The upload gets a new storage
+// key, which is what tells a request still storing the old start apart
+// from the new one (finishUpload).
 func (s *Server) startUploadOver(ctx context.Context, db store.DB, f core.File, why string) error {
-	changed, err := db.Update(ctx, "files", map[string]any{"received": 0, "parts": []string{}},
-		store.Eq("id", f.ID), store.Eq("state", core.FileUploading), store.Eq("received", f.Received))
+	fresh := fmt.Sprintf("%s/%s-%s", f.WorkspaceID, f.ID, id.New())
+	changed, err := db.Update(ctx, "files", map[string]any{"received": 0, "parts": []string{}, "storage_key": fresh},
+		store.Eq("id", f.ID), store.Eq("state", core.FileUploading), store.Eq("storage_key", f.StorageKey), store.Eq("received", f.Received))
 	if err != nil {
 		return err
 	}
