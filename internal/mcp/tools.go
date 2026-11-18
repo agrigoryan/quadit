@@ -101,7 +101,7 @@ var tools = []tool{
 	{Name: "file", Desc: "A file's details: name, type, size, checksum, address, and whether its upload is complete.", Props: map[string]arg{"!id": text("file id")}, Run: readPathTool("/files/{id}", "id")},
 	{Name: "secrets", Desc: "The secrets (keys, passwords) I may use, by name, with the hosts each may be sent to. Values are never shown.", Run: readPathTool("/secrets")},
 	{Name: "secret_request", Desc: "Make an HTTP request with a secret I cannot read: write {{secret}} where the value belongs (a header, the URL or the body); {{basic:USER}} gives base64 of USER:secret. " +
-		"It goes only to the secret's hosts, and the value is blanked out of the answer.",
+		"It goes only to the secret's hosts, and the value is blanked out of the answer; an answer that is not text comes back without its body (body_omitted).",
 		Props: map[string]arg{"!name": text("the secret's name"), "!url": text("full https address"), "method": text("GET (default), POST, PUT, PATCH, DELETE"),
 			"headers": headers(`JSON object, e.g. {"Authorization": "Bearer {{secret}}"}`), "body": text("request body, as text")},
 		Run: toolSecretRequest},

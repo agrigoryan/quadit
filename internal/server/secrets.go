@@ -5,8 +5,10 @@ package server
 //
 //   - It asks the server to make an HTTP request for it, writing {{secret}}
 //     where the value belongs. The request goes only to the hosts the secret
-//     is bound to, redirects are not followed, and the value is blanked out
-//     of the answer. The agent uses the key and never holds it.
+//     is bound to, redirects are not followed, every form of the value that
+//     was sent is blanked out of the answer, and an answer that is not text
+//     is not passed on. The agent uses the key without being handed it, as
+//     far as the services it is bound to keep it to themselves.
 //   - A secret marked env is handed to the companion ("quadit run"), which
 //     must hold a token made for that, to put in the environment of the
 //     command it starts. This is for tools on the agent's own machine.
@@ -15,10 +17,12 @@ package server
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"maps"
 	"net/http"
@@ -26,6 +30,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
@@ -36,7 +41,7 @@ import (
 func (s *Server) secretRoutes() []route {
 	return []route{
 		{"GET /api/v1/w/{ws}/secrets", s.workspaceMember(s.handleListSecrets), "The secrets the caller may use: names, hosts and what they are for. Values are never returned.", "", "secrets"},
-		{"POST /api/v1/w/{ws}/secrets/{name}/request", s.workspaceMember(s.handleSendRequestWithSecret), "Make an HTTP request with a secret the caller cannot read. Body: {method, url, headers, body}; write {{secret}} where the value belongs. Only to the secret's hosts; redirects are not followed; the value is blanked out of the answer.", "", "secrets"},
+		{"POST /api/v1/w/{ws}/secrets/{name}/request", s.workspaceMember(s.handleSendRequestWithSecret), "Make an HTTP request with a secret the caller cannot read. Body: {method, url, headers, body}; write {{secret}} where the value belongs. Only to the secret's hosts; redirects are not followed; every form of the value sent is blanked out of the answer, and an answer that is not text is not passed on (body_omitted).", "", "secrets"},
 		{"POST /api/v1/w/{ws}/secrets/env", s.workspaceMember(s.handleListEnvSecrets), "For a companion's token made for secrets: the values of secrets marked env. Body: {names}.", "", "secrets"},
 	}
 }
@@ -152,7 +157,8 @@ func (s *Server) handleSendRequestWithSecret(x *c) error {
 	if err != nil {
 		return err
 	}
-	req, target, err := newSecretRequest(x, sec, value, b)
+	use := &secretUse{value: value}
+	req, err := newSecretRequest(x, sec, use, b)
 	if err != nil {
 		return err
 	}
@@ -161,81 +167,127 @@ func (s *Server) handleSendRequestWithSecret(x *c) error {
 	defer cancel()
 	resp, err := s.outbound.Do(req.WithContext(ctx))
 	s.markSecretUsed(x, sec, started)
-	s.audit(x.r, x.ws.ID, x.user, "secret.used", "secret", sec.ID, map[string]string{"name": sec.Name, "method": req.Method, "host": target.Host, "path": target.Path})
-	mask := secretMasker(value)
+	// The record has the address as the caller wrote it: with the value in
+	// it, the audit log would hand it to whoever reads that.
+	written, perr := url.Parse(b.URL)
+	if perr != nil {
+		written = &url.URL{Host: req.URL.Host}
+	}
+	s.audit(x.r, x.ws.ID, x.user, "secret.used", "secret", sec.ID, map[string]string{"name": sec.Name, "method": req.Method, "host": written.Host, "path": written.Path})
 	if err != nil {
-		return x.ok(map[string]any{"ok": false, "error": mask(err.Error()), "ms": time.Since(started).Milliseconds()})
+		return x.ok(map[string]any{"ok": false, "error": use.mask(err.Error()), "ms": time.Since(started).Milliseconds()})
 	}
 	defer resp.Body.Close()
-	raw, cut, err := readSecretAnswer(resp.Body)
+	raw, cut, err := use.readAnswer(resp.Body)
 	if err != nil {
-		return x.ok(map[string]any{"ok": false, "error": mask(err.Error()), "ms": time.Since(started).Milliseconds()})
+		return x.ok(map[string]any{"ok": false, "error": use.mask(err.Error()), "ms": time.Since(started).Milliseconds()})
 	}
 	headers := map[string]string{}
 	for k, vs := range resp.Header {
 		if k == "Set-Cookie" {
 			continue
 		}
-		headers[k] = mask(strings.Join(vs, ", "))
+		headers[k] = use.mask(strings.Join(vs, ", "))
 	}
 	out := map[string]any{"ok": resp.StatusCode >= 200 && resp.StatusCode < 300, "status": resp.StatusCode, "headers": headers,
-		"ms": time.Since(started).Milliseconds(), "truncated": cut}
-	if isText(resp.Header.Get("Content-Type"), raw) {
-		out["body"] = mask(string(raw))
+		"ms": time.Since(started).Milliseconds(), "truncated": cut, "size": len(raw)}
+	if isText(resp.Header, raw) {
+		out["body"] = string(raw)
 	} else {
-		out["body_base64"] = base64.StdEncoding.EncodeToString(raw)
+		// Bytes, or text compressed or in another encoding: the value could
+		// be in there in a form no search finds, so none of it is passed on.
+		out["body_omitted"] = "the answer is not text (" + cmp.Or(resp.Header.Get("Content-Encoding"), resp.Header.Get("Content-Type"), "no Content-Type") +
+			"), so the vault cannot blank the secret out of it and does not pass it on"
 	}
 	if x.wantText() {
-		return x.text(secretAnswerText(resp.StatusCode, headers, out, len(raw)))
+		return x.text(secretAnswerText(resp.StatusCode, headers, out))
 	}
 	return x.ok(out)
 }
 
 // newSecretRequest builds the request the vault sends: the secret filled in
 // where it is asked for, and the address checked against the hosts the
-// secret is bound to. target is the address as the caller wrote it, for the
-// audit log.
-func newSecretRequest(x *c, sec core.Secret, value string, b secretRequest) (req *http.Request, target *url.URL, err error) {
-	u, err := url.Parse(fillSecret(b.URL, value))
+// secret is bound to.
+func newSecretRequest(x *c, sec core.Secret, use *secretUse, b secretRequest) (*http.Request, error) {
+	u, err := url.Parse(use.fillURL(b.URL))
 	if err != nil || u.Host == "" || (u.Scheme != "https" && u.Scheme != "http") {
-		return nil, nil, &engine.Error{Code: engine.CodeInvalid, Field: "url", Message: "url must be a full http(s) address"}
+		return nil, &engine.Error{Code: engine.CodeInvalid, Field: "url", Message: "url must be a full http(s) address"}
 	}
 	if len(sec.Hosts) == 0 {
-		return nil, nil, errForbidden("the secret %s is not bound to any host, so it cannot be sent anywhere; an admin sets its hosts", sec.Name)
+		return nil, errForbidden("the secret %s is not bound to any host, so it cannot be sent anywhere; an admin sets its hosts", sec.Name)
 	}
 	if !hostAllowed(sec, u) {
-		return nil, nil, &engine.Error{Code: engine.CodeForbidden, Field: "url", Allowed: sec.Hosts,
+		return nil, &engine.Error{Code: engine.CodeForbidden, Field: "url", Allowed: sec.Hosts,
 			Message: fmt.Sprintf("the secret %s may only be sent to: %s", sec.Name, strings.Join(sec.Hosts, ", "))}
 	}
 	method := strings.ToUpper(b.Method)
 	if method == "" {
 		method = "GET"
 	}
-	body := []byte(fillSecret(b.Body, value))
+	body := []byte(use.fill(b.Body))
 	if b.BodyBase64 != "" {
 		if body, err = base64.StdEncoding.DecodeString(b.BodyBase64); err != nil {
-			return nil, nil, &engine.Error{Code: engine.CodeInvalid, Field: "body_base64", Message: "body_base64 does not decode"}
+			return nil, &engine.Error{Code: engine.CodeInvalid, Field: "body_base64", Message: "body_base64 does not decode"}
 		}
 	}
-	req, err = http.NewRequestWithContext(x.ctx(), method, u.String(), bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(x.ctx(), method, u.String(), bytes.NewReader(body))
 	if err != nil {
-		return nil, nil, &engine.Error{Code: engine.CodeInvalid, Field: "method", Message: err.Error()}
+		return nil, &engine.Error{Code: engine.CodeInvalid, Field: "method", Message: err.Error()}
 	}
 	for k, v := range b.Headers {
-		req.Header.Set(k, fillSecret(v, value))
+		req.Header.Set(k, use.fill(v))
 	}
+	// The answer must come back as the service wrote it, for the secret to
+	// be found in it: the client asks for compression itself and undoes it.
+	req.Header.Del("Accept-Encoding")
 	if req.Header.Get("User-Agent") == "" {
 		req.Header.Set("User-Agent", "quadit")
 	}
-	return req, u, nil
+	return req, nil
 }
 
-// fillSecret puts the secret's value where a template asks for it:
-// {{secret}}, {{secret:base64}}, and {{basic:user}} for "user:value" in
-// base64, for Basic sign-in.
-func fillSecret(template, value string) string {
-	v := strings.ReplaceAll(template, "{{secret}}", value)
-	v = strings.ReplaceAll(v, "{{secret:base64}}", base64.StdEncoding.EncodeToString([]byte(value)))
+// secretUse is one use of a secret's value: it puts the value where a
+// request's templates ask for it, remembers each form the value went out
+// in, and blanks every one of those forms out of what comes back, as they
+// were sent and as a service that says them back may have escaped them
+// (in an address, in JSON, in HTML). Everything is filled before the first
+// mask: the forms to blank are settled then.
+type secretUse struct {
+	value string
+	sent  []string // the forms of the value filled in so far
+	masks []string // what mask blanks, longest first; made on first use
+}
+
+// fill puts the value where a template asks for it: {{secret}},
+// {{secret:base64}}, and {{basic:user}} for "user:value" in base64, for
+// Basic sign-in.
+func (use *secretUse) fill(template string) string {
+	return use.fillEscaped(template, func(v string) string { return v })
+}
+
+// fillURL fills an address, each form escaped for where it stands: in the
+// path, or in the query.
+func (use *secretUse) fillURL(template string) string {
+	path, query, hasQuery := strings.Cut(template, "?")
+	filled := use.fillEscaped(path, url.PathEscape)
+	if hasQuery {
+		filled += "?" + use.fillEscaped(query, url.QueryEscape)
+	}
+	return filled
+}
+
+func (use *secretUse) fillEscaped(template string, escape func(string) string) string {
+	put := func(form string) string {
+		use.sent = append(use.sent, form)
+		return escape(form)
+	}
+	v := template
+	if strings.Contains(v, "{{secret}}") {
+		v = strings.ReplaceAll(v, "{{secret}}", put(use.value))
+	}
+	if strings.Contains(v, "{{secret:base64}}") {
+		v = strings.ReplaceAll(v, "{{secret:base64}}", put(base64.StdEncoding.EncodeToString([]byte(use.value))))
+	}
 	for {
 		i := strings.Index(v, "{{basic:")
 		if i < 0 {
@@ -246,40 +298,69 @@ func fillSecret(template, value string) string {
 			break
 		}
 		user := v[i+len("{{basic:") : i+j]
-		v = v[:i] + base64.StdEncoding.EncodeToString([]byte(user+":"+value)) + v[i+j+2:]
+		v = v[:i] + put(base64.StdEncoding.EncodeToString([]byte(user+":"+use.value))) + v[i+j+2:]
 	}
 	return v
 }
 
-// secretMasker blanks a secret's value out of anything that goes back to
-// the caller, plain or in base64.
-func secretMasker(value string) func(string) string {
-	return func(v string) string {
-		v = strings.ReplaceAll(v, value, secretMask)
-		return strings.ReplaceAll(v, base64.StdEncoding.EncodeToString([]byte(value)), secretMask)
+// mask blanks every form of the value out of text going back to the
+// caller.
+func (use *secretUse) mask(text string) string {
+	for _, m := range use.forms() {
+		text = strings.ReplaceAll(text, m, secretMask)
 	}
+	return text
+}
+
+// forms are what mask blanks, longest first: each form of the value sent,
+// and the value itself and its base64 even when not sent, as they are and
+// escaped.
+func (use *secretUse) forms() []string {
+	if use.masks == nil {
+		seen := map[string]bool{}
+		for _, form := range append([]string{use.value, base64.StdEncoding.EncodeToString([]byte(use.value))}, use.sent...) {
+			quoted, _ := json.Marshal(form)
+			for _, m := range []string{form, url.QueryEscape(form), url.PathEscape(form), strings.Trim(string(quoted), `"`), html.EscapeString(form)} {
+				if m != "" && !seen[m] {
+					seen[m] = true
+					use.masks = append(use.masks, m)
+				}
+			}
+		}
+		slices.SortFunc(use.masks, func(a, b string) int { return len(b) - len(a) })
+	}
+	return use.masks
 }
 
 // secretAnswerLimit is how much of an answer the vault passes back.
 const secretAnswerLimit = 1 << 20
 
-// readSecretAnswer reads an answer's body up to secretAnswerLimit; cut
-// says there was more.
-func readSecretAnswer(body io.Reader) (raw []byte, cut bool, err error) {
-	raw, err = io.ReadAll(io.LimitReader(body, secretAnswerLimit+1))
+// readAnswer reads an answer's body up to secretAnswerLimit, blanked; cut
+// says there was more. It blanks before it cuts: a form of the value that
+// the cut would split is blanked whole, not left half there.
+func (use *secretUse) readAnswer(body io.Reader) (text []byte, cut bool, err error) {
+	longest := len(use.forms()[0])
+	raw, err := io.ReadAll(io.LimitReader(body, int64(secretAnswerLimit+longest+1)))
 	if err != nil {
 		return nil, false, err
 	}
-	if len(raw) > secretAnswerLimit {
-		return raw[:secretAnswerLimit], true, nil
+	cut = len(raw) > secretAnswerLimit
+	text = []byte(use.mask(string(raw)))
+	if len(text) > secretAnswerLimit {
+		text = text[:secretAnswerLimit]
+		for len(text) > 0 {
+			if r, size := utf8.DecodeLastRune(text); r != utf8.RuneError || size > 1 {
+				break
+			}
+			text = text[:len(text)-1] // a character the cut split
+		}
 	}
-	return raw, false, nil
+	return text, cut, nil
 }
 
 // secretAnswerText is an answer in the compact text form: the status, the
-// headers worth seeing, and the body. out is the answer as JSON; size is
-// how many bytes of body were read.
-func secretAnswerText(status int, headers map[string]string, out map[string]any, size int) string {
+// headers worth seeing, and the body. out is the answer as JSON.
+func secretAnswerText(status int, headers map[string]string, out map[string]any) string {
 	var text strings.Builder
 	fmt.Fprintf(&text, "%d %s\n", status, http.StatusText(status))
 	for _, k := range slices.Sorted(maps.Keys(headers)) {
@@ -291,7 +372,7 @@ func secretAnswerText(status int, headers map[string]string, out map[string]any,
 	if body, ok := out["body"].(string); ok {
 		text.WriteString(body)
 	} else {
-		fmt.Fprintf(&text, "(%d bytes, not text)", size)
+		fmt.Fprintf(&text, "(%d bytes not passed on: %s)", out["size"], out["body_omitted"])
 	}
 	if cut, _ := out["truncated"].(bool); cut {
 		text.WriteString("\n(cut at 1 MB)")
@@ -307,9 +388,17 @@ func (s *Server) markSecretUsed(x *c, sec core.Secret, at time.Time) {
 	}
 }
 
-// isText reports whether an answer can be shown as text.
-func isText(contentType string, raw []byte) bool {
-	ct := strings.ToLower(contentType)
+// isText reports whether an answer is text the vault can search for the
+// secret: declared text, JSON, XML or a form (or undeclared and valid
+// JSON), not compressed, and valid UTF-8.
+func isText(header http.Header, raw []byte) bool {
+	if enc := header.Get("Content-Encoding"); enc != "" && !strings.EqualFold(enc, "identity") {
+		return false
+	}
+	if !utf8.Valid(raw) {
+		return false
+	}
+	ct := strings.ToLower(header.Get("Content-Type"))
 	if strings.HasPrefix(ct, "text/") || strings.Contains(ct, "json") || strings.Contains(ct, "xml") || strings.Contains(ct, "x-www-form-urlencoded") {
 		return true
 	}

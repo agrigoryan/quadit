@@ -62,7 +62,8 @@ var helpTopics = map[string]string{
                                the server makes the request and writes the value where
                                {{secret}} stands ({{basic:USER}} = base64 of USER:secret).
                                It goes only to the secret's hosts, redirects are not followed,
-                               and the value is blanked out of the answer.
+                               and the value is blanked out of the answer; an answer that is
+                               not text comes back without its body.
   run --secret NAME [--secret NAME ...] -- COMMAND [ARG ...]
                                for tools on this machine: runs COMMAND with each secret in its
                                environment under its name, and blanks the values out of what it

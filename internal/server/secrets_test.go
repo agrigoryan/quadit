@@ -1,14 +1,18 @@
 package server_test
 
 import (
+	"compress/gzip"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -853,4 +857,120 @@ func TestSecondAuditFindings(t *testing.T) {
 			t.Fatalf("%d wrong tokens in a row were never slowed down", tries)
 		}
 	})
+}
+
+// TestTheVaultBlanksTheValueInEveryFormItSends: a service that says back
+// what it was sent does not hand the secret to the agent, in whichever
+// form the vault sent it: as written, in base64, inside Basic sign-in's
+// base64 of user:value, escaped in an address, escaped in JSON. An answer
+// the vault cannot read as text (bytes, or compressed) is not passed on at
+// all, only what it is and how long; one cut at the limit is blanked
+// before it is cut; and the audit log has the address as the agent wrote
+// it, not with the value in it.
+func TestTheVaultBlanksTheValueInEveryFormItSends(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		const key = `pa/ss+w"rd?&=é 42`
+		api := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			said := r.Method + " " + r.URL.RequestURI() + " " + r.Header.Get("Authorization") + " " + string(body)
+			switch r.URL.Path {
+			case "/bytes":
+				rw.Header().Set("Content-Type", "application/octet-stream")
+				rw.Write([]byte("\x00\x01" + said))
+			case "/gzip":
+				rw.Header().Set("Content-Type", "application/json")
+				rw.Header().Set("Content-Encoding", "gzip")
+				zw := gzip.NewWriter(rw)
+				zw.Write([]byte(`{"said":` + strconv.Quote(said) + `}`))
+				zw.Close()
+			case "/long":
+				rw.Header().Set("Content-Type", "text/plain")
+				rw.Write([]byte(strings.Repeat("a", 1<<20-5) + strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")))
+			default:
+				quoted, _ := json.Marshal(said)
+				rw.Header().Set("Content-Type", "application/json")
+				rw.Header().Set("X-Said", url.QueryEscape(said))
+				rw.Write([]byte(`{"said":` + string(quoted) + `}`))
+			}
+		}))
+		defer api.Close()
+		s.change(s.owner, "", "secret.set", M{"name": "ODD_KEY", "value": key, "hosts": []string{"http://" + strings.TrimPrefix(api.URL, "http://")}})
+		forms := map[string]string{
+			"as written": key, "base64": base64.StdEncoding.EncodeToString([]byte(key)), "basic": base64.StdEncoding.EncodeToString([]byte("bot:" + key)),
+			"query-escaped": url.QueryEscape(key), "path-escaped": url.PathEscape(key), "JSON-escaped": strings.Trim(string(must(json.Marshal(key))), `"`),
+		}
+		leaks := func(t *testing.T, out string) {
+			t.Helper()
+			for form, v := range forms {
+				if strings.Contains(out, v) {
+					t.Fatalf("the value came back %s: %s", form, out)
+				}
+			}
+		}
+		ask := func(t *testing.T, path string, headers M, body string) string {
+			t.Helper()
+			return s.call(s.owner, "", "POST", w+"/secrets/ODD_KEY/request", M{"method": "POST", "url": api.URL + path, "headers": headers, "body": body}, 200, nil)
+		}
+
+		t.Run("echoed", func(t *testing.T) {
+			for _, headers := range []M{{"Authorization": "Bearer {{secret}}"}, {"Authorization": "Basic {{basic:bot}}"}, {"Authorization": "Token {{secret:base64}}"}} {
+				out := ask(t, "/echo?k={{secret}}", headers, `{"k":"{{secret}}"}`)
+				leaks(t, out)
+				if !strings.Contains(out, "•••") {
+					t.Fatalf("nothing was blanked: %s", out)
+				}
+			}
+			leaks(t, ask(t, "/echo/{{secret}}", nil, ""))
+		})
+		t.Run("not text", func(t *testing.T) {
+			// Compressed, asked for by the agent: the vault asks for it
+			// itself and undoes it, so the answer is read as text.
+			leaks(t, ask(t, "/gzip", M{"Authorization": "Bearer {{secret}}", "Accept-Encoding": "gzip"}, ""))
+			for _, path := range []string{"/bytes"} {
+				var res struct {
+					OK         bool
+					Body       *string
+					BodyBase64 *string `json:"body_base64"`
+					Omitted    string  `json:"body_omitted"`
+					Size       int
+				}
+				out := ask(t, path, M{"Authorization": "Bearer {{secret}}", "Accept-Encoding": "gzip"}, "")
+				leaks(t, out)
+				if err := json.Unmarshal([]byte(out), &res); err != nil {
+					t.Fatal(err)
+				}
+				if !res.OK || res.Body != nil || res.BodyBase64 != nil || res.Omitted == "" || res.Size == 0 {
+					t.Fatalf("%s: %s", path, out)
+				}
+			}
+		})
+		t.Run("cut at the limit", func(t *testing.T) {
+			out := ask(t, "/long", M{"Authorization": "Bearer {{secret}}"}, "")
+			var res struct {
+				Body      string
+				Truncated bool
+			}
+			if err := json.Unmarshal([]byte(out), &res); err != nil {
+				t.Fatal(err)
+			}
+			if !res.Truncated || strings.HasSuffix(res.Body, key[:5]) || strings.Contains(res.Body, key[:5]) {
+				t.Fatalf("a cut answer ends with the start of the value: …%q", res.Body[len(res.Body)-20:])
+			}
+		})
+		t.Run("on the record", func(t *testing.T) {
+			if out := s.call(s.owner, "", "GET", w+"/audit?action=secret.used", nil, 200, nil); !strings.Contains(out, "/echo/{{secret}}") {
+				leaks(t, out)
+				t.Fatalf("the audit log does not have the address as written: %s", out)
+			}
+		})
+	})
+}
+
+// must is v, for a call that cannot fail here.
+func must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
