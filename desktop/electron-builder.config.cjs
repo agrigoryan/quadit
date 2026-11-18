@@ -56,6 +56,8 @@ module.exports = {
   copyright: "Copyright © Quadit contributors",
   directories: { output: "dist", buildResources: "build" },
   files: ["out/**", "!out/**/*.map", "assets/icon.png", "assets/trayTemplate*.png", "package.json"],
+  // Quadit's own licence, beside the Electron and Chromium ones electron-builder adds.
+  extraResources: [{ from: "../LICENSE", to: "LICENSE" }],
   extraMetadata: { quaditDesktop: keychainGroup ? { keychainAccessGroup: keychainGroup } : {} },
   artifactName: "Quadit-${version}-${os}-${arch}.${ext}",
   protocols: [{ name: "Quadit link", schemes: ["quadit"] }],

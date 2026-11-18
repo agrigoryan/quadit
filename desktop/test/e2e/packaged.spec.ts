@@ -5,7 +5,7 @@
 // is started as a person starts it, and watched from outside.
 
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
@@ -115,7 +115,10 @@ test("the packaged app claims quadit:// links and has the fuses that keep other 
   });
 });
 
-test("the packaged app carries the licences of Electron and of Chromium", () => {
+test("the packaged app carries Quadit's licence and those of Electron and of Chromium", () => {
+  expect(readFileSync(join(APP, "Contents/Resources/LICENSE"), "utf8")).toBe(
+    readFileSync(join(__dirname, "../../../LICENSE"), "utf8"),
+  );
   for (const file of ["LICENSE.electron.txt", "LICENSES.chromium.html"]) {
     expect(existsSync(join(APP, "Contents/Resources", file)), file).toBe(true);
   }
