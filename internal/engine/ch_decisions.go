@@ -364,8 +364,14 @@ func decisionPick(c *cx, a decisionPickArgs) error {
 		"outcome_note": a.Note, "decided_by": c.actor.UserID, "decided_at": c.at, "unclear_note": "", "updated_at": c.at, "updated_seq": seq}
 	if d.Kind == core.DecisionApproval && d.Action != "" && !c.system {
 		// The approval reaches what its giver reaches now, through the
-		// credential they answer with too: checkApproval holds the change to it.
-		answer["approver_projects"] = c.scope.Projects
+		// credential they answer with too: checkApproval holds the change to
+		// it. Every project is an empty list, never NULL, which is an answer
+		// whose reach is unknown.
+		reach := c.scope.Projects
+		if reach == nil {
+			reach = []string{}
+		}
+		answer["approver_projects"] = reach
 	}
 	if _, err := c.tx.Update(c.ctx, "decisions", answer, store.Eq("id", d.ID)); err != nil {
 		return err

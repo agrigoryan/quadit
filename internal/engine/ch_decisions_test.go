@@ -3,6 +3,8 @@ package engine_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -80,6 +82,19 @@ func TestAnApprovalIsGivenByOneWhoCouldMakeTheChange(t *testing.T) {
 		}
 		if err := use("task.delete", M{"id": "OPS-2"}, d); err == nil || w.task("OPS-2").DeletedAt != 0 {
 			t.Fatalf("an approval given with a credential limited to SVA, used to delete an OPS task: %v", err)
+		}
+
+		// An answer from before approvals kept what their giver reached says
+		// nothing of the credential it came with: it is asked again, not
+		// taken to reach every project.
+		d = ask("SVA-1", "task.delete", M{"id": "OPS-2"}, "@aram")
+		w.do(me, "decision.pick", M{"id": d, "outcome": "approved"})
+		if _, err := st.Update(ctx, "decisions", M{"approver_projects": nil}, store.Eq("id", d)); err != nil {
+			t.Fatal(err)
+		}
+		err := use("task.delete", M{"id": "OPS-2"}, d)
+		if refusal, ok := errors.AsType[*engine.Error](err); !ok || refusal.Code != engine.CodeNeedsApproval || !strings.Contains(refusal.Message, "ask again") || w.task("OPS-2").DeletedAt != 0 {
+			t.Fatalf("an approval answered before it kept its giver's reach, used: %v", err)
 		}
 
 		// Asked of nobody in particular, any person who could make it may answer.

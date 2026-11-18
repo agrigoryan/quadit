@@ -399,7 +399,9 @@ type Decision struct {
 	DecidedAt           int64           `json:"decided_at,omitempty" db:"decided_at,null"`
 	// ApproverProjects are the projects the one who approved a change could
 	// reach when they did, through their membership and the credential they
-	// answered with; nil is every project. The change is held to them.
+	// answered with; empty is every project. The change is held to them.
+	// nil on an answered approval is one given before this was kept: how
+	// far it reaches is unknown, so it is not used.
 	ApproverProjects []string `json:"-" db:"approver_projects,json"`
 	Rank             string   `json:"rank" db:"rank"`
 	CreatedBy        string   `json:"created_by" db:"created_by"`

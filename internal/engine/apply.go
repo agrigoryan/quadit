@@ -395,6 +395,8 @@ func (c *cx) checkApproval() error {
 		need.Message = "that approval was already used; an approval covers one change, once. Ask again for this one"
 	case !sameArgs(approval.ActionArgs, c.change.Args):
 		need.Message = "that approval was given for different arguments (" + string(approval.ActionArgs) + "); it covers that change and no other. Ask again for this one"
+	case approval.ApproverProjects == nil:
+		need.Message = "that approval was given before approvals kept which projects their giver could reach, so how far it reaches is unknown; ask again for this one"
 	default:
 		var approver core.Member
 		there, err := store.Find(c.ctx, c.tx, &approver, store.Eq("user_id", approval.DecidedBy), store.Null("removed_at"))
@@ -407,7 +409,7 @@ func (c *cx) checkApproval() error {
 		if err := holdTo(approver, "who approved it", c.change.Type, handlers[c.change.Type], &c.scope); err != nil {
 			return err
 		}
-		if approval.ApproverProjects != nil {
+		if len(approval.ApproverProjects) > 0 {
 			c.scope.Projects = intersectProjects(c.scope.Projects, approval.ApproverProjects)
 		}
 		// Used up, in the same write as the change it allows; and said in
