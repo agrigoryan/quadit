@@ -5,6 +5,8 @@ import (
 	"compress/gzip"
 	"context"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -215,4 +217,147 @@ func TestAPurgedFileStaysInStorageADay(t *testing.T) {
 		}
 		eventually(t, "the bytes to be removed a day later", func() bool { return !stored() })
 	})
+}
+
+// TestEachBackupIsCopiedWhereTheSettingSays: every backup, once verified,
+// is copied to a folder on the server or to file storage; its record says
+// when the copy got there; and only the newest the setting keeps are kept
+// there, as they are beside the data.
+func TestEachBackupIsCopiedWhereTheSettingSays(t *testing.T) {
+	for _, to := range []struct {
+		name, dir string
+		copyTo    func(folder string) M
+	}{
+		{"a folder", "", func(folder string) M { return M{"kind": "folder", "folder": folder} }},
+		{"file storage", "backups/", func(string) M { return M{"kind": "files"} }},
+	} {
+		t.Run(to.name, func(t *testing.T) {
+			testdb.Each(t, func(t *testing.T, st store.Store) {
+				ctx := context.Background()
+				files, err := blob.NewDisk(t.TempDir())
+				if err != nil {
+					t.Fatal(err)
+				}
+				s := newSiteWithFiles(t, st, files)
+				folder := t.TempDir()
+				copies := map[string]blob.Store{"": &blob.Disk{Root: folder}, "backups/": files}[to.dir]
+				s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/backup", M{"keep": 2, "copy_to": to.copyTo(folder)}, 200, nil)
+				var made []core.Backup
+				for range 3 {
+					var b core.Backup
+					s.call(t, s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &b)
+					if b.CopiedAt == 0 || b.CopyError != "" {
+						t.Fatalf("the backup's copy is recorded as made at %d, failed with %q", b.CopiedAt, b.CopyError)
+					}
+					made = append(made, b)
+				}
+				var kept []string
+				if err := copies.List(ctx, to.dir, func(k string, _ int64) error { kept = append(kept, k); return nil }); err != nil {
+					t.Fatal(err)
+				}
+				slices.Sort(kept)
+				want := []string{to.dir + filepath.Base(made[1].Location), to.dir + filepath.Base(made[2].Location)}
+				if !slices.Equal(kept, want) {
+					t.Fatalf("the copies are %v, want the newest two: %v", kept, want)
+				}
+				var listed struct{ Backups []core.Backup }
+				s.call(t, s.owner, "", "GET", "/api/v1/admin/backups", nil, 200, &listed)
+				if listed.Backups[0].ID != made[2].ID || listed.Backups[0].CopiedAt != made[2].CopiedAt {
+					t.Fatalf("the list shows the newest backup as %+v", listed.Backups[0])
+				}
+			})
+		})
+	}
+}
+
+// TestACopyThatFailsLeavesTheBackupAndSaysWhy: a backup whose copy cannot
+// be made is kept, verified, with why the copy failed on its record, shown
+// in the list, in the install's health and on the workspace dashboard; and
+// the copies made before are not dropped for it.
+func TestACopyThatFailsLeavesTheBackupAndSaysWhy(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		folder := filepath.Join(t.TempDir(), "drive")
+		if err := os.Mkdir(folder, 0o750); err != nil {
+			t.Fatal(err)
+		}
+		s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/backup", M{"keep": 1, "copy_to": M{"kind": "folder", "folder": folder}}, 200, nil)
+		var first core.Backup
+		s.call(t, s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &first)
+		// The drive is taken away; what was on it stays where it went.
+		moved := folder + "-elsewhere"
+		if err := os.Rename(folder, moved); err != nil {
+			t.Fatal(err)
+		}
+
+		var b core.Backup
+		s.call(t, s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &b)
+		if b.VerifiedAt == 0 || b.Error != "" || b.CopiedAt != 0 || !strings.Contains(b.CopyError, folder) {
+			t.Fatalf("the backup is recorded as verified at %d, error %q, copied at %d, copy error %q", b.VerifiedAt, b.Error, b.CopiedAt, b.CopyError)
+		}
+		if _, err := os.Stat(b.Location); err != nil {
+			t.Fatalf("the backup whose copy failed is not kept: %v", err)
+		}
+		if _, err := os.Stat(folder); !os.IsNotExist(err) {
+			t.Fatalf("the copy made the folder that was gone again: %v", err)
+		}
+		var health struct {
+			LastBackup core.Backup `json:"last_backup"`
+		}
+		s.call(t, s.owner, "", "GET", "/api/v1/admin/health", nil, 200, &health)
+		if health.LastBackup.ID != b.ID || health.LastBackup.CopyError != b.CopyError {
+			t.Fatalf("the install's health shows the last backup as %+v", health.LastBackup)
+		}
+		var board struct {
+			Health struct {
+				CopyFailed bool `json:"last_backup_copy_failed"`
+			}
+		}
+		s.call(t, s.owner, "", "GET", w+"/dashboard", nil, 200, &board)
+		if !board.Health.CopyFailed {
+			t.Fatal("the dashboard does not say the last backup was not copied")
+		}
+
+		// The drive is back: the copy made before the failure is still there.
+		if err := os.Rename(moved, folder); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(folder, filepath.Base(first.Location))); err != nil {
+			t.Fatalf("a failed copy dropped the copy before it: %v", err)
+		}
+	})
+}
+
+// TestADestinationThatCannotBeUsedIsRefused: saving where backups are
+// copied tries it first, and refuses, saying why, a folder that is not
+// there, not absolute or cannot be written, and a bucket that does not
+// answer.
+func TestADestinationThatCannotBeUsedIsRefused(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	locked := t.TempDir()
+	if err := os.Chmod(locked, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o700) }) // so the test's folder can be removed
+	for name, c := range map[string]struct {
+		copyTo M
+		says   string
+	}{
+		"a folder that is not there":      {M{"kind": "folder", "folder": filepath.Join(t.TempDir(), "nope")}, "nope"},
+		"a folder that is not absolute":   {M{"kind": "folder", "folder": "backups"}, "absolute"},
+		"a folder that cannot be written": {M{"kind": "folder", "folder": locked}, "test write"},
+		"a bucket that does not answer":   {M{"kind": "bucket", "bucket": M{"kind": "s3", "bucket": "quadit", "endpoint": "http://127.0.0.1:1", "access_key": "a", "secret_key": "b", "region": "us-east-1"}}, "bucket"},
+		"a bucket of no cloud":            {M{"kind": "bucket", "bucket": M{"kind": "disk"}}, "s3, gcs or azure"},
+		"a kind there is not":             {M{"kind": "tape"}, "tape"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if name == "a folder that cannot be written" && os.Geteuid() == 0 {
+				t.Skip("root writes to any folder")
+			}
+			out := s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/backup", M{"copy_to": c.copyTo}, 400, nil)
+			if !strings.Contains(out, c.says) {
+				t.Fatalf("the refusal does not say %q: %s", c.says, out)
+			}
+		})
+	}
 }

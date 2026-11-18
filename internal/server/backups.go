@@ -13,18 +13,20 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
+	"strconv"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/backup"
+	"github.com/agrigoryan/quadit/internal/blob"
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
-// Backups on a schedule and on request, restoring one item from a backup,
-// and the daily emptying of the trash.
+// Backups on a schedule and on request, their copies where the setting
+// says, restoring one item from a backup, and the daily emptying of the
+// trash.
 
 // backupRoutes are the routes of the install's backups.
 func (s *Server) backupRoutes() []route {
@@ -121,12 +123,106 @@ func (s *Server) jobRemoveFiles(ctx context.Context, j core.Job) error {
 
 // backupSetting is the "backup" setting of the admin area.
 type backupSetting struct {
-	Enabled bool `json:"enabled"`
-	Hour    int  `json:"hour"` // hour of the day, UTC, to run at
-	Keep    int  `json:"keep"` // how many to keep; default 14
-	// CopyToFiles also puts each archive in file storage, which is how a
-	// backup gets off the machine when storage is in the cloud.
-	CopyToFiles bool `json:"copy_to_files"`
+	Enabled bool       `json:"enabled"`
+	Hour    int        `json:"hour"` // hour of the day, UTC, to run at
+	Keep    int        `json:"keep"` // how many to keep, here and where they are copied; default 14
+	CopyTo  backupCopy `json:"copy_to"`
+}
+
+// kept is how many backups to keep.
+func (bs backupSetting) kept() int {
+	if bs.Keep <= 0 {
+		return defaultBackupsKept
+	}
+	return bs.Keep
+}
+
+// backupCopy is where every backup is also copied, which is how backups
+// get off the machine that holds the data.
+type backupCopy struct {
+	// Kind is "" (nowhere), "files" (the install's file storage, under
+	// backups/), "folder" (Folder) or "bucket" (Bucket).
+	Kind string `json:"kind"`
+	// Folder is an absolute path on the server: a mounted or synced drive.
+	Folder string `json:"folder"`
+	// Bucket is a cloud store of the backups' own, set as file storage is.
+	Bucket blob.Config `json:"bucket"`
+}
+
+// openBackupCopy opens where a backup is copied: the store, and the key
+// prefix the copies go under in it. Nowhere is a nil store. An error is
+// worded to follow "cannot be copied to" and backupCopyWhere.
+func (s *Server) openBackupCopy(ctx context.Context, bc backupCopy) (blob.Store, string, error) {
+	switch bc.Kind {
+	case "":
+		return nil, "", nil
+	case "files":
+		return s.fileStore(), "backups/", nil
+	case "folder":
+		if !filepath.IsAbs(bc.Folder) {
+			return nil, "", errors.New("it must be an absolute path on the server")
+		}
+		return &blob.Disk{Root: bc.Folder}, "", nil
+	case "bucket":
+		if bc.Bucket.Kind == "" || bc.Bucket.Kind == "disk" {
+			return nil, "", fmt.Errorf("its kind must be s3, gcs or azure, not %q", bc.Bucket.Kind)
+		}
+		store, err := blob.Open(ctx, bc.Bucket, s.cfg.DataDir)
+		return store, "", err
+	default:
+		return nil, "", errors.New(`a backup is copied to "files", a "folder" or a "bucket"`)
+	}
+}
+
+// backupCopyWhere names where a backup is copied, for a message.
+func backupCopyWhere(bc backupCopy) string {
+	switch bc.Kind {
+	case "files":
+		return "file storage"
+	case "folder":
+		return "the folder " + bc.Folder
+	case "bucket":
+		if bc.Bucket.Bucket == "" {
+			return "a bucket"
+		}
+		return "the " + bc.Bucket.Kind + " bucket " + bc.Bucket.Bucket
+	default:
+		return strconv.Quote(bc.Kind)
+	}
+}
+
+// checkBackupSetting tries where a new "backup" setting copies backups to
+// before it is kept: the place must be there and take a write.
+func (s *Server) checkBackupSetting(ctx context.Context, value json.RawMessage) error {
+	var bs backupSetting
+	if err := json.Unmarshal(value, &bs); err != nil {
+		return errBad("%v", err)
+	}
+	store, _, err := s.openBackupCopy(ctx, bs.CopyTo)
+	if err == nil && store != nil {
+		err = blob.Writable(ctx, store)
+	}
+	if err != nil {
+		return errBad("backups cannot be copied to %s: %v", backupCopyWhere(bs.CopyTo), err)
+	}
+	return nil
+}
+
+// copyBackup copies a verified backup's file where the setting says, and
+// then drops the copies there beyond the number to keep. Older copies are
+// dropped only once the new one is there.
+func (s *Server) copyBackup(ctx context.Context, bs backupSetting, path string) error {
+	store, dir, err := s.openBackupCopy(ctx, bs.CopyTo)
+	if err == nil {
+		err = backup.Copy(ctx, path, store, dir)
+	}
+	if err != nil {
+		return fmt.Errorf("copying the backup to %s: %w", backupCopyWhere(bs.CopyTo), err)
+	}
+	if err := backup.DropOldCopies(ctx, store, dir, bs.kept()); err != nil {
+		s.log.Warn("dropping old copies of backups; tried again after the next backup", "to", backupCopyWhere(bs.CopyTo), "err", err)
+	}
+	return nil
 }
 
 // runSchedule starts the daily jobs: a backup when they are turned on, and
@@ -187,7 +283,8 @@ func (s *Server) runBackup(ctx context.Context) (core.Backup, error) {
 	// stay unfinished.
 	finish := func(err error) (core.Backup, error) {
 		b.FinishedAt = time.Now().UnixMilli()
-		set := map[string]any{"finished_at": b.FinishedAt, "size": b.Size, "sha256": b.SHA256, "verified_at": b.VerifiedAt, "location": b.Location}
+		set := map[string]any{"finished_at": b.FinishedAt, "size": b.Size, "sha256": b.SHA256, "verified_at": b.VerifiedAt, "location": b.Location,
+			"copied_at": b.CopiedAt, "copy_error": b.CopyError}
 		if err != nil {
 			b.Error = oneLine(err.Error(), lastErrorSize)
 			set["error"] = b.Error
@@ -230,17 +327,15 @@ func (s *Server) runBackup(ctx context.Context) (core.Backup, error) {
 	}
 	b.VerifiedAt = time.Now().UnixMilli()
 
-	// Put it in file storage too when the setting says so, which is how a
-	// backup gets off the machine.
-	if setting.CopyToFiles {
-		in, err := os.Open(path)
-		if err != nil {
-			return finish(err)
-		}
-		err = s.fileStore().Put(ctx, "backups/"+filepath.Base(path), in, "application/gzip")
-		in.Close()
-		if err != nil {
-			return finish(fmt.Errorf("copying the archive to file storage: %w", err))
+	// Copy it where the setting says, which is how a backup gets off the
+	// machine. A copy that fails leaves the backup as it is, with why on
+	// its record for the admin to see; the next backup tries again.
+	if setting.CopyTo.Kind != "" {
+		if err := s.copyBackup(ctx, setting, path); err != nil {
+			b.CopyError = oneLine(err.Error(), lastErrorSize)
+			s.log.Error("backup written and verified, but not copied", "err", err)
+		} else {
+			b.CopiedAt = time.Now().UnixMilli()
 		}
 	}
 
@@ -250,13 +345,11 @@ func (s *Server) runBackup(ctx context.Context) (core.Backup, error) {
 }
 
 // dropOldBackups keeps the newest few archives the setting asks for and
-// removes the rest, with their copies in file storage and their records.
-// What cannot be removed is logged and tried again after the next backup.
+// removes the rest, with their records; their copies are dropped where
+// they were copied (copyBackup). What cannot be removed is logged and
+// tried again after the next backup.
 func (s *Server) dropOldBackups(ctx context.Context, setting backupSetting) {
-	keep := setting.Keep
-	if keep <= 0 {
-		keep = defaultBackupsKept
-	}
+	keep := setting.kept()
 	dir := s.backupDir()
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -265,7 +358,7 @@ func (s *Server) dropOldBackups(ctx context.Context, setting backupSetting) {
 	}
 	var names []string
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), "quadit-") && strings.HasSuffix(e.Name(), ".tar.gz") {
+		if backup.IsFile(e.Name()) {
 			names = append(names, e.Name())
 		}
 	}
@@ -276,26 +369,20 @@ func (s *Server) dropOldBackups(ctx context.Context, setting backupSetting) {
 			s.log.Warn("dropping an old backup", "file", old, "err", err)
 			continue
 		}
-		if setting.CopyToFiles {
-			if err := s.fileStore().Delete(ctx, "backups/"+names[0]); err != nil {
-				s.log.Warn("dropping the copy of an old backup", "file", names[0], "err", err)
-			}
-		}
 		if _, err := s.st.Delete(ctx, "backups", store.Eq("location", old)); err != nil {
 			s.log.Warn("dropping the record of an old backup", "file", old, "err", err)
 		}
 	}
 }
 
-// handleListBackups lists the newest backups, with the schedule.
+// handleListBackups lists the newest backups, and the folder they are in.
+// The schedule is the "backup" setting, read with the settings.
 func (s *Server) handleListBackups(x *c) error {
 	var list []core.Backup
 	if err := s.st.List(x.ctx(), &list, store.Q{Order: "-started_at", Limit: 100}); err != nil {
 		return err
 	}
-	var bs backupSetting
-	s.settings.Get(x.ctx(), "backup", &bs)
-	return x.ok(map[string]any{"backups": list, "schedule": bs, "directory": s.backupDir()})
+	return x.ok(map[string]any{"backups": list, "directory": s.backupDir()})
 }
 
 // handleCreateBackup writes a backup right away and waits for it.

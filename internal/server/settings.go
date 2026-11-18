@@ -40,7 +40,7 @@ func (s *Server) settingKinds() settings.Table {
 		"files.max_mb":                 {Shape: func() any { return new(int) }},
 		"limits.api_per_minute":        {Shape: func() any { return new(int) }, Check: checkAPIPerMinute, Changed: s.applyLimits},
 		"metrics.token":                {Shape: func() any { return new(string) }},
-		"backup":                       {Shape: func() any { return new(backupSetting) }},
+		"backup":                       {Shape: func() any { return new(backupSetting) }, Secrets: prefixed("copy_to.bucket.", bucketSecrets), Check: s.checkBackupSetting},
 		"push":                         {Shape: func() any { return new(webpush.Keys) }, Secrets: []string{"private_key"}},
 	}
 }
@@ -49,7 +49,20 @@ func (s *Server) settingKinds() settings.Table {
 // the keys to a cloud store sealed. check, when set, tries a new value
 // before it is kept.
 func filesKind(check func(ctx context.Context, value json.RawMessage) error) settings.Kind {
-	return settings.Kind{Shape: func() any { return new(blob.Config) }, Secrets: []string{"secret_key", "credentials", "account_key"}, Check: check}
+	return settings.Kind{Shape: func() any { return new(blob.Config) }, Secrets: bucketSecrets, Check: check}
+}
+
+// bucketSecrets are the fields of a blob.Config that are secrets: the keys
+// to a cloud store.
+var bucketSecrets = []string{"secret_key", "credentials", "account_key"}
+
+// prefixed is each field named as a field of the object at prefix.
+func prefixed(prefix string, fields []string) []string {
+	out := make([]string, len(fields))
+	for i, f := range fields {
+		out[i] = prefix + f
+	}
+	return out
 }
 
 // FilesConfig reads the "files" setting as a running server reads it (the

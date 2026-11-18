@@ -166,6 +166,10 @@ type Backup struct {
 	SHA256     string `json:"sha256,omitempty" db:"sha256"`
 	VerifiedAt int64  `json:"verified_at,omitempty" db:"verified_at,null"`
 	Error      string `json:"error,omitempty" db:"error"`
+	// CopiedAt is when the copy the "backup" setting asks for got there;
+	// CopyError is why it did not. Both are empty when none is asked for.
+	CopiedAt  int64  `json:"copied_at,omitempty" db:"copied_at,null"`
+	CopyError string `json:"copy_error,omitempty" db:"copy_error"`
 }
 
 // RateCounter counts hits on one name within one window of time, for rate

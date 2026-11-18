@@ -39,6 +39,7 @@ func (who *viewer) health(ctx context.Context) (map[string]any, error) {
 	if len(backups) > 0 {
 		health["last_backup"] = formatTime(backups[0].FinishedAt)
 		health["last_backup_ok"] = backups[0].Error == "" && backups[0].FinishedAt != 0
+		health["last_backup_copy_failed"] = backups[0].CopyError != ""
 	}
 	var sources []core.DocSource
 	if err := who.db.List(ctx, &sources, store.Where(store.Live)); err != nil {

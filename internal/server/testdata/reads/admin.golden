@@ -465,13 +465,7 @@ surface: 2.0 (within 2.x nothing is removed or renamed)
 200
 {
  "backups": [],
- "directory": "<data>/backups",
- "schedule": {
-  "copy_to_files": false,
-  "enabled": false,
-  "hour": 0,
-  "keep": 0
- }
+ "directory": "<data>/backups"
 }
 
 === GET /api/v1/admin/backups/<project SVA>/download

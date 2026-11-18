@@ -89,6 +89,8 @@ export interface Backup {
   sha256?: string;
   verified_at?: number;
   error?: string;
+  copied_at?: number;
+  copy_error?: string;
 }
 
 export interface Block {
