@@ -28,6 +28,7 @@ const NOT_OURS = [
   "/oauth/",
   "/.well-known/",
   "/hooks/",
+  "/desktop/finish",
   "/healthz",
   "/readyz",
   "/metrics",

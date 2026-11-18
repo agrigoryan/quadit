@@ -2,6 +2,7 @@ import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router";
 import { NoWorkspacePage } from "@/auth/create-workspace";
+import { DesktopConnectPage } from "@/auth/desktop-connect";
 import { InvitePage } from "@/auth/invite";
 import { LoginPage } from "@/auth/login";
 import { RegisterPage } from "@/auth/register";
@@ -93,6 +94,14 @@ export function App() {
             <Route path="/reset" element={<ResetRequestPage />} />
             <Route path="/reset/:token" element={<ResetConfirmPage />} />
             <Route path="/invite/:token" element={<InvitePage />} />
+            <Route
+              path="/desktop/connect"
+              element={
+                <RequireSession>
+                  <DesktopConnectPage />
+                </RequireSession>
+              }
+            />
             <Route
               path="/admin/*"
               element={

@@ -97,4 +97,18 @@ export const authStrings = {
   "auth.account.required":
     "This install asks everyone for a second step. Set up an authenticator app or add a passkey here; your workspaces open once one is in place.",
   "auth.account.ready": "You have a second step. Your workspaces are open.",
+
+  "auth.desktop.title": "Sign in to the Quadit app on this computer as {name}?",
+  "auth.desktop.lead":
+    "The app will open {install} as you, with everything you can see and do here. Continue only if you started this from the Quadit app a moment ago.",
+  "auth.desktop.continue": "Continue",
+  "auth.desktop.notYou": "Not {name}?",
+  "auth.desktop.signOut": "Sign out and use another account",
+  "auth.desktop.sent":
+    "Your browser asks to open the Quadit app. Once the app is open and signed in, you can close this tab.",
+  "auth.desktop.cancelledTitle": "Cancelled",
+  "auth.desktop.cancelled": "The Quadit app was not signed in. You can close this tab.",
+  "auth.desktop.invalidTitle": "This sign-in request is not valid",
+  "auth.desktop.invalid":
+    "The link that opened this page is incomplete or was changed. Start again from the Quadit app.",
 };
