@@ -411,8 +411,20 @@ func (c *cx) mayAnswer(d core.Decision) error {
 	if d.CreatedBy == c.actor.UserID {
 		return forbidden("you asked this question, so someone else has to answer it")
 	}
-	if d.Kind == core.DecisionApproval && d.Action != "" && c.actor.Kind != core.KindPerson && !c.system {
-		return forbidden("an approval for a change is a person's to give, not an agent's")
+	if d.Kind == core.DecisionApproval && d.Action != "" && !c.system {
+		// An approval for a change is given by a person who could make the
+		// change, and, when it was asked of someone, by them. Whether the
+		// approver reaches what the change touches is held when it is used
+		// (checkApproval).
+		if c.actor.Kind != core.KindPerson {
+			return forbidden("an approval for a change is a person's to give, not an agent's")
+		}
+		if d.AskedID != "" && d.AskedID != c.actor.UserID {
+			return forbidden("this approval was asked of someone else; only they can give it")
+		}
+		if h, ok := handlers[d.Action]; ok && !c.actor.Role.AtLeast(h.min) {
+			return forbidden("%s needs the %s role, so a %s cannot approve it", d.Action, h.min, c.actor.Role)
+		}
 	}
 	if c.actor.Kind == core.KindAgent && d.AskedID != "" && d.AskedID != c.actor.UserID {
 		return forbidden("this question was asked of someone else")

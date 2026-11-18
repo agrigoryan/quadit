@@ -53,6 +53,15 @@ describe("useViewer", () => {
     expect(viewer()).toMatchObject({ canAnswer: false, canComment: false });
   });
 
+  it("leaves an approval for a change to the one it was asked of", () => {
+    const approval = { ...decision, kind: "approval", action: "task.delete", asked_id: "u3" } as Decision;
+    const answer = (d: Decision) => renderHook(() => useViewer(d)).result.current.canAnswer;
+    expect(answer(approval)).toBe(false);
+    expect(answer({ ...approval, asked_id: "u1" })).toBe(true);
+    // A question that is not an approval for a change may be answered by any person.
+    expect(answer({ ...decision, asked_id: "u3" })).toBe(true);
+  });
+
   it("lets an admin delete someone else's question, and a member only their own", () => {
     expect(viewer().canDelete).toBe(false);
     seed({ role: "admin" });

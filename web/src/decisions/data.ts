@@ -151,8 +151,11 @@ export function useViewer(decision: Decision): Viewer {
   const write = !!task && can.editTask(task);
   const open = decision.state === "open";
   const isAsker = decision.created_by === me.user_id;
-  // An agent answers only what was asked of it; a person may answer anything they did not ask.
-  const barred = me.kind === "agent" && !!decision.asked_id && decision.asked_id !== me.user_id;
+  // An agent answers only what was asked of it; a person may answer anything they did not ask, except an
+  // approval for a change asked of someone else, which is theirs to give (the server's mayAnswer).
+  const askedOther = !!decision.asked_id && decision.asked_id !== me.user_id;
+  const forChange = decision.kind === "approval" && !!decision.action;
+  const barred = (me.kind === "agent" || forChange) && askedOther;
   return {
     isAsker,
     mine: open && decision.asked_id === me.user_id,

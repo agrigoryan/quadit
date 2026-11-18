@@ -180,7 +180,7 @@ quadit approval SVA-12 "Delete the duplicate SVA-14?" action=task.delete args='{
 quadit do task.delete '{"id":"SVA-14"}' approval=DECISION_ID      # once approved
 ```
 
-An approval covers that one change with those arguments, once.
+An approval covers that one change with those arguments, once. It is given by a person who could make that change themselves (of the role it needs), and when you asked someone in particular, by them; the change then reaches only the projects they reach.
 
 ## Results
 

@@ -316,19 +316,31 @@ func (b *batch) checkFor(ch Change, h handler, scope *core.Scope) (string, error
 	if err != nil {
 		return "", err
 	}
-	if asker.SuspendedAt != 0 || !asker.Role.AtLeast(h.min) {
-		return "", forbidden("%s needs the %s role; @%s, who asked for it, is a %s", ch.Type, h.min, asker.Handle, asker.Role)
-	}
-	if asker.Scope == nil {
-		return asker.UserID, nil
-	}
-	if asker.Scope.ReadOnly {
-		return "", forbidden("@%s, who asked for this, may only read", asker.Handle)
-	}
-	if len(asker.Scope.Projects) > 0 {
-		scope.Projects = intersectProjects(scope.Projects, asker.Scope.Projects)
+	if err := holdTo(asker, "who asked for it", ch.Type, h, scope); err != nil {
+		return "", err
 	}
 	return asker.UserID, nil
+}
+
+// holdTo holds a change of type typ to what another member could do (the
+// one it is made for, the one who approved it; their part names them in a
+// refusal): it is refused when they are suspended, of a lower role than
+// the change needs, or may only read, and scope is narrowed to their
+// projects.
+func holdTo(m core.Member, part, typ string, h handler, scope *core.Scope) error {
+	if m.SuspendedAt != 0 || !m.Role.AtLeast(h.min) {
+		return forbidden("%s needs the %s role; @%s, %s, is a %s", typ, h.min, m.Handle, part, m.Role)
+	}
+	if m.Scope == nil {
+		return nil
+	}
+	if m.Scope.ReadOnly {
+		return forbidden("@%s, %s, may only read", m.Handle, part)
+	}
+	if len(m.Scope.Projects) > 0 {
+		scope.Projects = intersectProjects(scope.Projects, m.Scope.Projects)
+	}
+	return nil
 }
 
 // remember records that the change was applied, at the positions of its
@@ -349,7 +361,9 @@ func (b *batch) remember(c *cx, ch Change, hash string) (*Result, error) {
 }
 
 // checkApproval makes sure the change comes with an approved decision that
-// was opened for this kind of change by this actor.
+// was opened for this kind of change by this actor, and holds the change
+// to what the one who approved it could do: a change approved by someone
+// who reaches some projects touches those alone.
 func (c *cx) checkApproval() error {
 	need := &Error{Code: CodeNeedsApproval, Message: fmt.Sprintf(
 		`%s needs approval. Open one with decision.open {"kind": "approval", "action": %q, "task": …, "question": …, "ask": …}, `+
@@ -378,6 +392,17 @@ func (c *cx) checkApproval() error {
 	case !sameArgs(approval.ActionArgs, c.change.Args):
 		need.Message = "that approval was given for different arguments (" + string(approval.ActionArgs) + "); it covers that change and no other. Ask again for this one"
 	default:
+		var approver core.Member
+		there, err := store.Find(c.ctx, c.tx, &approver, store.Eq("user_id", approval.DecidedBy), store.Null("removed_at"))
+		if err != nil {
+			return err
+		}
+		if !there {
+			return forbidden("the one who approved this is no longer a member here; ask again")
+		}
+		if err := holdTo(approver, "who approved it", c.change.Type, handlers[c.change.Type], &c.scope); err != nil {
+			return err
+		}
 		// Used up, in the same write as the change it allows; and said in
 		// the feed, so the approval shows as used wherever it is open.
 		seq := c.tx.NextSeq()
