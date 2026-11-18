@@ -24,6 +24,22 @@ type loadedDatabase struct {
 	props  []core.DBProperty
 	rows   []core.Doc
 	values map[string]map[string]any // row id -> property id -> stored value
+	byID   map[string]core.Doc       // the rows by id, made on first use (row)
+}
+
+// row finds one of the database's rows by id, which a relation cell names.
+// A cell can link every row of the other database, so the rows are found
+// through an index, not by reading the list for each link.
+func (t *loadedDatabase) row(rowID any) (core.Doc, bool) {
+	if t.byID == nil {
+		t.byID = make(map[string]core.Doc, len(t.rows))
+		for _, r := range t.rows {
+			t.byID[r.ID] = r
+		}
+	}
+	s, _ := rowID.(string)
+	r, ok := t.byID[s]
+	return r, ok
 }
 
 // loadTable reads a database's properties and rows, and each row's stored
@@ -106,14 +122,12 @@ func (who *viewer) computed(ctx context.Context, t *loadedDatabase) (map[string]
 		rt := other(dbID)
 		list, _ := ids.([]any)
 		var out []any
+		if rt == nil {
+			return nil
+		}
 		for _, rid := range list {
-			if rt == nil {
-				continue
-			}
-			for _, r := range rt.rows {
-				if r.ID == rid {
-					out = append(out, r.Title)
-				}
+			if r, ok := rt.row(rid); ok {
+				out = append(out, r.Title)
 			}
 		}
 		return out
@@ -188,15 +202,13 @@ func (who *viewer) computed(ctx context.Context, t *loadedDatabase) (map[string]
 			}
 			var vals []any
 			for _, rid := range ids {
-				for _, r := range rt.rows {
-					if r.ID != rid {
-						continue
-					}
-					if target.ID == "" {
-						vals = append(vals, r.Title)
-					} else if v := rt.values[r.ID][target.ID]; v != nil {
-						vals = append(vals, v)
-					}
+				r, ok := rt.row(rid)
+				switch {
+				case !ok:
+				case target.ID == "":
+					vals = append(vals, r.Title)
+				case rt.values[r.ID][target.ID] != nil:
+					vals = append(vals, rt.values[r.ID][target.ID])
 				}
 			}
 			return rollup(cfg.Fn, vals, len(ids))
