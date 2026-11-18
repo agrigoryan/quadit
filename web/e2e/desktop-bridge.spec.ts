@@ -74,7 +74,7 @@ test("a question answered from the app's panel shows as answered", async ({ page
   await expect.poll(async () => (await summary(page))?.waiting.some((w) => w.title === "Which colour?")).toBe(false);
 });
 
-test("a question asked while the window is open comes with its options as buttons", async ({
+test("a question asked while the window is open is answered from its notification", async ({
   page,
   project,
   quadit,
@@ -84,9 +84,19 @@ test("a question asked while the window is open comes with its options as button
   await page.goto("/e2e/my-work");
   await expect.poll(() => summary(page)).not.toBeNull();
   await quadit.agent("ask", key, "Which font?", "option=Serif", "option=Sans", `ask=@${OWNER.handle}`);
+  const notice = () =>
+    page.evaluate(() => window.standIn.notified.find((n) => n.actions?.some((a) => a.label === "Serif")) ?? null);
+  await expect.poll(async () => (await notice())?.actions?.map((a) => a.label)).toEqual(["Serif", "Sans", "Mark read"]);
+
+  // Answered, so that it waits on nobody in the other tests' My work.
+  const serif = (await notice())?.actions?.find((a) => a.label === "Serif")?.request ?? "";
+  expect(await ask(page, { kind: "action", request: serif })).toEqual({ ok: true });
   await expect
-    .poll(() => page.evaluate(() => window.standIn.notified.map((n) => n.actions?.map((a) => a.label))))
-    .toContainEqual(["Serif", "Sans", "Mark read"]);
+    .poll(
+      async () =>
+        (JSON.parse(await quadit.cli("--json", "show", key)) as { decisions: { state: string }[] }).decisions[0],
+    )
+    .toMatchObject({ state: "picked" });
 });
 
 test("quick capture creates a task, and says where it is", async ({ page, project, quadit }) => {
