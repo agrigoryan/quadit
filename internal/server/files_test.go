@@ -107,6 +107,57 @@ func TestAnUploadWhoseStoringFailsCanBeFinishedLater(t *testing.T) {
 	})
 }
 
+// TestAPartSentWhileFileStorageCannotBeUsedIsAskedForLater: a part of an
+// upload sent while the file store that is set cannot be used (it is
+// still being opened) is answered "try again later", as the first part
+// would be, not taken for a request sent wrong; once the store can be
+// used, the part sent again goes on from the same place.
+func TestAPartSentWhileFileStorageCannotBeUsedIsAskedForLater(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		disk, err := blob.NewDisk(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		files := &awayFiles{Store: disk}
+		s := newSiteWithFiles(t, st, files)
+		data := []byte(strings.Repeat("0123456789", 600))
+		var f uploaded
+		s.call(t, s.owner, "", "POST", fmt.Sprintf(w+"/files?name=clip.bin&size=%d", len(data)), data[:2000], 201, &f)
+
+		files.away.Store(true)
+		req, _ := http.NewRequest("PATCH", s.url+w+"/files/"+f.ID+"?offset=2000", strings.NewReader(string(data[2000:])))
+		resp, err := s.owner.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		said, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusServiceUnavailable || resp.Header.Get("Retry-After") == "" {
+			t.Fatalf("a part sent while file storage cannot be used: %d, Retry-After %q: %s; want 503 with Retry-After", resp.StatusCode, resp.Header.Get("Retry-After"), said)
+		}
+
+		files.away.Store(false)
+		s.call(t, s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=2000", data[2000:], 200, &f)
+		if f.State != "ready" || f.SHA256 != sumOf(data) {
+			t.Fatalf("sent again once file storage can be used, the file is %+v", f)
+		}
+	})
+}
+
+// awayFiles is file storage that, while away is set, stores nothing, as
+// a cloud store that is set but still being opened answers.
+type awayFiles struct {
+	blob.Store
+	away atomic.Bool
+}
+
+func (f *awayFiles) Put(ctx context.Context, key string, r io.Reader, ct string) error {
+	if f.away.Load() {
+		return blob.Unusable{Set: "s3", Err: errors.New("it is being opened")}.Put(ctx, key, r, ct)
+	}
+	return f.Store.Put(ctx, key, r, ct)
+}
+
 // meetingFiles is file storage where parts of an upload after the first
 // wait for each other: a part is stored once `together` of them have come
 // (or a moment has passed), so they are all under way at once.

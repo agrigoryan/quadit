@@ -411,6 +411,9 @@ func (s *Server) handleUploadFilePart(x *c) error {
 			// A part cut short is not kept: the caller sends it again from the
 			// same place, which is what the answer tells it.
 			s.dropParts(ctx, key)
+			if errors.Is(err, blob.ErrUnusable) {
+				return err // answered "try again later", not as a request sent wrong
+			}
 			return errBad("upload interrupted after %d bytes; continue from %d: %v", f.Received, f.Received, err)
 		}
 		if f.Received+body.n > f.Size {
