@@ -63,8 +63,10 @@ func (s *Server) handleStartProviderSignIn(x *c) error {
 	if !strings.HasPrefix(state.Next, "/") || strings.HasPrefix(state.Next, "//") {
 		state.Next = "/"
 	}
-	// Someone already signed in is adding this provider to their account.
-	if s.identify(x.ctx(), x) == nil && x.sess != nil && x.r.URL.Query().Has("link") {
+	// Someone already signed in is adding this provider to their account:
+	// a way in, so their session must have come as far as any change to
+	// the account's security asks (bothSteps).
+	if x.r.URL.Query().Has("link") && s.identify(x.ctx(), x) == nil && x.sess != nil {
 		state.LinkUser = x.user.ID
 	}
 	stateToken, err := s.oneTime(ctx, core.OneTimeOAuth, "", state, approvalLife)

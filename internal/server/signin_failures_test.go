@@ -351,6 +351,11 @@ func TestAccountChecksFailWhenTheyCannotCount(t *testing.T) {
 		}
 		t.Run("turning codes off where two steps are required", func(t *testing.T) {
 			s := s.in(t)
+			// The owner's session took two steps, as one must to change the
+			// account's security where two are required.
+			if _, err := st.Update(context.Background(), "sessions", map[string]any{"two_step": true}, store.Eq("user_id", s.ownerID())); err != nil {
+				t.Fatal(err)
+			}
 			s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
 			defer s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", []byte("null"), 200, nil)
 			fs.faults.set("count passkeys")

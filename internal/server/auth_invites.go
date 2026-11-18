@@ -300,10 +300,15 @@ func (s *Server) handleAcceptInvite(x *c) error {
 		return err
 	}
 	var u core.User
-	if s.identify(x.ctx(), x) == nil && x.user.Kind == core.KindPerson {
+	switch signedIn := s.identify(ctx, x); {
+	case signedIn == nil && x.user.Kind == core.KindPerson:
 		u = x.user
-	} else if u, err = s.newInvitedPerson(x, inv, b); err != nil {
-		return err
+	case owesSecondStep(signedIn):
+		return signedIn // signed in here, and owing this sign-in's second step first
+	default:
+		if u, err = s.newInvitedPerson(x, inv, b); err != nil {
+			return err
+		}
 	}
 	if inv.Email != "" && !strings.EqualFold(inv.Email, u.Email) {
 		return errForbidden("this invitation is for %s; you are signed in as %s", inv.Email, u.Email)

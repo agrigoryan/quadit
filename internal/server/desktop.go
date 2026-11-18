@@ -93,6 +93,10 @@ func (s *Server) handleApproveDesktopSignIn(x *c) error {
 		return s.showDesktopPage(x, http.StatusBadRequest, desktopNotValid)
 	}
 	ctx := x.ctx()
+	// The app is handed what this browser has: a person the install requires
+	// a second step of, who has none yet, gets a session in which to set it
+	// up, as this one is.
+	x.needs = toSetUpSecondStep
 	err := s.identify(ctx, x)
 	var he *httpError
 	switch {

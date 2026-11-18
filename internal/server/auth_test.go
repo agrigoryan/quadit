@@ -335,8 +335,10 @@ func postFrom127(t *testing.T, s *site, path string, body any, forwarded string)
 // two-step verification, what lets a session in is how it signed in, not
 // what the account has set up. A password, or an outside account, is one
 // step: a person with a passkey is asked for it next, and a session that
-// took one step before the rule was turned on is asked again. A person
-// with nothing set up gets in once they set a second step up.
+// took one step before the rule was turned on is asked again, for a
+// workspace, the install's administration or a change to the account's
+// security alike. A person with nothing set up reaches only what sets a
+// second step up, and gets in once they have.
 func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
@@ -355,21 +357,45 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 		}
 		resp.Body.Close()
 		s.call(octo, "", "POST", "/api/v1/auth/invite/"+token, nil, 200, nil)
+		var octoMe struct{ User struct{ ID string } }
+		s.call(octo, "", "GET", "/api/v1/auth/me", nil, 200, &octoMe)
+		s.call(s.owner, "", "PATCH", "/api/v1/admin/users/"+octoMe.User.ID, M{"is_admin": true}, 200, nil)
 
-		// The owner has a passkey, and no authenticator app.
-		passkey := func(userID string) {
+		// The owner has a passkey, and no authenticator app, and signed in
+		// with it: two steps. (A passkey's ceremony needs a browser; the
+		// end-to-end tests make one.)
+		passkey := func(userID string) string {
 			t.Helper()
-			if err := st.Insert(ctx, core.Passkey{ID: id.New(), UserID: userID, Name: "laptop", CredentialID: id.New(), Credential: json.RawMessage(`{}`), CreatedAt: 1}); err != nil {
+			pk := core.Passkey{ID: id.New(), UserID: userID, Name: "laptop", CredentialID: id.New(), Credential: json.RawMessage(`{}`), CreatedAt: 1}
+			if err := st.Insert(ctx, pk); err != nil {
 				t.Fatal(err)
 			}
+			return pk.ID
 		}
-		passkey(s.ownerID())
-		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
+		laptop := passkey(s.ownerID())
+		if _, err := st.Update(ctx, "sessions", map[string]any{"two_step": true}, store.Eq("user_id", s.ownerID())); err != nil {
+			t.Fatal(err)
+		}
 		login := M{"email": "owner@example.com", "password": ownerPassword}
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
+		// A browser with a session of the owner's of one step, as one from
+		// before two steps were required, or from before steps were counted.
+		before := func() *http.Client {
+			t.Helper()
+			token, now := auth.Random(32), time.Now()
+			sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: s.ownerID(), Stage: core.SessionFull,
+				CreatedAt: now.UnixMilli(), LastSeenAt: now.UnixMilli(), ExpiresAt: now.Add(time.Hour).UnixMilli()}
+			if err := st.Insert(ctx, sess); err != nil {
+				t.Fatal(err)
+			}
+			b := browser()
+			u, _ := url.Parse(s.url)
+			b.Jar.SetCookies(u, []*http.Cookie{{Name: "quadit_session", Value: token, Path: "/"}})
+			return b
+		}
 
 		t.Run("a passkey is no second step where passkeys are off", func(t *testing.T) {
 			s := s.in(t)
-			// The owner's session reaches the install's settings, which are no workspace's.
 			s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.passkeys", false, 200, nil)
 			defer s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.passkeys", true, 200, nil)
 			b := browser()
@@ -396,31 +422,109 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 			}
 			s.call(b, "", "POST", "/api/v1/auth/second-step", M{"code": "123456"}, 401, nil)
 		})
-		t.Run("a session of one step from before is asked again", func(t *testing.T) {
+		t.Run("a session of one step from before is asked again, whatever it asks for", func(t *testing.T) {
 			s := s.in(t)
-			if out := s.call(s.owner, "", "GET", w+"/me", nil, 401, nil); !strings.Contains(out, "second_step") {
-				t.Fatalf("a one-step session went on into the workspace: %s", out)
+			var link struct{ Link string }
+			s.call(s.owner, "", "POST", w+"/invites", M{}, 201, &link)
+			for _, call := range []struct {
+				method, path string
+				body         any
+			}{
+				{"GET", w + "/me", nil},
+				{"PUT", "/api/v1/admin/settings/auth.require_2fa", false},
+				{"GET", "/api/v1/admin/backups", nil},
+				{"POST", "/api/v1/auth/password", M{"current": ownerPassword, "new": "a-new-long-password"}},
+				{"PATCH", "/api/v1/auth/me", M{"email": "taken@example.com", "password": ownerPassword}},
+				{"DELETE", "/api/v1/auth/passkeys/" + laptop, nil},
+				{"GET", "/api/v1/auth/sessions", nil},
+				{"POST", "/api/v1/auth/invite/" + link.Link[strings.LastIndex(link.Link, "/")+1:], nil},
+			} {
+				b := before()
+				if out := s.call(b, "", call.method, call.path, call.body, 401, nil); !strings.Contains(out, "second_step") {
+					t.Fatalf("%s %s: a one-step session was not asked for its second step: %s", call.method, call.path, out)
+				}
+				s.call(b, "", "GET", "/api/v1/auth/me", nil, 401, nil)
 			}
-			s.call(s.owner, "", "GET", "/api/v1/auth/me", nil, 401, nil)
+			var settings struct {
+				Settings map[string]struct{ Value any }
+			}
+			s.call(s.owner, "", "GET", "/api/v1/admin/settings", nil, 200, &settings)
+			if settings.Settings["auth.require_2fa"].Value != true {
+				t.Fatalf("a one-step session changed the rule: %v", settings.Settings["auth.require_2fa"].Value)
+			}
 		})
 		t.Run("an outside account is one step too", func(t *testing.T) {
 			s := s.in(t)
 			if out := s.call(octo, "", "GET", w+"/me", nil, 403, nil); !strings.Contains(out, "second_step_required") {
 				t.Fatalf("a person with no second step got in: %s", out)
 			}
+			// An install admin with no second step reaches none of the
+			// install's administration, and changes nothing of the account's
+			// security, until they have one.
+			for _, call := range []struct {
+				method, path string
+				body         any
+			}{
+				{"GET", "/api/v1/admin/settings", nil},
+				{"PUT", "/api/v1/admin/settings/auth.require_2fa", false},
+				{"GET", "/api/v1/admin/backups", nil},
+				{"PATCH", "/api/v1/auth/me", M{"email": "octo2@example.com"}},
+				{"POST", "/api/v1/auth/password", M{"current": "", "new": "a-new-long-password"}},
+				{"GET", "/api/v1/auth/sessions", nil},
+			} {
+				if out := s.call(octo, "", call.method, call.path, call.body, 403, nil); !strings.Contains(out, "second_step_required") {
+					t.Fatalf("%s %s: a person with no second step was not sent to set one up: %s", call.method, call.path, out)
+				}
+			}
+			// No client is let in through them: a token answers to no second step.
+			var client struct {
+				ID string `json:"client_id"`
+			}
+			s.call(nil, "", "POST", "/oauth/register", M{"client_name": "Test Client", "redirect_uris": []string{"http://localhost:9999/callback"}}, 201, &client)
+			consent := s.url + "/oauth/authorize?" + url.Values{"response_type": {"code"}, "client_id": {client.ID}, "redirect_uri": {"http://localhost:9999/callback"},
+				"code_challenge": {"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGW3Sj4o4Q"}, "code_challenge_method": {"S256"}}.Encode()
+			resp, err := octo.Get(consent)
+			if err != nil {
+				t.Fatal(err)
+			}
+			page, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusForbidden || !strings.Contains(string(page), "second_step_required") {
+				t.Fatalf("a client asked a person with no second step to let it in: %d %.200s", resp.StatusCode, page)
+			}
+			// What sets one up is open to them, and the desktop app is
+			// handed what this browser has: a session to set it up in.
+			s.call(octo, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+			s.call(octo, "", "GET", "/api/v1/auth/passkeys", nil, 200, nil)
+			s.call(octo, "", "POST", "/api/v1/auth/passkeys/register/start", M{}, 200, nil)
+			flow := newDesktopFlow()
+			app := desktopApp{hc: noRedirects()}
+			if resp, _ := app.get(t, finishURL(s, approve(t, s, octo, flow, octoMe.User.ID), flow.verifier)); resp.StatusCode != http.StatusFound {
+				t.Fatalf("finish: status %d", resp.StatusCode)
+			}
+			s.call(app.hc, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+			s.call(app.hc, "", "GET", w+"/me", nil, 403, nil)
 			// Setting one up is the second step of this sign-in.
 			var setup struct{ Secret string }
 			s.call(octo, "", "POST", "/api/v1/auth/totp/start", M{}, 200, &setup)
 			s.call(octo, "", "POST", "/api/v1/auth/totp/enable", M{"code": auth.TOTPCode(setup.Secret, time.Now())}, 200, nil)
 			s.call(octo, "", "GET", w+"/me", nil, 200, nil)
+			s.call(octo, "", "GET", "/api/v1/admin/settings", nil, 200, nil)
+			// A session of one step from before is sent to sign in for a
+			// client, and gives its second step on the way.
+			stops := &http.Client{Jar: before().Jar, Transport: ownPage{}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+			if resp, err := stops.Get(consent); err != nil || resp.StatusCode != http.StatusFound || !strings.HasPrefix(resp.Header.Get("Location"), "/login?") {
+				t.Fatalf("a one-step session asked for a client: %v %v", resp, err)
+			}
 			// Next time GitHub alone is not enough: the code is asked for.
 			again := browser()
-			resp, err := again.Get(s.url + "/api/v1/auth/oauth/github/start")
+			resp, err = again.Get(s.url + "/api/v1/auth/oauth/github/start")
 			if err != nil {
 				t.Fatal(err)
 			}
 			resp.Body.Close()
 			s.call(again, "", "GET", w+"/me", nil, 401, nil)
+			s.call(again, "", "POST", "/api/v1/auth/totp/start", M{}, 401, nil)
 		})
 	})
 }

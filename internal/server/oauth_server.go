@@ -186,9 +186,16 @@ func (s *Server) handleShowConsentPage(x *c) error {
 	if q.Get("response_type") != "code" || q.Get("code_challenge") == "" || (q.Get("code_challenge_method") != "S256" && q.Get("code_challenge_method") != "") {
 		return errBad("this server takes response_type=code with a S256 code_challenge")
 	}
-	if signedIn := s.identify(x.ctx(), x) == nil && x.sess != nil && x.user.Kind == core.KindPerson; !signedIn {
+	// Not signed in in this browser, or the second step owed: the sign-in
+	// page, then here again. Signed in but refused (a second step to set up
+	// first, where the install requires one): the refusal.
+	err = s.identify(x.ctx(), x)
+	if he, ok := errors.AsType[*httpError](err); (ok && he.Status == http.StatusUnauthorized) || (err == nil && (x.sess == nil || x.user.Kind != core.KindPerson)) {
 		http.Redirect(x.w, x.r, "/login?next="+url.QueryEscape(x.r.URL.RequestURI()), http.StatusFound)
 		return nil
+	}
+	if err != nil {
+		return err
 	}
 	groups, err := s.oauthActors(ctx, x.user)
 	if err != nil {

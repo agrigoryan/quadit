@@ -30,8 +30,9 @@ type route struct {
 	// takes the rest of the path.
 	pattern string
 	// handler answers, wrapped in the check of who may call it: public,
-	// signedIn, firstStepPassed, workspaceMember, installAdmin; none for a
-	// route that checks its caller itself or takes anyone.
+	// signedIn, settingUpSecondStep, firstStepPassed, workspaceMember,
+	// installAdmin; none for a route that checks its caller itself or
+	// takes anyone.
 	handler http.HandlerFunc
 	summary string // what it does, for whoever calls it
 	query   string // its query parameters: "name: what it does; name2: …"
@@ -101,7 +102,7 @@ func (s *Server) coreRoutes() []route {
 		{"POST /api/v1/auth/setup", s.public(s.handleSetUpInstall), "First run: make the first person and workspace. Body: {name, email, password, workspace_name}.", "", "account"},
 		{"POST /api/v1/auth/login", s.public(s.handleSignIn), "Sign in with email and password. Body: {email, password}. Answers with a session cookie; with two-step on, the second step follows.", "", "account"},
 		{"POST /api/v1/auth/logout", s.public(s.handleSignOut), "Sign out of this session.", "", "account"},
-		{"GET /api/v1/auth/me", s.signedIn(s.handleShowAccount), "The signed-in account and the workspaces it is in.", "", "account"},
+		{"GET /api/v1/auth/me", s.settingUpSecondStep(s.handleShowAccount), "The signed-in account and the workspaces it is in.", "", "account"},
 		{"PATCH /api/v1/auth/me", s.signedIn(s.handleUpdateProfile), "Change the profile: {name, avatar, timezone, theme, locale}; {email, password} changes the sign-in address.", "", "account"},
 		{"POST /api/v1/auth/password", s.signedIn(s.handleChangePassword), "Change the password. Body: {current, new}. Signed in only.", "", "account"},
 		{"GET /api/v1/auth/sessions", s.signedIn(s.handleListSessions), "The devices signed in to this account.", "", "account"},

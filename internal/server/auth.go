@@ -26,8 +26,8 @@ func (s *Server) authRoutes() []route {
 	return []route{
 		{"GET /api/v1/auth/second-step", s.firstStepPassed(s.handleShowSecondSteps), "How a sign-in that waits for its second step may give it: {code, passkey}. A passkey is given by signing in with it.", "", "account"},
 		{"POST /api/v1/auth/second-step", s.firstStepPassed(s.handleFinishSecondStep), "Finish signing in with an authenticator code or a recovery code. Body: {code}.", "", "account"},
-		{"POST /api/v1/auth/totp/start", s.signedIn(s.handleStartTwoStepSetup), "Begin setting up two-step codes; answers with the secret to scan.", "", "account"},
-		{"POST /api/v1/auth/totp/enable", s.signedIn(s.handleEnableTwoStep), "Turn two-step on with a first code. Body: {code}. Answers with recovery codes.", "", "account"},
+		{"POST /api/v1/auth/totp/start", s.settingUpSecondStep(s.handleStartTwoStepSetup), "Begin setting up two-step codes; answers with the secret to scan.", "", "account"},
+		{"POST /api/v1/auth/totp/enable", s.settingUpSecondStep(s.handleEnableTwoStep), "Turn two-step on with a first code. Body: {code}. Answers with recovery codes.", "", "account"},
 		{"POST /api/v1/auth/totp/disable", s.signedIn(s.handleDisableTwoStep), "Turn two-step off. Body: {code} or {password}.", "", "account"},
 		{"POST /api/v1/auth/recovery-codes", s.signedIn(s.handleRenewRecoveryCodes), "Make a new set of recovery codes. Body: {code}, a current code.", "", "account"},
 		{"POST /api/v1/auth/reset/request", s.public(s.handleRequestPasswordReset), "Ask for a password reset by mail. Body: {email}.", "", "account"},

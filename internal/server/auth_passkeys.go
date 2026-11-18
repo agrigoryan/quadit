@@ -25,9 +25,9 @@ import (
 // passkeyRoutes are the routes of adding, naming and signing in with passkeys.
 func (s *Server) passkeyRoutes() []route {
 	return []route{
-		{"GET /api/v1/auth/passkeys", s.signedIn(s.handleListPasskeys), "The account's passkeys.", "", "account"},
-		{"POST /api/v1/auth/passkeys/register/start", s.signedIn(s.handleStartPasskeyRegistration), "Begin adding a passkey: answers with what the browser's WebAuthn call needs.", "", "account"},
-		{"POST /api/v1/auth/passkeys/register/finish", s.signedIn(s.handleFinishPasskeyRegistration), "Finish adding a passkey with the browser's answer.", "", "account"},
+		{"GET /api/v1/auth/passkeys", s.settingUpSecondStep(s.handleListPasskeys), "The account's passkeys.", "", "account"},
+		{"POST /api/v1/auth/passkeys/register/start", s.settingUpSecondStep(s.handleStartPasskeyRegistration), "Begin adding a passkey: answers with what the browser's WebAuthn call needs.", "", "account"},
+		{"POST /api/v1/auth/passkeys/register/finish", s.settingUpSecondStep(s.handleFinishPasskeyRegistration), "Finish adding a passkey with the browser's answer.", "", "account"},
 		{"PATCH /api/v1/auth/passkeys/{id}", s.signedIn(s.handleRenamePasskey), "Rename a passkey. Body: {name}.", "", "account"},
 		{"DELETE /api/v1/auth/passkeys/{id}", s.signedIn(s.handleDeletePasskey), "Remove a passkey.", "", "account"},
 		{"POST /api/v1/auth/passkeys/login/start", s.public(s.handleStartPasskeySignIn), "Begin signing in with a passkey.", "", "account"},

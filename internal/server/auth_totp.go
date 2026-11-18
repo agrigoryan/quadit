@@ -5,6 +5,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -64,29 +65,46 @@ func (s *Server) secondStepOwed(ctx context.Context, u core.User) (bool, error) 
 	return s.hasSecondStep(ctx, u)
 }
 
-// holdToTwoSteps refuses a session into a workspace where the install
+// holdToTwoSteps refuses a session, wherever it goes, when the install
 // requires two steps and its sign-in took one. What counts is how this
 // session signed in, not what the account has set up: a person who has a
 // second step owes it now (the session goes back to waiting for it, and
 // the answer is the 401 a half-signed-in session gets); a person with none
-// is sent to set one up. A session made to take a picture is let through:
-// the request that made it was held here already.
+// is sent to set one up, and let through only on the routes that do that
+// (toSetUpSecondStep). A session that already owes its second step
+// (sessionMayAct) or was made to take a picture (the request that made it
+// was held here already) is not this rule's.
 func (s *Server) holdToTwoSteps(ctx context.Context, x *c) error {
-	if x.sess == nil || x.sess.Stage != core.SessionFull || x.sess.TwoStep || !s.settings.Bool(ctx, "auth.require_2fa", false) {
+	if x.needs == firstStep || x.sess.Stage != core.SessionFull || x.sess.TwoStep {
 		return nil
 	}
-	// Fails closed: when the second steps cannot be counted, the answer is no.
+	// Fails closed: when the rule or the second steps cannot be read, the answer is no.
+	required, err := s.settings.CheckedBool(ctx, "auth.require_2fa", false)
+	if err != nil || !required {
+		return err
+	}
 	has, err := s.hasSecondStep(ctx, x.user)
 	if err != nil {
 		return err
 	}
 	if !has {
+		if x.needs == toSetUpSecondStep {
+			return nil
+		}
 		return &httpError{Status: 403, Code: "second_step_required", Message: "this install requires two-step verification: set it up in your profile first"}
 	}
 	if _, err := s.st.Update(ctx, "sessions", map[string]any{"stage": core.SessionMFA}, store.Eq("id", x.sess.ID)); err != nil {
 		return err
 	}
 	return &httpError{Status: 401, Code: "second_step", Message: "this install requires two-step verification: finish signing in with your second step"}
+}
+
+// owesSecondStep reports whether err refuses a signed-in session for its
+// second step: one it owes (sessionMayAct, holdToTwoSteps), or one it has
+// to set up first where the install requires it.
+func owesSecondStep(err error) bool {
+	he, ok := errors.AsType[*httpError](err)
+	return ok && (he.Code == "second_step" || he.Code == "second_step_required")
 }
 
 // tookTwoSteps marks the session as signed in with two steps, once the

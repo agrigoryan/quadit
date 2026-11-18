@@ -10,8 +10,10 @@
 //
 //	Routing and the request context
 //	  server.go      the Server, the request context c, the route wrappers
-//	                 (public, signedIn, firstStepPassed, workspaceMember),
-//	                 sign-in by token or cookie, errors and the audit log
+//	                 (public, signedIn, settingUpSecondStep, firstStepPassed,
+//	                 workspaceMember), sign-in by token or cookie and how far
+//	                 a session's sign-in must have come, errors and the
+//	                 audit log
 //	  origin.go      which pages a browser's write is taken from
 //	  routes.go      the route: one address with its words; allRoutes, the
 //	                 list of them all that the mux and openapi.json are both
@@ -290,7 +292,7 @@ var statusOf = map[string]int{
 
 // c is one request with who is asking: the request context every handler
 // takes, named x. The route wrapper makes it with s, w and r (and
-// firstStepEnough); identify fills in who is asking; enterWorkspace fills
+// needs); identify fills in who is asking; enterWorkspace fills
 // in the viewer (the workspace, the membership and what the caller may
 // read there) and the actor. What reads the workspace's data is a method
 // of the viewer, not of c: c is the HTTP side of a request.
@@ -309,10 +311,30 @@ type c struct {
 	// actor is who the engine applies changes as, read-only or limited to
 	// projects by the token's scopes (enterWorkspace).
 	actor engine.Actor
-	// firstStepEnough lets a session that still owes its second step through.
-	// Set by firstStepPassed.
-	firstStepEnough bool
+	// needs is how far a session's sign-in must have come for the route
+	// (signedIn, settingUpSecondStep, firstStepPassed); identify holds the
+	// session to it.
+	needs signInNeeds
 }
+
+// signInNeeds is how far a session's sign-in must have come for a route to
+// let it through. A token is a credential of its own: it is not asked.
+type signInNeeds int
+
+const (
+	// bothSteps: signed in, and with two steps where the install requires
+	// two (holdToTwoSteps), for every route that does not say otherwise: a
+	// workspace, the install's administration, the account and its
+	// security.
+	bothSteps signInNeeds = iota
+	// toSetUpSecondStep is bothSteps, except that a person the install
+	// requires a second step of and who has none yet is let through: the
+	// routes that set one up (settingUpSecondStep).
+	toSetUpSecondStep
+	// firstStep: the first step passed; the second may still be owed
+	// (firstStepPassed).
+	firstStep
+)
 
 // ctx is the request's context: it ends when the caller goes away.
 func (x *c) ctx() context.Context { return x.r.Context() }
@@ -594,27 +616,26 @@ func (s *Server) public(h handler) http.HandlerFunc {
 
 // signedIn wraps a handler that needs a signed-in person or a token, but no
 // workspace. It runs identify, which fills in user and either sess or
-// token, refuses a session that still owes its second step, and checks the
-// caller's rate limit.
-func (s *Server) signedIn(h handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		x := &c{s: s, w: w, r: r}
-		if err := s.identify(r.Context(), x); err != nil {
-			s.fail(w, r, err)
-			return
-		}
-		if err := h(x); err != nil {
-			s.fail(w, r, err)
-		}
-	}
+// token, refuses a session whose sign-in has not come far enough
+// (bothSteps), and checks the caller's rate limit.
+func (s *Server) signedIn(h handler) http.HandlerFunc { return s.signedInFor(bothSteps, h) }
+
+// settingUpSecondStep wraps a handler of setting up a second step: it is
+// signedIn, letting through a person the install requires one of who has
+// none yet (toSetUpSecondStep).
+func (s *Server) settingUpSecondStep(h handler) http.HandlerFunc {
+	return s.signedInFor(toSetUpSecondStep, h)
 }
 
 // firstStepPassed wraps a handler for someone who has passed the first
-// sign-in step and may still owe the second: it is signedIn with
-// firstStepEnough set, so a session at any stage is let through.
-func (s *Server) firstStepPassed(h handler) http.HandlerFunc {
+// sign-in step and may still owe the second: it is signedIn letting a
+// session at any stage through (firstStep).
+func (s *Server) firstStepPassed(h handler) http.HandlerFunc { return s.signedInFor(firstStep, h) }
+
+// signedInFor is signedIn, holding a session to needs.
+func (s *Server) signedInFor(needs signInNeeds, h handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		x := &c{s: s, w: w, r: r, firstStepEnough: true}
+		x := &c{s: s, w: w, r: r, needs: needs}
 		if err := s.identify(r.Context(), x); err != nil {
 			s.fail(w, r, err)
 			return
@@ -654,9 +675,9 @@ func (s *Server) workspaceMember(h handler) http.HandlerFunc {
 const sessionCookie = "quadit_session"
 
 // identify finds who is asking: a token in the Authorization header, or a
-// session cookie. It fills in x.user and x.token or x.sess, and counts the
-// request against the caller's rate limit unless it is made inside another
-// request (inProcess).
+// session cookie, which it holds to x.needs. It fills in x.user and
+// x.token or x.sess, and counts the request against the caller's rate
+// limit unless it is made inside another request (inProcess).
 func (s *Server) identify(ctx context.Context, x *c) error {
 	now := time.Now().UnixMilli()
 	if h := x.r.Header.Get("Authorization"); h != "" {
@@ -702,7 +723,9 @@ func (s *Server) identifyByToken(ctx context.Context, x *c, header string, now i
 	return s.limits.check("t:"+t.ID, limitPerToken)
 }
 
-// identifyBySession signs the caller in with the session cookie.
+// identifyBySession signs the caller in with the session cookie, when its
+// sign-in has come as far as x.needs: past the second step when one is
+// owed, and with two steps where the install requires two (holdToTwoSteps).
 func (s *Server) identifyBySession(ctx context.Context, x *c, now int64) error {
 	ck, err := x.r.Cookie(sessionCookie)
 	if err != nil || ck.Value == "" {
@@ -723,6 +746,9 @@ func (s *Server) identifyBySession(ctx context.Context, x *c, now int64) error {
 		return err
 	}
 	x.sess = &sess
+	if err := s.holdToTwoSteps(ctx, x); err != nil {
+		return err
+	}
 	if now-sess.LastSeenAt > signInWriteEvery {
 		_, _ = s.st.Update(ctx, "sessions", map[string]any{"last_seen_at": now}, store.Eq("id", sess.ID)) // best effort: last seen is shown to people, and written again on the next call
 	}
@@ -734,8 +760,9 @@ func (s *Server) identifyBySession(ctx context.Context, x *c, now int64) error {
 
 // sessionMayAct refuses what a session may not do with this request: a
 // session made for taking pictures may only read, and one that owes its
-// second step gets only as far as firstStepPassed routes. (A write another
-// site's page sent with the cookie never gets here: refuseOtherPages.)
+// second step gets only as far as firstStepPassed routes (firstStep). (A
+// write another site's page sent with the cookie never gets here:
+// refuseOtherPages.)
 func (x *c) sessionMayAct(sess core.Session) error {
 	switch {
 	case sess.Stage == core.SessionRender:
@@ -743,7 +770,7 @@ func (x *c) sessionMayAct(sess core.Session) error {
 		if x.r.Method != http.MethodGet && x.r.Method != http.MethodHead {
 			return errForbidden("this session is read-only")
 		}
-	case sess.Stage != core.SessionFull && !x.firstStepEnough:
+	case sess.Stage != core.SessionFull && x.needs != firstStep:
 		return &httpError{Status: 401, Code: "second_step", Message: "finish signing in with your second step"}
 	}
 	return nil
@@ -788,8 +815,9 @@ func (s *Server) enterWorkspace(ctx context.Context, x *c, ref string) error {
 // the membership (a workspace the caller is not a member of is not found,
 // as if it did not exist), holds the request to its credential (the
 // workspace a token or a picture's session is for, and how its scopes
-// narrow the account: x.actor, and the viewer's projects) and to the
-// install's two-step rule, and records the member's presence.
+// narrow the account: x.actor, and the viewer's projects), and records the
+// member's presence. The install's two-step rule held the session when it
+// was identified.
 func (s *Server) enter(ctx context.Context, x *c, ws core.Workspace) error {
 	workspaceID, scopes := x.credential()
 	if workspaceID != "" && workspaceID != ws.ID {
@@ -807,9 +835,6 @@ func (s *Server) enter(ctx context.Context, x *c, ws core.Workspace) error {
 		return errForbidden("your membership in this workspace is suspended")
 	}
 	x.viewer = *s.viewerFor(ws, member)
-	if err := s.holdToTwoSteps(ctx, x); err != nil {
-		return err
-	}
 	// The credential narrows the account: "read" makes the actor
 	// read-only, and "project:ID" limits the actor to those projects, and
 	// what the caller may read to those of them the membership allows.
