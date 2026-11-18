@@ -10,6 +10,10 @@ import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 
 vi.mock("@/auth/create-workspace", () => ({ NoWorkspacePage: () => <p>signed in, with no workspace yet</p> }));
 vi.mock("@/auth/login", () => ({ LoginPage: () => <p>the sign-in page</p> }));
+vi.mock("@/shell/workspace", async () => {
+  const { useLocation } = await import("react-router");
+  return { WorkspaceRoute: () => <p>at {useLocation().pathname}</p> };
+});
 
 const WHO_AM_I = "/api/v1/auth/me";
 const user = { id: "u1", name: "Me" } as User;
@@ -81,5 +85,22 @@ describe("App", () => {
     await settle();
     expect(useSession.getState().status).toBe("out");
     expect(screen.getByText("the sign-in page")).toBeInTheDocument();
+  });
+});
+
+describe("the start page, /", () => {
+  const workspaces = [{ id: "w", slug: "acme", name: "Acme", role: "member", handle: "me" }];
+
+  it.each([
+    ["", "/acme"],
+    ["?open=inbox", "/acme/inbox"],
+    ["?open=my-work", "/acme/my-work"],
+    ["?open=settings/../admin", "/acme"],
+  ])("opens the first workspace, at the page a shortcut of the installed app names (%s)", async (search, at) => {
+    server.get(WHO_AM_I, { user, workspaces });
+    window.history.replaceState(null, "", `/${search}`);
+    render(<App />);
+    await settle();
+    expect(screen.getByText(`at ${at}`)).toBeInTheDocument();
   });
 });

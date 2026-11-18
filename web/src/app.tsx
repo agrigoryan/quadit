@@ -1,6 +1,6 @@
 import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useSearchParams } from "react-router";
 import { NoWorkspacePage } from "@/auth/create-workspace";
 import { DesktopConnectPage } from "@/auth/desktop-connect";
 import { InvitePage } from "@/auth/invite";
@@ -38,11 +38,16 @@ function RequireSession({ children }: { children: ReactNode }) {
   return children;
 }
 
-/** "/" goes to the person's first workspace. */
+/** The pages of a workspace "/?open=" may name: those the installed app's shortcuts open (public/manifest.webmanifest). */
+const SHORTCUT_PAGES = ["my-work", "inbox"];
+
+/** "/" goes to the person's first workspace, or to one of its pages named by ?open=. */
 function Home() {
   const first = useSession((s) => s.workspaces[0]);
+  const [params] = useSearchParams();
   if (!first) return <NoWorkspacePage />;
-  return <Navigate to={`/${first.slug}`} replace />;
+  const open = params.get("open") ?? "";
+  return <Navigate to={`/${first.slug}${SHORTCUT_PAGES.includes(open) ? `/${open}` : ""}`} replace />;
 }
 
 export function App() {
