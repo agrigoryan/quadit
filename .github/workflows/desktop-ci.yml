@@ -1,6 +1,7 @@
 name: desktop-ci
 
-# The desktop app's gate (desktop/): types, lint, format and unit tests; and
+# The desktop app's gate (desktop/): types, lint, format and unit tests, on
+# Linux and on Windows (whose release build runs the same check); and
 # on a Mac, its end-to-end suite (desktop/test/e2e): the app driven against
 # the server built here, signing in through the server's own hand-off, and
 # the app packaged as a release packages it (unsigned), checked for what
@@ -17,6 +18,7 @@ on:
     branches: [main]
     paths: &paths
       - "desktop/**"
+      - ".gitattributes"
       - ".github/workflows/desktop-*.yml"
       - "internal/server/desktop*.go"
       - "internal/app/web.go"
@@ -34,7 +36,11 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: desktop

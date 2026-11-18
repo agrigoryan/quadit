@@ -144,7 +144,8 @@ jobs:
         env:
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-        run: pnpm build && node scripts/cli.mjs && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
+        # No quadit command here: it has no Windows build, and the Windows app has no Connect.
+        run: pnpm build && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
       - name: Package (Linux)
         if: runner.os == 'Linux'
         shell: bash
