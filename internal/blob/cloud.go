@@ -226,7 +226,7 @@ var ErrUnusable = errors.New("file storage cannot be used")
 // Every call answers why, so that meanwhile nothing is written to, or
 // looked for in, another store.
 type Unusable struct {
-	Set string // the kind of store that is set: s3, gcs or azure
+	Set string // the kind of store that is set: s3, gcs or azure, or unknown while the setting cannot be read
 	Err error  // why it cannot be used
 }
 

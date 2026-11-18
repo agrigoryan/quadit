@@ -184,9 +184,10 @@ func (s *Server) keptOpenContext(parent context.Context) (context.Context, conte
 }
 
 // New wires a server. Call Handler to serve it and Run for background work.
-// files is the local disk. When the "files" setting names a cloud store,
-// no file is stored or read until Run has opened it: until then a request
-// that needs one is answered 503, and /readyz says the server is not ready.
+// files is the local disk. When the "files" setting names a cloud store, or
+// cannot be read, no file is stored or read until Run has opened the store
+// it names: until then a request that needs one is answered 503, and
+// /readyz says the server is not ready.
 func New(ctx context.Context, cfg Config, st store.Store, files blob.Store, sealer *auth.Sealer) *Server {
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
@@ -198,7 +199,11 @@ func New(ctx context.Context, cfg Config, st store.Store, files blob.Store, seal
 		seen: map[string]int64{}, limits: newLimiter(), quit: make(chan struct{}), outbound: outbound.Client(cfg.PrivateNetworks), origin: originOf(cfg.BaseURL)}
 	s.eng.OnCommit = s.hub.Notify
 	s.settings = settings.New(st, sealer, cfg.Log, s.settingKinds())
-	if fc := (blob.Config{}); s.settings.Get(ctx, "files", &fc) && fc.Kind != "" && fc.Kind != "disk" {
+	var fc blob.Config
+	switch err := s.settings.Checked(ctx, "files", &fc); {
+	case err != nil:
+		s.files = blob.Unusable{Set: "unknown", Err: err}
+	case fc.Kind != "" && fc.Kind != "disk":
 		s.files = blob.Unusable{Set: fc.Kind, Err: errors.New("it is being opened")}
 	}
 	s.repos = &reposync.Syncer{Store: st, Engine: s.eng, Log: cfg.Log, DataDir: cfg.DataDir}

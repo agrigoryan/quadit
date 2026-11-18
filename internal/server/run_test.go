@@ -1,6 +1,8 @@
 package server_test
 
 import (
+	"context"
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -117,5 +120,65 @@ func TestNoFileIsTakenWhileTheStoreThatIsSetIsBeingOpened(t *testing.T) {
 		if len(kept) > 0 {
 			t.Fatalf("an upload while the file store was being opened went to the local disk: %v", kept)
 		}
+	})
+}
+
+// TestFileStorageWaitsForItsSettingToBeRead: a server that cannot read the
+// "files" setting when it starts does not know which store holds the
+// files, so it stores and reads none (it is not ready, and an upload is
+// answered "try again later") rather than taking the local disk for it.
+// Once the setting can be read, the store it names is used.
+func TestFileStorageWaitsForItsSettingToBeRead(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		if err := st.Upsert(context.Background(), &core.Setting{Name: "files", Value: json.RawMessage(`{"kind":"disk"}`)}, "name"); err != nil {
+			t.Fatal(err)
+		}
+		fs := newFaultyStore(st)
+		fs.faults.arm(fault{op: "get", table: "settings", match: func(_ map[string]any, where []store.Cond) bool { return whereHas(where, "name", "files") }})
+		s := newSite(t, fs)
+		ready := func() (int, string) {
+			resp, err := http.Get(s.url + "/readyz")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer resp.Body.Close()
+			raw, _ := io.ReadAll(resp.Body)
+			return resp.StatusCode, string(raw)
+		}
+
+		if status, said := ready(); status != http.StatusServiceUnavailable || !strings.Contains(said, "file") {
+			t.Fatalf("/readyz with the files setting unreadable: %d %q, want 503 naming the file store", status, said)
+		}
+		req, _ := http.NewRequest("POST", s.url+w+"/files?name=notes.txt", strings.NewReader("hello"))
+		resp, err := s.owner.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusServiceUnavailable || resp.Header.Get("Retry-After") == "" {
+			t.Fatalf("an upload with the files setting unreadable: %d, Retry-After %q; want 503 with Retry-After", resp.StatusCode, resp.Header.Get("Retry-After"))
+		}
+		var kept []string
+		_ = filepath.WalkDir(filepath.Join(s.dir, "files"), func(path string, d os.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				kept = append(kept, path)
+			}
+			return nil
+		})
+		if len(kept) > 0 {
+			t.Fatalf("an upload with the files setting unreadable went to the local disk: %v", kept)
+		}
+
+		fs.faults.clear()
+		for deadline := time.Now().Add(20 * time.Second); ; time.Sleep(100 * time.Millisecond) {
+			status, said := ready()
+			if status == http.StatusOK {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("/readyz once the files setting reads again: %d %q, want 200", status, said)
+			}
+		}
+		s.call(t, s.owner, "", "POST", w+"/files?name=notes.txt", []byte("hello"), 201, nil)
 	})
 }

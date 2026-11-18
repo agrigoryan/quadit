@@ -21,9 +21,10 @@ import (
 // resources every minute.
 //
 // A file store that is set but cannot be used yet (a bucket another
-// container is still making) is never replaced by the local disk: until it
-// can be used, files are neither stored nor read, /readyz says the server
-// is not ready, and Run tries it again in the background.
+// container is still making), or a "files" setting that cannot be read, is
+// never replaced by the local disk: until the store that is set is known
+// and can be used, files are neither stored nor read, /readyz says the
+// server is not ready, and Run tries again in the background.
 //
 // When ctx ends Run returns once every loop it started has returned, so
 // the caller may then close the store. A loop in the middle of a piece of
@@ -35,14 +36,17 @@ func (s *Server) Run(ctx context.Context) {
 	var loops sync.WaitGroup
 	defer loops.Wait()
 	var fc blob.Config
-	if s.settings.Get(ctx, "files", &fc) {
-		if err := s.useFiles(ctx, fc); err != nil {
-			s.log.Error("file storage cannot be used as set; no file is stored or read, and the server is not ready, until it can; trying again", "err", err)
+	err := s.settings.Checked(ctx, "files", &fc)
+	if err == nil {
+		if err = s.useFiles(ctx, fc); err != nil {
 			s.filesMu.Lock()
 			s.files = blob.Unusable{Set: fc.Kind, Err: err}
 			s.filesMu.Unlock()
-			loops.Go(func() { s.reachFiles(ctx) })
 		}
+	}
+	if err != nil {
+		s.log.Error("file storage cannot be used as set; no file is stored or read, and the server is not ready, until it can; trying again", "err", err)
+		loops.Go(func() { s.reachFiles(ctx) })
 	}
 	s.applyLimits(ctx)
 	for _, r := range runners {
@@ -73,9 +77,9 @@ func (s *Server) Run(ctx context.Context) {
 	}
 }
 
-// reachFiles tries the file store that is set again, with a pause that
-// grows, until it can be used, the setting is changed to one that can, or
-// ctx ends.
+// reachFiles reads the "files" setting and tries the store it names
+// again, with a pause that grows, until it can be used, the setting is
+// changed to one that can, or ctx ends.
 func (s *Server) reachFiles(ctx context.Context) {
 	pause := 2 * time.Second
 	for {
@@ -88,8 +92,10 @@ func (s *Server) reachFiles(ctx context.Context) {
 			return // an admin set a store that works meanwhile
 		}
 		var fc blob.Config
-		s.settings.Get(ctx, "files", &fc)
-		err := s.useFiles(ctx, fc)
+		err := s.settings.Checked(ctx, "files", &fc)
+		if err == nil {
+			err = s.useFiles(ctx, fc)
+		}
 		if err == nil {
 			s.log.Info("file storage can be used now", "kind", fc.Kind)
 			return
