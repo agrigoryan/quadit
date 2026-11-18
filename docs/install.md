@@ -75,7 +75,7 @@ Everything else is set in the admin area of the web app. Each setting can also c
 | `mail` | `{"host", "port", "username", "password", "from", "tls"}`. `tls` is `starttls` (default), `tls` or `none` |
 | `files` | Where uploads go: see below |
 | `files.max_mb` | Largest upload, default 250 |
-| `backup` | `{"enabled": true, "hour": 3, "keep": 14, "copy_to_files": false}` |
+| `backup` | `{"enabled": true, "hour": 3, "keep": 14, "copy_to": {"kind": "folder", "folder": "/mnt/backups"}}`: see [Backups](#backups) |
 | `limits.api_per_minute` | Requests per token per minute, default 1200 |
 | `metrics.token` | If set, `/metrics` needs it as a bearer token |
 
@@ -116,13 +116,26 @@ An archive is the install at one moment, taken while it runs: every table as it 
 
 - `--secret-key FILE` gives the original secret. The restore checks that it opens the archive's secrets, and the restored install keeps it as its `secret.key` (the one the new, empty install made for itself is kept beside it as `secret.key.before-restore-…`). With `QUADIT_SECRET`, set it as it was set before and leave the flag out.
 - Without the flag, the restore uses the install's own secret, and refuses, changing nothing, when that is not the one the archive was made with.
-- `--without-secret-key` is for a secret that is lost for good: everything else is restored, and two-step sign-in, vault secrets, integrations, mail and file storage settings must be set up again.
+- `--without-secret-key` is for a secret that is lost for good: everything else is restored, and two-step sign-in, vault secrets, integrations, mail, file storage and backup bucket settings must be set up again.
 
 An archive that does not say which secret it was made with cannot be checked, and a full restore refuses it. `--without-secret-key` restores it unchecked: its encrypted values open only if this install's secret (its `secret.key`, or `QUADIT_SECRET`) is the one they were sealed with, and must be set up again otherwise.
 
 A full restore goes into an empty install. It reads the whole archive first and refuses a damaged one before writing anything; then it loads every row in one transaction. When it fails, the database is left empty and the files it stored are taken out again, so it can simply be run again. An archive holds no part of an upload that was still arriving: after a restore, such an upload is sent again from the start.
 
 Scheduled backups are a switch in the admin area. Each one is read back and checked before it counts; the last one shows in the health panel. Deleted tasks, pages and files stay in the trash for 30 days first, and a file's bytes a day longer.
+
+Archives are written to `backups` in the data directory, on the same disk as the data. To have each one also kept somewhere else, choose where in the admin area ("Also copy each backup to"), or set `copy_to` in the `backup` setting:
+
+| `copy_to.kind` | Where each archive is copied |
+| --- | --- |
+| none (default) | nowhere: archives stay only beside the data |
+| `files` | file storage, under `backups/`. This takes them off the machine only when file storage is a cloud bucket |
+| `folder` | `folder`, an absolute path on the server: a mounted network drive or a synced folder. It must be there; the server does not make it |
+| `bucket` | `bucket`, a cloud bucket of their own, set with the same fields as [file storage](#file-storage) (`kind` is `s3`, `gcs` or `azure`); its keys are stored encrypted the same way |
+
+Every backup, scheduled or made with "Back up now", is copied once it is verified, under its own name (`quadit-YYYYMMDD-HHMMSS.tar.gz`). `keep` holds there too: after a copy gets there, the oldest copies beyond it are removed; other files in that place are left alone. Saving the setting tries the place first and refuses it, saying why, when it is not there or does not take a test write. A copy that fails does not fail the backup: the archive is kept, and the reason is shown on it in the admin area, in the health panel and on the dashboards of workspace admins; the next backup tries again. `quadit backup --out` writes only where it is told.
+
+The install secret is not in the copies either: keep `secret.key` somewhere that is neither the data directory nor where the copies go.
 
 ## Export
 
