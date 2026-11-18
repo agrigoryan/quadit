@@ -29,7 +29,9 @@ func (w *world) found(text, projectID, docID string) bool {
 		w.t.Fatal(err)
 	}
 	for _, h := range hits {
-		if h.ScopeID == docID {
+		// A page of no project is found too, as it opens for everyone: the
+		// project it is filed under is the hit's.
+		if h.ScopeID == docID && h.ProjectID == projectID {
 			return true
 		}
 	}
