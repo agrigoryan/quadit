@@ -74,10 +74,10 @@ type desktopGrant struct {
 // browser to the app with a code. Only the server's own page can press it
 // (sentFrom): any other page, a sibling site's included, could otherwise
 // skip the question the page asks. This is stricter than every other write
-// (refuseOtherPages): a post the person's own doing or one that says
-// nothing of where it comes from is no press of Continue either. Someone no longer signed in is
-// sent to sign in and back to the page. The session cookie decides who is
-// signed in. The confirm page names the account it asks about (user), and a
+// (refuseOtherPages): a post that is the person's own doing, or that says
+// nothing of where it comes from, is no press of Continue either. Someone
+// no longer signed in is sent to sign in and back to the page. The session
+// cookie decides who is signed in. The confirm page names the account it asks about (user), and a
 // browser signed in as someone else since is refused.
 func (s *Server) handleApproveDesktopSignIn(x *c) error {
 	x.w.Header().Set("Cache-Control", "no-store")
