@@ -20,7 +20,9 @@
 //   - window.open of the same origin opens another window held to the same
 //     rules; anything else goes to the system browser;
 //   - only the server's own pages get the bridge, and each message on it is
-//     checked again here against the frame that sent it.
+//     checked again here against the frame that sent it; what a page
+//     publishes and answers goes to Requests (requests.ts), and goes with
+//     the page.
 
 import {
   BrowserWindow,

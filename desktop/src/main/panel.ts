@@ -10,9 +10,12 @@ import type { Requests } from "@/main/requests";
 
 const WIDTH = 380;
 const HEIGHT = 520;
+const JUST_HIDDEN_MS = 300;
 
 export class Panel {
   private win: BrowserWindow | undefined;
+  /** When the panel last hid: a click on the tray icon takes the focus first, and must not open it again at once. */
+  private hiddenAt = 0;
 
   constructor(
     private pages: AppPages,
@@ -35,6 +38,7 @@ export class Panel {
       this.win.hide();
       return;
     }
+    if (Date.now() - this.hiddenAt < JUST_HIDDEN_MS) return;
     const win = this.window();
     win.setPosition(...placeUnder(tray));
     win.show();
@@ -58,7 +62,10 @@ export class Panel {
       alwaysOnTop: true,
       title: "Quadit",
     });
-    win.on("blur", () => win.hide());
+    win.on("blur", () => {
+      this.hiddenAt = Date.now();
+      win.hide();
+    });
     win.on("closed", () => (this.win = undefined));
     this.win = win;
     return win;

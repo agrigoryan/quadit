@@ -344,3 +344,17 @@ describe("Connect and Disconnect", () => {
     expect(await connections.applyConnect(planned.plan.id)).toMatchObject({ ok: false });
   });
 });
+
+describe("an older quadit", () => {
+  it("is refused with a word to update it", async () => {
+    const { connections, choice, bin } = setUp();
+    writeFileSync(
+      join(bin, "quadit"),
+      '#!/bin/sh\n[ "$1" = login ] && { echo "usage: quadit login URL TOKEN" >&2; exit 2; }\necho ok\n',
+    );
+    expect(await connections.planConnect(choice("claude"))).toEqual({
+      ok: false,
+      error: expect.stringMatching(/is older than this app and cannot be connected: update it/),
+    });
+  });
+});

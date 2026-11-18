@@ -4,7 +4,9 @@
 // that got past the navigation rules) gets nothing. A message is sent only
 // in the shape the app keeps (shared/bridge.ts), so a page cannot make the
 // app copy megabytes across. The main process checks the sender and the
-// shape of every message again, so this is the first of two locks.
+// shape of every message again, so this is the first of two locks. A
+// request the app sends (src/main/requests.ts) goes to the page's one
+// handler, and its answer back in the outcome's shape.
 //
 // Sandboxed: only `electron`'s renderer modules are here, no Node.
 

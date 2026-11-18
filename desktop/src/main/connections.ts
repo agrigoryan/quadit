@@ -223,12 +223,16 @@ export class Connections {
       else if (!look.found && look.linkInto && cli.bundled) {
         changes.push({ kind: "link", path: join(look.linkInto, "quadit"), target: cli.bundled });
       }
+      // An older quadit has no `login --path` (nor `login URL -`): it is to be updated, not worked around.
+      const tooOld = (err: Error) => {
+        throw new EditRefused(`${binary} is older than this app and cannot be connected: update it. (${err.message})`);
+      };
       changes.push({
         kind: "file",
         path: join(home, harness.skills, "quadit", "SKILL.md"),
-        content: await cli.skill(binary),
+        content: await cli.skill(binary).catch(tooOld),
       });
-      const defaultConfig = await cli.defaultConfig(binary);
+      const defaultConfig = await cli.defaultConfig(binary).catch(tooOld);
       const shown = `${JSON.stringify({ url: origin, token: MASKED_TOKEN }, null, 2)}\n`;
       if (harness.env) {
         const config = join(dirname(defaultConfig), `${harness.id}.json`);
