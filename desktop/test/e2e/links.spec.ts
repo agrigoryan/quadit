@@ -34,9 +34,10 @@ test("window.open: the server's own pages open in another app window, other site
   await page.evaluate(() => window.open("javascript:alert(1)", "_blank"));
 
   const opened = desktop.app.waitForEvent("window");
-  await page.evaluate(() => window.open("/e2e/settings", "_blank"));
+  // The inbox, which stays at its address: settings moves on to its first section, which a check can catch either side of.
+  await page.evaluate(() => window.open("/e2e/inbox", "_blank"));
   const child = await opened;
-  await expect(child).toHaveURL(`${run.server}/e2e/settings`);
+  await expect(child).toHaveURL(`${run.server}/e2e/inbox`);
   // Held to the same rules: its own pages get the bridge, and it shares the server's session.
   expect(await child.evaluate(() => window.quaditDesktop?.version)).toBe("0.1.0");
   expect((await desktop.recorded()).opened).toEqual(["https://example.org/elsewhere"]);
