@@ -1,8 +1,10 @@
 // Two-step verification required by the install: what lets a person in is
 // how this sign-in went, not what their account has set up. A password is
 // one step; a person with a passkey confirms with it next, a person with an
-// authenticator app types its code. The setting holds for the whole
-// install, so these tests run on a server of their own.
+// authenticator app types its code. A passkey is both steps only when the
+// device checked who holds it (a fingerprint, a PIN): one that does not is
+// refused. The setting holds for the whole install, so these tests run on a
+// server of their own.
 
 import { createHmac } from "node:crypto";
 import { type Browser, type BrowserContext, expect, type Page, test } from "@playwright/test";
@@ -21,22 +23,46 @@ test.afterAll(async ({}, testInfo) => {
   await server?.stop(testInfo.outputDir);
 });
 
-/** A browser of its own, signed in as nobody, with a passkey device that says yes. */
-async function freshBrowser(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
+/**
+ * A browser of its own, signed in as nobody, with a passkey device that
+ * checks who holds it (a fingerprint, a PIN) and says yes. `useDevice(false)`
+ * swaps it for a device that cannot check (a security key with no PIN),
+ * with no passkey on it; `useDevice(true)` brings the first back, with its
+ * passkeys.
+ */
+async function freshBrowser(
+  browser: Browser,
+): Promise<{ context: BrowserContext; page: Page; useDevice: (checks: boolean) => Promise<void> }> {
   const context = await browser.newContext({ baseURL: server.url, serviceWorkers: "block" });
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
   await cdp.send("WebAuthn.enable");
-  await cdp.send("WebAuthn.addVirtualAuthenticator", {
-    options: {
-      protocol: "ctap2",
-      transport: "internal",
-      hasResidentKey: true,
-      hasUserVerification: true,
-      isUserVerified: true,
-    },
-  });
-  return { context, page };
+  const device = async (checks: boolean) =>
+    (
+      await cdp.send("WebAuthn.addVirtualAuthenticator", {
+        options: {
+          protocol: "ctap2",
+          transport: "internal",
+          hasResidentKey: true,
+          hasUserVerification: checks,
+          isUserVerified: checks,
+        },
+      })
+    ).authenticatorId;
+  const passkeysOn = async (authenticatorId: string) =>
+    (await cdp.send("WebAuthn.getCredentials", { authenticatorId })).credentials;
+  let current = { id: await device(true), checks: true };
+  let kept: Awaited<ReturnType<typeof passkeysOn>> = [];
+  const useDevice = async (checks: boolean) => {
+    if (current.checks) kept = await passkeysOn(current.id);
+    // Chrome has one device of this kind at a time: the one in hand goes first.
+    await cdp.send("WebAuthn.removeVirtualAuthenticator", { authenticatorId: current.id });
+    current = { id: await device(checks), checks };
+    if (!checks) return;
+    for (const credential of kept)
+      await cdp.send("WebAuthn.addCredential", { authenticatorId: current.id, credential });
+  };
+  return { context, page, useDevice };
 }
 
 async function signInWithPassword(page: Page, email: string, password: string) {
@@ -60,7 +86,7 @@ function totp(secret: string): string {
 }
 
 test("a password sign-in is followed by the second step the person has", async ({ browser }) => {
-  const { context, page } = await freshBrowser(browser);
+  const { context, page, useDevice } = await freshBrowser(browser);
   const member = { email: "mia@example.com", password: "a-long-member-password", secret: "" };
 
   await test.step("the first person adds a passkey and requires two steps of everyone", async () => {
@@ -124,6 +150,33 @@ test("a password sign-in is followed by the second step the person has", async (
     await second.getByLabel("Code").fill(totp(member.secret));
     await expect(second.getByRole("heading", { level: 1, name: "My work" })).toBeVisible();
     await other.close();
+  });
+
+  await test.step("a device that cannot check who holds it makes no passkey and signs nobody in", async () => {
+    const passkeys = async () =>
+      ((await (await page.request.get("/api/v1/auth/passkeys")).json()) as { passkeys: unknown[] }).passkeys.length;
+    await useDevice(false);
+    await page.goto("/account/security");
+    await page.getByRole("button", { name: "Add a passkey" }).click();
+    const dialog = page.getByRole("dialog");
+    const go = dialog.getByRole("button", { name: "Continue" });
+    // The button is busy from the start of the try to its end.
+    await Promise.all([page.waitForResponse("**/api/v1/auth/passkeys/register/start"), go.click()]);
+    await expect(go).toBeEnabled();
+    expect(await passkeys()).toBe(1);
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+
+    await page.request.post("/api/v1/auth/logout", { headers: fromOwnPage(server.url) });
+    await signInWithPassword(page, OWNER.email, OWNER.password);
+    await expect(page.getByRole("heading", { name: "One more step" })).toBeVisible();
+    const passkey = page.getByRole("button", { name: "Sign in with a passkey" });
+    await Promise.all([page.waitForResponse("**/api/v1/auth/passkeys/login/start"), passkey.click()]);
+    await expect(passkey).toBeEnabled();
+    expect((await page.request.get(`/api/v1/w/${WORKSPACE.slug}/me`)).status()).toBe(401);
+
+    await useDevice(true);
+    await passkey.click();
+    await expect(page.getByRole("heading", { level: 1, name: "My work" })).toBeVisible();
   });
   await context.close();
 });

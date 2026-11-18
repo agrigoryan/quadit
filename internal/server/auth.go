@@ -299,7 +299,7 @@ func (s *Server) handleSignIn(x *c) error {
 // finishSignIn starts the session after the first step and answers with
 // the person, or with second_step when the session waits for it.
 func (s *Server) finishSignIn(x *c, u core.User, method string) error {
-	secondStep, err := s.signIn(x, u, method, method == "passkey") // a passkey is both steps at once
+	secondStep, err := s.signIn(x, u, method, method == "passkey") // a passkey whose device checked its holder is both steps at once (webauthn)
 	if err != nil {
 		return err
 	}

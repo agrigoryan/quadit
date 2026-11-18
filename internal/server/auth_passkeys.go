@@ -53,6 +53,16 @@ func (w webAuthnUser) WebAuthnCredentials() []webauthn.Credential { return w.cre
 // webauthn builds the relying party for this request. The party is the
 // host people reach the server on; a local dev server on another port of
 // localhost is let in too.
+//
+// Every ceremony requires the device to check who holds it (user
+// verification: a fingerprint, a face, a PIN), and the check is verified
+// here, not taken from the browser: a passkey is then something the person
+// has and something they are or know, which is why signing in with one is
+// both steps at once (finishSignIn). A device that cannot check, a
+// security key with no PIN, adds no passkey and signs nobody in. Asking
+// for the check only where it is offered, and counting a passkey that
+// skipped it as one step, would leave such a person with no second step to
+// give where the install requires two: the passkey is the one they have.
 func (s *Server) webauthn(r *http.Request) (*webauthn.WebAuthn, error) {
 	base, err := url.Parse(s.cfg.BaseURL)
 	if err != nil {
@@ -68,7 +78,8 @@ func (s *Server) webauthn(r *http.Request) (*webauthn.WebAuthn, error) {
 		return nil, &engine.Error{Code: engine.CodeConflict, Message: "passkeys need the server to be reached by a name, not an IP address: " +
 			"start it with --url set to its name (http://localhost:4780 works for a local install)"}
 	}
-	return webauthn.New(&webauthn.Config{RPID: base.Hostname(), RPDisplayName: s.installName(r.Context()), RPOrigins: origins})
+	return webauthn.New(&webauthn.Config{RPID: base.Hostname(), RPDisplayName: s.installName(r.Context()), RPOrigins: origins,
+		AuthenticatorSelection: protocol.AuthenticatorSelection{UserVerification: protocol.VerificationRequired}})
 }
 
 func (s *Server) passkeyUser(ctx context.Context, u core.User) (webAuthnUser, error) {

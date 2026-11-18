@@ -148,8 +148,9 @@ func TestSecondStepInvitesAndSettings(t *testing.T) {
 		if csv := s.call(s.owner, "", "GET", "/api/v1/admin/audit?format=csv", nil, 200, nil); !strings.HasPrefix(csv, "time,actor,action") {
 			t.Fatalf("csv export = %.80s", csv)
 		}
-		// Passkey sign-in starts without knowing who is asking.
-		if out := s.call(nil, "", "POST", "/api/v1/auth/passkeys/login/start", M{}, 200, nil); !strings.Contains(out, "challenge") {
+		// Passkey sign-in starts without knowing who is asking, and asks the
+		// device to check who holds it.
+		if out := s.call(nil, "", "POST", "/api/v1/auth/passkeys/login/start", M{}, 200, nil); !strings.Contains(out, "challenge") || !strings.Contains(out, `"userVerification":"required"`) {
 			t.Fatalf("passkey start = %s", out)
 		}
 		// No mail server: a reset says how to get one done by hand.
