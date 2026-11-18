@@ -71,6 +71,12 @@ release:
     owner: agrigoryan
     name: quadit
   prerelease: auto
+  # Without the tap's token the cask is not pushed (homebrew_casks below):
+  # the notes say so, since the README sends people to the tap.
+  footer: |
+    {{- if eq (envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "") "" }}
+    The Homebrew tap was not updated with this release: `brew install agrigoryan/tap/quadit` still installs the earlier version. Use the install script or an archive below.
+    {{- end }}
   # A server release that is no pre-release is the repository's Latest, said
   # outright rather than left to GitHub's guess: releases/latest is the
   # server's, and the desktop app is released from the same repository
@@ -144,7 +150,8 @@ dockers_v2:
 # brew install agrigoryan/tap/quadit. Pushing the cask needs a token that
 # can write to agrigoryan/homebrew-tap (the HOMEBREW_TAP_GITHUB_TOKEN
 # secret); without one the cask is still made in dist/ but not pushed, and
-# the release goes on.
+# the release goes on, saying so: a warning on the workflow run
+# (release.yml) and a line in the release notes (release.footer above).
 homebrew_casks:
   - name: quadit
     ids: [quadit]

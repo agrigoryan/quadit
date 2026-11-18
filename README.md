@@ -44,7 +44,7 @@ On Linux or macOS, the install script downloads the newest release, checks it ag
 curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh
 ```
 
-With Homebrew, from the `agrigoryan/tap` tap that each release updates:
+With Homebrew, from the `agrigoryan/tap` tap. A release updates the tap when it may push to it; when it may not, its release notes say the tap still has the earlier version:
 
 ```bash
 brew install agrigoryan/tap/quadit

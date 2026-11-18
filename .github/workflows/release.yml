@@ -94,6 +94,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Whether the Homebrew tap is updated
+        env:
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          if [ -z "$HOMEBREW_TAP_GITHUB_TOKEN" ]; then
+            echo "::warning::HOMEBREW_TAP_GITHUB_TOKEN is not set: the Homebrew cask is not pushed to agrigoryan/homebrew-tap, which keeps the earlier version. The release notes say so."
+          fi
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
