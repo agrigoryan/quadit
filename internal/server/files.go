@@ -119,8 +119,8 @@ func readUploadStart(x *c) (uploadStart, error) {
 // or a multipart form with a "file" field. A large file can come in parts:
 // give its full size with ?size= and send the rest with PATCH.
 func (s *Server) handleUploadFile(x *c) error {
-	if x.actor.ReadOnly {
-		return errForbidden("this credential is read-only")
+	if err := x.mayWrite(); err != nil {
+		return err
 	}
 	ctx := x.ctx()
 	maxSize := s.maxUpload(ctx)
@@ -243,6 +243,9 @@ func (s *Server) receiveFirstPart(ctx context.Context, f *core.File, src io.Read
 // resumes from there. An upload whose bytes all came but could not be
 // stored is finished by sending nothing from its end.
 func (s *Server) handleUploadFilePart(x *c) error {
+	if err := x.mayWrite(); err != nil {
+		return err
+	}
 	ctx := x.ctx()
 	var f core.File
 	if err := x.db.Get(ctx, &f, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
@@ -618,8 +621,11 @@ func inlineType(ct string) bool {
 }
 
 // handleServeFile sends a file's bytes, or with /preview its reduced copy. The
-// address never changes and neither do the bytes, so browsers keep them;
-// ranges work, so a clip can be scrubbed without downloading it whole.
+// address never changes and neither do the bytes, so a browser may keep
+// them, but it asks again (by the ETag) each time it shows them: who may
+// see a file is checked on every showing, so a browser signed out, or of
+// someone who lost access, shows nothing from its cache. Ranges work, so a
+// clip can be scrubbed without downloading it whole.
 func (s *Server) handleServeFile(x *c) error {
 	ctx := x.ctx()
 	var f core.File
@@ -678,7 +684,7 @@ func (s *Server) handleServeFile(x *c) error {
 	}
 	h := x.w.Header()
 	h.Set("Content-Type", ctype)
-	h.Set("Cache-Control", "private, max-age=31536000, immutable")
+	h.Set("Cache-Control", "private, no-cache")
 	h.Set("ETag", `"`+f.ID+filepath.Ext(key)+`"`)
 	// A file is never trusted to run as a page of this site.
 	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
