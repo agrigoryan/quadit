@@ -149,7 +149,9 @@ Passkeys and phone notifications need HTTPS. Three ways:
 
 ## Several servers
 
-More than one copy of the server can share a Postgres database and a cloud file store (not SQLite, and not files on local disk). Sessions, cursors, task leases, job claims, rate counts, page presence and uploads in progress are all in the database or the file store, and a write taken by one server wakes the live connections held by the others.
+More than one copy of the server can share a Postgres database and a cloud file store (not SQLite, and not files on local disk). Sessions, cursors, task leases, job claims, rate counts, page presence and uploads in progress are all in the database or the file store, and a write taken by one server wakes the live connections held by the others. Jobs (the daily backup, emptying the trash) run once, on whichever server claims them; a backup is written to that server's data directory.
+
+Two things are not shared out yet, and work with a single server only: syncing pages with a git repository, and GitHub integrations. Each server runs them on its own timer, so with several servers two can sync the same source at the same time and their writes can clash. Use them on an install with one server.
 
 ## Accounts with no mail server
 

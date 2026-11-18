@@ -44,7 +44,7 @@ On Linux or macOS, the install script downloads the newest release, checks it ag
 curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh
 ```
 
-With Homebrew:
+With Homebrew, from the `agrigoryan/tap` tap that each release updates:
 
 ```bash
 brew install agrigoryan/tap/quadit
@@ -90,7 +90,7 @@ quadit skill install    # teaches Claude Code, Codex, Cursor, Gemini CLI, Copilo
 quadit work             # what waits on me
 ```
 
-The same is available as an MCP server at `/mcp` and as an HTTP API described at `/api/v1/openapi.json`. [docs/agents.md](docs/agents.md) has the setup for each agent, waking an agent when something needs it, and the whole command set.
+The HTTP API, described at `/api/v1/openapi.json`, has all of it. The MCP server at `/mcp` has the work an agent does (reading tasks, pages and the feed, any change, questions, files, secrets) but not the admin reads, imports and exports. [docs/agents.md](docs/agents.md) has the setup for each agent, waking an agent when something needs it, and the whole command set.
 
 ## Updating
 

@@ -16,7 +16,7 @@ find      tasks [filter=value ...]   assignee=me status=todo label=art open=1 q=
           search TEXT | decisions [state=open] | inbox [all=1]
 follow    events [after=SEQ] [wait=50] [cursor=NAME] [mine=1] [others=1] [task=KEY]
           ack SEQ [NAME]             mark the feed handled up to SEQ
-          listen --exec CMD          wait for inbox items and run CMD for each
+          listen --exec CMD          run CMD for each inbox item, again until it succeeds
 act       new PROJECT TITLE [field=value ...]      description=- reads it from stdin
           update KEY field=value ... status=done assignee=@ann priority=high add_labels=a,b
           status KEY NAME | assign KEY @WHO|none | take KEY | release KEY
@@ -44,7 +44,8 @@ more      quadit help secrets        using keys without holding them
           quadit help import         bring work in from other tools
           quadit help server         serve, admin, backup, restore
 
-Every command takes --json for full data and --dry-run to check a write.
+Every command takes --json for full data and --dry-run to check a write
+(run, request and listen refuse it: they cannot check without doing).
 A write takes --id=UUID (send it again with the same id and it happens once)
 and --for=@WHO (it runs with that member's access).
 Connect with QUADIT_URL and QUADIT_TOKEN, or: quadit login URL TOKEN
