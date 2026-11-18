@@ -3,6 +3,8 @@
 import { t } from "@/lib/i18n";
 
 const browsers: [RegExp, string][] = [
+  // The desktop app's windows are Chrome inside; they say what they are at the end.
+  [/ QuaditDesktop\//, "Quadit desktop"],
   [/Edg(e|A|iOS)?\//, "Edge"],
   [/OPR\/|Opera/, "Opera"],
   [/Firefox\/|FxiOS\//, "Firefox"],
