@@ -13,10 +13,14 @@
 // when the request fails outright or a gateway says the server is away.
 //
 // It never answers for the API, files, hooks or sign-in: everything the app
-// shows is live data and always comes from the server.
+// shows is live data and always comes from the server. Nor for the pages
+// that sign the desktop app in (/desktop/): the server gives the confirm
+// page a policy of its own (it may send its form on to quadit:), which must
+// neither become the kept page of every other address nor be swapped for it.
 
 const ASSETS = "quadit-assets-v2";
-const SHELL = "quadit-shell-v1";
+// v2: a v1 worker may have kept the desktop confirm page as every page's.
+const SHELL = "quadit-shell-v2";
 /** Kept built files beyond this many are trimmed, oldest first (each deploy adds a set). */
 const MAX_ASSETS = 400;
 
@@ -28,7 +32,7 @@ const NOT_OURS = [
   "/oauth/",
   "/.well-known/",
   "/hooks/",
-  "/desktop/finish",
+  "/desktop/",
   "/healthz",
   "/readyz",
   "/metrics",
