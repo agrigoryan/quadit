@@ -1039,9 +1039,8 @@ func TestARequestThatChangesSomethingIsHeldAsAChangeIs(t *testing.T) {
 			if len(calls) != before+1 {
 				t.Fatalf("calls made: %v", calls[before:])
 			}
-			ask := s.change(nil, asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "secret.send",
-				"args": M{"name": "DEPLOY_KEY", "method": "POST", "url": api.URL + "/deploy", "headers": M{"Authorization": "Bearer {{secret}}"}, "body": deploy},
-				"question": "Deploy?"})["ref"].(string)
+			request := M{"name": "DEPLOY_KEY", "method": "POST", "url": api.URL + "/deploy", "headers": M{"Authorization": "Bearer {{secret}}"}, "body": deploy}
+			ask := s.change(nil, asker, "decision.open", M{"task": "SVA-1", "kind": "approval", "action": "secret.send", "args": request, "question": "Deploy?"})["ref"].(string)
 			s.change(s.owner, "", "decision.pick", M{"id": ask, "outcome": "approved"})
 			// The approval is of the whole request as written: any other
 			// method, header or body is another request, which needs its own.
