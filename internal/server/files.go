@@ -496,8 +496,8 @@ func (s *Server) fileOut(x *c, f core.File) core.File {
 // checksum, real type, size on screen and a reduced copy, and marks it
 // ready. The bytes put together must be the file the upload was started
 // as: as many as its size, and matching the checksum given, if one was;
-// when they are not, or a file received whole is not on this machine, what
-// was received is let go and the caller is told to send the file again
+// when they are not, a part listed is gone from file storage, or a file
+// received whole is not on this machine, what was received is let go and the caller is told to send the file again
 // from the start. What was received (the parts, or the file on this
 // machine) is removed only once the file is stored and marked: until then
 // a failure leaves it all, and finishing again starts from it.
@@ -505,6 +505,11 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 	path := s.partPath(f.ID)
 	if len(f.Parts) > 0 {
 		joined, err := s.joinUploadParts(ctx, *f)
+		if errors.Is(err, blob.ErrNotFound) {
+			// Asking again does not bring a part back that is gone; one that
+			// cannot be read for now may, and is asked for again instead.
+			return s.startUploadOver(ctx, x.db, *f, "a part of this upload is no longer in file storage")
+		}
 		if err != nil {
 			return fmt.Errorf("file storage: %w", err)
 		}

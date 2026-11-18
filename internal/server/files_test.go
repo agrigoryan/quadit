@@ -25,10 +25,18 @@ import (
 )
 
 // failingFiles is file storage that refuses to store a whole file (any key
-// that is not one part of an upload) while failing is set.
+// that is not one part of an upload) while failing is set, and to read
+// anything while unreadable is.
 type failingFiles struct {
 	blob.Store
-	failing atomic.Bool
+	failing, unreadable atomic.Bool
+}
+
+func (f *failingFiles) Open(ctx context.Context, key string) (io.ReadSeekCloser, time.Time, error) {
+	if f.unreadable.Load() {
+		return nil, time.Time{}, errors.New("the storage is down")
+	}
+	return f.Store.Open(ctx, key)
 }
 
 func (f *failingFiles) Put(ctx context.Context, key string, r io.Reader, ct string) error {
@@ -90,6 +98,18 @@ func TestAnUploadWhoseStoringFailsCanBeFinishedLater(t *testing.T) {
 			}
 			if left := files.keys(t, ""); strings.Contains(strings.Join(left, " "), ".upload-parts/") {
 				t.Fatalf("parts left behind once the file is stored: %v", left)
+			}
+		})
+
+		t.Run("its parts cannot be read for a moment", func(t *testing.T) {
+			var f uploaded
+			s.call(t, s.owner, "", "POST", fmt.Sprintf(w+"/files?name=clip.bin&size=%d", len(data)), data[:2000], 201, &f)
+			files.unreadable.Store(true)
+			s.call(t, s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=2000", data[2000:], 500, nil)
+			files.unreadable.Store(false)
+			s.call(t, s.owner, "", "PATCH", fmt.Sprintf(w+"/files/%s?offset=%d", f.ID, len(data)), nil, 200, &f)
+			if f.State != "ready" || f.SHA256 != sumOf(data) {
+				t.Fatalf("finished again, the file is %+v, want the sum %s", f, sumOf(data))
 			}
 		})
 
@@ -318,6 +338,25 @@ func TestAnUploadWhoseBytesAreGoneStartsAgain(t *testing.T) {
 			var f uploaded
 			s.call(t, s.owner, "", "PATCH", w+"/files/"+fid+"?offset=0", data, 200, &f)
 			if f.State != "ready" || f.SHA256 != sumOf(data) {
+				t.Fatalf("sent again from the start, the file is %+v", f)
+			}
+		})
+
+		t.Run("one of its parts is gone", func(t *testing.T) {
+			var f uploaded
+			s.call(t, s.owner, "", "POST", w+"/files?name=clip.bin&size=10", []byte("hello"), 201, &f)
+			for _, key := range files.keys(t, "") {
+				if strings.Contains(key, f.ID+".upload-parts/") {
+					if err := files.Delete(context.Background(), key); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			if out := s.call(t, s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=5", []byte("world"), 409, nil); !strings.Contains(out, "continue from 0") {
+				t.Fatalf("finished with a part gone: %s", out)
+			}
+			s.call(t, s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=0", []byte("helloworld"), 200, &f)
+			if f.State != "ready" || f.SHA256 != sumOf([]byte("helloworld")) {
 				t.Fatalf("sent again from the start, the file is %+v", f)
 			}
 		})
