@@ -121,7 +121,7 @@ func TestVault(t *testing.T) {
 		// is refused, not sent with one of its values picked by chance.
 		before := len(seen)
 		twice := M{"url": api.URL + "/deploy", "headers": M{"Authorization": "Bearer {{secret}}", "authorization": "Basic {{basic:bot}}"}}
-		if out := s.call(nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", twice, 400, nil); !strings.Contains(out, `\"Authorization\" and \"authorization\"`) || len(seen) != before {
+		if out := s.call(t, nil, ct.Token, "POST", "/api/v1/w/-/secrets/DEPLOY_KEY/request", twice, 400, nil); !strings.Contains(out, `\"Authorization\" and \"authorization\"`) || len(seen) != before {
 			t.Fatalf("a header named twice: %s; the service saw %v", out, seen[before:])
 		}
 		// Every use is on the record, without the value.

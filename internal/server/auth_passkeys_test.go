@@ -59,10 +59,10 @@ func TestAPasskeyCountsOnlyWhenItsDeviceCheckedWhoHoldsIt(t *testing.T) {
 				} `json:"options"`
 				State string `json:"state"`
 			}
-			s.in(t).call(s.owner, "", "POST", "/api/v1/auth/passkeys/register/start", M{}, 200, &start)
+			s.call(t, s.owner, "", "POST", "/api/v1/auth/passkeys/register/start", M{}, 200, &start)
 			begunBefore(t, start.State)
 			dev.user = start.Options.PublicKey.User.ID
-			s.in(t).call(s.owner, "", "POST", "/api/v1/auth/passkeys/register/finish?state="+url.QueryEscape(start.State),
+			s.call(t, s.owner, "", "POST", "/api/v1/auth/passkeys/register/finish?state="+url.QueryEscape(start.State),
 				dev.made(t, s.url, start.Options.PublicKey.Challenge, checked), want, nil)
 		}
 		signIn := func(t *testing.T, checked bool, want int) {
@@ -75,9 +75,9 @@ func TestAPasskeyCountsOnlyWhenItsDeviceCheckedWhoHoldsIt(t *testing.T) {
 				} `json:"options"`
 				State string `json:"state"`
 			}
-			s.in(t).call(nil, "", "POST", "/api/v1/auth/passkeys/login/start", M{}, 200, &start)
+			s.call(t, nil, "", "POST", "/api/v1/auth/passkeys/login/start", M{}, 200, &start)
 			begunBefore(t, start.State)
-			s.in(t).call(browser(), "", "POST", "/api/v1/auth/passkeys/login/finish?state="+url.QueryEscape(start.State),
+			s.call(t, browser(), "", "POST", "/api/v1/auth/passkeys/login/finish?state="+url.QueryEscape(start.State),
 				dev.signed(t, s.url, start.Options.PublicKey.Challenge, checked), want, nil)
 		}
 
