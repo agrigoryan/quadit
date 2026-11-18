@@ -89,6 +89,9 @@ test("Connect sets Claude Code up with its own login and MCP, and Disconnect tak
     await expect(connect.getByRole("listitem").filter({ hasText: "Claude Code" })).toContainText("as @coder");
 
     await connect.getByRole("button", { name: "Disconnect Claude Code" }).click();
+    // The login going is shown with its token masked, as it was when it came.
+    await expect(plan).toContainText('"token":"qd_…"');
+    await expect(plan).not.toContainText(login.token);
     await connect.getByRole("button", { name: "Apply" }).click();
     await expect(connect.getByRole("status")).toContainText("Disconnected.");
     expect(JSON.parse(readFileSync(settings, "utf8"))).toEqual({ permissions: { allow: ["Read"] } });
