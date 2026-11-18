@@ -103,7 +103,8 @@ var helpTopics = map[string]string{
   quadit serve [--listen :4780] [--data DIR] [--db PATH|postgres://…] [--url https://…]
   quadit admin                 setup, reset-password, token, make-admin
   quadit backup [--out FILE] | quadit backup verify FILE
-  quadit restore FILE [--workspace SLUG --task KEY | --doc ID]
+  quadit restore FILE [--secret-key FILE | --without-secret-key]
+  quadit restore FILE --workspace SLUG (--task KEY | --doc ID)
 `,
 }
 

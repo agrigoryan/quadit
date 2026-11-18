@@ -14,7 +14,7 @@ quadit serve --data /var/lib/quadit --url https://quadit.example.com
 | `--data` | `QUADIT_DATA` | `./data` | Database, files, backups, the install secret |
 | `--db` | `QUADIT_DB` | `quadit.sqlite` in the data directory | A SQLite path, or a `postgres://` URL |
 | `--url` | `QUADIT_BASE_URL` | `http://localhost:4780` | The address people use. Links in mail, passkeys and file addresses need it right, and so does a change made in a browser too old to say which page it comes from: a write sent with the sign-in cookie is taken only from the server's own pages |
-| | `QUADIT_SECRET` | a file made in the data directory | Encrypts stored secrets (mail password, storage keys, integration tokens). Keep it with your backups |
+| | `QUADIT_SECRET` | a file made in the data directory (`secret.key`) | Encrypts stored secrets (two-step sign-in codes, the vault, integration tokens, mail and storage passwords). Backups do not hold it: keep a copy apart from them (see [Backups](#backups)) |
 | `--log-json` | `QUADIT_LOG=json` | text | Structured logs |
 | `--trusted-proxies` | `QUADIT_TRUSTED_PROXIES` | `127.0.0.1,::1` | The reverse proxies in front of the server, addresses or networks: only their `X-Forwarded-For` is believed ([below](#behind-a-proxy)). `--trusted-proxies=` (empty) trusts none |
 | `--allow-private-networks` | `QUADIT_ALLOW_PRIVATE_NETWORKS` | none | Networks off the public internet the server may call for its users, e.g. `192.168.1.0/24,10.0.0.5` ([below](#addresses-users-give)) |
@@ -105,12 +105,22 @@ The schema is the same on both databases. To move an install from one to the oth
 ```bash
 quadit backup --out /backups/quadit.tar.gz      # database and files in one archive, verified
 quadit backup verify /backups/quadit.tar.gz
-quadit restore /backups/quadit.tar.gz            # into an empty install, on SQLite or Postgres
+quadit restore /backups/quadit.tar.gz --secret-key /safe/place/secret.key   # into an empty install, on SQLite or Postgres
 quadit restore FILE --workspace games --task SVA-12     # bring back one task
 quadit restore FILE --workspace games --doc PAGE_ID     # or one page
 ```
 
-Scheduled backups are a switch in the admin area. Each one is read back and checked before it counts; the last one shows in the health panel. Deleted tasks, pages and files stay in the trash for 30 days first.
+An archive is the install at one moment, taken while it runs: every table as it stood when the backup began, and the uploaded files those rows name. Checking an archive (`verify`, and every backup after it is written) reads every member against its checksum and the rows against each other.
+
+**Keep the install secret apart from your backups.** The archive does not hold `secret.key` from the data directory (or `QUADIT_SECRET`), which encrypts two-step sign-in codes, vault secrets, integration tokens and the mail and storage passwords; an archive that leaks does not give those away. Copy `secret.key` once to somewhere safe that is not where the archives go. A full restore checks the secret before it writes anything:
+
+- `--secret-key FILE` gives the original secret. The restore checks that it opens the archive's secrets, and the restored install keeps it as its `secret.key` (the one the new, empty install made for itself is kept beside it as `secret.key.before-restore-…`). With `QUADIT_SECRET`, set it as it was set before and leave the flag out.
+- Without the flag, the restore uses the install's own secret, and refuses, changing nothing, when that is not the one the archive was made with.
+- `--without-secret-key` is for a secret that is lost for good: everything else is restored, and two-step sign-in, vault secrets, integrations, mail and file storage settings must be set up again.
+
+A full restore goes into an empty install. It reads the whole archive first and refuses a damaged one before writing anything; then it loads every row in one transaction. When it fails, the database is left empty and the files it stored are taken out again, so it can simply be run again.
+
+Scheduled backups are a switch in the admin area. Each one is read back and checked before it counts; the last one shows in the health panel. Deleted tasks, pages and files stay in the trash for 30 days first, and a file's bytes a day longer.
 
 ## Export
 

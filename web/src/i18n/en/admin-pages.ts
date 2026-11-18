@@ -180,7 +180,7 @@ export const adminStrings = {
   "admin.backups.failed": "Failed",
   "admin.backups.running": "Running",
   "admin.backups.restoreHint":
-    "To restore into an empty install, run: quadit restore FILE. Keep the install secret with your backups.",
+    "To restore into an empty install, run: quadit restore FILE --secret-key SECRET_FILE. Archives do not hold the install secret (secret.key in the data directory): keep a copy of it somewhere safe, apart from them.",
 
   "admin.users.title": "Users",
   "admin.users.lead": "Every person and agent on this install, across all workspaces.",
