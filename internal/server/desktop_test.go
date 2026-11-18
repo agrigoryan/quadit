@@ -31,6 +31,9 @@ func newDesktopFlow() desktopFlow {
 	return desktopFlow{state: auth.Random(32), verifier: verifier, challenge: base64.RawURLEncoding.EncodeToString(sum[:])}
 }
 
+// fromOwnPage are the headers a browser sends with a form the server's own page posts.
+var fromOwnPage = map[string]string{"Sec-Fetch-Site": "same-origin"}
+
 // form is what the confirm page posts when the person presses Continue.
 func (f desktopFlow) form(userID string) url.Values {
 	return url.Values{"state": {f.state}, "challenge": {f.challenge}, "user": {userID}}
@@ -97,7 +100,7 @@ func approve(t *testing.T, s *site, hc *http.Client, f desktopFlow, userID strin
 	t.Helper()
 	// The browser's cookies, stopping at the redirect to the app.
 	stops := &http.Client{Jar: hc.Jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	resp, body := post(t, stops, s.url+"/desktop/connect", f.form(userID), map[string]string{"Sec-Fetch-Site": "same-origin"})
+	resp, body := post(t, stops, s.url+"/desktop/connect", f.form(userID), fromOwnPage)
 	if resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("continue: status %d: %s", resp.StatusCode, body)
 	}
@@ -133,7 +136,7 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 		t.Run("a browser signed out signs in first and comes back", func(t *testing.T) {
 			f := newDesktopFlow()
 			hc := noRedirects()
-			resp, _ := post(t, hc, s.url+"/desktop/connect", f.form(ownerID), nil)
+			resp, _ := post(t, hc, s.url+"/desktop/connect", f.form(ownerID), fromOwnPage)
 			if resp.StatusCode != http.StatusSeeOther {
 				t.Fatalf("signed out: status %d", resp.StatusCode)
 			}
@@ -288,11 +291,33 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 			}
 		})
 
-		t.Run("a page of another site cannot press Continue", func(t *testing.T) {
-			f := newDesktopFlow()
-			resp, body := post(t, s.owner, s.url+"/desktop/connect", f.form(ownerID), map[string]string{"Sec-Fetch-Site": "cross-site"})
-			if resp.StatusCode != http.StatusForbidden || strings.Contains(resp.Header.Get("Location"), "quadit:") {
-				t.Fatalf("cross-site: status %d to %q: %s", resp.StatusCode, resp.Header.Get("Location"), body)
+		t.Run("only the server's own page can press Continue", func(t *testing.T) {
+			// The user id the page posts is no secret: what stops another page is where the post comes from.
+			stops := &http.Client{Jar: s.owner.Jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+			sibling := strings.Replace(s.url, "://", "://evil.", 1)
+			for name, header := range map[string]map[string]string{
+				"another site":                      {"Sec-Fetch-Site": "cross-site"},
+				"a sibling of the server's site":    {"Sec-Fetch-Site": "same-site", "Origin": sibling},
+				"a typed address or a bookmark":     {"Sec-Fetch-Site": "none"},
+				"no word of where it came from":     nil,
+				"no fetch metadata, another origin": {"Origin": sibling},
+				"no fetch metadata, an opaque one":  {"Origin": "null"},
+				"no fetch metadata, another page":   {"Referer": sibling + "/desktop/connect"},
+			} {
+				resp, body := post(t, stops, s.url+"/desktop/connect", newDesktopFlow().form(ownerID), header)
+				if resp.StatusCode != http.StatusForbidden || strings.Contains(resp.Header.Get("Location"), "quadit:") {
+					t.Errorf("%s: status %d to %q: %s", name, resp.StatusCode, resp.Header.Get("Location"), body)
+				}
+			}
+			// A browser without Fetch Metadata is known by its Origin, or failing that its Referer.
+			for name, header := range map[string]map[string]string{
+				"its origin":  {"Origin": s.url},
+				"its referer": {"Referer": s.url + "/desktop/connect?state=x"},
+			} {
+				resp, body := post(t, stops, s.url+"/desktop/connect", newDesktopFlow().form(ownerID), header)
+				if resp.StatusCode != http.StatusSeeOther || !strings.HasPrefix(resp.Header.Get("Location"), "quadit://connect?") {
+					t.Errorf("the server's page by %s: status %d to %q: %s", name, resp.StatusCode, resp.Header.Get("Location"), body)
+				}
 			}
 		})
 
@@ -300,7 +325,7 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 			var tok struct{ Token string }
 			s.call(s.owner, "", "POST", w+"/tokens", M{}, 201, &tok)
 			f := newDesktopFlow()
-			resp, _ := post(t, noRedirects(), s.url+"/desktop/connect", f.form(ownerID), map[string]string{"Authorization": "Bearer " + tok.Token})
+			resp, _ := post(t, noRedirects(), s.url+"/desktop/connect", f.form(ownerID), map[string]string{"Authorization": "Bearer " + tok.Token, "Sec-Fetch-Site": "same-origin"})
 			if resp.StatusCode != http.StatusForbidden {
 				t.Fatalf("with a token: status %d to %q", resp.StatusCode, resp.Header.Get("Location"))
 			}
@@ -309,11 +334,11 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 		t.Run("the page answered is the account signed in", func(t *testing.T) {
 			// The confirm page named someone else: the browser has signed in as another account since.
 			f := newDesktopFlow()
-			resp, _ := post(t, noRedirects(), s.url+"/desktop/connect", f.form("someone-else"), nil)
+			resp, _ := post(t, noRedirects(), s.url+"/desktop/connect", f.form("someone-else"), fromOwnPage)
 			if resp.StatusCode != http.StatusSeeOther {
 				t.Fatalf("signed out: status %d", resp.StatusCode)
 			}
-			resp, body := post(t, s.owner, s.url+"/desktop/connect", f.form("someone-else"), nil)
+			resp, body := post(t, s.owner, s.url+"/desktop/connect", f.form("someone-else"), fromOwnPage)
 			if resp.StatusCode != http.StatusConflict || !strings.Contains(body, "signed in as someone else") {
 				t.Fatalf("another account: status %d: %s", resp.StatusCode, body)
 			}
@@ -327,7 +352,7 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 				"no challenge":       {"state": {f.state}, "user": {ownerID}},
 				"a plain challenge":  {"state": {f.state}, "challenge": {f.verifier}, "user": {ownerID}},
 			} {
-				if resp, body := post(t, s.owner, s.url+"/desktop/connect", form, nil); resp.StatusCode != http.StatusBadRequest {
+				if resp, body := post(t, s.owner, s.url+"/desktop/connect", form, fromOwnPage); resp.StatusCode != http.StatusBadRequest {
 					t.Errorf("%s: status %d: %s", name, resp.StatusCode, body)
 				}
 			}

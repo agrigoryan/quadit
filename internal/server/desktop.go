@@ -71,13 +71,17 @@ type desktopGrant struct {
 }
 
 // handleApproveDesktopSignIn takes the person's Continue and sends the
-// browser to the app with a code. Someone no longer signed in is sent to
-// sign in and back to the page. The session cookie decides who is signed in,
-// with the check every signed-in write has: a page of another site cannot
-// press Continue. The confirm page names the account it asks about (user),
-// and a browser signed in as someone else since is refused.
+// browser to the app with a code. Only the server's own page can press it
+// (postedByOwnPage): any other page, a sibling site's included, could
+// otherwise skip the question the page asks. Someone no longer signed in is
+// sent to sign in and back to the page. The session cookie decides who is
+// signed in. The confirm page names the account it asks about (user), and a
+// browser signed in as someone else since is refused.
 func (s *Server) handleApproveDesktopSignIn(x *c) error {
 	x.w.Header().Set("Cache-Control", "no-store")
+	if !s.postedByOwnPage(x.r) {
+		return s.showDesktopPage(x, http.StatusForbidden, desktopRefused)
+	}
 	if err := x.r.ParseForm(); err != nil {
 		return s.showDesktopPage(x, http.StatusBadRequest, desktopNotValid)
 	}
@@ -171,6 +175,28 @@ func (s *Server) handleFinishDesktopSignIn(x *c) error {
 	}
 	http.Redirect(x.w, x.r, "/", http.StatusFound)
 	return nil
+}
+
+// postedByOwnPage reports whether a form post came from a page of this
+// server's own origin. A browser says so in Sec-Fetch-Site; one too old to
+// send Fetch Metadata is judged by its Origin, or failing that its Referer
+// (the server sends Referrer-Policy: same-origin, so its own pages send
+// one), against the address the server is configured with. Anything else,
+// a request that says nothing included, is refused.
+func (s *Server) postedByOwnPage(r *http.Request) bool {
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "same-origin":
+		return true
+	case "":
+	default:
+		return false
+	}
+	own := originOf(s.cfg.BaseURL)
+	from := r.Header.Get("Origin")
+	if from == "" {
+		from = originOf(r.Header.Get("Referer"))
+	}
+	return own != "" && strings.EqualFold(from, own)
 }
 
 // isDesktopHandoff reports whether a request for /desktop/finish is the
