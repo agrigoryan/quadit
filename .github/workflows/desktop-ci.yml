@@ -1,0 +1,30 @@
+name: desktop-ci
+
+# The desktop app's gate (desktop/): types, lint, format and unit tests.
+# Its end-to-end suite drives the app against a server and runs locally:
+# make desktop-e2e.
+on:
+  push:
+    branches: [main]
+    paths: ["desktop/**", ".github/workflows/desktop-*.yml"]
+  pull_request:
+    paths: ["desktop/**", ".github/workflows/desktop-*.yml"]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
