@@ -257,6 +257,9 @@ func TestEachBackupIsCopiedWhereTheSettingSays(t *testing.T) {
 				}
 				slices.Sort(kept)
 				want := []string{to.dir + filepath.Base(made[1].Location), to.dir + filepath.Base(made[2].Location)}
+				if to.name == "a folder" {
+					want = append([]string{".quadit-backups"}, want...)
+				}
 				if !slices.Equal(kept, want) {
 					t.Fatalf("the copies are %v, want the newest two: %v", kept, want)
 				}
@@ -326,6 +329,38 @@ func TestACopyThatFailsLeavesTheBackupAndSaysWhy(t *testing.T) {
 			t.Fatalf("a failed copy dropped the copy before it: %v", err)
 		}
 	})
+}
+
+// TestACopyRefusesAFolderNotMarkedForBackups: saving a folder as where
+// backups are copied marks it; a copy refuses a folder without the mark,
+// such as the empty mount point of a drive that is not mounted, and writes
+// nothing into it.
+func TestACopyRefusesAFolderNotMarkedForBackups(t *testing.T) {
+	s := newSite(t, testdb.SQLite(t))
+	folder := filepath.Join(t.TempDir(), "drive")
+	if err := os.Mkdir(folder, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	s.call(t, s.owner, "", "PUT", "/api/v1/admin/settings/backup", M{"copy_to": M{"kind": "folder", "folder": folder}}, 200, nil)
+	if _, err := os.Stat(filepath.Join(folder, ".quadit-backups")); err != nil {
+		t.Fatalf("saving the setting did not mark the folder: %v", err)
+	}
+	// The drive is not mounted: its mount point is there, empty.
+	if err := os.Rename(folder, folder+"-unmounted"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(folder, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	var b core.Backup
+	s.call(t, s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &b)
+	if b.CopiedAt != 0 || !strings.Contains(b.CopyError, ".quadit-backups") {
+		t.Fatalf("the copy is recorded as made at %d, failed with %q", b.CopiedAt, b.CopyError)
+	}
+	if entries, _ := os.ReadDir(folder); len(entries) != 0 {
+		t.Fatalf("the copy wrote into a folder not marked for backups: %v", entries)
+	}
 }
 
 // TestADestinationThatCannotBeUsedIsRefused: saving where backups are

@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/backup"
@@ -191,8 +192,15 @@ func backupCopyWhere(bc backupCopy) string {
 	}
 }
 
+// backupFolderMark is the file put in a folder when it is chosen for the
+// copies of backups. A copy goes only to a folder that has it: a drive that
+// is not mounted leaves its mount point there, empty, on the disk the copy
+// was meant to leave.
+const backupFolderMark = ".quadit-backups"
+
 // checkBackupSetting tries where a new "backup" setting copies backups to
-// before it is kept: the place must be there and take a write.
+// before it is kept: the place must be there and take a write. A folder is
+// marked as chosen (backupFolderMark).
 func (s *Server) checkBackupSetting(ctx context.Context, value json.RawMessage) error {
 	var bs backupSetting
 	if err := json.Unmarshal(value, &bs); err != nil {
@@ -201,6 +209,9 @@ func (s *Server) checkBackupSetting(ctx context.Context, value json.RawMessage) 
 	store, _, err := s.openBackupCopy(ctx, bs.CopyTo)
 	if err == nil && store != nil {
 		err = blob.Writable(ctx, store)
+	}
+	if err == nil && bs.CopyTo.Kind == "folder" {
+		err = store.Put(ctx, backupFolderMark, strings.NewReader("Quadit copies its backups here.\n"), "text/plain")
 	}
 	if err != nil {
 		return errBad("backups cannot be copied to %s: %v", backupCopyWhere(bs.CopyTo), err)
@@ -213,6 +224,9 @@ func (s *Server) checkBackupSetting(ctx context.Context, value json.RawMessage) 
 // dropped only once the new one is there.
 func (s *Server) copyBackup(ctx context.Context, bs backupSetting, path string) error {
 	store, dir, err := s.openBackupCopy(ctx, bs.CopyTo)
+	if err == nil && bs.CopyTo.Kind == "folder" {
+		err = backupFolderMarked(ctx, store)
+	}
 	if err == nil {
 		err = backup.Copy(ctx, path, store, dir)
 	}
@@ -223,6 +237,19 @@ func (s *Server) copyBackup(ctx context.Context, bs backupSetting, path string) 
 		s.log.Warn("dropping old copies of backups; tried again after the next backup", "to", backupCopyWhere(bs.CopyTo), "err", err)
 	}
 	return nil
+}
+
+// backupFolderMarked refuses a folder that was not chosen for backups: it
+// has no backupFolderMark.
+func backupFolderMarked(ctx context.Context, folder blob.Store) error {
+	f, _, err := folder.Open(ctx, backupFolderMark)
+	if errors.Is(err, blob.ErrNotFound) {
+		return fmt.Errorf("it has no %s file, which saving the setting puts there: is the drive mounted?", backupFolderMark)
+	}
+	if err != nil {
+		return err
+	}
+	return f.Close()
 }
 
 // runSchedule starts the daily jobs: a backup when they are turned on, and
