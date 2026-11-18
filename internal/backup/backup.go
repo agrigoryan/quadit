@@ -13,9 +13,8 @@
 // made at, the Quadit that made it, and a value sealed with the install's
 // secret, so a restore can refuse an archive it cannot read whole, or
 // whose stored secrets the destination could not open, before it writes
-// anything; its last (manifest.json) lists every member with
-// its checksum. An archive made before the first member existed has only
-// the last.
+// anything; its last (manifest.json) lists every member with its checksum.
+// An archive made before the first member existed has only the last.
 //
 // A full restore reads the archive twice: once to check all of it, the
 // rows against each other included, then to load it, every row in one
