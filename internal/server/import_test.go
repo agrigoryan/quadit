@@ -256,12 +256,13 @@ func TestImports(t *testing.T) {
 // place in the folder, so two exports that both hold README.md, under the
 // same file name, make two pages, while the same export imported again
 // under its name adds nothing. An uploaded folder must be named. An import
-// made before imports had names goes on under any name, rather than being
-// made a second time.
+// made before imports had names is gone on with only when that is asked
+// for: a name given is never taken for it.
 func TestImportsFromDifferentPlacesDoNotMeet(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
-		upload := func(readme string) string {
+		upload := func(t *testing.T, readme string) string {
+			t.Helper()
 			var buf strings.Builder
 			zw := zip.NewWriter(&buf)
 			f, _ := zw.Create("README.md")
@@ -275,46 +276,50 @@ func TestImportsFromDifferentPlacesDoNotMeet(t *testing.T) {
 			Made         struct{ Pages int }
 			AlreadyThere int `json:"already_there"`
 		}
-		run := func(file, origin string) made {
+		run := func(t *testing.T, kind, readme string, options M) made {
 			t.Helper()
 			var out made
-			s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "markdown", "file": file, "options": M{"origin": origin}}, 200, &out)
+			s.call(t, s.owner, "", "POST", w+"/import", M{"kind": kind, "file": upload(t, readme), "options": options}, 200, &out)
 			return out
 		}
 		pages := func() string {
 			return s.call(t, s.owner, "", "GET", w+"/docs?format=text", nil, 200, nil)
 		}
 
-		if got := run(upload("Team A's readme."), "team-a"); got.Made.Pages != 1 {
+		if got := run(t, "markdown", "Team A's readme.", M{"origin": "team-a"}); got.Made.Pages != 1 {
 			t.Fatalf("the first export: %+v", got)
 		}
-		if got := run(upload("Team B's readme."), "team-b"); got.Made.Pages != 1 || got.AlreadyThere != 0 {
+		if got := run(t, "markdown", "Team B's readme.", M{"origin": "team-b"}); got.Made.Pages != 1 || got.AlreadyThere != 0 {
 			t.Fatalf("a second export with its own README.md made %d pages and took %d for already there", got.Made.Pages, got.AlreadyThere)
 		}
-		if got := run(upload("Team A's readme, edited since."), "team-a"); got.Made.Pages != 0 {
+		if got := run(t, "markdown", "Team A's readme, edited since.", M{"origin": "team-a"}); got.Made.Pages != 0 {
 			t.Fatalf("the first export imported again made %d pages", got.Made.Pages)
 		}
 		if n := strings.Count(pages(), "README"); n != 2 {
 			t.Fatalf("%d README pages, want 2:\n%s", n, pages())
 		}
-		if out := s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "markdown", "file": upload("Unnamed.")}, 400, nil); !strings.Contains(out, "origin") {
+		if out := s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "markdown", "file": upload(t, "Unnamed.")}, 400, nil); !strings.Contains(out, "origin") {
 			t.Fatalf("an uploaded folder with no name: %s", out)
 		}
 
 		t.Run("an import made before imports had names", func(t *testing.T) {
 			s.change(t, s.owner, "", "doc.create", M{"id": id.From("import", "obsidian", "doc", "README"), "title": "README"})
-			var out made
-			var buf strings.Builder
-			zw := zip.NewWriter(&buf)
-			f, _ := zw.Create("README.md")
-			f.Write([]byte("The vault's readme."))
-			zw.Close()
-			var up struct{ ID string }
-			s.call(t, s.owner, "", "POST", w+"/files?name=vault.zip", []byte(buf.String()), 201, &up)
-			s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "obsidian", "file": up.ID, "options": M{"origin": "my-vault"}}, 200, &out)
-			if out.Made.Pages != 0 || out.AlreadyThere != 1 {
-				t.Fatalf("imported again under a name, an import from before names made %d pages and found %d there", out.Made.Pages, out.AlreadyThere)
-			}
+			t.Run("is not met by an import given a name", func(t *testing.T) {
+				if got := run(t, "obsidian", "Team B's readme.", M{"origin": "team-b"}); got.Made.Pages != 1 || got.AlreadyThere != 0 {
+					t.Fatalf("another vault named team-b made %d pages and took %d for already there", got.Made.Pages, got.AlreadyThere)
+				}
+			})
+			t.Run("is gone on with when that is asked for", func(t *testing.T) {
+				if got := run(t, "obsidian", "The vault's readme.", M{"unnamed": "true"}); got.Made.Pages != 0 || got.AlreadyThere != 1 {
+					t.Fatalf("going on with the import from before names made %d pages and found %d there", got.Made.Pages, got.AlreadyThere)
+				}
+			})
+			t.Run("is not gone on with under a name", func(t *testing.T) {
+				out := s.call(t, s.owner, "", "POST", w+"/import", M{"kind": "obsidian", "file": upload(t, "Both."), "options": M{"origin": "team-c", "unnamed": "true"}}, 400, nil)
+				if !strings.Contains(out, "origin") {
+					t.Fatalf("a name and going on with the unnamed import, both: %s", out)
+				}
+			})
 		})
 	})
 }

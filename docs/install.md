@@ -152,7 +152,7 @@ Then restart the server, if the upgrade did not. Take a backup first (`quadit ba
 
 An upload in parts that the older version had started goes on after the upgrade from the parts it kept; a part it had lost is asked for again, and a file is made ready only when its bytes add up to its size.
 
-An import of a folder (Obsidian, Markdown) is given a name when it is made from a zip, and importing again under the same name adds only what is new; a different name makes pages of its own. A folder imported before imports had names keeps its pages: importing it again, under any name, goes on with that import and adds only what it lacks, and says so in its log.
+An import of a folder (Obsidian, Markdown) is given a name when it is made from a zip, and importing again under the same name adds only what is new; a different name makes pages of its own. A folder imported before imports had names keeps its pages, and a named import never takes them for its own: to go on with that import instead, adding only what it lacks, import the folder again with no name and `unnamed=true` (`quadit import obsidian VAULT unnamed=true`, or `"unnamed": "true"` in the API's options). Every import of a kind made before names shares that one set of pages, so this is asked for, never guessed.
 
 A release that does not change the schema makes no copy. Copies are not removed by Quadit: delete old ones once the new version has proved itself. Uploaded files are not copied; an upgrade does not change them.
 

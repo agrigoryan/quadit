@@ -103,6 +103,8 @@ var helpTopics = map[string]string{
   import obsidian|markdown EXPORT.zip origin=NAME
                                            a zipped folder is named: importing again under the
                                            same name adds only what is new (a folder: its path)
+  import obsidian|markdown FOLDER|EXPORT.zip unnamed=true
+                                           goes on with an import made before imports had names
   import orbit https://orbit.example workspace=ID token=ORBIT_TOKEN [session=ORBIT_SESSION]
                                            with a signed-in session, attached files come too
 `,

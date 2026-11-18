@@ -89,16 +89,6 @@ func newApplier(sink Sink, plan Plan, project string) (*applier, error) {
 	for _, p := range projects {
 		a.projectID[p.Key] = p.ID
 	}
-	if a.plan.Origin != "" {
-		earlier, err := a.importedBeforeOrigins()
-		if err != nil {
-			return nil, err
-		}
-		if earlier {
-			sink.Logf("note: pages of this %s import are here from when imports were not named; this run goes on with that import, adding only what it lacks", plan.Source)
-			a.plan.Origin = ""
-		}
-	}
 	for _, t := range plan.Tasks {
 		a.tasks[t.Ext] = t
 	}
@@ -127,31 +117,6 @@ type row struct {
 	ProjectID                                    string `json:"project_id"`
 	UserID                                       string `json:"user_id"`
 	IsDefault                                    bool   `json:"is_default"`
-}
-
-// importedBeforeOrigins reports whether the workspace holds pages this
-// plan made when imports had no origin: the ids of the plan's pages
-// without its origin. Such an import is gone on with, not made a second
-// time beside itself.
-func (a *applier) importedBeforeOrigins() (bool, error) {
-	raw, err := a.sink.Get("/docs", nil)
-	if err != nil {
-		return false, err
-	}
-	var tree struct{ Docs []struct{ ID string } }
-	if err := json.Unmarshal(raw, &tree); err != nil {
-		return false, err
-	}
-	here := map[string]bool{}
-	for _, d := range tree.Docs {
-		here[d.ID] = true
-	}
-	for _, d := range a.plan.Docs {
-		if here[id.From("import", a.plan.Source, "doc", d.Ext)] {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // uid is the id a thing of the source has here: always the same one, which
