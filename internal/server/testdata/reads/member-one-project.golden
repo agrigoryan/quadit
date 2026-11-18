@@ -178,7 +178,7 @@ rule.create (admin): id, name, active, match, action
 rule.delete (admin): id (required)
 rule.update (admin): id, name, active, match, action
 secret.delete (admin): id (required)
-secret.send (member): name (required), method, url
+secret.send (member): name (required), method, url, headers, body, body_base64
 secret.set (admin): id, name (required), description, value, hosts, agents, env
 session.start (member): id, task, title, instructions
 session.update (member): id (required), title, summary, state, add_steps, add_links
