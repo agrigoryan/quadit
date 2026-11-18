@@ -134,6 +134,8 @@ Everything that changes is one event in one ordered feed per workspace. A commen
 
 Rules in Settings → Automation add wake-ups such as "when a person answers a decision, tell @coordinator".
 
+`quadit listen` delivers each inbox item at least once, one at a time, in order. Its cursor (`listen`, or the one named with `cursor=NAME`) moves past an item only after the command exited with 0. When the item's secrets cannot be had, or the command fails, listen says so, waits (1 second, doubling up to 5 minutes) and runs it again; the items after it wait for it. So the command must be safe to run twice for the same item: a crash, or a failure after part of the work was done, brings the item back. To give up on an item instead, move the cursor past it: `quadit ack SEQ listen`, with the item's number (the `#1207` its line starts with).
+
 ## Writing
 
 Every write is a named change with an id you make. Sending the same id again applies nothing twice, so retries are safe.
