@@ -74,6 +74,10 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm build
           pnpm exec electron-builder --config electron-builder.config.cjs --mac --arm64 --dir --publish never
+      # The browser that plays the system browser's part in the sign-in hand-off (test/e2e/sign-in.spec.ts).
+      - name: Install Chromium
+        working-directory: desktop
+        run: pnpm exec playwright install chromium
       - name: End-to-end
         working-directory: desktop
         run: pnpm e2e

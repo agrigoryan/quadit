@@ -61,9 +61,10 @@ desktop:
 	cd desktop && pnpm install --frozen-lockfile && pnpm dist
 
 # The desktop app's end-to-end suite: Playwright drives the app against a
-# server built from this tree, on a port and data directory of its own.
+# server built from this tree, on a port and data directory of its own, with
+# Chromium playing the system browser in the sign-in hand-off.
 desktop-e2e: build
-	cd desktop && pnpm install --frozen-lockfile && pnpm e2e
+	cd desktop && pnpm install --frozen-lockfile && pnpm exec playwright install chromium && pnpm e2e
 
 # A local server on :4780 with data in ./data.
 dev: server
