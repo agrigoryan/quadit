@@ -3,7 +3,11 @@ name: desktop-release
 # A tag desktop-v* (desktop-v0.1.0) publishes the desktop app (desktop/):
 # each system builds its packages with electron-builder, and the last job
 # attaches them to a GitHub Release for the tag. The app's own version
-# (desktop/package.json) must be the tag's.
+# (desktop/package.json) must be the tag's, and SemVer; a version with a
+# pre-release part (1.2.3-beta.1) is published as a GitHub pre-release
+# (desktop/scripts/release-tag.mjs reads the tag). A desktop release is
+# never the repository's Latest: that is the server's, which install.sh and
+# the docs download.
 #
 # macOS must be signed and notarized, or the release fails: CSC_LINK (the
 # Developer ID Application certificate, a base64 .p12) with
@@ -25,7 +29,21 @@ permissions:
   contents: write # the GitHub Release
 
 jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      prerelease: ${{ steps.tag.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: The tag is the app's version, and says whether it is a pre-release
+        id: tag
+        run: node desktop/scripts/release-tag.mjs "$GITHUB_REF_NAME"
+
   build:
+    needs: tag
     strategy:
       fail-fast: false
       matrix:
@@ -50,9 +68,6 @@ jobs:
           node-version: 24
           cache: pnpm
           cache-dependency-path: desktop/pnpm-lock.yaml
-      - name: The tag is the app's version
-        shell: bash
-        run: test "desktop-v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       # Each system gets its own signing secrets and no other's: given the
@@ -72,6 +87,7 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           MAC_PROVISIONING_PROFILE: ${{ secrets.MAC_PROVISIONING_PROFILE }}
           ALLOW_UNSIGNED: ${{ vars.DESKTOP_ALLOW_UNSIGNED }}
+          PRERELEASE: ${{ needs.tag.outputs.prerelease }}
         run: |
           # The App Store Connect API key and the provisioning profile come as
           # secrets; electron-builder reads them from files.
@@ -89,7 +105,7 @@ jobs:
           if [ -n "${APPLE_API_KEY:-}" ] && [ -n "$APPLE_API_KEY_ID" ] && [ -n "$APPLE_API_ISSUER" ]; then notarize=yes; fi
           if [ -n "$CSC_LINK" ] && [ -n "$CSC_KEY_PASSWORD" ] && [ "$notarize" = yes ]; then
             echo "signed=true" >> "$GITHUB_OUTPUT"
-          elif [[ "$GITHUB_REF_NAME" == *-* && "$ALLOW_UNSIGNED" == "true" ]]; then
+          elif [ "$PRERELEASE" = true ] && [ "$ALLOW_UNSIGNED" = true ]; then
             echo "::warning::The macOS build of the pre-release $GITHUB_REF_NAME is unsigned and not notarized (DESKTOP_ALLOW_UNSIGNED)."
             echo "signed=false" >> "$GITHUB_OUTPUT"
           else
@@ -135,7 +151,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    needs: build
+    needs: [tag, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -143,11 +159,16 @@ jobs:
           path: packages
           merge-multiple: true
       - name: Checksums
-        run: cd packages && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+        run: cd packages && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      # Never Latest, which GitHub would otherwise give the newest release:
+      # releases/latest is the server's (install.sh, the docs).
       - name: Publish the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: >
-          gh release create "$GITHUB_REF_NAME" packages/* --repo "$GITHUB_REPOSITORY"
-          --title "Quadit desktop ${GITHUB_REF_NAME#desktop-v}"
-          --notes "The Quadit desktop app. macOS: the .dmg for Apple silicon (arm64) or Intel (x64). Windows: the .exe installer. Linux: the AppImage or the .deb."
+          PRERELEASE: ${{ needs.tag.outputs.prerelease }}
+        run: |
+          kind=()
+          if [ "$PRERELEASE" = true ]; then kind=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" packages/* --repo "$GITHUB_REPOSITORY" --latest=false "${kind[@]}" \
+            --title "Quadit desktop ${GITHUB_REF_NAME#desktop-v}" \
+            --notes "The Quadit desktop app. macOS: the .dmg for Apple silicon (arm64) or Intel (x64). Windows: the .exe installer. Linux: the AppImage or the .deb."
