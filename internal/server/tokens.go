@@ -25,8 +25,9 @@ type tokenBody struct {
 	Secrets bool `json:"secrets"`
 }
 
-// handleCreateToken issues a token for an agent (admins) or for oneself. The
-// token is in the answer and nowhere else afterwards.
+// handleCreateToken issues a token for oneself, or for an agent the caller
+// may make one for (mayMakeTokenFor). The token is in the answer and nowhere
+// else afterwards.
 func (s *Server) handleCreateToken(x *c) error {
 	var b tokenBody
 	if err := x.body(&b); err != nil {
@@ -75,15 +76,23 @@ func mayMakeTokenFor(x *c, m core.Member) error {
 		}
 		return nil
 	}
-	// An admin makes tokens for agents; anyone makes them for a
-	// sub-agent they made themselves.
-	if m.DelegatedBy != x.member.UserID {
-		if err := x.admin(); err != nil {
-			return err
-		}
-	}
 	if m.Kind != core.KindAgent {
 		return errForbidden("a person's tokens are made by that person")
+	}
+	// Anyone makes tokens for a sub-agent they made themselves. Otherwise a
+	// person makes them for the agents they may let a client work as by OAuth
+	// (oauthActors): every agent as an admin, else those they answer for.
+	if m.DelegatedBy != x.member.UserID && !x.member.Role.AtLeast(core.RoleAdmin) {
+		if x.member.Kind == core.KindAgent {
+			return x.admin()
+		}
+		var agent core.User
+		if err := x.s.st.Get(x.ctx(), &agent, store.Eq("id", m.UserID)); err != nil {
+			return err
+		}
+		if agent.ResponsibleID != x.member.UserID {
+			return errForbidden("only an admin or the person responsible for @%s may make it a token", m.Handle)
+		}
 	}
 	if x.member.Kind == core.KindAgent {
 		return agentMayHandOut(x.member, m)
