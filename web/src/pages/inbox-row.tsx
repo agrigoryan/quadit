@@ -20,7 +20,7 @@ import { t } from "@/lib/i18n";
 import { useMember, useRowEvenIfGone } from "@/data/selectors";
 import { exact } from "@/lib/time";
 import type { Notification, NotificationType } from "@/types/core";
-import { anchorOf, archive, markOpened, markRead, markUnread, splitTitle } from "@/pages/inbox-actions";
+import { anchorOf, archive, markOpened, markRead, markUnread, sentenceOf, splitTitle } from "@/pages/inbox-actions";
 import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
@@ -61,10 +61,7 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen, readOnly
   const { key, title } = splitTitle(item.title);
   const Icon = icons[item.type] ?? MessageSquare;
   const who = actor ? `@${actor.handle}` : t("common.someone");
-  // A type this version does not know yet reads as a plain comment.
-  const sentence = t(item.type in icons ? (`inbox.type.${item.type}` as "inbox.type.comment") : "inbox.type.comment", {
-    who,
-  });
+  const sentence = sentenceOf(item, who);
   const snippet = item.snippet ? plain(item.snippet) : "";
   // The row is a link to its task, so it opens in a new tab like any link; one about no task is a plain button.
   // A task in the trash too: its page shows it as trashed.

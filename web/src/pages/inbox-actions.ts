@@ -3,7 +3,7 @@
 
 import { send } from "@/data/mutate";
 import { getState } from "@/data/store";
-import { t } from "@/lib/i18n";
+import { isKey, t } from "@/lib/i18n";
 import { type Batch, sendUndoable } from "@/data/undo";
 import type { Notification } from "@/types/core";
 
@@ -11,6 +11,12 @@ import type { Notification } from "@/types/core";
 export function splitTitle(title: string | undefined): { key: string; title: string } {
   const m = /^([A-Z][A-Z0-9]*-\d+)\s+(.*)$/s.exec(title ?? "");
   return m ? { key: m[1] ?? "", title: m[2] ?? "" } : { key: "", title: title ?? "" };
+}
+
+/** What an item says happened, as the inbox says it: "@ann assigned this to you". A type this version does not know yet reads as a plain comment. */
+export function sentenceOf(item: Pick<Notification, "type">, who: string): string {
+  const key = `inbox.type.${item.type}`;
+  return t(isKey(key) ? key : "inbox.type.comment", { who });
 }
 
 /** The part of its task an item is about, as the task's address names it: a question asked opens at that question. */

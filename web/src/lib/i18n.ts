@@ -48,6 +48,9 @@ export function t(key: Key, params?: Params): string {
   });
 }
 
+/** Whether the dictionary has a key built at run time ("inbox.type." + type), to give t() with its parameters. */
+export const isKey = (key: string): key is Key => key in current;
+
 /** For keys built at run time ("category." + c). Falls back to the fallback text, or the key. */
 export function tMaybe(key: string, fallback?: string): string {
   return key in current ? current[key as Key] : (fallback ?? key);
