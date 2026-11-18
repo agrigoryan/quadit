@@ -22,7 +22,12 @@ vi.mock("@/data/sync", () => ({
   },
 }));
 
+// What the agents are doing is read from the server; here, nothing yet.
+vi.mock("@/data/listening", () => ({ useAgentStates: () => ({ data: undefined, error: "" }) }));
+
 const { useSystemNotices } = await import("@/shell/system-notices");
+const { useDesktopSummary } = await import("@/shell/desktop-summary");
+const { useDesktopRequests } = await import("@/shell/desktop-requests");
 
 let seq = 10;
 const created = (item: Partial<Notification>): FeedEvent => {
@@ -187,6 +192,22 @@ describe("in the desktop app", () => {
     renderHook(() => useSystemNotices());
     streamed(created({ task_id: "t1", title: "SVA-5 Jump feels floaty" }));
     expect(notify).toHaveBeenLastCalledWith(expect.objectContaining({ id: "n11" }));
+  });
+});
+
+describe("in an app released before summaries and requests", () => {
+  it("still gets its notifications, and the shell's desktop code asks it for nothing more", () => {
+    // Its bridge has no publish and no onRequest; it keeps a notification's own fields and ignores the rest.
+    window.quaditDesktop = { version: "0.1.0", notify, setBadge };
+    const { unmount } = renderHook(() => {
+      useSystemNotices();
+      useDesktopSummary();
+      useDesktopRequests();
+    });
+    streamed(created({ task_id: "t1", title: "SVA-5 Jump feels floaty" }));
+    expect(notify).toHaveBeenLastCalledWith(expect.objectContaining({ id: "n11", path: "/acme/task/SVA-5" }));
+    unmount();
+    expect(setBadge).toHaveBeenLastCalledWith(0);
   });
 });
 

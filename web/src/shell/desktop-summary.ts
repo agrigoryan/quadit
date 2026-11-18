@@ -33,13 +33,13 @@ export function useDesktopSummary() {
     const text = JSON.stringify(summary);
     if (!summary || text === told.current) return;
     told.current = text;
-    window.quaditDesktop?.publish(summary);
+    window.quaditDesktop?.publish?.(summary);
   }, [summary]);
 
   // The shell going (signing out, say) takes the summary back; another workspace replaces it.
   useEffect(() => {
     const desktop = window.quaditDesktop;
-    return () => desktop?.publish(null);
+    return () => desktop?.publish?.(null);
   }, []);
 }
 

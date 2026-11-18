@@ -143,7 +143,7 @@ describe("the summary", () => {
 });
 
 describe("in the desktop app", () => {
-  let publish: ReturnType<typeof vi.fn<QuaditDesktop["publish"]>>;
+  let publish: ReturnType<typeof vi.fn<NonNullable<QuaditDesktop["publish"]>>>;
   beforeEach(() => {
     publish = vi.fn();
     window.quaditDesktop = { version: "0.1.0", notify: vi.fn(), setBadge: vi.fn(), publish, onRequest: vi.fn() };

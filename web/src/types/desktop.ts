@@ -85,10 +85,11 @@ export interface QuaditDesktop {
    * newest report), and adds up the servers, for its dock and tray badge.
    */
   setBadge(count: number, workspace?: string): void;
+  // The app is released apart from the server: an app older than these two has neither, and gets no summary and no requests.
   /** Replaces this window's summary; null takes it back (signed out, the shell gone). */
-  publish(summary: DesktopSummary | null): void;
+  publish?(summary: DesktopSummary | null): void;
   /** The one handler for requests the person made in the app; returns a function that stops it. */
-  onRequest(handler: (r: DesktopRequest) => Promise<DesktopOutcome>): () => void;
+  onRequest?(handler: (r: DesktopRequest) => Promise<DesktopOutcome>): () => void;
 }
 
 declare global {

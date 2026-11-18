@@ -145,5 +145,5 @@ async function act(request: string, text: string | undefined): Promise<DesktopOu
 
 /** Answers the desktop app's requests for as long as the shell is on screen. */
 export function useDesktopRequests() {
-  useEffect(() => window.quaditDesktop?.onRequest(answer), []);
+  useEffect(() => window.quaditDesktop?.onRequest?.(answer), []);
 }
