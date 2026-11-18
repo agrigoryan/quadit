@@ -52,7 +52,9 @@ func TestVault(t *testing.T) {
 		defer other.Close()
 		host := "http://" + strings.TrimPrefix(api.URL, "http://")
 
-		s.change(s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder"})
+		// Coder is trusted to send with secrets without asking first (a new
+		// agent asks before a request that changes something).
+		s.change(s.owner, "", "agent.create", M{"name": "Coder", "handle": "coder", "scope": M{"needs_approval": []string{}}})
 		s.change(s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 		var ct, at struct{ Token string }
 		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@coder"}, 201, &ct)
