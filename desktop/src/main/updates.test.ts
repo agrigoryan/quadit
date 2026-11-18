@@ -19,7 +19,10 @@ describe("newerRelease", () => {
       release("desktop-v0.10.1"),
       release("desktop-v0.3.0"),
     ];
-    expect(newerRelease(releases, "0.1.0")).toEqual({ version: "0.10.1", url: "https://github.com/agrigoryan/quadit/releases/tag/desktop-v0.10.1" });
+    expect(newerRelease(releases, "0.1.0")).toEqual({
+      version: "0.10.1",
+      url: "https://github.com/agrigoryan/quadit/releases/tag/desktop-v0.10.1",
+    });
   });
 
   it("skips drafts, pre-releases, the server's tags and what is not newer", () => {
@@ -89,8 +92,14 @@ describe("UpdateWatch", () => {
     await vi.waitFor(() => expect(tell).toHaveBeenCalledTimes(1));
     first.stop();
     expect(asked).toEqual([RELEASES_API]);
-    expect(first.available).toEqual({ version: "0.2.0", url: "https://github.com/agrigoryan/quadit/releases/tag/desktop-v0.2.0" });
-    expect(news).toHaveBeenLastCalledWith({ version: "0.2.0", url: "https://github.com/agrigoryan/quadit/releases/tag/desktop-v0.2.0" });
+    expect(first.available).toEqual({
+      version: "0.2.0",
+      url: "https://github.com/agrigoryan/quadit/releases/tag/desktop-v0.2.0",
+    });
+    expect(news).toHaveBeenLastCalledWith({
+      version: "0.2.0",
+      url: "https://github.com/agrigoryan/quadit/releases/tag/desktop-v0.2.0",
+    });
 
     // A restart within the day: no new request, no second notice, the menu item stays.
     const second = new UpdateWatch(file, "0.1.0", fetcher, news, tell);

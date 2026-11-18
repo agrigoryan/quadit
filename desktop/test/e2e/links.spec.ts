@@ -98,3 +98,39 @@ test("a quadit://open link for a server not added yet offers to add it", async (
   );
   await expect(list.getByLabel("Address")).toHaveValue(run.server);
 });
+
+test("a frame in a server's page stays on the server's pages, and away from the sign-in finish", async ({
+  desktop,
+  run,
+}) => {
+  await desktop.addServer(run.server);
+  await desktop.signedIn(run.server);
+  // The navigations a frame of the page starts, as Electron reports them to the app before they begin.
+  const stopped = await desktop.app.evaluate(
+    ({ BrowserWindow }, { origin, urls }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().startsWith(origin));
+      return urls.map((url) => {
+        let prevented = false;
+        win?.webContents.emit("will-frame-navigate", {
+          url,
+          isMainFrame: false,
+          preventDefault: () => (prevented = true),
+        });
+        return prevented;
+      });
+    },
+    {
+      origin: run.server,
+      urls: [
+        `${run.server}/desktop/finish?code=Z&verifier=V`,
+        `${run.other}/e2e`,
+        "https://example.com/",
+        `${run.server}/e2e/inbox`,
+        "about:srcdoc",
+      ],
+    },
+  );
+  expect(stopped).toEqual([true, true, true, false, false]);
+  // Nothing was handed to the system browser: a frame opens nothing by itself.
+  expect((await desktop.recorded()).opened).toEqual([]);
+});

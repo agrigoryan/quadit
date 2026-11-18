@@ -16,6 +16,7 @@
 //     but the app's own hand-off (finishSignIn): not a page's navigation,
 //     a redirect, a frame or window.open, and not a link or a notification,
 //     which may only open pages of the web app (origins.ts, appPage);
+//   - a frame of a page stays on the server's own pages;
 //   - window.open of the same origin opens another window held to the same
 //     rules; anything else goes to the system browser;
 //   - only the server's own pages get the bridge, and each message on it is
@@ -327,6 +328,15 @@ export class ServerWindows {
     contents.on("will-navigate", (event) => stopIfAway(event, event.url));
     contents.on("will-redirect", (event) => stopIfAway(event, event.url));
     contents.on("will-attach-webview", (event) => event.preventDefault());
+    // A frame of the page: kept to the server's own pages (and the empty ones a page makes itself).
+    // It hands nothing to the system browser: a frame navigating is no person's click.
+    contents.on("will-frame-navigate", (event) => {
+      if (event.isMainFrame) return;
+      const server = this.store.get(serverId);
+      const { url } = event;
+      const own = !!server && isOwnPage(url, server.origin) && !isHandoffPage(url, server.origin);
+      if (!own && url !== "about:blank" && url !== "about:srcdoc") event.preventDefault();
+    });
 
     contents.setWindowOpenHandler(({ url }) => {
       const server = this.store.get(serverId);
