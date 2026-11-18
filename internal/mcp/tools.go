@@ -3,6 +3,7 @@ package mcp
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"net/url"
 	"slices"
@@ -174,35 +175,25 @@ func optionList(desc string) arg {
 		"properties": map[string]any{"label": arg{"type": "string"}, "description": arg{"type": "string"}, "files": textList("")}}}, desc)
 }
 
-// checkArgs holds a call's arguments to the tool's schema, so a value of
-// the wrong type is refused and never quietly dropped: a dry run asked for
-// as "true" must not become a real write. A missing or null argument is
-// one not given. Arguments the tool does not name pass (a read takes any
-// task filter), except dry_run: a tool without one cannot check without
-// doing. An object or a list may come as its JSON text, which some clients
-// send; that is the same value, written differently.
+// checkArgs holds a call's arguments to the schema the tool advertises
+// (toolSchema), all the way down: a required argument, or a required field
+// of an object in a list, is there, and every value given is of its type.
+// So a value of the wrong type is refused and never quietly dropped: a dry
+// run asked for as "true" must not become a real write. A missing or null
+// argument is one not given. Arguments the tool does not name pass (a read
+// takes any task filter), except dry_run: a tool without one cannot check
+// without doing. An object or a list may come as its JSON text, which some
+// clients send; that is the same value, written differently.
 func checkArgs(t tool, a map[string]any) error {
-	schemas := map[string]arg{}
-	for name, schema := range t.Props {
-		schemas[strings.TrimPrefix(name, "!")] = schema
+	if _, dry := a["dry_run"]; dry && t.Props["dry_run"] == nil {
+		return fmt.Errorf("%s has no dry run: it cannot check without doing", t.Name)
 	}
-	for name, v := range a {
-		schema, named := schemas[name]
-		if !named {
-			if name == "dry_run" {
-				return fmt.Errorf("%s has no dry run: it cannot check without doing", t.Name)
-			}
-			continue
-		}
-		if v != nil && !fits(schema, v) {
-			return fmt.Errorf("%s must be %s", name, typeWords(schema["type"]))
-		}
-	}
-	return nil
+	return checkObject(arg(toolSchema(t)), a, "")
 }
 
-// fits tells whether v, as JSON decoded it, is of the schema's type.
-func fits(schema arg, v any) bool {
+// checkValue holds v, as JSON decoded it, to schema, and says what is wrong
+// with it, naming where in the argument it is (options[1].label).
+func checkValue(schema arg, v any, at string) error {
 	types, ok := schema["type"].([]string)
 	if !ok {
 		types = []string{fmt.Sprint(schema["type"])}
@@ -211,23 +202,23 @@ func fits(schema arg, v any) bool {
 		switch typ {
 		case "string":
 			if _, ok := v.(string); ok {
-				return true
+				return nil
 			}
 		case "integer":
 			if n, ok := v.(float64); ok && n == math.Trunc(n) {
-				return true
+				return nil
 			}
 		case "boolean":
 			if _, ok := v.(bool); ok {
-				return true
+				return nil
 			}
 		case "object":
-			if _, ok := v.(map[string]any); ok {
-				return true
+			fields, ok := v.(map[string]any)
+			if text, isText := v.(string); isText {
+				ok = json.Unmarshal([]byte(text), &fields) == nil
 			}
-			var m map[string]any
-			if text, ok := v.(string); ok && json.Unmarshal([]byte(text), &m) == nil {
-				return true
+			if ok {
+				return checkObject(schema, fields, at)
 			}
 		case "array":
 			items, _ := schema["items"].(arg)
@@ -235,19 +226,56 @@ func fits(schema arg, v any) bool {
 				var list []any
 				if json.Unmarshal([]byte(text), &list) != nil {
 					if items["type"] == "string" {
-						return true // ids written with commas
+						return nil // ids written with commas
 					}
 					continue
 				}
 				v = list
 			}
 			list, ok := v.([]any)
-			if ok && (items == nil || !slices.ContainsFunc(list, func(e any) bool { return !fits(items, e) })) {
-				return true
+			if !ok {
+				continue
+			}
+			for i, item := range list {
+				if items == nil {
+					break
+				}
+				if err := checkValue(items, item, fmt.Sprintf("%s[%d]", at, i)); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("%s must be %s", at, typeWords(schema["type"]))
+}
+
+// checkObject holds the fields of an object to its schema: the required
+// ones there (not null), and each that is given, of its type. Fields the
+// schema does not name pass.
+func checkObject(schema arg, fields map[string]any, at string) error {
+	field := func(name string) string {
+		if at == "" {
+			return name
+		}
+		return at + "." + name
+	}
+	required, _ := schema["required"].([]string)
+	for _, name := range required {
+		if fields[name] == nil {
+			return fmt.Errorf("%s is missing", field(name))
+		}
+	}
+	properties, _ := schema["properties"].(map[string]any)
+	for _, name := range slices.Sorted(maps.Keys(properties)) {
+		propertySchema, _ := properties[name].(arg)
+		if v := fields[name]; v != nil && propertySchema != nil {
+			if err := checkValue(propertySchema, v, field(name)); err != nil {
+				return err
 			}
 		}
 	}
-	return false
+	return nil
 }
 
 // typeWords says a schema type as a person would.
