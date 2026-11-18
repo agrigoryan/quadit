@@ -3,7 +3,7 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build server web generate test test-all e2e lint notices dev seed clean fmt release image
+.PHONY: all build server web generate test test-all e2e lint notices dev seed clean fmt release smoke image
 
 all: build
 
@@ -71,6 +71,11 @@ fmt:
 # the real one.
 release:
 	goreleaser release --snapshot --clean
+
+# Start what make release made, as the release workflow does before it
+# publishes: the archive, the .deb and the image (scripts/release-smoke.sh).
+smoke: release
+	scripts/release-smoke.sh dist
 
 # The Docker image.
 image:

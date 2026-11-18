@@ -129,6 +129,11 @@ After adding or updating a dependency, run `make notices` and commit `THIRD_PART
 
 Quadit follows [Semantic Versioning](https://semver.org). A release is a tag `vX.Y.Z` on `main`, and the version comes from that tag alone: GoReleaser sets it in the binary (`-X main.version`), and `quadit version` prints it. A build from a checkout prints `git describe` (`make build`) or `dev` (plain `go build`).
 
-A change people or agents will notice gets a line under "Unreleased" in [CHANGELOG.md](CHANGELOG.md). To release: move those lines under the new version with the date, commit, and push the tag. The tag runs GoReleaser (`.goreleaser.yaml`, `.github/workflows/release.yml`): the archives, `.deb` and `.rpm` packages and checksums on a GitHub Release with notes grouped from the commit messages, the Docker images on `ghcr.io/agrigoryan/quadit` (`X.Y.Z`, `X.Y`, `X`, `latest`), and the Homebrew cask. `make release` makes the same into `dist/` locally, publishing nothing.
+A change people or agents will notice gets a line under "Unreleased" in [CHANGELOG.md](CHANGELOG.md). To release:
+
+1. Move those lines under the new version, and set its date to the day you tag it (`## [0.1.0] - 2026-12-01`; until then the heading says `Unreleased`). Commit that to `main` and push.
+2. Tag that commit `vX.Y.Z` and push the tag.
+
+The tag runs `.github/workflows/release.yml`, which publishes nothing until, for the tagged commit itself, the commit is on `main`, the whole CI passes (`ci.yml`: Go tests with the race detector on SQLite and Postgres, lint, the licence check, the web app, the end-to-end suite), and the archive, the `.deb` and the image that GoReleaser makes from it start and answer `/readyz` (`scripts/release-smoke.sh`). Then GoReleaser (`.goreleaser.yaml`) publishes: the archives, `.deb` and `.rpm` packages and checksums on a GitHub Release with notes grouped from the commit messages, the Docker images on `ghcr.io/agrigoryan/quadit` (`X.Y.Z`, `X.Y`, `X`, `latest`), and the Homebrew cask, pushed to `agrigoryan/homebrew-tap` when the `HOMEBREW_TAP_GITHUB_TOKEN` secret is set (without it the release goes on with no cask: check the tap after the first release). `make release` makes the same into `dist/` locally, publishing nothing, and `make smoke` starts what it made.
 
 By contributing, you agree that your contribution is licensed under the [MIT License](LICENSE).
