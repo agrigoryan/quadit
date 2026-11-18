@@ -47,9 +47,13 @@ func (c *cx) roleArg(s, kind string) (core.Role, error) {
 		}
 		return role, e
 	}
-	// Nobody hands out more access than they have.
+	// Nobody hands out more access than they have: not a higher role, and
+	// not the owner's, which reaches every project, from a reach of some.
 	if !c.system && !c.actor.Role.AtLeast(role) {
 		return role, forbidden("you are a %s and cannot give the %s role", c.actor.Role, role)
+	}
+	if !c.system && role == core.RoleOwner && len(c.scope.Projects) > 0 {
+		return role, forbidden("you reach only some projects here, so you cannot give the owner role, which reaches them all")
 	}
 	return role, nil
 }

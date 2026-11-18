@@ -232,17 +232,18 @@ func (c *cx) endDelegates(t core.Task) error {
 	return nil
 }
 
-// capScope holds a scope an agent hands out to the agent's own: an agent
-// made or changed by an agent never reaches further than its maker. What a
-// person sets is taken as given.
+// capScope holds a scope handed out (to a member added or changed, to an
+// agent made) to the actor's own reach: nobody hands out more than they
+// have. The actor's reach is c.scope: its membership's, narrowed by the
+// credential it acts with and by the member it acts for.
 func (c *cx) capScope(scope *core.Scope) *core.Scope {
-	if c.system || c.actor.Kind != core.KindAgent || c.actor.Scope == nil {
+	mine := c.scope
+	if c.system || len(mine.Projects) == 0 && !mine.ReadOnly && len(mine.NeedsApproval) == 0 {
 		return scope
 	}
 	if scope == nil {
 		scope = &core.Scope{}
 	}
-	mine := c.actor.Scope
 	if len(mine.Projects) > 0 {
 		scope.Projects = intersectProjects(mine.Projects, ifEmpty(scope.Projects, mine.Projects))
 	}
