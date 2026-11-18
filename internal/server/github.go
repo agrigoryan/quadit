@@ -97,7 +97,7 @@ func integrationOf(x *c) (core.Integration, error) {
 // handleSyncIntegration syncs an integration now and says how many pull
 // requests and issues it handled.
 func (s *Server) handleSyncIntegration(x *c) error {
-	if err := x.admin(); err != nil {
+	if err := x.mayAdminister(); err != nil {
 		return err
 	}
 	in, err := integrationOf(x)

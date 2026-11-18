@@ -342,7 +342,7 @@ func plainNetError(err error) string {
 
 // handleResendDelivery sends a delivery again, whatever became of it.
 func (s *Server) handleResendDelivery(x *c) error {
-	if err := x.admin(); err != nil {
+	if err := x.mayAdminister(); err != nil {
 		return err
 	}
 	tests, err := x.db.Count(x.ctx(), "webhook_deliveries", store.Eq("id", x.r.PathValue("id")), store.Lt("seq", int64(0)))
@@ -366,7 +366,7 @@ func (s *Server) handleResendDelivery(x *c) error {
 // handleSendTestWebhook posts a sample event to a webhook right now and returns what
 // the receiver answered.
 func (s *Server) handleSendTestWebhook(x *c) error {
-	if err := x.admin(); err != nil {
+	if err := x.mayAdminister(); err != nil {
 		return err
 	}
 	var h core.Webhook

@@ -48,7 +48,7 @@ type importBody struct {
 // handleImportWork reads a source and makes what it holds, or with
 // dry_run only says what it found.
 func (s *Server) handleImportWork(x *c) error {
-	if err := x.admin(); err != nil {
+	if err := x.mayAdminister(); err != nil {
 		return err
 	}
 	var b importBody

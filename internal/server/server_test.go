@@ -383,3 +383,27 @@ func TestLooseEnds(t *testing.T) {
 		}
 	})
 }
+
+// TestAnAdminWhoMayOnlyReadStartsNothing: what an admin starts outside the
+// engine (an import, a sync, a webhook sent again or tried, withdrawing an
+// invitation) is refused to a credential or a membership that may only
+// read, as every change is.
+func TestAnAdminWhoMayOnlyReadStartsNothing(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		var ro struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "me", "read_only": true}, 201, &ro)
+		s.change(s.owner, "", "agent.create", M{"name": "Reader", "handle": "reader", "role": "admin", "scope": M{"read_only": true, "needs_approval": []string{}}})
+		var reader struct{ Token string }
+		s.call(s.owner, "", "POST", w+"/tokens", M{"user": "@reader"}, 201, &reader)
+		some := id.New()
+		for _, path := range []string{"/import", "/integrations/" + some + "/sync", "/sources/" + some + "/sync", "/deliveries/" + some + "/redeliver", "/webhooks/" + some + "/test"} {
+			for _, token := range []string{ro.Token, reader.Token} {
+				if out := s.call(nil, token, "POST", "/api/v1/w/-"+path, M{}, 403, nil); !strings.Contains(out, "read-only") {
+					t.Fatalf("POST %s: %s", path, out)
+				}
+			}
+		}
+		s.call(nil, ro.Token, "DELETE", "/api/v1/w/-/invites/"+some, nil, 403, nil)
+	})
+}

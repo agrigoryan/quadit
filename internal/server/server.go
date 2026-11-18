@@ -498,6 +498,16 @@ func (x *c) mayWrite() error {
 	return nil
 }
 
+// mayAdminister refuses what an admin starts outside the engine (an
+// import, a sync, a webhook sent, an invitation withdrawn) to a caller who
+// is not an admin, or who may only read.
+func (x *c) mayAdminister() error {
+	if err := x.admin(); err != nil {
+		return err
+	}
+	return x.mayWrite()
+}
+
 // fail writes an error in the one shape every error has.
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	var he *httpError

@@ -28,7 +28,7 @@ func (s *Server) handleListSources(x *c) error {
 
 // handleSyncSource syncs a source now and says what the sync did.
 func (s *Server) handleSyncSource(x *c) error {
-	if err := x.admin(); err != nil {
+	if err := x.mayAdminister(); err != nil {
 		return err
 	}
 	var src core.DocSource

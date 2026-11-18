@@ -203,10 +203,7 @@ func (s *Server) handleListInvites(x *c) error {
 }
 
 func (s *Server) handleRevokeInvite(x *c) error {
-	if err := x.admin(); err != nil {
-		return err
-	}
-	if err := x.mayWrite(); err != nil {
+	if err := x.mayAdminister(); err != nil {
 		return err
 	}
 	n, err := s.st.Update(x.ctx(), "invites", map[string]any{"revoked_at": time.Now().UnixMilli()},
