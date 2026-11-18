@@ -2,6 +2,8 @@
 
 package core
 
+import "strings"
+
 // Watcher is a member who follows a task or another subject and is told
 // what happens to it.
 type Watcher struct {
@@ -25,6 +27,36 @@ const (
 	NoteResult    = "result"
 	NoteStatus    = "status"
 )
+
+// NoteHeadlines are what a notification outside the app (a push, a mail's
+// subject, the desktop app's) says an inbox item is, by its type: {who} is
+// the actor's name and {title} the item's title. They are the only copy:
+// cmd/webtypes writes them into the web app's dictionary
+// (web/src/i18n/en/push.gen.ts), which words the desktop app's notifications
+// with them, so a person is told the same thing however they are told.
+var NoteHeadlines = map[string]string{
+	NoteAssigned:  "{who} assigned you {title}",
+	NoteMentioned: "{who} mentioned you in {title}",
+	NoteWaitingOn: "{who} is waiting on you in {title}",
+	NoteAsked:     "{who} asked you a question in {title}",
+	NotePicked:    "{who} answered your question in {title}",
+	NoteUnclear:   "{who} found your answer unclear in {title}",
+	NoteReplied:   "{who} replied to you in {title}",
+	NoteComment:   "{who} commented on {title}",
+	NoteResult:    "{who} posted a result in {title}",
+	NoteStatus:    "{who} changed the status of {title}",
+}
+
+// NoteHeadline is the headline of an inbox item of the type noteType that
+// who (the actor's name, "" when nobody is named) made about title. A type
+// without a headline of its own reads as a comment.
+func NoteHeadline(noteType, who, title string) string {
+	headline, ok := NoteHeadlines[noteType]
+	if !ok {
+		headline = NoteHeadlines[NoteComment]
+	}
+	return strings.TrimSpace(strings.NewReplacer("{who}", who, "{title}", title).Replace(headline))
+}
 
 // Notification is one inbox item.
 type Notification struct {

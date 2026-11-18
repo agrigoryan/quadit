@@ -142,10 +142,6 @@ type notifyPrefs struct {
 var importantNotes = map[string]bool{core.NoteAsked: true, core.NoteMentioned: true, core.NoteAssigned: true, core.NotePicked: true,
 	core.NoteUnclear: true, core.NoteWaitingOn: true, core.NoteResult: true}
 
-var noteVerbs = map[string]string{core.NoteAssigned: "assigned you", core.NoteMentioned: "mentioned you in", core.NoteWaitingOn: "is waiting on you in",
-	core.NoteAsked: "asked you a question in", core.NotePicked: "answered your question in", core.NoteUnclear: "found your answer unclear in",
-	core.NoteReplied: "replied to you in", core.NoteComment: "commented on", core.NoteResult: "posted a result in", core.NoteStatus: "changed the status of"}
-
 // jobNotify tells a person about an inbox item by push and mail, unless
 // they have already read it. An item or a person that is gone is nothing
 // to tell; a read that fails is an error, and the job is tried again.
@@ -187,7 +183,7 @@ func (s *Server) jobNotify(ctx context.Context, j core.Job) error {
 	} else if n.DocID != "" {
 		link = s.cfg.BaseURL + "/" + ws.Slug + "/docs/" + n.DocID
 	}
-	title := strings.TrimSpace(actor.Name + " " + noteVerbs[n.Type] + " " + n.Title)
+	title := core.NoteHeadline(n.Type, actor.Name, n.Title)
 
 	// Tell by push and by mail, as the person chose.
 	if prefs.Push == nil || *prefs.Push {

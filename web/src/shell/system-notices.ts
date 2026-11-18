@@ -5,11 +5,11 @@
 // A browser gets its notifications by push (public/sw.js, sent by the
 // server). The desktop app has no push: its pages are given a bridge
 // instead (types/desktop.ts), and the notifications come from the live
-// stream, from the one window that reads it (data/sync.ts), so each is
-// shown once. The words are the inbox's own: push words them on the server
-// (jobNotify, internal/server/jobs.go) as the actor's name, a verb and the
-// title, with the snippet below; here the title is the inbox's sentence and
-// the body the item's title with the snippet below.
+// stream, from the one window that reads it (data/sync.ts); the app shows
+// each item once whichever window tells it. The words are push's own
+// (jobNotify, internal/server/jobs.go): the server's headline of the item
+// (core.NoteHeadlines, generated into i18n/en/push.gen.ts), with its
+// snippet below.
 
 import { useEffect } from "react";
 import { useSession } from "@/auth/session";
@@ -17,9 +17,9 @@ import { getRowEvenIfGone, useUnreadCount, useWorkspaceId } from "@/data/selecto
 import { getState } from "@/data/store";
 import { onStreamEvents } from "@/data/sync";
 import { docPath } from "@/docs/area";
-import { t } from "@/lib/i18n";
+import { isKey, t } from "@/lib/i18n";
 import { taskPath } from "@/nav/task-link";
-import { anchorOf, sentenceOf, splitTitle } from "@/pages/inbox-actions";
+import { anchorOf, splitTitle } from "@/pages/inbox-actions";
 import type { Notification } from "@/types/core";
 import type { QuaditDesktop } from "@/types/desktop";
 
@@ -64,16 +64,18 @@ export function useSystemNotices() {
 /** What the desktop app shows for an inbox item, and the address a click opens: its task, the page it is about, or the inbox. */
 function noticeOf(item: Notification): Parameters<QuaditDesktop["notify"]>[0] {
   const { slug } = getState();
-  // Named even when gone, as the inbox names them: the actor who left, the task in the trash.
-  const who = getRowEvenIfGone("members", item.actor_id)?.name || t("common.someone");
+  // Named even when gone, as push names them: the actor who left, the task in the trash. Nobody known, no name.
+  const who = getRowEvenIfGone("members", item.actor_id)?.name ?? "";
   const key = getRowEvenIfGone("tasks", item.task_id)?.key || splitTitle(item.title).key;
   const anchor = anchorOf(item);
   let path = `/${slug}/inbox`;
   if (key) path = taskPath(slug, key) + (anchor ? `#${anchor}` : "");
   else if (item.doc_id) path = docPath(slug, item.doc_id);
+  // A type this version does not know yet reads as a comment, as on the server.
+  const headline = `push.${item.type}`;
   return {
-    title: sentenceOf(item, who),
-    body: [item.title, item.snippet].filter(Boolean).join("\n"),
+    title: t(isKey(headline) ? headline : "push.comment", { who, title: item.title ?? "" }).trim(),
+    body: item.snippet ?? "",
     path,
     // The same task or page replaces its earlier notification, as push does.
     tag: (item.task_id ?? "") + (item.doc_id ?? "") || undefined,

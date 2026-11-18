@@ -5,7 +5,9 @@
 //     Go structs each change reads its arguments into (changes.go);
 //   - web/src/types/rows.gen.ts, the rows the server sends as stored, from
 //     the row structs of package core (rows.go). The app does not use it:
-//     web/src/types/rows.check.ts holds the hand-written wire types to it.
+//     web/src/types/rows.check.ts holds the hand-written wire types to it;
+//   - web/src/i18n/en/push.gen.ts, what a notification outside the app says
+//     an inbox item is, from core.NoteHeadlines (push.go).
 //
 // Run it after changing a change's arguments or a row:
 //
@@ -32,6 +34,7 @@ import (
 var files = map[string]func() string{
 	"web/src/types/changes.gen.ts": changesSource,
 	"web/src/types/rows.gen.ts":    rowsSource,
+	"web/src/i18n/en/push.gen.ts":  pushSource,
 }
 
 func main() {

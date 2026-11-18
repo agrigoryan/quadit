@@ -88,7 +88,7 @@ describe("in the desktop app", () => {
     window.quaditDesktop = desktop;
   });
 
-  it("shows a notification for each new inbox item of mine, in the inbox's words, opening its task", () => {
+  it("shows a notification for each new inbox item of mine, in push's words, opening its task", () => {
     renderHook(() => useSystemNotices());
     streamed(
       created({ task_id: "t1", title: "SVA-5 Jump feels floaty", snippet: "Can you look at this today?" }),
@@ -104,8 +104,8 @@ describe("in the desktop app", () => {
     expect(notify.mock.calls).toEqual([
       [
         {
-          title: "Bea assigned this to you",
-          body: "SVA-5 Jump feels floaty\nCan you look at this today?",
+          title: "Bea assigned you SVA-5 Jump feels floaty",
+          body: "Can you look at this today?",
           path: "/acme/task/SVA-5",
           tag: "t1",
           id: "n11",
@@ -113,8 +113,8 @@ describe("in the desktop app", () => {
       ],
       [
         {
-          title: "Bea asked you a question",
-          body: "SVA-5 Jump feels floaty",
+          title: "Bea asked you a question in SVA-5 Jump feels floaty",
+          body: "",
           path: "/acme/task/SVA-5#decision-d1",
           tag: "t1",
           id: "n13",
