@@ -116,7 +116,7 @@ async function capture({
   return { ok: true, path: docPath(slug, id, project) };
 }
 
-/** Carries out a button the page handed the app (requestTo). */
+/** Carries out a button the page handed the app (pickAction, readAction, replyBox). */
 async function act(request: string, text: string | undefined): Promise<DesktopOutcome> {
   const [verb, id = "", option = ""] = request.split(":");
   if (verb === "pick") {
