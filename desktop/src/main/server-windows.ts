@@ -1,0 +1,358 @@
+// Each server's window: its own signed-in session, its pages kept to its
+// origin, the bridge its pages may use, and the bar that offers the browser
+// sign-in when its page is the sign-in page.
+//
+// A window lives as long as its server is added: closing it only hides it,
+// so its page keeps receiving the live feed and its notifications and badge
+// keep coming, the way chat apps behave. Quitting the app really closes it.
+//
+// The rules every page of a server's window is held to:
+//   - its session is the partition "persist:server-<id>", shared with no other server;
+//   - Node is off, the renderer is sandboxed, contexts are isolated, web security is on;
+//   - a navigation to another origin is stopped and that address goes to the
+//     system browser (http and https only); from the sign-in page it starts
+//     the browser sign-in instead, since providers refuse embedded windows;
+//   - window.open of the same origin opens another window held to the same
+//     rules; anything else goes to the system browser;
+//   - only the server's own pages get the bridge, and each message on it is
+//     checked again here against the frame that sent it.
+
+import {
+  BrowserWindow,
+  type IpcMainEvent,
+  ipcMain,
+  Notification,
+  type Session,
+  session,
+  shell,
+  type WebContents,
+  WebContentsView,
+  type WebPreferences,
+} from "electron";
+import { giveContextMenu } from "@/main/context-menu";
+import { browserAddress, isOwnPage, pageAt } from "@/main/origins";
+import { HANDOFF_VERSION } from "@/main/probe";
+import type { Server, ServerStore } from "@/main/servers";
+import { BRIDGE_BADGE, BRIDGE_NOTIFY, ORIGIN_SWITCH, VERSION_SWITCH } from "@/shared/bridge";
+
+/** The path of the web app's sign-in page: where the bar offering the browser sign-in shows. */
+const SIGN_IN_PATH = "/login";
+const BAR_HEIGHT = 52;
+
+/** What a server's windows need from the rest of the app. */
+export interface WindowsSetup {
+  version: string;
+  /** The bridge preload and the bundled pages' preload, as file paths. */
+  bridgePreload: string;
+  pagesPreload: string;
+  /** The bundled sign-in bar page for a server. */
+  signInBarUrl(serverId: string): string;
+  /** Starts the browser sign-in for a server. */
+  signIn(serverId: string): void;
+  /** A server's page reported its unread count. */
+  setUnread(serverId: string, count: number): void;
+  /** A window was shown, hidden or focused: the menus that list them change. */
+  changed(): void;
+}
+
+export class ServerWindows {
+  private windows = new Map<string, BrowserWindow>();
+  /** Which server each web contents belongs to: the windows and the windows their pages opened. */
+  private owners = new Map<number, string>();
+  private bars = new Map<string, WebContentsView>();
+  /** Servers whose sign-in bar the person closed; it stays away until the app restarts. */
+  private barDismissed = new Set<string>();
+  /** Shown notifications, held so their click still arrives (macOS forgets the handlers of collected ones). */
+  private notifications = new Map<string, Notification>();
+  private sessions = new WeakSet<Session>();
+  private quitting = false;
+
+  constructor(
+    private store: ServerStore,
+    private setup: WindowsSetup,
+  ) {
+    ipcMain.on(BRIDGE_NOTIFY, (event, n: { title: string; body: string; path: string; tag?: string }) => {
+      const server = this.bridgeSender(event);
+      if (server) this.notify(server, n);
+    });
+    ipcMain.on(BRIDGE_BADGE, (event, count: unknown) => {
+      const server = this.bridgeSender(event);
+      if (server && typeof count === "number" && Number.isFinite(count)) {
+        setup.setUnread(server.id, Math.min(Math.max(Math.floor(count), 0), 99_999));
+      }
+    });
+  }
+
+  /** Makes a window for every server, shown for those that were open when the app last stopped; gives whether any is shown. */
+  restore(): boolean {
+    for (const server of this.store.list()) this.ensure(server, server.origin + "/", server.open);
+    return this.store.list().some((server) => server.open);
+  }
+
+  /** Shows and focuses a server's window, at `path` when given. */
+  show(serverId: string, path?: string) {
+    const server = this.store.get(serverId);
+    if (!server) return;
+    const target = pageAt(server.origin, path ?? "/") ?? server.origin + "/";
+    const known = this.windows.get(serverId);
+    const win = known ?? this.ensure(server, target, true);
+    if (known && path !== undefined) this.goTo(win.webContents, server, target);
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  }
+
+  /** Loads a full address of the server in its window, shown: for addresses the server must answer itself (the sign-in finish). */
+  load(serverId: string, url: string) {
+    const server = this.store.get(serverId);
+    if (!server || !isOwnPage(url, server.origin)) return;
+    this.show(serverId);
+    void this.windows.get(serverId)?.webContents.loadURL(url);
+  }
+
+  /** The server whose window is in front, if one is. */
+  focused(): Server | undefined {
+    const contents = BrowserWindow.getFocusedWindow()?.webContents;
+    const id = contents && this.owners.get(contents.id);
+    return id ? this.store.get(id) : undefined;
+  }
+
+  /** Whether a server's window is shown now. */
+  isShown(serverId: string): boolean {
+    return this.windows.get(serverId)?.isVisible() ?? false;
+  }
+
+  /** Closes a removed server's window and forgets what it kept: cookies, storage, its place on screen. */
+  async forget(server: Server) {
+    const win = this.windows.get(server.id);
+    this.windows.delete(server.id);
+    this.bars.delete(server.id);
+    win?.destroy();
+    BrowserWindow.clearPersistedState(windowName(server.id));
+    await session.fromPartition(partitionOf(server.id)).clearStorageData();
+  }
+
+  /** From now on closing a window closes it, so the app can quit. */
+  quit() {
+    this.quitting = true;
+  }
+
+  /** Hides the sign-in bar a bundled page sits in (the bar's own close button). */
+  dismissBar(contents: WebContents) {
+    for (const [serverId, bar] of this.bars) {
+      if (bar.webContents !== contents) continue;
+      this.barDismissed.add(serverId);
+      const win = this.windows.get(serverId);
+      if (win) this.placeBar(win, serverId);
+    }
+  }
+
+  private ensure(server: Server, firstUrl: string, shown: boolean): BrowserWindow {
+    const known = this.windows.get(server.id);
+    if (known) return known;
+    this.prepareSession(server);
+    const win = new BrowserWindow({
+      name: windowName(server.id),
+      windowStatePersistence: true,
+      width: 1280,
+      height: 860,
+      minWidth: 480,
+      minHeight: 400,
+      title: server.name,
+      show: shown,
+      webPreferences: this.preferencesFor(server),
+    });
+    this.windows.set(server.id, win);
+    this.guard(win.webContents, server.id);
+    if (shown) this.store.change(server.id, { open: true });
+
+    win.on("close", (event) => {
+      if (this.quitting) return;
+      event.preventDefault();
+      win.hide();
+    });
+    win.on("show", () => {
+      this.store.change(server.id, { open: true });
+      this.setup.changed();
+    });
+    win.on("hide", () => {
+      this.store.change(server.id, { open: false });
+      this.setup.changed();
+    });
+    win.on("focus", () => this.setup.changed());
+    win.on("resize", () => this.placeBar(win, server.id));
+    win.on("closed", () => {
+      if (this.windows.get(server.id) === win) this.windows.delete(server.id);
+      this.setup.setUnread(server.id, 0);
+    });
+    void win.webContents.loadURL(firstUrl);
+    return win;
+  }
+
+  /** The partition's user agent and permissions, set once per session. */
+  private prepareSession(server: Server) {
+    const own = session.fromPartition(partitionOf(server.id));
+    if (this.sessions.has(own)) return;
+    this.sessions.add(own);
+    own.setUserAgent(`${own.getUserAgent()} QuaditDesktop/${this.setup.version}`);
+    // What a task tracker needs and nothing else: copying, full-screen video, notifications.
+    const allowed = new Set(["clipboard-sanitized-write", "clipboard-read", "fullscreen", "notifications"]);
+    own.setPermissionRequestHandler((contents, permission, decide, details) => {
+      const current = this.store.get(server.id);
+      decide(
+        !!current && allowed.has(permission) && isOwnPage(details.requestingUrl ?? contents.getURL(), current.origin),
+      );
+    });
+    own.setPermissionCheckHandler((_contents, permission, requestingOrigin) => {
+      const current = this.store.get(server.id);
+      return !!current && allowed.has(permission) && requestingOrigin === current.origin;
+    });
+  }
+
+  private preferencesFor(server: Server): WebPreferences {
+    return {
+      partition: partitionOf(server.id),
+      preload: this.setup.bridgePreload,
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      webviewTag: false,
+      spellcheck: true,
+      additionalArguments: [ORIGIN_SWITCH + server.origin, VERSION_SWITCH + this.setup.version],
+    };
+  }
+
+  /** Holds a server's web contents (its window, or one its page opened) to the rules at the top of this file. */
+  private guard(contents: WebContents, serverId: string) {
+    this.owners.set(contents.id, serverId);
+    contents.once("destroyed", () => this.owners.delete(contents.id));
+    giveContextMenu(contents);
+
+    const stopIfAway = (event: { preventDefault(): void }, url: string) => {
+      const server = this.store.get(serverId);
+      if (!server || isOwnPage(url, server.origin)) return;
+      event.preventDefault();
+      this.leave(contents, server, url);
+    };
+    contents.on("will-navigate", (event) => stopIfAway(event, event.url));
+    contents.on("will-redirect", (event) => stopIfAway(event, event.url));
+    contents.on("will-attach-webview", (event) => event.preventDefault());
+
+    contents.setWindowOpenHandler(({ url }) => {
+      const server = this.store.get(serverId);
+      if (server && isOwnPage(url, server.origin)) {
+        return { action: "allow", overrideBrowserWindowOptions: { webPreferences: this.preferencesFor(server) } };
+      }
+      if (server) this.leave(contents, server, url);
+      return { action: "deny" };
+    });
+    contents.on("did-create-window", (child) => this.guard(child.webContents, serverId));
+
+    const pageChanged = () => {
+      const win = this.windows.get(serverId);
+      if (win?.webContents === contents) this.placeBar(win, serverId);
+    };
+    contents.on("did-navigate", pageChanged);
+    contents.on("did-navigate-in-page", pageChanged);
+  }
+
+  /** A page of the server tried to go to `url`, outside the server. */
+  private leave(contents: WebContents, server: Server, url: string) {
+    if (onSignInPage(contents, server) && handoffWorks(server)) {
+      this.setup.signIn(server.id);
+      return;
+    }
+    const address = browserAddress(url);
+    if (address) void shell.openExternal(address);
+  }
+
+  /** Moves a server's page to `url` (on its origin), keeping the page when it is already the web app. */
+  private goTo(contents: WebContents, server: Server, url: string) {
+    if (!isOwnPage(contents.getURL(), server.origin) || contents.isLoading()) {
+      void contents.loadURL(url);
+      return;
+    }
+    // The web app routes with the History API: pushing the path and telling
+    // its router keeps the page (and anything typed in it) instead of reloading.
+    const { pathname, search, hash } = new URL(url);
+    const path = JSON.stringify(pathname + search + hash);
+    void contents.executeJavaScript(
+      `history.pushState(null, "", ${path}); dispatchEvent(new PopStateEvent("popstate"));`,
+    );
+  }
+
+  /** The server a bridge message came from, or undefined when its sender is not that server's own page. */
+  private bridgeSender(event: IpcMainEvent): Server | undefined {
+    const serverId = this.owners.get(event.sender.id);
+    const server = serverId ? this.store.get(serverId) : undefined;
+    const frame = event.senderFrame;
+    if (!server || !frame || frame !== event.sender.mainFrame) return undefined;
+    return isOwnPage(frame.url, server.origin) ? server : undefined;
+  }
+
+  private notify(server: Server, n: { title: string; body: string; path: string; tag?: string }) {
+    if (!Notification.isSupported()) return;
+    const key = n.tag ? `${server.id}:${n.tag}` : `${server.id}:${Date.now()}:${Math.random()}`;
+    this.notifications.get(key)?.close();
+    const note = new Notification({ title: n.title.slice(0, 200), body: n.body.slice(0, 1000) });
+    const path = pageAt(server.origin, n.path) ? n.path : "/";
+    note.on("click", () => {
+      this.notifications.delete(key);
+      this.show(server.id, path);
+    });
+    note.on("close", () => {
+      if (this.notifications.get(key) === note) this.notifications.delete(key);
+    });
+    this.notifications.set(key, note);
+    note.show();
+  }
+
+  /** Shows the sign-in bar over the top of a server's window when its page is the sign-in page, and hides it otherwise. */
+  private placeBar(win: BrowserWindow, serverId: string) {
+    const server = this.store.get(serverId);
+    const wanted =
+      !!server && !this.barDismissed.has(serverId) && handoffWorks(server) && onSignInPage(win.webContents, server);
+    let bar = this.bars.get(serverId);
+    if (!wanted) {
+      if (bar) bar.setVisible(false);
+      return;
+    }
+    if (!bar) {
+      bar = new WebContentsView({
+        webPreferences: {
+          preload: this.setup.pagesPreload,
+          contextIsolation: true,
+          sandbox: true,
+          nodeIntegration: false,
+        },
+      });
+      bar.webContents.on("will-navigate", (event) => event.preventDefault());
+      bar.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+      void bar.webContents.loadURL(this.setup.signInBarUrl(serverId));
+      win.contentView.addChildView(bar);
+      this.bars.set(serverId, bar);
+    }
+    const { width } = win.getContentBounds();
+    bar.setBounds({ x: 0, y: 0, width, height: BAR_HEIGHT });
+    bar.setVisible(true);
+  }
+}
+
+export function partitionOf(serverId: string): string {
+  return `persist:server-${serverId}`;
+}
+
+function windowName(serverId: string): string {
+  return `server-${serverId}`;
+}
+
+function onSignInPage(contents: WebContents, server: Server): boolean {
+  const url = URL.parse(contents.getURL());
+  return !!url && url.origin === server.origin && url.pathname === SIGN_IN_PATH;
+}
+
+/** Whether the server speaks the hand-off this app knows. */
+function handoffWorks(server: Server): boolean {
+  return server.handoff >= 1 && server.handoff <= HANDOFF_VERSION;
+}

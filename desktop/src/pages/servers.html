@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'"
+    />
+    <title>Quadit Servers</title>
+    <link rel="stylesheet" href="pages.css" />
+  </head>
+  <body>
+    <main class="servers">
+      <header class="brand">
+        <img src="icon.png" alt="" width="40" height="40" />
+        <h1>Quadit</h1>
+      </header>
+
+      <p id="invitation" class="notice" role="status" hidden></p>
+
+      <section aria-labelledby="list-title">
+        <h2 id="list-title">Your servers</h2>
+        <p id="empty" class="hint" hidden>No servers yet. Add the address of your Quadit server below.</p>
+        <ul id="list" class="list"></ul>
+      </section>
+
+      <section aria-labelledby="add-title">
+        <h2 id="add-title">Add a server</h2>
+        <form id="add" class="add" novalidate>
+          <label>
+            <span>Address</span>
+            <input
+              name="address"
+              type="text"
+              inputmode="url"
+              autocomplete="url"
+              placeholder="quadit.example.com"
+              required
+            />
+          </label>
+          <label>
+            <span>Name <small>(optional)</small></span>
+            <input name="name" type="text" autocomplete="off" placeholder="Work" />
+          </label>
+          <p id="add-error" class="error" role="alert"></p>
+          <button type="submit" class="primary">Add server</button>
+        </form>
+      </section>
+    </main>
+    <script src="servers.js"></script>
+  </body>
+</html>

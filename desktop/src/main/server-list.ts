@@ -1,0 +1,135 @@
+// The server list: the app's own bundled page where servers are added,
+// checked, opened, signed in to and removed, and the IPC that answers the
+// bundled pages (the list and the sign-in bar) through src/preload/pages.ts.
+// Only frames loaded from the app's own page files are answered.
+
+import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
+import { serverOrigin } from "@/main/origins";
+import { type Fetch, probe } from "@/main/probe";
+import type { ServerWindows } from "@/main/server-windows";
+import type { Server, ServerStore } from "@/main/servers";
+import {
+  type AddResult,
+  type Invitation,
+  PAGES_CHANGED,
+  PAGES_CHANNEL,
+  type PagesApi,
+  type ServerStatus,
+  type ServerView,
+} from "@/shared/pages-api";
+
+export interface ServerListSetup {
+  pagesPreload: string;
+  /** The file URL of the folder holding the bundled pages; frames from anywhere else are not answered. */
+  pagesUrl: string;
+  /** The network the probes go through (Electron's net.fetch). */
+  fetcher: Fetch;
+  signIn(serverId: string): void;
+}
+
+/** The pages API as the main process answers it: the same methods, the asking frame's web contents first. */
+type Handlers = {
+  [K in keyof PagesApi]: (sender: Electron.WebContents, ...args: Parameters<PagesApi[K]>) => unknown;
+};
+
+export class ServerList {
+  private win: BrowserWindow | undefined;
+  private invitation: Invitation | null = null;
+
+  constructor(
+    private store: ServerStore,
+    private windows: ServerWindows,
+    private setup: ServerListSetup,
+  ) {
+    const handlers: Omit<Handlers, "onChanged"> = {
+      listServers: () => store.list().map(view),
+      checkServer: (_sender, id) => this.check(String(id)),
+      addServer: (_sender, address, name) => this.add(String(address), String(name ?? "")),
+      removeServer: async (_sender, id) => {
+        const server = store.get(String(id));
+        if (!server) return;
+        await windows.forget(server);
+        store.remove(server.id);
+      },
+      openServer: (_sender, id) => windows.show(String(id)),
+      signIn: (_sender, id) => {
+        if (store.get(String(id))) setup.signIn(String(id));
+      },
+      takeInvitation: () => {
+        const invitation = this.invitation;
+        this.invitation = null;
+        return invitation;
+      },
+      dismissSignInBar: (sender) => windows.dismissBar(sender),
+    };
+    for (const [name, handle] of Object.entries(handlers)) {
+      ipcMain.handle(PAGES_CHANNEL + name, (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+        if (!event.senderFrame?.url.startsWith(setup.pagesUrl)) throw new Error("not an app page");
+        return (handle as (sender: Electron.WebContents, ...rest: unknown[]) => unknown)(event.sender, ...args);
+      });
+    }
+    store.onChange(() => this.win?.webContents.send(PAGES_CHANGED));
+  }
+
+  /** Shows the list, making its window when there is none. */
+  show() {
+    if (this.win && !this.win.isDestroyed()) {
+      this.win.show();
+      this.win.focus();
+      return;
+    }
+    this.win = new BrowserWindow({
+      name: "servers",
+      windowStatePersistence: true,
+      width: 560,
+      height: 640,
+      minWidth: 420,
+      minHeight: 420,
+      title: "Quadit Servers",
+      webPreferences: {
+        preload: this.setup.pagesPreload,
+        contextIsolation: true,
+        sandbox: true,
+        nodeIntegration: false,
+      },
+    });
+    this.win.webContents.on("will-navigate", (event) => event.preventDefault());
+    this.win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    this.win.on("closed", () => (this.win = undefined));
+    void this.win.loadURL(new URL("servers.html", this.setup.pagesUrl).href);
+  }
+
+  /** A link asked for a server that is not added: the list offers to add it. */
+  invite(origin: string) {
+    this.invitation = { origin };
+    this.show();
+    this.win?.webContents.send(PAGES_CHANGED);
+  }
+
+  private async add(address: string, name: string): Promise<AddResult> {
+    const origin = serverOrigin(address);
+    if (!origin)
+      return {
+        ok: false,
+        error: "That is not a web address. Type it as quadit.example.com or https://quadit.example.com.",
+      };
+    const answer = await probe(origin, this.setup.fetcher);
+    if (!answer.reachable) return { ok: false, error: answer.reason };
+    const server = this.store.add(origin, name, answer.handoff);
+    this.windows.show(server.id);
+    return { ok: true, server: view(server) };
+  }
+
+  private async check(id: string): Promise<ServerStatus> {
+    const server = this.store.get(id);
+    if (!server) return { reachable: false, reason: "This server was removed." };
+    const answer = await probe(server.origin, this.setup.fetcher);
+    if (!answer.reachable) return answer;
+    this.store.change(server.id, { handoff: answer.handoff });
+    return { reachable: true, version: answer.version, fit: answer.fit };
+  }
+}
+
+function view(server: Server): ServerView {
+  return { id: server.id, name: server.name, origin: server.origin };
+}
