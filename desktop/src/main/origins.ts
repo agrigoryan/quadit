@@ -30,11 +30,14 @@ export function serverOrigin(text: string): string | null {
  * How the address of a server carries what the app and the server say,
  * sign-ins and session cookies included:
  *   secure    https
- *   local     http to this computer or to a network the person runs: a
- *             loopback, private, link-local or carrier-grade NAT address
- *             (Tailscale's), or a name that cannot be on the internet
- *             (localhost, a single word, .local, .home.arpa, .internal).
- *             Not encrypted, so the app says so, but nobody else is on the way.
+ *   local     http to this computer, or to an address that is usually on a
+ *             network the person runs: a loopback, private, link-local or
+ *             carrier-grade NAT address (Tailscale's), or a name that cannot
+ *             be on the internet (localhost, a single word, .local,
+ *             .home.arpa, .internal). Not encrypted: anyone else on that
+ *             network (a shared Wi-Fi, an office) can read and change it, and
+ *             the app cannot tell whose network it is. It says so, and adds
+ *             such a server without asking: most self-hosted servers are there.
  *   insecure  http to anywhere else: anyone on the way can read and change
  *             it. The app adds such a server only when the person says so.
  */
