@@ -471,8 +471,9 @@ var sealedIn = map[string]func(row map[string]any) []string{
 	"secrets":      sealedColumn("value"),
 	"integrations": sealedColumn("secret"),
 	// A setting's value is JSON, an object for one with secret fields:
-	// package settings seals those at its top level, and its other fields
-	// are the install's configuration, never anything that looks sealed.
+	// package settings seals those at its top level. Every top-level string
+	// that looks sealed is taken for one, whichever field holds it, so a
+	// plain field whose value happens to look sealed is taken too.
 	"settings": func(row map[string]any) []string {
 		value, _ := row["value"].(map[string]any)
 		var out []string
