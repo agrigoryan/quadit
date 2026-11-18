@@ -50,6 +50,8 @@ With Homebrew, from the `agrigoryan/tap` tap. A release updates the tap when it 
 brew install agrigoryan/tap/quadit
 ```
 
+Homebrew 7 and later load a third-party tap only once you trust it: if the install is refused as coming from an untrusted tap, run `brew trust agrigoryan/tap` and install again.
+
 With Docker, the image on ghcr.io serves port 4780 and keeps its data in the `/data` volume:
 
 ```bash

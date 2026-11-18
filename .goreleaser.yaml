@@ -158,7 +158,10 @@ homebrew_casks:
     repository:
       owner: agrigoryan
       name: homebrew-tap
-      token: '{{ envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "" }}'
+      # .Env, not envOrDefault: GoReleaser reads this one field with a
+      # template that has no envOrDefault (v0.1.0's cask was not pushed for
+      # it). The release workflow always sets the variable, empty or not.
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     skip_upload: '{{ if eq (envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "") "" }}true{{ else }}false{{ end }}'
     commit_msg_template: "chore: quadit {{ .Tag }}"
     homepage: https://github.com/agrigoryan/quadit
