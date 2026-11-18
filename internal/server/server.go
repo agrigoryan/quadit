@@ -480,6 +480,16 @@ func (x *c) hasFullAccess() bool {
 	return x.token != nil && x.token.Kind == core.TokenAPI && x.token.Scopes == ""
 }
 
+// mayWrite refuses a caller who may only read, whether the credential used
+// says so or the membership does (engine.Effective): what the engine asks
+// of every change, for a write the server makes itself.
+func (x *c) mayWrite() error {
+	if engine.Effective(x.member, x.actor).ReadOnly {
+		return errForbidden("this credential is read-only")
+	}
+	return nil
+}
+
 // fail writes an error in the one shape every error has.
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	var he *httpError

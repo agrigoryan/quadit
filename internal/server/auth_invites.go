@@ -13,6 +13,7 @@ import (
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
+	"github.com/agrigoryan/quadit/internal/plainjson"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -113,17 +114,24 @@ type inviteBody struct {
 	Role        string `json:"role"`
 	ExpiresDays int    `json:"expires_days"`
 	MaxUses     int    `json:"max_uses"`
+	// Approval is an approved decision for the member.add the invitation
+	// stands for, from one who must get approval to add people.
+	Approval string `json:"approval"`
 }
 
 // handleCreateInvite makes an invitation: a link that lets someone join this
 // workspace with a role. With an email it is for that address only and is
 // mailed when the install can send mail.
+//
+// An invitation adds a member, so it is allowed exactly as member.add is
+// (engine.Permit): the role, a credential or membership that may only read,
+// the approval the caller may need, whose arguments are {"user": email,
+// "role": role}, or {"role": role} for a link for anyone. A caller who
+// reaches only some projects admits the new member to those alone, and
+// cannot invite an owner.
 func (s *Server) handleCreateInvite(x *c) error {
 	var b inviteBody
 	if err := x.body(&b); err != nil {
-		return err
-	}
-	if err := x.admin(); err != nil {
 		return err
 	}
 	ctx := x.ctx()
@@ -144,9 +152,24 @@ func (s *Server) handleCreateInvite(x *c) error {
 	if b.MaxUses <= 0 || email != "" {
 		b.MaxUses = 1
 	}
+	adds := map[string]any{"role": string(role)}
+	if email != "" {
+		adds["user"] = email
+	}
+	reach, err := s.eng.Permit(ctx, x.ws.ID, x.actor, engine.Change{Type: "member.add", Args: plainjson.Marshal(adds), Approval: b.Approval})
+	if err != nil {
+		return err
+	}
+	var limit *core.Scope
+	if len(reach.Projects) > 0 {
+		if role == core.RoleOwner {
+			return errForbidden("you reach only some projects here, so you cannot invite an owner, who reaches them all")
+		}
+		limit = &core.Scope{Projects: reach.Projects}
+	}
 	token := auth.Random(24)
 	now := time.Now()
-	inv := core.Invite{ID: id.New(), WorkspaceID: x.ws.ID, Email: email, Role: role, TokenHash: auth.Hash(token), CreatedBy: x.member.UserID,
+	inv := core.Invite{ID: id.New(), WorkspaceID: x.ws.ID, Email: email, Role: role, Scope: limit, TokenHash: auth.Hash(token), CreatedBy: x.member.UserID,
 		CreatedAt: now.UnixMilli(), ExpiresAt: now.AddDate(0, 0, b.ExpiresDays).UnixMilli(), MaxUses: b.MaxUses}
 	if err := s.st.Insert(ctx, inv); err != nil {
 		return err
@@ -181,6 +204,9 @@ func (s *Server) handleListInvites(x *c) error {
 
 func (s *Server) handleRevokeInvite(x *c) error {
 	if err := x.admin(); err != nil {
+		return err
+	}
+	if err := x.mayWrite(); err != nil {
 		return err
 	}
 	n, err := s.st.Update(x.ctx(), "invites", map[string]any{"revoked_at": time.Now().UnixMilli()},
@@ -291,17 +317,40 @@ func (s *Server) handleAcceptInvite(x *c) error {
 	} else if n > 0 {
 		return x.ok(map[string]any{"workspace": ws, "already_member": true})
 	}
+	if err := s.inviterStillMay(ctx, inv); err != nil {
+		return err
+	}
 	// Count the use first, so a link good for one person admits one.
 	n, err := s.st.Incr(ctx, "invites", "uses", 1, store.Eq("id", inv.ID))
 	if err != nil || int(n) > inv.MaxUses {
 		return &engine.Error{Code: engine.CodeNotFound, Message: "this invitation was already used"}
 	}
+	adds := map[string]any{"user": u.ID, "role": string(inv.Role)}
+	if inv.Scope != nil {
+		adds["scope"] = map[string]any{"projects": inv.Scope.Projects}
+	}
 	err = s.eng.System(ctx, ws.ID, inv.CreatedBy, func(sys *engine.Sys) error {
-		return sys.Do("member.add", map[string]any{"user": u.ID, "role": string(inv.Role)})
+		return sys.Do("member.add", adds)
 	})
 	if err != nil {
 		return err
 	}
 	s.audit(x.r, ws.ID, u, "invite.accepted", "invite", inv.ID, nil)
 	return x.ok(map[string]any{"workspace": ws, "user": u})
+}
+
+// inviterStillMay refuses an invitation whose maker could not make it now:
+// gone from the workspace, suspended, or of a role below the one it gives.
+// The member it adds is added as the engine itself, on the strength of the
+// invitation, so the maker's standing is what admits them.
+func (s *Server) inviterStillMay(ctx context.Context, inv core.Invite) error {
+	var m core.Member
+	there, err := store.Find(ctx, s.st.In(inv.WorkspaceID), &m, store.Eq("user_id", inv.CreatedBy), store.Null("removed_at"))
+	if err != nil {
+		return err
+	}
+	if !there || m.SuspendedAt != 0 || !m.Role.AtLeast(core.RoleAdmin) || !m.Role.AtLeast(inv.Role) {
+		return &engine.Error{Code: engine.CodeNotFound, Message: "this invitation is no longer valid; ask for a new one"}
+	}
+	return nil
 }

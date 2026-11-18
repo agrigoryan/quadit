@@ -76,13 +76,16 @@ type Invite struct {
 	WorkspaceID string `json:"workspace_id" db:"workspace_id"`
 	Email       string `json:"email,omitempty" db:"email"` // whom it was sent to, if anyone
 	Role        Role   `json:"role" db:"role"`
-	TokenHash   string `json:"-" db:"token_hash"`
-	CreatedBy   string `json:"created_by" db:"created_by"`
-	CreatedAt   int64  `json:"created_at" db:"created_at"`
-	ExpiresAt   int64  `json:"expires_at" db:"expires_at"`
-	MaxUses     int    `json:"max_uses" db:"max_uses"`
-	Uses        int    `json:"uses" db:"uses"`
-	RevokedAt   int64  `json:"revoked_at,omitempty" db:"revoked_at,null"`
+	// Scope is the limit of the one who invited: the projects the new
+	// member reaches, when not all. nil limits nothing.
+	Scope     *Scope `json:"scope,omitempty" db:"scope,json"`
+	TokenHash string `json:"-" db:"token_hash"`
+	CreatedBy string `json:"created_by" db:"created_by"`
+	CreatedAt int64  `json:"created_at" db:"created_at"`
+	ExpiresAt int64  `json:"expires_at" db:"expires_at"`
+	MaxUses   int    `json:"max_uses" db:"max_uses"`
+	Uses      int    `json:"uses" db:"uses"`
+	RevokedAt int64  `json:"revoked_at,omitempty" db:"revoked_at,null"`
 }
 
 // OneTimeToken is a short-lived secret, stored as its hash, with what it

@@ -173,17 +173,69 @@ func (e *Engine) startBatch(ctx context.Context, tx store.Tx, actor Actor) (*bat
 	if b.member.SuspendedAt != 0 {
 		return nil, forbidden("your membership is suspended")
 	}
-	if b.member.Scope != nil {
-		b.scope = *b.member.Scope
-	}
-	if actor.ReadOnly {
-		b.scope.ReadOnly = true
-	}
-	if len(actor.Projects) > 0 {
-		b.scope.Projects = intersectProjects(b.scope.Projects, actor.Projects)
-	}
+	b.scope = Effective(b.member, actor)
 	b.now = e.now().UnixMilli()
 	return b, nil
+}
+
+// Effective is how far a member reaches through the credential it acts
+// with: the membership's scope (its projects, read-only, the changes that
+// need approval), narrowed by the credential's (read-only, some projects).
+// The engine holds every change to it; a write the server makes outside the
+// engine asks it the same.
+func Effective(m core.Member, a Actor) core.Scope {
+	var scope core.Scope
+	if m.Scope != nil {
+		scope = *m.Scope
+		scope.Projects = slices.Clone(m.Scope.Projects)
+		scope.NeedsApproval = slices.Clone(m.Scope.NeedsApproval)
+	}
+	if a.ReadOnly {
+		scope.ReadOnly = true
+	}
+	if len(a.Projects) > 0 {
+		scope.Projects = intersectProjects(scope.Projects, a.Projects)
+	}
+	return scope
+}
+
+// Permit checks that actor may make the change ch, exactly as Batch checks
+// a change before running it: a member, not suspended, with the role the
+// change needs, not read-only, and with an approval when the actor must
+// get one for this kind of change, which is used up here. No handler runs.
+// It is for a write the server makes outside the engine that stands for a
+// change (an invitation stands for member.add) and must be allowed as that
+// change would be. It returns how far the actor reaches (Effective, and
+// narrowed by an approver's reach), which what is written must stay within.
+func (e *Engine) Permit(ctx context.Context, workspaceID string, actor Actor, ch Change) (core.Scope, error) {
+	h, ok := handlers[ch.Type]
+	if !ok {
+		return core.Scope{}, oneOf("type", "change type", ch.Type, ChangeTypes())
+	}
+	if ch.ID == "" {
+		ch.ID = id.New()
+	}
+	var scope core.Scope
+	var seq int64
+	err := e.st.Write(ctx, workspaceID, func(raw store.Tx) error {
+		run, err := e.startBatch(ctx, newMemoTx(raw), actor)
+		if err != nil {
+			return err
+		}
+		c, err := run.authorize(ch, h)
+		if err != nil {
+			return err
+		}
+		scope, seq = c.scope, run.tx.Seq()
+		return nil
+	})
+	if err != nil {
+		return core.Scope{}, err
+	}
+	if e.OnCommit != nil {
+		e.OnCommit(workspaceID, seq)
+	}
+	return scope, nil
 }
 
 // apply runs one change of the batch, or answers it from the first time
@@ -194,6 +246,23 @@ func (b *batch) apply(ch Change) (*Result, error) {
 	if res, dup, err := b.resent(ch, hash); dup || err != nil {
 		return res, err
 	}
+	c, err := b.authorize(ch, h)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.takeBackNews(); err != nil {
+		return nil, err
+	}
+	if err := h.fn(c); err != nil {
+		return nil, err
+	}
+	return b.remember(c, ch, hash)
+}
+
+// authorize checks that the batch's actor may make a change of kind h, and
+// gives the context it runs in: the role, quiet, the member it is made
+// for, read-only, and the approval it needs, which is used up.
+func (b *batch) authorize(ch Change, h handler) (*cx, error) {
 	if !b.member.Role.AtLeast(h.min) {
 		return nil, forbidden("%s needs the %s role; you are a %s", ch.Type, h.min, b.member.Role)
 	}
@@ -215,13 +284,7 @@ func (b *batch) apply(ch Change) (*Result, error) {
 			return nil, err
 		}
 	}
-	if err := c.takeBackNews(); err != nil {
-		return nil, err
-	}
-	if err := h.fn(c); err != nil {
-		return nil, err
-	}
-	return b.remember(c, ch, hash)
+	return c, nil
 }
 
 func (b *batch) resolver() *Resolver {
