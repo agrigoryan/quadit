@@ -39,7 +39,8 @@ type Kind struct {
 	// shape is refused instead of stored: a secret under a wrong key would
 	// not be known as one, and would be shown.
 	Shape func() any
-	// Secrets are the fields stored sealed and never sent back.
+	// Secrets are the fields stored sealed and never sent back. A field of
+	// an object inside the setting is named by its path: "bucket.secret_key".
 	Secrets []string
 	// WhenUnreadable is what a setting that decides access reads as when
 	// the database cannot be read and no earlier value is known: the answer
@@ -231,10 +232,11 @@ func (s *Settings) unseal(name string, raw json.RawMessage) json.RawMessage {
 	if json.Unmarshal(raw, &obj) != nil {
 		return raw
 	}
-	for _, f := range secrets {
-		if v, ok := obj[f].(string); ok && v != "" {
+	for _, path := range secrets {
+		holder, f := field(obj, path)
+		if v, ok := holder[f].(string); ok && v != "" {
 			if plain, err := s.sealer.Open(v); err == nil {
-				obj[f] = plain
+				holder[f] = plain
 			}
 		}
 	}
@@ -261,9 +263,10 @@ func (s *Settings) List(ctx context.Context) (map[string]any, error) {
 				return nil, fmt.Errorf("the setting %s: %w", name, err)
 			}
 			if obj, ok := v.(map[string]any); ok {
-				for _, f := range kind.Secrets {
-					if sv, _ := obj[f].(string); sv != "" {
-						obj[f] = masked
+				for _, path := range kind.Secrets {
+					holder, f := field(obj, path)
+					if sv, _ := holder[f].(string); sv != "" {
+						holder[f] = masked
 					}
 				}
 			}
@@ -340,24 +343,38 @@ func (s *Settings) seal(ctx context.Context, name string, secrets []string, valu
 	if err != nil {
 		return nil, err
 	}
-	for _, f := range secrets {
-		v, _ := obj[f].(string)
+	for _, path := range secrets {
+		holder, f := field(obj, path)
+		if holder == nil {
+			continue // the object that would hold it is not sent
+		}
+		v, _ := holder[f].(string)
 		switch {
-		case v == masked || (v == "" && obj[f] == nil):
-			if old[f] != nil {
-				obj[f] = old[f]
+		case v == masked || (v == "" && holder[f] == nil):
+			if was, wf := field(old, path); was[wf] != nil {
+				holder[f] = was[wf]
 			} else {
-				delete(obj, f)
+				delete(holder, f)
 			}
 		case v != "":
 			sealed, err := s.sealer.Seal(v)
 			if err != nil {
 				return nil, err
 			}
-			obj[f] = sealed
+			holder[f] = sealed
 		}
 	}
 	return json.Marshal(obj)
+}
+
+// field finds a secret field by its path: the object in obj that holds it,
+// nil when there is none, and its name there.
+func field(obj map[string]any, path string) (map[string]any, string) {
+	parts := strings.Split(path, ".")
+	for _, p := range parts[:len(parts)-1] {
+		obj, _ = obj[p].(map[string]any)
+	}
+	return obj, parts[len(parts)-1]
 }
 
 // stored reads a setting's stored object as it is in the database, secrets

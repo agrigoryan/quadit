@@ -2,11 +2,15 @@ package settings_test
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/auth"
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/settings"
+	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
 
@@ -30,5 +34,49 @@ func TestACheckRefusesAValueWrittenWrong(t *testing.T) {
 	set = settings.New(st, sealer, slog.Default(), table) // a value read is kept a few seconds
 	if on, err := set.CheckedBool(context.Background(), "auth.require_2fa", false); err != nil || !on {
 		t.Fatalf("a value written right reads as %v, %v", on, err)
+	}
+}
+
+// TestASecretInANestedObjectIsSealed: a secret named by a dotted path, a
+// field of an object inside the setting, is stored sealed, listed masked,
+// read plain, and kept when sent back masked or left out.
+func TestASecretInANestedObjectIsSealed(t *testing.T) {
+	ctx := context.Background()
+	sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
+	st := testdb.SQLite(t)
+	type bucket struct {
+		Name      string `json:"name"`
+		SecretKey string `json:"secret_key"`
+	}
+	type shape struct {
+		Bucket bucket `json:"bucket"`
+	}
+	table := settings.Table{"copy": {Shape: func() any { return new(shape) }, Secrets: []string{"bucket.secret_key"}}}
+	set := settings.New(st, sealer, slog.Default(), table)
+	if err := set.Set(ctx, "copy", json.RawMessage(`{"bucket":{"name":"b","secret_key":"hunter2"}}`), "test"); err != nil {
+		t.Fatal(err)
+	}
+	var row core.Setting
+	if err := st.Get(ctx, &row, store.Eq("name", "copy")); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(row.Value), "hunter2") {
+		t.Fatalf("the nested secret is stored in the clear: %s", row.Value)
+	}
+	listed, err := set.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := json.Marshal(listed["copy"]); !strings.Contains(string(got), `"secret_key":"********"`) {
+		t.Fatalf("the nested secret is listed as %s, want it masked", got)
+	}
+	for _, sent := range []string{`{"bucket":{"name":"c","secret_key":"********"}}`, `{"bucket":{"name":"c"}}`} {
+		if err := set.Set(ctx, "copy", json.RawMessage(sent), "test"); err != nil {
+			t.Fatal(err)
+		}
+		var got shape
+		if err := settings.New(st, sealer, slog.Default(), table).Checked(ctx, "copy", &got); err != nil || got.Bucket.SecretKey != "hunter2" {
+			t.Fatalf("after %s the secret reads %q (%v), want it kept", sent, got.Bucket.SecretKey, err)
+		}
 	}
 }
