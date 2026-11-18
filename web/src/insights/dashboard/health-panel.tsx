@@ -43,6 +43,8 @@ export function HealthPanel({ health, className }: { health: Health; className?:
     problems.push({ key: "sync", tone: "bad", text: t("dash.health.sources", { n: n(health.sources_failing) }) });
   if (health.last_backup_ok === false)
     problems.push({ key: "backup", tone: "bad", text: t("dash.health.backupFailed") });
+  if (health.last_backup_copy_failed)
+    problems.push({ key: "backup-copy", tone: "warn", text: t("dash.health.backupNotCopied") });
   const backupAt = parseWhen(health.last_backup);
 
   return (

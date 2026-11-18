@@ -77,6 +77,7 @@ export const dashboardStrings = {
   "dash.health.retrying": "{n} delivery is being retried | {n} deliveries are being retried",
   "dash.health.sources": "{n} repository sync has an error | {n} repository syncs have errors",
   "dash.health.backupFailed": "The last backup failed",
+  "dash.health.backupNotCopied": "The last backup was not copied off this server",
   "dash.health.backup": "Last backup {when}",
   "dash.health.backupTried": "Last backup attempt {when}",
   "dash.health.noBackup": "No backup has run yet",

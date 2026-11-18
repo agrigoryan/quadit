@@ -103,6 +103,8 @@ export interface Health {
   sources_failing?: number;
   last_backup?: string;
   last_backup_ok?: boolean;
+  /** The last backup was made, but its copy did not get where the backup setting says. */
+  last_backup_copy_failed?: boolean;
 }
 
 export interface Dashboard {

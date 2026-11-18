@@ -137,6 +137,24 @@ function BackupLine({ backup }: { backup: Backup | undefined }) {
         note={link}
       />
     );
+  // Verified, but still only beside the data.
+  if (backup.copy_error)
+    return (
+      <Line
+        tone="warn"
+        label={label}
+        value={
+          <>
+            {t("admin.health.backupNotCopied")} · {when}
+          </>
+        }
+        note={
+          <>
+            {backup.copy_error} {link}
+          </>
+        }
+      />
+    );
   const old = now - backup.started_at > 3 * 24 * 3600_000;
   return (
     <Line
