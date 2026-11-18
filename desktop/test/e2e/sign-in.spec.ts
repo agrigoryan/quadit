@@ -174,3 +174,26 @@ test("nothing but the app's own hand-off reaches the sign-in finish: not a link,
   expect((await desktop.recorded()).opened).toEqual([]);
   expect(await stillRedeemable(run, code, verifier)).toBe(true);
 });
+
+test("a link to a server not added yet still opens its page once the server is added and signed in to", async ({
+  desktop,
+  run,
+}) => {
+  await desktop.openLink(
+    `quadit://open?server=${encodeURIComponent(run.server)}&path=${encodeURIComponent("/e2e/inbox")}`,
+  );
+  const list = await desktop.serverList();
+  await expect(list.getByRole("status")).toHaveText(/A link asked to open/);
+  await list.getByRole("button", { name: "Add server" }).click();
+
+  // Signed out, the web app keeps the page for after its sign-in page.
+  const page = await desktop.pageOf(run.server);
+  await expect(page).toHaveURL(`${run.server}/login?next=%2Fe2e%2Finbox`);
+
+  // Signed in through the browser, the window goes on to it.
+  await expect.poll(() => desktop.barShown(run.server)).toBe(true);
+  await (await desktop.signInBar()).getByRole("button", { name: "Sign in with your browser" }).click();
+  await expect.poll(async () => (await desktop.recorded()).opened.length).toBe(1);
+  await desktop.openLink(await browserApproves(run, (await desktop.recorded()).opened[0] ?? ""));
+  await expect(page).toHaveURL(`${run.server}/e2e/inbox`);
+});

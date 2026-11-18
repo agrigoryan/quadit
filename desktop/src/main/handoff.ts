@@ -25,10 +25,14 @@ interface Flow {
   origin: string;
   verifier: string;
   startedAt: number;
+  next?: string;
 }
 
-/** Where a finished hand-off goes: the server's window loads `finishUrl`. */
-export type Redeemed = { ok: true; serverId: string; finishUrl: string } | { ok: false; reason: string };
+/**
+ * Where a finished hand-off goes: the server's window loads `finishUrl`,
+ * then `next` when the sign-in began on the way to a page.
+ */
+export type Redeemed = { ok: true; serverId: string; finishUrl: string; next?: string } | { ok: false; reason: string };
 
 /** The sign-ins started and not yet finished, in memory: a restart forgets them, and the person starts again. */
 export class SignInFlows {
@@ -36,12 +40,16 @@ export class SignInFlows {
 
   constructor(private now: () => number = Date.now) {}
 
-  /** Starts a sign-in on the server at `origin` and gives the address to open in the system browser. */
-  begin(serverId: string, origin: string): string {
+  /**
+   * Starts a sign-in on the server at `origin` and gives the address to open
+   * in the system browser. `next` is the page of the web app the window was
+   * on its way to, given back by redeem.
+   */
+  begin(serverId: string, origin: string, next?: string): string {
     this.forgetExpired();
     const state = randomBytes(32).toString("base64url");
     const verifier = randomBytes(48).toString("base64url");
-    this.flows.set(state, { serverId, origin, verifier, startedAt: this.now() });
+    this.flows.set(state, { serverId, origin, verifier, startedAt: this.now(), next });
     const url = new URL("/desktop/connect", origin);
     url.searchParams.set("state", state);
     url.searchParams.set("challenge", challengeOf(verifier));
@@ -65,7 +73,7 @@ export class SignInFlows {
     const url = new URL("/desktop/finish", flow.origin);
     url.searchParams.set("code", link.code);
     url.searchParams.set("verifier", flow.verifier);
-    return { ok: true, serverId: flow.serverId, finishUrl: url.href };
+    return { ok: true, serverId: flow.serverId, finishUrl: url.href, next: flow.next };
   }
 
   private forgetExpired() {

@@ -23,6 +23,14 @@ describe("SignInFlows", () => {
     expect(two.challenge).not.toBe(one.challenge);
   });
 
+  it("keeps the page the window was on its way to, for after the sign-in", () => {
+    const flows = new SignInFlows();
+    const state = new URL(flows.begin("srv1", ORIGIN, "/e2e/task/ABC-1")).searchParams.get("state") ?? "";
+    expect(flows.redeem({ server: ORIGIN, code: "Z9", state })).toMatchObject({ ok: true, next: "/e2e/task/ABC-1" });
+    const other = new URL(flows.begin("srv1", ORIGIN)).searchParams.get("state") ?? "";
+    expect(flows.redeem({ server: ORIGIN, code: "Z9", state: other })).toMatchObject({ ok: true, next: undefined });
+  });
+
   it("redeems a link for the flow it started with a verifier that matches the challenge", () => {
     const flows = new SignInFlows();
     const { state, challenge } = started(flows);

@@ -70,7 +70,7 @@ function start() {
     void checks.whyNoSignIn(serverId).then((refused) => {
       const server = store.get(serverId);
       if (refused) void warn(refused);
-      else if (server) void shell.openExternal(flows.begin(server.id, server.origin));
+      else if (server) void shell.openExternal(flows.begin(server.id, server.origin, windows.waitingFor(server.id)));
     });
 
   let refreshMenu = () => {};
@@ -140,13 +140,13 @@ function start() {
     if (!link) return;
     if (link.kind === "connect") {
       const redeemed = flows.redeem(link);
-      if (redeemed.ok) windows.finishSignIn(redeemed.serverId, redeemed.finishUrl);
+      if (redeemed.ok) windows.finishSignIn(redeemed.serverId, redeemed.finishUrl, redeemed.next);
       else void dialog.showMessageBox({ type: "warning", message: "Sign-in not finished", detail: redeemed.reason });
       return;
     }
     const server = store.byOrigin(link.server);
     if (server) windows.show(server.id, link.path);
-    else list.invite(link.server);
+    else list.invite(link.server, link.path);
   };
 
   app.on("second-instance", (_event, argv) => {

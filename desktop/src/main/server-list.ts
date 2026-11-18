@@ -38,6 +38,8 @@ type Handlers = {
 export class ServerList {
   private win: BrowserWindow | undefined;
   private invitation: Invitation | null = null;
+  /** The page a link asked for on a server not added yet: opened when that server is added. */
+  private destination: { origin: string; path: string } | null = null;
 
   constructor(
     private store: ServerStore,
@@ -103,9 +105,10 @@ export class ServerList {
     void this.win.loadURL(new URL("servers.html", this.setup.pagesUrl).href);
   }
 
-  /** A link asked for a server that is not added: the list offers to add it. */
-  invite(origin: string) {
+  /** A link asked for `path` on a server that is not added: the list offers to add it, and the page opens once it is. */
+  invite(origin: string, path: string) {
     this.invitation = { origin };
+    this.destination = { origin, path };
     this.show();
     this.win?.webContents.send(PAGES_CHANGED);
   }
@@ -131,7 +134,9 @@ export class ServerList {
     if (!answer.reachable) return { ok: false, error: answer.reason };
     const server = this.store.add(origin, name, answer.handoff);
     this.store.change(server.id, { version: answer.version });
-    this.windows.show(server.id);
+    const path = this.destination?.origin === origin ? this.destination.path : undefined;
+    if (path) this.destination = null;
+    this.windows.show(server.id, path);
     return { ok: true, server: view(server) };
   }
 

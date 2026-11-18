@@ -117,11 +117,33 @@ export class ServerWindows {
    * its window, shown. The only way the app ever loads a /desktop/ address,
    * and the only load that carries the hand-off header the server asks for.
    */
-  finishSignIn(serverId: string, finishUrl: string) {
+  finishSignIn(serverId: string, finishUrl: string, next?: string) {
     const server = this.store.get(serverId);
     if (!server || !isHandoffPage(finishUrl, server.origin)) return;
     this.show(serverId);
-    void this.windows.get(serverId)?.webContents.loadURL(finishUrl, { extraHeaders: `${HANDOFF_HEADER}: 1\n` });
+    const window = this.windows.get(serverId);
+    if (!window) return;
+    void window.webContents
+      .loadURL(finishUrl, { extraHeaders: `${HANDOFF_HEADER}: 1\n` })
+      .then(() => {
+        // Signed in: on to the page the window was on its way to.
+        const target = next && appPage(server.origin, next);
+        if (target && !window.isDestroyed()) this.goTo(window.webContents, server, target);
+      })
+      .catch(() => {}); // A finish that did not load leaves the window where it failed, and the person starts again.
+  }
+
+  /**
+   * The page of the web app a server's window is on its way to: where its
+   * sign-in page will send it once signed in (/login?next=…), when it is there.
+   */
+  waitingFor(serverId: string): string | undefined {
+    const server = this.store.get(serverId);
+    const contents = this.windows.get(serverId)?.webContents;
+    const url = contents && URL.parse(contents.getURL());
+    if (!server || !url || url.origin !== server.origin || url.pathname !== SIGN_IN_PATH) return undefined;
+    const next = url.searchParams.get("next");
+    return next && appPage(server.origin, next) ? next : undefined;
   }
 
   /** The server whose window is in front, if one is. */
