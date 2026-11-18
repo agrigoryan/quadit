@@ -1,10 +1,21 @@
-import { lstatSync, mkdtempSync, readFileSync, readlinkSync, statSync, writeFileSync } from "node:fs";
+import {
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "jsonc-parser";
 import { describe, expect, it } from "vitest";
 import {
   type Applied,
+  backUp,
   changedSince,
   diffOf,
   EditRefused,
@@ -14,14 +25,16 @@ import {
   writeEdits,
 } from "@/main/config-edits";
 
+/** A new folder, as its real path (the plans name files by theirs). */
 function folder() {
-  return mkdtempSync(join(tmpdir(), "quadit-desktop-edits-"));
+  return realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-edits-")));
 }
 
 /** Plans and writes `changes`, as Apply does, and gives the records with their file hashes filled in. */
 function apply(changes: Parameters<typeof planChanges>[0], dir = folder()): Applied[] {
   const { edits, applied } = planChanges(changes);
-  const backups = writeEdits(edits, join(dir, "backups"));
+  const backups = backUp(edits, join(dir, "backups"));
+  writeEdits(edits);
   return applied.map((record) =>
     record.kind === "file"
       ? { ...record, sha256: sha256(readFileSync(record.path, "utf8")), backup: backups.get(record.path) ?? null }
@@ -31,7 +44,7 @@ function apply(changes: Parameters<typeof planChanges>[0], dir = folder()): Appl
 
 function revert(applied: Applied[]): string[] {
   const { edits, notes } = planReverts(applied);
-  writeEdits(edits, join(folder(), "backups"));
+  writeEdits(edits);
   return notes;
 }
 
@@ -175,6 +188,18 @@ describe("whole files and links", () => {
     expect(() => lstatSync(path)).toThrow();
     writeFileSync(path, "#!/bin/sh\n");
     expect(() => planChanges([{ kind: "link", path, target: "/x" }])).toThrow(EditRefused);
+  });
+
+  it("edits the file a symbolic link leads to, and keeps the link", () => {
+    const dir = folder();
+    mkdirSync(join(dir, "dotfiles"));
+    writeFileSync(join(dir, "dotfiles", "settings.json"), "{}");
+    symlinkSync(join(dir, "dotfiles", "settings.json"), join(dir, "settings.json"));
+    const { edits } = planChanges([{ kind: "json", path: join(dir, "settings.json"), keyPath: ["a"], value: 1 }]);
+    expect(edits.map((e) => e.path)).toEqual([join(dir, "dotfiles", "settings.json")]);
+    writeEdits(edits);
+    expect(lstatSync(join(dir, "settings.json")).isSymbolicLink()).toBe(true);
+    expect(JSON.parse(readFileSync(join(dir, "settings.json"), "utf8"))).toEqual({ a: 1 });
   });
 
   it("notices a file changed between the plan and writing it", () => {

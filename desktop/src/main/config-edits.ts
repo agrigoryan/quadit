@@ -9,6 +9,10 @@
 // formatting. TOML is edited only by appending a table, never by rewriting
 // it: a table that is already there is refused with what to add by hand.
 // Writing checks first that every file is still as planned.
+//
+// A path is planned as the file it really is: through a symbolic link in
+// it (dotfiles kept in a repository and linked home, say), the plan shows
+// and edits the file the link leads to, and the link stays a link.
 
 import { createHash } from "node:crypto";
 import {
@@ -18,13 +22,14 @@ import {
   mkdirSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { createTwoFilesPatch } from "diff";
 import { applyEdits, type ModificationOptions, modify, type ParseError, parse as parseJsonc } from "jsonc-parser";
 import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
@@ -55,7 +60,7 @@ export type Change =
 export type Applied =
   | { kind: "json"; path: string; keyPath: string[]; prior?: unknown; wrote: unknown; existed: number }
   | { kind: "json-item"; path: string; keyPath: string[]; value: string; existed: number }
-  | { kind: "toml"; path: string; block: string }
+  | { kind: "toml"; path: string; table: string[]; block: string }
   | { kind: "file"; path: string; sha256: string; backup: string | null }
   | { kind: "link"; path: string; target: string };
 
@@ -85,7 +90,8 @@ const TOML_MARK = "# Added by the Quadit app; Disconnect in the app takes it out
 export function planChanges(changes: Change[]): { edits: FileEdit[]; applied: Applied[] } {
   const edits = new Map<string, FileEdit>();
   const applied: Applied[] = [];
-  for (const change of changes) {
+  for (const asked of changes) {
+    const change = { ...asked, path: changedPath(asked) };
     let edit = edits.get(change.path);
     if (!edit) {
       const link = change.kind === "link";
@@ -140,7 +146,7 @@ function applyChange(edit: FileEdit, change: Change): Applied | null {
       root = readToml(text + block, path);
       if (lookUp(root, change.table).existed !== change.table.length) throw new Error(`${path}: ${name} was not added`);
       edit.after = text + block;
-      return { kind: "toml", path, block };
+      return { kind: "toml", path, table: change.table, block };
     }
     case "file":
       if (edit.after === change.content) return null;
@@ -241,11 +247,10 @@ export function changedSince(edits: FileEdit[]): FileEdit | null {
 }
 
 /**
- * Backs up every file `edits` replace into `backupDir` (0600: a backup may
- * hold a token) and writes the edits, except those another program writes.
- * Gives each backed-up path's backup.
+ * Copies every file `edits` replace into `backupDir` (0600: a backup may
+ * hold a token); gives each backed-up path's copy.
  */
-export function writeEdits(edits: FileEdit[], backupDir: string): Map<string, string> {
+export function backUp(edits: FileEdit[], backupDir: string): Map<string, string> {
   const backups = new Map<string, string>();
   for (const edit of edits) {
     if (edit.before === null || edit.link) continue;
@@ -255,6 +260,11 @@ export function writeEdits(edits: FileEdit[], backupDir: string): Map<string, st
     chmodSync(backup, 0o600);
     backups.set(edit.path, backup);
   }
+  return backups;
+}
+
+/** Writes the edits, except those another program writes. */
+export function writeEdits(edits: FileEdit[]) {
   for (const edit of edits) {
     if (edit.writtenBy) continue;
     if (edit.after === null) rmSync(edit.path, { force: true });
@@ -263,7 +273,6 @@ export function writeEdits(edits: FileEdit[], backupDir: string): Map<string, st
       symlinkSync(edit.after, edit.path);
     } else writeText(edit.path, edit.after);
   }
-  return backups;
 }
 
 /** Writes beside and renames over, keeping the file's mode, so a reader never sees half a file. */
@@ -292,6 +301,43 @@ export function diffOf(edit: FileEdit): string {
 
 export function sha256(text: string): string {
   return createHash("sha256").update(text).digest("hex");
+}
+
+/** The file a change is to: the one its path really is, or for a link, the link in the folder its path really is. */
+function changedPath(change: { kind: string; path: string }): string {
+  return change.kind === "link" ? join(realPath(dirname(change.path)), basename(change.path)) : realPath(change.path);
+}
+
+/**
+ * What a change or a record is a change to (a key of a file, a file, a
+ * link), the same for a change and the record of one like it: two
+ * harnesses that need the same change share it.
+ */
+export function targetOf(item: Change | Applied): string {
+  const path = changedPath(item);
+  switch (item.kind) {
+    case "json":
+      return ["json", path, ...item.keyPath].join("\n");
+    case "json-item":
+      return ["json-item", path, ...item.keyPath, item.value].join("\n");
+    case "toml":
+      return ["toml", path, ...item.table].join("\n");
+    case "file":
+    case "written-by":
+      return `file\n${path}`;
+    case "link":
+      return `link\n${path}`;
+  }
+}
+
+/** The file `path` really is, through any symbolic links in it, as far as it exists. */
+export function realPath(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    const parent = dirname(path);
+    return parent === path ? path : join(realPath(parent), basename(path));
+  }
 }
 
 /** The text of a file, or null when there is none. */

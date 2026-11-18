@@ -1,6 +1,9 @@
-// What the app's own bundled pages (the server list, the sign-in bar, the connection error)
+// What the app's own bundled pages (the server list, the sign-in bar, the
+// connection error, setup, Connect, the menu-bar panel and quick capture)
 // may ask of the app, through the preload src/preload/pages.ts. The server's
 // web pages never see this: they get only the bridge of the contract.
+
+import type { DesktopSummary } from "@/shared/bridge";
 
 export interface ServerView {
   id: string;
@@ -22,6 +25,93 @@ export interface Invitation {
   origin: string;
 }
 
+/** A workspace one of a server's windows shows, as its page published it. */
+export interface SummaryView {
+  serverId: string;
+  serverName: string;
+  summary: DesktopSummary;
+  /** Whether its page takes requests: a server whose web app is older than the app's does not. */
+  listening: boolean;
+}
+
+export interface SetupState {
+  setupDone: boolean;
+  captureShortcut: boolean;
+  /** The quick-capture key, as Electron names it. */
+  shortcut: string;
+  /** Why the key could not be taken, when it is on and could not be. */
+  shortcutError?: string;
+  /** The servers a window has shown a workspace of: signed in. */
+  signedIn: string[];
+}
+
+export type CaptureWhat = "task" | "page";
+
+/** Where quick capture puts what it makes; the last one is offered again. */
+export interface CaptureTarget {
+  serverId: string;
+  workspaceId: string;
+  /** A project's key; null for no project, which only a page may have. */
+  project: string | null;
+  what: CaptureWhat;
+}
+
+export type ConnectMethod = "cli" | "mcp";
+
+export interface HarnessView {
+  id: string;
+  name: string;
+  /** Its config folder or its command is on this computer. */
+  installed: boolean;
+  /** Whether it can connect through MCP. */
+  mcp: boolean;
+  /**
+   * Who the quadit command works as in it: "own", its own agent (the app
+   * sets QUADIT_CONFIG in its settings, which its commands are known to
+   * see); "default", the computer's default login.
+   */
+  cliIdentity: "own" | "default";
+  connected: { methods: ConnectMethod[]; server: string; workspace: string; agent: string } | null;
+}
+
+export interface ConnectView {
+  /** Connect needs the quadit command, which exists for macOS and Linux only. */
+  supported: boolean;
+  harnesses: HarnessView[];
+  cli: {
+    /** The quadit command on the login shell's PATH, and its version; null when there is none. */
+    found: string | null;
+    version: string;
+    /** Without one: the folder the app's own copy would be linked into, or the command to run by hand. */
+    linkInto: string | null;
+    manual: string | null;
+  };
+  /** The computer's default login, when there is one Connect did not make: its server. Connect leaves it as it is. */
+  defaultLogin: string | null;
+  /** The Quadit plugin for Claude Code is installed: its MCP entry needs QUADIT_URL and QUADIT_TOKEN. */
+  claudePlugin: boolean;
+}
+
+export interface ConnectChoice {
+  harness: string;
+  serverId: string;
+  workspaceId: string;
+  methods: ConnectMethod[];
+  agent: { id: string } | { create: { name: string; handle: string } };
+  /** Let the harness use quadit without asking each time, where it has a setting for that. */
+  allowUnattended: boolean;
+}
+
+/** Every file a plan changes, as a diff, the folder its backups go to, and what the person should know first. */
+export interface PlanView {
+  id: string;
+  files: { path: string; diff: string; note?: string }[];
+  backupDir: string;
+  warnings: string[];
+}
+
+export type Planned = { ok: true; plan: PlanView } | { ok: false; error: string };
+
 export interface PagesApi {
   listServers(): Promise<ServerView[]>;
   checkServer(id: string): Promise<ServerStatus>;
@@ -39,6 +129,7 @@ export interface PagesApi {
   dismissSignInBar(): void;
   /** Loads again the server's page that the connection error it sits over is about. */
   retryServer(): void;
+
 }
 
 /** The IPC channels of this API: "pages:" and the method's name, and the one the app sends changes on. */
