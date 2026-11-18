@@ -361,11 +361,9 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 			}
 		})
 
-		var totpSecret string
 		t.Run("two-step codes were given in the browser already", func(t *testing.T) {
 			var setup struct{ Secret string }
 			s.call(s.owner, "", "POST", "/api/v1/auth/totp/start", M{}, 200, &setup)
-			totpSecret = setup.Secret
 			s.call(s.owner, "", "POST", "/api/v1/auth/totp/enable", M{"code": auth.TOTPCode(setup.Secret, time.Now())}, 200, nil)
 			f := newDesktopFlow()
 			code := approve(t, s, s.owner, f, ownerID)
@@ -375,71 +373,81 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 			}
 			s.call(a.hc, "", "GET", "/api/v1/auth/me", nil, 200, nil)
 		})
+	})
+}
 
-		t.Run("the app's session took the steps the browser's took, no more", func(t *testing.T) {
-			if totpSecret == "" {
-				t.Skip("the owner has no two-step codes: the subtest before failed")
-			}
-			twoStep := func(hc *http.Client) bool {
-				t.Helper()
-				u, _ := url.Parse(s.url)
-				for _, ck := range hc.Jar.Cookies(u) {
-					if ck.Name == "quadit_session" {
-						var sess core.Session
-						if _, err := store.Find(context.Background(), st, &sess, store.Eq("token_hash", auth.Hash(ck.Value))); err != nil {
-							t.Fatal(err)
-						}
-						return sess.TwoStep
-					}
-				}
-				t.Fatal("no session cookie")
-				return false
-			}
-			b := browser()
-			var first struct {
-				SecondStep bool `json:"second_step"`
-			}
-			s.call(b, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": "correct-horse-battery"}, 200, &first)
-			if !first.SecondStep {
-				t.Fatal("the password let a person with codes in")
-			}
-			// The next step's code: the one the subtest before gave is spent.
-			s.call(b, "", "POST", "/api/v1/auth/second-step", M{"code": auth.TOTPCode(totpSecret, time.Now().Add(30*time.Second))}, 200, nil)
-
-			// The browser took two steps: so does the app.
-			f := newDesktopFlow()
-			code := approve(t, s, b, f, ownerID)
-			a := app()
-			if resp, _ := a.get(t, finishURL(s, code, f.verifier)); resp.StatusCode != http.StatusFound {
-				t.Fatalf("finish: status %d", resp.StatusCode)
-			}
-			s.call(a.hc, "", "GET", "/api/v1/auth/me", nil, 200, nil)
-			if !twoStep(a.hc) {
-				t.Fatal("the app's session from a browser of two steps is of one")
-			}
-
-			// A browser session of one step (one from before steps were
-			// recorded) hands over a session that owes the second step.
+// TestTheDesktopAppsSessionTookTheBrowsersSteps: the app's session counts
+// the steps the session of the browser that approved it took, no more: from
+// a browser that gave a password and a code it is a session of two steps,
+// and from a browser session of one it owes the second step, as a password
+// sign-in does.
+func TestTheDesktopAppsSessionTookTheBrowsersSteps(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		ownerID := s.ownerID()
+		app := func() desktopApp { return desktopApp{hc: noRedirects()} }
+		var setup struct{ Secret string }
+		s.call(s.owner, "", "POST", "/api/v1/auth/totp/start", M{}, 200, &setup)
+		s.call(s.owner, "", "POST", "/api/v1/auth/totp/enable", M{"code": auth.TOTPCode(setup.Secret, time.Now())}, 200, nil)
+		twoStep := func(hc *http.Client) bool {
+			t.Helper()
 			u, _ := url.Parse(s.url)
-			for _, ck := range b.Jar.Cookies(u) {
+			for _, ck := range hc.Jar.Cookies(u) {
 				if ck.Name == "quadit_session" {
-					if _, err := st.Update(context.Background(), "sessions", map[string]any{"two_step": false}, store.Eq("token_hash", auth.Hash(ck.Value))); err != nil {
+					var sess core.Session
+					if _, err := store.Find(context.Background(), st, &sess, store.Eq("token_hash", auth.Hash(ck.Value))); err != nil {
 						t.Fatal(err)
 					}
+					return sess.TwoStep
 				}
 			}
-			f = newDesktopFlow()
-			code = approve(t, s, b, f, ownerID)
-			a = app()
-			if resp, _ := a.get(t, finishURL(s, code, f.verifier)); resp.StatusCode != http.StatusFound {
-				t.Fatalf("finish: status %d", resp.StatusCode)
+			t.Fatal("no session cookie")
+			return false
+		}
+		b := browser()
+		var first struct {
+			SecondStep bool `json:"second_step"`
+		}
+		s.call(b, "", "POST", "/api/v1/auth/login", M{"email": "owner@example.com", "password": "correct-horse-battery"}, 200, &first)
+		if !first.SecondStep {
+			t.Fatal("the password let a person with codes in")
+		}
+		// The next step's code: the one that turned codes on is spent.
+		s.call(b, "", "POST", "/api/v1/auth/second-step", M{"code": auth.TOTPCode(setup.Secret, time.Now().Add(30*time.Second))}, 200, nil)
+
+		// The browser took two steps: so does the app.
+		f := newDesktopFlow()
+		code := approve(t, s, b, f, ownerID)
+		a := app()
+		if resp, _ := a.get(t, finishURL(s, code, f.verifier)); resp.StatusCode != http.StatusFound {
+			t.Fatalf("finish: status %d", resp.StatusCode)
+		}
+		s.call(a.hc, "", "GET", "/api/v1/auth/me", nil, 200, nil)
+		if !twoStep(a.hc) {
+			t.Fatal("the app's session from a browser of two steps is of one")
+		}
+
+		// A browser session of one step (one from before steps were
+		// recorded) hands over a session that owes the second step.
+		u, _ := url.Parse(s.url)
+		for _, ck := range b.Jar.Cookies(u) {
+			if ck.Name == "quadit_session" {
+				if _, err := st.Update(context.Background(), "sessions", map[string]any{"two_step": false}, store.Eq("token_hash", auth.Hash(ck.Value))); err != nil {
+					t.Fatal(err)
+				}
 			}
-			if out := s.call(a.hc, "", "GET", "/api/v1/auth/me", nil, 401, nil); !strings.Contains(out, "second_step") {
-				t.Fatalf("the app's session from a browser of one step skipped the second: %s", out)
-			}
-			if twoStep(a.hc) {
-				t.Fatal("the hand-off made a session of one step into one of two")
-			}
-		})
+		}
+		f = newDesktopFlow()
+		code = approve(t, s, b, f, ownerID)
+		a = app()
+		if resp, _ := a.get(t, finishURL(s, code, f.verifier)); resp.StatusCode != http.StatusFound {
+			t.Fatalf("finish: status %d", resp.StatusCode)
+		}
+		if out := s.call(a.hc, "", "GET", "/api/v1/auth/me", nil, 401, nil); !strings.Contains(out, "second_step") {
+			t.Fatalf("the app's session from a browser of one step skipped the second: %s", out)
+		}
+		if twoStep(a.hc) {
+			t.Fatal("the hand-off made a session of one step into one of two")
+		}
 	})
 }
