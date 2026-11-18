@@ -169,6 +169,16 @@ Some addresses the server calls are written by its users: a browser's push servi
 
 A webhook to an agent on the same machine or network, or a secret for a service inside it, needs that network opened: `--allow-private-networks 192.168.1.0/24,::1` (or `QUADIT_ALLOW_PRIVATE_NETWORKS`), networks or single addresses, split by commas. Open no more than is needed: anyone who may make a webhook can make the server call what is there. These calls use no proxy from the environment (`HTTPS_PROXY`).
 
+## The desktop app
+
+The Quadit desktop app opens a server's own web address in a window of its own; the server needs nothing turned on for it.
+
+- Adding a server, the app asks `GET /api/v1/version` (no sign-in needed) whether the address is a Quadit server and which version of the sign-in hand-off it speaks.
+- Passkeys and Google, GitHub or OpenID Connect sign-in do not work inside the app's window, so the app signs in through the system browser: it opens `/desktop/connect` there, the person signs in as usual (second step included) and presses Continue, and the browser hands the app a code that works once, for two minutes. The app trades it at `/desktop/finish` for a session of its own, of the steps the browser's session took: a browser signed in with one step hands over a session that still owes the second, where one is owed.
+- The browser hands the app this server's address as set with `--url`, and the app checks it is the address it was given: add the server in the app by that same address.
+- The app's session is listed under Settings → Sign-in and security, Signed-in browsers, as "Quadit desktop", and is signed out there like any browser. Each hand-off is in the audit log as a sign-in with the method `desktop`.
+- The app shows a notification for each new inbox item of the workspace open in it, from the live connection (it has no push). "Send push notifications" off, under Settings → Notifications, turns these off too.
+
 ## Several servers
 
 More than one copy of the server can share a Postgres database and a cloud file store (not SQLite, and not files on local disk). Sessions, cursors, task leases, job claims, rate counts, page presence and uploads in progress are all in the database or the file store, and a write taken by one server wakes the live connections held by the others. Jobs (the daily backup, emptying the trash) run once, on whichever server claims them; a backup is written to that server's data directory.
