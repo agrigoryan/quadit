@@ -90,7 +90,7 @@ Everything else is set in the admin area of the web app. Each setting can also c
 
 Switching from disk to a cloud store needs no downtime: new files go to the cloud at once, old ones are still served from disk, and a background job copies them over.
 
-A cloud store set in the admin area is tried before it is kept, and refused if it does not take a test write. A cloud store that cannot be used when the server starts (its bucket not made yet, the store not up, a wrong key in `QUADIT_SETTING_FILES`) is never replaced by the local disk: no file is stored or read and `/readyz` fails until it can be used, which the server tries again every minute at most, and says so in its log.
+A cloud store set in the admin area is tried before it is kept, and refused if it does not take a test write. A cloud store that is set is never replaced by the local disk: while the server is opening it at start, and for as long as it cannot be used (its bucket not made yet, the store not up, a wrong key in `QUADIT_SETTING_FILES`), no file is stored or read, a request for one is answered `503` with `Retry-After`, and `/readyz` fails. The server tries the store again every minute at most, and says so in its log.
 
 ## Postgres
 
@@ -147,6 +147,8 @@ Then restart the server, if the upgrade did not. Take a backup first (`quadit ba
 
 - on SQLite, a file beside it: `quadit.sqlite.before-vN`, where N is the schema version being upgraded to;
 - on Postgres, a database beside it on the same server: `<name>_before_vN`. This needs the database to itself for a moment and a role allowed to create databases; with several servers on one database, stop them all first. Where that is not possible, take a backup yourself and set `QUADIT_UPGRADE_WITHOUT_COPY=1` to upgrade without the copy.
+
+An upload in parts that the older version had started goes on after the upgrade from the parts it kept; a part it had lost is asked for again, and a file is made ready only when its bytes add up to its size.
 
 A release that does not change the schema makes no copy. Copies are not removed by Quadit: delete old ones once the new version has proved itself. Uploaded files are not copied; an upgrade does not change them.
 
