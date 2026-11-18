@@ -123,7 +123,7 @@ func askWithFiles(c caller, a, open map[string]any, onOptions [][]string) (strin
 			"args": map[string]any{"id": ids("attachment", "question", strconv.Itoa(j)), "file": f, "decision": open["id"]}})
 	}
 	req := map[string]any{"changes": changes}
-	if b, _ := a["dry_run"].(bool); b || argText(a, "dry_run") == "true" {
+	if a["dry_run"] == true {
 		req["dry_run"] = true
 	}
 	body := plainjson.Marshal(req)

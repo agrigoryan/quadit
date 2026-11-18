@@ -33,7 +33,7 @@ func (s *Server) pageRoutes() []route {
 		{"POST " + w + "/docs/{id}/presence", s.workspaceMember(s.handleReportPagePresence), "Say which block I am in; returns who else is in the page. Body: {block}.", "", "docs"},
 		{"GET " + w + "/docs/{id}/rows", s.workspaceMember(s.handleListDatabaseRows), "A database's rows with formulas and rollups worked out.", "filter: Prop:op:value, comma-separated; sort: Prop or -Prop; view: name", "docs"},
 		{"GET " + w + "/memory", s.workspaceMember(s.handleShowAgentMemory), "An agent's notes from earlier sessions, as Markdown.", "agent: @handle (default: the caller)", "docs"},
-		{"POST " + w + "/memory", s.workspaceMember(s.handleSaveAgentMemory), "Save a note: {title, markdown, mode}.", "", "docs"},
+		{"POST " + w + "/memory", s.workspaceMember(s.handleSaveAgentMemory), "Save a note: {title, markdown, mode}. dry_run=1 checks it without saving.", "", "docs"},
 	}
 }
 
@@ -584,7 +584,8 @@ func (s *Server) handleShowAgentMemory(x *c) error {
 
 // handleSaveAgentMemory saves a note: the page with this title under the caller's
 // memory, made if it is not there. Mode append adds to it. The memory's root
-// page is made with the first note.
+// page is made with the first note, in the same batch. dry_run=1 checks the
+// note without saving it.
 func (s *Server) handleSaveAgentMemory(x *c) error {
 	var b struct {
 		Title    string `json:"title"`
@@ -597,40 +598,44 @@ func (s *Server) handleSaveAgentMemory(x *c) error {
 	if x.member.Kind != core.KindAgent {
 		return errBad("memory pages are written by the agent they belong to; edit them as pages instead")
 	}
-	if strings.TrimSpace(b.Title) == "" {
+	title := strings.TrimSpace(b.Title)
+	if title == "" {
 		return errBad("a note needs a title")
 	}
 	ctx := x.ctx()
-	apply := func(typ string, args map[string]any) (*engine.Result, error) {
-		raw := plainjson.Marshal(args)
-		return s.eng.Apply(ctx, x.ws.ID, x.actor, engine.Change{ID: id.New(), Type: typ, Args: raw})
+	var changes []engine.Change
+	add := func(typ string, args map[string]any) {
+		changes = append(changes, engine.Change{ID: id.New(), Type: typ, Args: plainjson.Marshal(args)})
 	}
-	root, ok, err := x.memoryRoot(x.ctx(), x.member.UserID)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		res, err := apply("doc.create", map[string]any{"title": x.member.Name + ": memory", "memory_of": "me", "icon": "brain"})
-		if err != nil {
-			return err
-		}
-		root.ID = res.Ref
-	}
-	var page core.Doc
-	there, err := store.Find(ctx, x.db, &page, store.Eq("parent_id", root.ID), store.Eq("title", strings.TrimSpace(b.Title)), store.Live)
+	root, there, err := x.memoryRoot(ctx, x.member.UserID)
 	if err != nil {
 		return err
 	}
 	if !there {
-		res, err := apply("doc.create", map[string]any{"parent": root.ID, "title": strings.TrimSpace(b.Title), "markdown": b.Markdown})
-		if err != nil {
+		root.ID = id.New()
+		add("doc.create", map[string]any{"id": root.ID, "title": x.member.Name + ": memory", "memory_of": "me", "icon": "brain"})
+	}
+	var page core.Doc
+	if there {
+		if there, err = store.Find(ctx, x.db, &page, store.Eq("parent_id", root.ID), store.Eq("title", title), store.Live); err != nil {
 			return err
 		}
-		return x.json(http.StatusCreated, map[string]any{"doc": res.Ref, "seq": res.Seq})
 	}
-	res, err := apply("doc.write", map[string]any{"doc": page.ID, "markdown": b.Markdown, "mode": b.Mode})
+	status := http.StatusOK
+	if there {
+		add("doc.write", map[string]any{"doc": page.ID, "markdown": b.Markdown, "mode": b.Mode})
+	} else {
+		page.ID, status = id.New(), http.StatusCreated
+		add("doc.create", map[string]any{"id": page.ID, "parent": root.ID, "title": title, "markdown": b.Markdown})
+	}
+	dry := truthyParam(x.r.URL.Query(), "dry_run")
+	res, err := s.eng.Batch(ctx, x.ws.ID, x.actor, changes, dry)
 	if err != nil {
 		return err
 	}
-	return x.ok(map[string]any{"doc": page.ID, "seq": res.Seq})
+	out := map[string]any{"doc": page.ID, "seq": res[len(res)-1].Seq}
+	if dry {
+		out["dry_run"], status = true, http.StatusOK
+	}
+	return x.json(status, out)
 }

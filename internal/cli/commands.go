@@ -18,7 +18,11 @@ type command struct {
 	args int
 	// usage is what it says it takes, when given too few arguments.
 	usage string
-	run   func(r *runner, in input) error
+	// noDryRun marks a command that cannot check without doing: it runs a
+	// program or sends a request elsewhere. --dry-run is refused for it,
+	// never ignored.
+	noDryRun bool
+	run      func(r *runner, in input) error
 }
 
 // commands is every command that talks to a server, in the order the help
@@ -43,7 +47,7 @@ var commands = []command{
 	// follow (cmd_follow.go, listen.go)
 	{names: []string{"events"}, run: readsWithFilters("/events")},
 	{names: []string{"ack"}, args: 1, usage: "ack SEQ [NAME]", run: (*runner).ack},
-	{names: []string{"listen"}, run: (*runner).listen},
+	{names: []string{"listen"}, noDryRun: true, run: (*runner).listen},
 	{names: []string{"read"}, run: (*runner).markRead},
 
 	// act on tasks (cmd_task.go)
@@ -79,8 +83,8 @@ var commands = []command{
 
 	// secrets (cmd_secrets.go)
 	{names: []string{"secrets"}, run: readCommand("/secrets")},
-	{names: []string{"request"}, args: 2, usage: "request NAME URL [method=POST] [header=K:V ...] [body=TEXT|-]", run: (*runner).request},
-	{names: []string{"run"}, run: (*runner).runWithSecrets},
+	{names: []string{"request"}, args: 2, noDryRun: true, usage: "request NAME URL [method=POST] [header=K:V ...] [body=TEXT|-]", run: (*runner).request},
+	{names: []string{"run"}, noDryRun: true, run: (*runner).runWithSecrets},
 
 	// docs (cmd_docs.go)
 	{names: []string{"docs"}, run: readsWithFilters("/docs")},

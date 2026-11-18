@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/url"
 	"strings"
 
@@ -79,6 +80,9 @@ func (r *runner) run(name string, rest []string) error {
 	if !ok {
 		return fmt.Errorf("unknown command %q; run: quadit help", name)
 	}
+	if r.dry && cmd.noDryRun {
+		return fmt.Errorf("quadit %s has no dry run: it cannot check without doing", name)
+	}
 	in := readInput(name, rest)
 	if len(in.pos) < cmd.args {
 		return errors.New("usage: quadit " + cmd.usage)
@@ -134,8 +138,18 @@ func (r *runner) change(typ string, args map[string]any, approval string) error 
 }
 
 // send sends a JSON body to a path that is not a change (a cursor, a note
-// to memory, a request with a secret) and returns the answer.
+// to memory, a request with a secret) and returns the answer. In a dry run
+// it asks the server for one (dry_run=1): every path it is used for either
+// honors that, or belongs to a command that refuses --dry-run (see
+// command.noDryRun).
 func (r *runner) send(method, path string, q url.Values, body any, accept string) ([]byte, error) {
+	if r.dry {
+		q = maps.Clone(q)
+		if q == nil {
+			q = url.Values{}
+		}
+		q.Set("dry_run", "1")
+	}
 	raw := plainjson.Marshal(body)
 	return r.c.workspaceRequest(r.ctx, apiRequest{method: method, path: path, query: q, body: bytes.NewReader(raw), contentType: "application/json", accept: accept})
 }

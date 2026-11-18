@@ -38,10 +38,15 @@ func (r *runner) remember(in input) error {
 		body["mode"] = m[0]
 	}
 	out, err := r.send("POST", "/memory", nil, body, "")
-	if err == nil {
-		fmt.Fprintln(r.out, "ok remembered", strings.TrimSpace(string(out)))
+	if err != nil {
+		return err
 	}
-	return err
+	said := "ok remembered"
+	if r.dry {
+		said = "would be accepted: remember"
+	}
+	fmt.Fprintln(r.out, said, strings.TrimSpace(string(out)))
+	return nil
 }
 
 // row adds a row to a database: its title, and a value for each property

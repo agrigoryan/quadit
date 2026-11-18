@@ -217,6 +217,18 @@ func (s *Server) listening(x *c, seconds int) {
 
 // setCursor moves a cursor forward; a cursor never moves back.
 func (s *Server) setCursor(x *c, name string, seq int64) error {
+	if err := s.checkCursorMove(x, name, seq); err != nil {
+		return err
+	}
+	// One conditional statement, so acknowledgments racing each other
+	// leave the cursor at the furthest, whichever lands last.
+	return x.db.Advance(x.ctx(), core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: name, Seq: seq, UpdatedAt: time.Now().UnixMilli()},
+		"seq", "workspace_id", "user_id", "name")
+}
+
+// checkCursorMove refuses what setCursor would refuse: a name it cannot
+// keep, or a position that is not in the feed.
+func (s *Server) checkCursorMove(x *c, name string, seq int64) error {
 	if len(name) == 0 || len(name) > 64 {
 		return errBad("a cursor name is 1 to 64 characters")
 	}
@@ -232,10 +244,7 @@ func (s *Server) setCursor(x *c, name string, seq int64) error {
 	if seq > ws.Seq {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "seq", Message: fmt.Sprintf("the feed is at %d; %d has not happened yet", ws.Seq, seq)}
 	}
-	// One conditional statement, so acknowledgments racing each other
-	// leave the cursor at the furthest, whichever lands last.
-	return x.db.Advance(x.ctx(), core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: name, Seq: seq, UpdatedAt: time.Now().UnixMilli()},
-		"seq", "workspace_id", "user_id", "name")
+	return nil
 }
 
 // handleShowFeedCursor says where one of the caller's cursors stands; one
@@ -248,7 +257,8 @@ func (s *Server) handleShowFeedCursor(x *c) error {
 	return x.ok(map[string]any{"name": x.r.PathValue("name"), "seq": cursor.Seq})
 }
 
-// handleMoveFeedCursor marks everything up to seq as handled.
+// handleMoveFeedCursor marks everything up to seq as handled. dry_run=1
+// checks the move and says where the cursor would stand, without moving it.
 func (s *Server) handleMoveFeedCursor(x *c) error {
 	var body struct {
 		Seq int64 `json:"seq"`
@@ -256,10 +266,21 @@ func (s *Server) handleMoveFeedCursor(x *c) error {
 	if err := x.body(&body); err != nil {
 		return err
 	}
-	if err := s.setCursor(x, x.r.PathValue("name"), body.Seq); err != nil {
+	name := x.r.PathValue("name")
+	if !truthyParam(x.r.URL.Query(), "dry_run") {
+		if err := s.setCursor(x, name, body.Seq); err != nil {
+			return err
+		}
+		return s.handleShowFeedCursor(x)
+	}
+	if err := s.checkCursorMove(x, name, body.Seq); err != nil {
 		return err
 	}
-	return s.handleShowFeedCursor(x)
+	var cursor core.Cursor
+	if _, err := store.Find(x.ctx(), x.db, &cursor, store.Eq("user_id", x.member.UserID), store.Eq("name", name)); err != nil {
+		return err
+	}
+	return x.ok(map[string]any{"name": name, "seq": max(cursor.Seq, body.Seq), "dry_run": true})
 }
 
 // handleStreamFeed is the live stream: server-sent events, one per feed event, from

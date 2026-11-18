@@ -22,10 +22,14 @@ func (r *runner) ack(in input) error {
 		name = in.pos[1]
 	}
 	out, err := r.setCursor(name, seq)
-	if err == nil {
-		fmt.Fprintln(r.out, strings.TrimSpace(string(out)))
+	if err != nil {
+		return err
 	}
-	return err
+	if r.dry {
+		fmt.Fprint(r.out, "would be accepted: ")
+	}
+	fmt.Fprintln(r.out, strings.TrimSpace(string(out)))
+	return nil
 }
 
 // setCursor moves a cursor to a sequence number and returns the server's

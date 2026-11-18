@@ -149,6 +149,9 @@ func callTool(who caller, params json.RawMessage) (any, *rpcError) {
 	if p.Arguments == nil {
 		p.Arguments = map[string]any{}
 	}
+	if err := checkArgs(*named, p.Arguments); err != nil {
+		return map[string]any{"content": []map[string]any{{"type": "text", "text": err.Error()}}, "isError": true}, nil
+	}
 	text, ok := named.Run(who, p.Arguments)
 	if data, isPicture := strings.CutPrefix(text, pictureMark); ok && isPicture {
 		// A picture goes back as a picture, which a model can look at.

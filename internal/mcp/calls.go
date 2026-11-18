@@ -47,12 +47,29 @@ func toolAck(c caller, a map[string]any) (string, bool) {
 		name = "main"
 	}
 	body := plainjson.Marshal(map[string]any{"seq": a["seq"]})
-	return c.callAPI("PUT", "/cursors/"+url.PathEscape(name), nil, body)
+	return dryRunSaid(a, func(q url.Values) (string, bool) {
+		return c.callAPI("PUT", "/cursors/"+url.PathEscape(name), q, body)
+	})
 }
 
 func toolRemember(c caller, a map[string]any) (string, bool) {
 	body := plainjson.Marshal(map[string]any{"title": a["title"], "markdown": a["markdown"], "mode": argText(a, "mode")})
-	return c.callAPI("POST", "/memory", nil, body)
+	return dryRunSaid(a, func(q url.Values) (string, bool) {
+		return c.callAPI("POST", "/memory", q, body)
+	})
+}
+
+// dryRunSaid makes a write that is not a change, with dry_run=1 when the
+// call asks for a dry run, and says so in front of the answer.
+func dryRunSaid(a map[string]any, write func(q url.Values) (string, bool)) (string, bool) {
+	if a["dry_run"] != true {
+		return write(nil)
+	}
+	out, ok := write(url.Values{"dry_run": {"1"}})
+	if ok {
+		out = "would be accepted: " + out
+	}
+	return out, ok
 }
 
 // toolChange makes one change, or several together when changes lists them.
@@ -74,7 +91,7 @@ func toolChange(c caller, a map[string]any) (string, bool) {
 	if v := argText(a, "approval"); v != "" {
 		req["approval"] = v
 	}
-	if b, _ := a["dry_run"].(bool); b {
+	if a["dry_run"] == true {
 		req["dry_run"] = true
 	}
 	if text, ok := a["args"].(string); ok { // some clients send the object as text
@@ -121,7 +138,7 @@ func toolChangeBatch(c caller, a map[string]any, list []any) (string, bool) {
 		}
 	}
 	req := map[string]any{"changes": list}
-	if b, _ := a["dry_run"].(bool); b {
+	if a["dry_run"] == true {
 		req["dry_run"] = true
 	}
 	body := plainjson.Marshal(req)

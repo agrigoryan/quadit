@@ -720,6 +720,7 @@ cli work
 cli write
 mcp ack
 mcp ack arg cursor
+mcp ack arg dry_run
 mcp ack arg seq
 mcp agents
 mcp ask
@@ -778,6 +779,7 @@ mcp layout arg project
 mcp memory
 mcp my_work
 mcp remember
+mcp remember arg dry_run
 mcp remember arg markdown
 mcp remember arg mode
 mcp remember arg title

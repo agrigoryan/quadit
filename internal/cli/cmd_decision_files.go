@@ -5,7 +5,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 
 	"github.com/agrigoryan/quadit/internal/id"
@@ -42,26 +41,6 @@ func questionParts(fields []field) (labels []string, files []askFile) {
 	return labels, files
 }
 
-// readable says whether every file can be read, so that nothing is sent
-// when one of them cannot.
-func readable(files []askFile) error {
-	for _, f := range files {
-		h, err := os.Open(f.path)
-		if err != nil {
-			return fmt.Errorf("file %s: %w", f.path, err)
-		}
-		st, err := h.Stat()
-		h.Close()
-		if err != nil {
-			return fmt.Errorf("file %s: %w", f.path, err)
-		}
-		if st.IsDir() {
-			return fmt.Errorf("file %s is a folder", f.path)
-		}
-	}
-	return nil
-}
-
 // askIDs makes the ids of a question with files. Given --id, they all come
 // from it, so the same command sent again uploads and attaches nothing twice.
 type askIDs struct{ base string }
@@ -86,7 +65,11 @@ func (k askIDs) uploadName(i int) string {
 // askWithFiles uploads a question's files, then opens the decision with them
 // attached in one batch, so that it is never seen without its pictures.
 func (r *runner) askWithFiles(a map[string]any, files []askFile, approval string) error {
-	if err := readable(files); err != nil {
+	paths := make([]string, len(files))
+	for i, f := range files {
+		paths[i] = f.path
+	}
+	if err := readable(paths); err != nil {
 		return err
 	}
 	opts, _ := a["options"].([]map[string]any)
