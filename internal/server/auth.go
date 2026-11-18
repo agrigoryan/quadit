@@ -103,9 +103,7 @@ func (s *Server) oneTime(ctx context.Context, kind, userID string, data any, lif
 // useOneTime spends a one-time secret. It works once and only while fresh: a
 // secret that is unknown, stale or spent is a refusal (*engine.Error), and
 // any other error is a failure to read or spend it.
-//
-//nolint:unparam // keep is in the signature picture.go calls too; dropping it belongs to the unit that owns that file
-func (s *Server) useOneTime(ctx context.Context, kind, token string, keep bool) (core.OneTimeToken, error) {
+func (s *Server) useOneTime(ctx context.Context, kind, token string) (core.OneTimeToken, error) {
 	var spent core.OneTimeToken
 	there, err := store.Find(ctx, s.st, &spent, store.Eq("token_hash", auth.Hash(token)), store.Eq("kind", kind), store.Null("used_at"))
 	if err != nil {
@@ -114,14 +112,12 @@ func (s *Server) useOneTime(ctx context.Context, kind, token string, keep bool) 
 	if !there || spent.ExpiresAt < time.Now().UnixMilli() {
 		return spent, &engine.Error{Code: engine.CodeNotFound, Message: "this link is no longer valid; ask for a new one"}
 	}
-	if !keep {
-		n, err := s.st.Update(ctx, "one_time_tokens", map[string]any{"used_at": time.Now().UnixMilli()}, store.Eq("id", spent.ID), store.Null("used_at"))
-		if err != nil {
-			return spent, err
-		}
-		if n != 1 {
-			return spent, &engine.Error{Code: engine.CodeNotFound, Message: "this link was already used"}
-		}
+	n, err := s.st.Update(ctx, "one_time_tokens", map[string]any{"used_at": time.Now().UnixMilli()}, store.Eq("id", spent.ID), store.Null("used_at"))
+	if err != nil {
+		return spent, err
+	}
+	if n != 1 {
+		return spent, &engine.Error{Code: engine.CodeNotFound, Message: "this link was already used"}
 	}
 	return spent, nil
 }

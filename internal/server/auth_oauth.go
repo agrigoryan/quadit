@@ -88,7 +88,7 @@ func (s *Server) handleFinishProviderSignIn(x *c) error {
 	if e := q.Get("error"); e != "" {
 		return back("The sign-in was cancelled.") //nolint:misspell // the words the person is shown, kept as they are
 	}
-	spent, err := s.useOneTime(ctx, core.OneTimeOAuth, q.Get("state"), false)
+	spent, err := s.useOneTime(ctx, core.OneTimeOAuth, q.Get("state"))
 	if _, refused := errors.AsType[*engine.Error](err); err != nil && !refused {
 		return err
 	}

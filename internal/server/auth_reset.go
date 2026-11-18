@@ -71,7 +71,7 @@ func (s *Server) handleConfirmPasswordReset(x *c) error {
 	if err := auth.CheckPasswordRules(b.Password); err != nil {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "password", Message: err.Error()}
 	}
-	spent, err := s.useOneTime(ctx, core.OneTimeReset, b.Token, false)
+	spent, err := s.useOneTime(ctx, core.OneTimeReset, b.Token)
 	if err != nil {
 		return err
 	}

@@ -160,7 +160,7 @@ func picturePath(x *c) (string, error) {
 // and sends it to the page.
 func (s *Server) handleSignInPictureBrowser(x *c) error {
 	q := x.r.URL.Query()
-	ot, err := s.useOneTime(x.ctx(), core.OneTimeRender, q.Get("token"), false)
+	ot, err := s.useOneTime(x.ctx(), core.OneTimeRender, q.Get("token"))
 	if err != nil {
 		return err
 	}

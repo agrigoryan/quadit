@@ -149,7 +149,7 @@ func (s *Server) handleFinishDesktopSignIn(x *c) error {
 	if q.Get("code") == "" || !desktopVerifier.MatchString(verifier) {
 		return s.showDesktopPage(x, http.StatusBadRequest, desktopExpired)
 	}
-	spent, err := s.useOneTime(ctx, core.OneTimeDesktopCode, q.Get("code"), false)
+	spent, err := s.useOneTime(ctx, core.OneTimeDesktopCode, q.Get("code"))
 	if _, refused := errors.AsType[*engine.Error](err); refused {
 		return s.showDesktopPage(x, http.StatusBadRequest, desktopExpired)
 	}

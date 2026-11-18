@@ -223,7 +223,7 @@ func (s *Server) handleAnswerConsentPage(x *c) error {
 	if err := s.identify(x.ctx(), x); err != nil || x.sess == nil {
 		return errUnauthorized("sign in first")
 	}
-	spent, err := s.useOneTime(ctx, core.OneTimeOAuthConsent, x.r.PostForm.Get("request"), false)
+	spent, err := s.useOneTime(ctx, core.OneTimeOAuthConsent, x.r.PostForm.Get("request"))
 	if _, refused := errors.AsType[*engine.Error](err); err != nil && !refused {
 		return err
 	}
@@ -327,7 +327,7 @@ func (s *Server) handleIssueOAuthToken(w http.ResponseWriter, r *http.Request) {
 	}
 	switch form.Get("grant_type") {
 	case "authorization_code":
-		spent, err := s.useOneTime(ctx, core.OneTimeOAuthCode, form.Get("code"), false)
+		spent, err := s.useOneTime(ctx, core.OneTimeOAuthCode, form.Get("code"))
 		if _, refused := errors.AsType[*engine.Error](err); err != nil && !refused {
 			s.log.Error("oauth token: the code could not be spent", "err", err)
 			fail("server_error", "the code could not be spent; try again")
