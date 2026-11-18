@@ -93,6 +93,8 @@ export class ServerList {
       minWidth: 420,
       minHeight: 420,
       title: "Quadit Servers",
+      // pages.css's --bg, so the window is not white until its page paints.
+      backgroundColor: "#1b1d22",
       webPreferences: {
         preload: this.setup.pagesPreload,
         contextIsolation: true,

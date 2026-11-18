@@ -7,12 +7,15 @@
   var colors = { light: "#ffffff", dark: "#1b1d23" };
   try {
     var t = localStorage.getItem("quadit.theme");
-    if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    if (t === "system") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    else if (t !== "light") t = "dark";
     root.dataset.theme = t;
-  } catch {}
+  } catch {
+    root.dataset.theme = "dark";
+  }
   function paint() {
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", colors[root.dataset.theme] || colors.light);
+    if (meta) meta.setAttribute("content", colors[root.dataset.theme] || colors.dark);
   }
   paint();
   try {

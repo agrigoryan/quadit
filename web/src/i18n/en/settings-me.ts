@@ -39,7 +39,7 @@ export const meStrings = {
   "avatar.ownPlaceholder": "One emoji, or up to two letters",
   "avatar.use": "Use",
   "me.profile.themeLead":
-    "Light or dark follows you to every browser you sign in on. System leaves each device to its own setting.",
+    "Your choice follows you to every browser you sign in on. System matches each device's own setting.",
 
   "me.notify.lead": "Your inbox always gets everything. Choose what else should reach you when you are not looking.",
   "me.notify.email": "Email",

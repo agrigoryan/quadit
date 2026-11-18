@@ -1,34 +1,22 @@
-/* The app's own pages: the server list and the sign-in bar. Colours follow the system's light or dark setting. */
+/* The app's own pages: the server list and the sign-in bar. Dark, the app's default theme; they have no theme setting of their own. */
 
 :root {
-  color-scheme: light dark;
-  --bg: #f6f6f4;
-  --panel: #ffffff;
-  --text: #1b1d22;
-  --muted: #6b6f78;
-  --line: #e2e2de;
+  color-scheme: dark;
+  --bg: #1b1d22;
+  --panel: #24272e;
+  --text: #ecedef;
+  --muted: #a0a4ad;
+  --line: #353943;
   --accent: #ffd60a;
   --accent-text: #1b1d22;
-  --warn: #9a5b00;
-  --danger: #b42318;
+  --warn: #f5b84a;
+  --danger: #ff8a7a;
   font:
     14px/1.45 -apple-system,
     BlinkMacSystemFont,
     "Segoe UI",
     system-ui,
     sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1b1d22;
-    --panel: #24272e;
-    --text: #ecedef;
-    --muted: #a0a4ad;
-    --line: #353943;
-    --warn: #f5b84a;
-    --danger: #ff8a7a;
-  }
 }
 
 * {

@@ -236,6 +236,8 @@ export class ServerWindows {
       minWidth: 480,
       minHeight: 400,
       title: server.name,
+      // The web app's dark --bg (its default theme), so the window is not white until its page paints.
+      backgroundColor: "#131419",
       show: shown,
       webPreferences: this.preferencesFor(server),
     });
