@@ -39,22 +39,23 @@ func (l *limiter) shareCounts(ctx context.Context, st store.Store) {
 	window, mine := l.window, l.hits
 	l.hits = map[string]int{}
 	l.mu.Unlock()
+	ends := (window + 1) * 60 // the end of the minute counted, as rate_counters keeps it
 	totals := map[string]int{}
 	for key, n := range mine {
 		name := "api:" + key
-		total, err := st.Incr(ctx, "rate_counters", "hits", int64(n), store.Eq("name", name), store.Eq("bucket", window))
+		total, err := st.Incr(ctx, "rate_counters", "hits", int64(n), store.Eq("name", name), store.Eq("bucket", ends))
 		if err != nil {
 			total = int64(n) // the database is unwell: count what is known here
 		}
 		totals[key] = int(total)
 	}
 	if len(mine) > 0 {
-		_, _ = st.Delete(ctx, "rate_counters", store.Like("name", "api:%"), store.Lt("bucket", window-1)) // best effort: old counters are deleted again in two seconds
+		_ = clearEndedWindows(ctx, st, time.Now().Unix()) // best effort: old counters are deleted again in two seconds
 	}
 	// And what the other servers counted this minute, for every caller: a
 	// caller this server has not seen lately may be busy on another.
 	var rows []core.RateCounter
-	if err := st.List(ctx, &rows, store.Q{Where: []store.Cond{store.Like("name", "api:%"), store.Eq("bucket", window)}, Limit: 5000}); err == nil {
+	if err := st.List(ctx, &rows, store.Q{Where: []store.Cond{store.Like("name", "api:%"), store.Eq("bucket", ends)}, Limit: 5000}); err == nil {
 		for _, r := range rows {
 			key := strings.TrimPrefix(r.Name, "api:")
 			if _, flushed := totals[key]; !flushed {
@@ -67,6 +68,15 @@ func (l *limiter) shareCounts(ctx context.Context, st store.Store) {
 		maps.Copy(l.shared, totals)
 	}
 	l.mu.Unlock()
+}
+
+// clearEndedWindows deletes the counts in rate_counters whose window ended
+// before now (Unix seconds). Each count is kept under the time its window
+// ends, whatever the window's length, so this one rule clears every
+// limit's old windows and none that still runs.
+func clearEndedWindows(ctx context.Context, st store.Store, now int64) error {
+	_, err := st.Delete(ctx, "rate_counters", store.Lt("bucket", now))
+	return err
 }
 
 // check counts one request and refuses it when the caller is over

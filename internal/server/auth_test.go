@@ -241,3 +241,42 @@ func TestSingleSignOn(t *testing.T) {
 		s.call(b2, "", "DELETE", "/api/v1/auth/identities/"+ids.Identities[0].ID, nil, 409, nil)
 	})
 }
+
+// TestALimitsWindowsAreClearedOnlyWhenOver: limits counted over windows of
+// different lengths share one table. Clearing the windows that are over,
+// which a limit's first attempt in a window does, leaves the others'
+// windows that still run: a sign-in does not wipe the count of password
+// reset requests made in the hour.
+func TestALimitsWindowsAreClearedOnlyWhenOver(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		reset := M{"email": "owner@example.com"}
+		for range 10 {
+			if got := postFrom127(t, s, "/api/v1/auth/reset/request", reset, ""); got != http.StatusConflict { // counted; no mail server to send it
+				t.Fatalf("a reset request within the limit: %d", got)
+			}
+		}
+		postFrom127(t, s, "/api/v1/auth/login", M{"email": "nobody@example.com", "password": "not-a-password"}, "")
+		if got := postFrom127(t, s, "/api/v1/auth/reset/request", reset, ""); got != http.StatusTooManyRequests {
+			t.Fatalf("the 11th reset request in an hour: %d, want 429", got)
+		}
+	})
+}
+
+// postFrom127 posts body as JSON to the server from 127.0.0.1 (never ::1,
+// so every request counts against one address), with X-Forwarded-For when
+// forwarded is not empty, and gives the status.
+func postFrom127(t *testing.T, s *site, path string, body any, forwarded string) int {
+	t.Helper()
+	raw, _ := json.Marshal(body)
+	req, _ := http.NewRequest(http.MethodPost, strings.Replace(s.url, "localhost", "127.0.0.1", 1)+path, bytes.NewReader(raw))
+	if forwarded != "" {
+		req.Header.Set("X-Forwarded-For", forwarded)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode
+}

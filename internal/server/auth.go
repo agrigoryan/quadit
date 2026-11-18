@@ -59,19 +59,19 @@ const accountRequestsPerHour = 10
 // sharing it sees the same number. An attempt that cannot be counted is
 // refused: a limit that cannot be checked lets nobody through.
 func (s *Server) throttle(ctx context.Context, name string, limit int, window time.Duration) error {
-	bucket := time.Now().Unix() / int64(window.Seconds())
-	hits, err := s.st.Incr(ctx, "rate_counters", "hits", 1, store.Eq("name", name), store.Eq("bucket", bucket))
+	now, length := time.Now().Unix(), int64(window.Seconds())
+	ends := (now/length + 1) * length
+	hits, err := s.st.Incr(ctx, "rate_counters", "hits", 1, store.Eq("name", name), store.Eq("bucket", ends))
 	if err != nil {
 		return s.uncounted(name, err)
 	}
 	if hits == 1 { // the window's first attempt
-		if _, err := s.st.Delete(ctx, "rate_counters", store.Lt("bucket", bucket-2)); err != nil {
+		if err := clearEndedWindows(ctx, s.st, now); err != nil {
 			s.log.Warn("old rate-limit windows not cleared; the next first attempt tries again", "err", err)
 		}
 	}
 	if hits > int64(limit) {
-		wait := int(int64(window.Seconds()) - time.Now().Unix()%int64(window.Seconds()))
-		return &httpError{Status: 429, Code: "rate_limited", RetryAfter: wait, Message: "too many attempts; try again in a few minutes"}
+		return &httpError{Status: 429, Code: "rate_limited", RetryAfter: int(ends - now), Message: "too many attempts; try again in a few minutes"}
 	}
 	return nil
 }

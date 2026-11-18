@@ -154,10 +154,13 @@ type Backup struct {
 	Error      string `json:"error,omitempty" db:"error"`
 }
 
-// RateCounter counts hits on one name within one time bucket, for rate
+// RateCounter counts hits on one name within one window of time, for rate
 // limits.
 type RateCounter struct {
-	Name   string `db:"name"`
-	Bucket int64  `db:"bucket"`
-	Hits   int    `db:"hits"`
+	Name string `db:"name"`
+	// Bucket is when the window ends, in Unix seconds, whatever its length:
+	// limits counted over windows of different lengths share the table, and
+	// a window that is over can be cleared without knowing whose it was.
+	Bucket int64 `db:"bucket"`
+	Hits   int   `db:"hits"`
 }
