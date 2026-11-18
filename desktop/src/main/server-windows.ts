@@ -206,7 +206,11 @@ export class ServerWindows {
     this.sessions.add(own);
     own.setUserAgent(`${own.getUserAgent()} QuaditDesktop/${this.setup.version}`);
     // What a task tracker needs and nothing else: copying, full-screen video, notifications.
-    const allowed = new Set(["clipboard-sanitized-write", "clipboard-read", "fullscreen", "notifications"]);
+    // Never clipboard-read: a script reading the clipboard whenever it likes
+    // would see passwords and tokens copied anywhere. Pasting needs no
+    // permission: the Edit menu's Paste and its key hand the page what the
+    // person chose to paste, as a paste event.
+    const allowed = new Set(["clipboard-sanitized-write", "fullscreen", "notifications"]);
     own.setPermissionRequestHandler((contents, permission, decide, details) => {
       const current = this.store.get(server.id);
       decide(
