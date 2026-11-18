@@ -14,13 +14,32 @@ import (
 )
 
 // login checks a server address and a token by asking who they are, and
-// saves them where NewClient reads them.
-func login(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+// saves them where NewClient reads them. A token of "-" is read from stdin,
+// so that it is not in the list of running processes. "login --path" prints
+// where the login is kept.
+func login(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) == 1 && args[0] == "--path" {
+		fmt.Fprintln(stdout, configPath())
+		return 0
+	}
 	if len(args) != 2 {
-		fmt.Fprintln(stderr, "usage: quadit login URL TOKEN")
+		fmt.Fprintln(stderr, "usage: quadit login URL TOKEN|-  or  quadit login --path")
 		return 2
 	}
-	c := &Client{URL: strings.TrimRight(args[0], "/"), Token: args[1], HTTP: &http.Client{Timeout: requestTimeout}}
+	token := args[1]
+	if token == "-" {
+		raw, err := io.ReadAll(stdin)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		token = strings.TrimSpace(string(raw))
+		if token == "" {
+			fmt.Fprintln(stderr, "no token on standard input")
+			return 2
+		}
+	}
+	c := &Client{URL: strings.TrimRight(args[0], "/"), Token: token, HTTP: &http.Client{Timeout: requestTimeout}}
 	me, err := c.Text(ctx, "/me", nil)
 	if err != nil {
 		fmt.Fprintln(stderr, err)

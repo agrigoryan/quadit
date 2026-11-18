@@ -25,6 +25,7 @@ import (
 	"io"
 	"maps"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/plainjson"
@@ -42,7 +43,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	cmd, rest := rest[0], rest[1:]
 	switch cmd {
 	case "login":
-		return login(ctx, rest, stdout, stderr)
+		return login(ctx, rest, os.Stdin, stdout, stderr)
 	case "skill":
 		return skill(rest, stdout, stderr)
 	}
