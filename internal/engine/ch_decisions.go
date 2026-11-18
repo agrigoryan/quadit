@@ -360,9 +360,14 @@ func decisionPick(c *cx, a decisionPickArgs) error {
 		return err
 	}
 	seq := c.tx.NextSeq()
-	if _, err := c.tx.Update(c.ctx, "decisions", map[string]any{"state": state, "picked_option_id": optionID, "outcome": outcome,
-		"outcome_note": a.Note, "decided_by": c.actor.UserID, "decided_at": c.at, "unclear_note": "", "updated_at": c.at, "updated_seq": seq},
-		store.Eq("id", d.ID)); err != nil {
+	answer := map[string]any{"state": state, "picked_option_id": optionID, "outcome": outcome,
+		"outcome_note": a.Note, "decided_by": c.actor.UserID, "decided_at": c.at, "unclear_note": "", "updated_at": c.at, "updated_seq": seq}
+	if d.Kind == core.DecisionApproval && d.Action != "" && !c.system {
+		// The approval reaches what its giver reaches now, through the
+		// credential they answer with too: checkApproval holds the change to it.
+		answer["approver_projects"] = c.scope.Projects
+	}
+	if _, err := c.tx.Update(c.ctx, "decisions", answer, store.Eq("id", d.ID)); err != nil {
 		return err
 	}
 	d.State, d.PickedOptionID, d.Outcome, d.OutcomeNote, d.DecidedBy, d.DecidedAt, d.UpdatedSeq, d.UnclearNote = state, optionID, outcome, a.Note, c.actor.UserID, c.at, seq, ""

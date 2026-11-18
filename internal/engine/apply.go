@@ -366,7 +366,8 @@ func (b *batch) remember(c *cx, ch Change, hash string) (*Result, error) {
 // checkApproval makes sure the change comes with an approved decision that
 // was opened for this kind of change by this actor, and holds the change
 // to what the one who approved it could do: a change approved by someone
-// who reaches some projects touches those alone.
+// who reaches some projects, by their membership now or by the credential
+// they answered with then, touches those alone.
 func (c *cx) checkApproval() error {
 	need := &Error{Code: CodeNeedsApproval, Message: fmt.Sprintf(
 		`%s needs approval. Open one with decision.open {"kind": "approval", "action": %q, "task": …, "question": …, "ask": …}, `+
@@ -405,6 +406,9 @@ func (c *cx) checkApproval() error {
 		}
 		if err := holdTo(approver, "who approved it", c.change.Type, handlers[c.change.Type], &c.scope); err != nil {
 			return err
+		}
+		if approval.ApproverProjects != nil {
+			c.scope.Projects = intersectProjects(c.scope.Projects, approval.ApproverProjects)
 		}
 		// Used up, in the same write as the change it allows; and said in
 		// the feed, so the approval shows as used wherever it is open.

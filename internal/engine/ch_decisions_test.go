@@ -15,16 +15,18 @@ import (
 // TestAnApprovalIsGivenByOneWhoCouldMakeTheChange: an approval for a change
 // is answered by the person it was asked of, when it names one, and only
 // by someone who could make that change themselves: of the role it needs,
-// and, when it is used, reaching what it touches.
+// and, when it is used, reaching what it touches, through the membership
+// and the credential they answered with.
 func TestAnApprovalIsGivenByOneWhoCouldMakeTheChange(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
 		me := w.owner.ID
-		w.do(me, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		sva := w.do(me, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"}).Ref
 		w.do(me, "project.create", M{"key": "OPS", "name": "Operations"})
 		w.do(me, "task.create", M{"project": "SVA", "title": "Boss design"})
 		w.do(me, "task.create", M{"project": "OPS", "title": "Rotate the keys"})
+		w.do(me, "task.create", M{"project": "OPS", "title": "Renew the certificates"})
 		person := func(handle, role string, scope any) string {
 			u := core.User{ID: id.New(), Kind: core.KindPerson, Name: handle, Email: handle + "-" + id.New() + "@example.com", CreatedAt: 1, UpdatedAt: 1}
 			if err := st.Insert(ctx, u); err != nil {
@@ -67,6 +69,17 @@ func TestAnApprovalIsGivenByOneWhoCouldMakeTheChange(t *testing.T) {
 		w.do(ops, "decision.pick", M{"id": d, "outcome": "approved"})
 		if err := use("task.delete", M{"id": "OPS-1"}, d); err != nil {
 			t.Fatalf("an approval within the approver's reach: %v", err)
+		}
+
+		// The owner reaches every project, but answers with a credential
+		// limited to SVA: the approval reaches SVA alone.
+		d = ask("SVA-1", "task.delete", M{"id": "OPS-2"}, "@aram")
+		raw, _ := json.Marshal(M{"id": d, "outcome": "approved"})
+		if _, err := w.e.Apply(ctx, w.ws.ID, engine.Actor{UserID: me, Projects: []string{sva}}, engine.Change{ID: id.New(), Type: "decision.pick", Args: raw}); err != nil {
+			t.Fatal(err)
+		}
+		if err := use("task.delete", M{"id": "OPS-2"}, d); err == nil || w.task("OPS-2").DeletedAt != 0 {
+			t.Fatalf("an approval given with a credential limited to SVA, used to delete an OPS task: %v", err)
 		}
 
 		// Asked of nobody in particular, any person who could make it may answer.

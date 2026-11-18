@@ -397,14 +397,18 @@ type Decision struct {
 	OutcomeNote         string          `json:"outcome_note,omitempty" db:"outcome_note"`
 	DecidedBy           string          `json:"decided_by,omitempty" db:"decided_by,null"`
 	DecidedAt           int64           `json:"decided_at,omitempty" db:"decided_at,null"`
-	Rank                string          `json:"rank" db:"rank"`
-	CreatedBy           string          `json:"created_by" db:"created_by"`
-	CreatedAt           int64           `json:"created_at" db:"created_at"`
-	UpdatedAt           int64           `json:"updated_at" db:"updated_at"`
-	CreatedSeq          int64           `json:"-" db:"created_seq"`
-	UpdatedSeq          int64           `json:"updated_seq" db:"updated_seq"`
-	DeletedAt           int64           `json:"deleted_at,omitempty" db:"deleted_at,null"`
-	Options             []Option        `json:"options,omitempty"`
+	// ApproverProjects are the projects the one who approved a change could
+	// reach when they did, through their membership and the credential they
+	// answered with; nil is every project. The change is held to them.
+	ApproverProjects []string `json:"-" db:"approver_projects,json"`
+	Rank             string   `json:"rank" db:"rank"`
+	CreatedBy        string   `json:"created_by" db:"created_by"`
+	CreatedAt        int64    `json:"created_at" db:"created_at"`
+	UpdatedAt        int64    `json:"updated_at" db:"updated_at"`
+	CreatedSeq       int64    `json:"-" db:"created_seq"`
+	UpdatedSeq       int64    `json:"updated_seq" db:"updated_seq"`
+	DeletedAt        int64    `json:"deleted_at,omitempty" db:"deleted_at,null"`
+	Options          []Option `json:"options,omitempty"`
 }
 
 // Option is one answer a decision offers.
