@@ -152,8 +152,9 @@ export class Desktop {
     return servers.find((server) => server.origin === origin)?.id ?? "";
   }
 
+  /** The count the app last put on its dock badge. */
   async badge(): Promise<number> {
-    return this.app.evaluate(({ app }) => app.getBadgeCount());
+    return this.app.evaluate(() => (globalThis as unknown as { e2e: { badge: number } }).e2e.badge);
   }
 
   async close() {

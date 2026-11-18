@@ -14,9 +14,8 @@
 //
 // GET /__fake/log gives what happened, for the tests to check,
 // GET /__fake/handoff?version=N changes the hand-off version it says it
-// speaks (an upgraded server), GET /__fake/agents the user agents of the requests it passed on (who
-// loaded pages through it), and GET /__fake/provider redirects to another
-// site, as a sign-in provider's start does.
+// speaks (an upgraded server), and GET /__fake/provider redirects to
+// another site, as a sign-in provider's start does.
 
 import { createHash, randomBytes } from "node:crypto";
 import { createServer, type IncomingMessage, request, type Server, type ServerResponse } from "node:http";
@@ -33,7 +32,6 @@ export function startHandoffFake(
 ): Promise<{ url: string; close(): Promise<void> }> {
   const codes = new Map<string, { challenge: string; state: string; used: boolean; at: number }>();
   const log: HandoffEvent[] = [];
-  const agents = new Set<string>();
   let handoff = 1;
   let self = "";
 
@@ -61,11 +59,6 @@ export function startHandoffFake(
     if (url.pathname === "/__fake/log") {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify(log));
-      return;
-    }
-    if (url.pathname === "/__fake/agents") {
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify([...agents]));
       return;
     }
     if (url.pathname === "/__fake/provider") {
@@ -122,7 +115,6 @@ export function startHandoffFake(
   }
 
   function proxy(req: IncomingMessage, res: ServerResponse) {
-    agents.add(req.headers["user-agent"] ?? "");
     const target = new URL(req.url ?? "/", real);
     const upstream = request(
       target,

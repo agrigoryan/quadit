@@ -6,6 +6,7 @@
 
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -28,7 +29,12 @@ function start(
 ): { app: ChildProcess; data: string } {
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-packaged-"));
   if (servers) writeFileSync(join(data, "servers.json"), JSON.stringify({ servers }));
-  const app = spawn(BINARY, args, { env: { ...process.env, ...env, QUADIT_DESKTOP_DATA: data }, stdio: "pipe" });
+  // Cookies are encrypted with a key in the login keychain, which asks the person before it lets an
+  // app with another signature in (each unsigned build has its own): the test keeps to Chromium's stand-in.
+  const app = spawn(BINARY, ["--use-mock-keychain", ...args], {
+    env: { ...process.env, ...env, QUADIT_DESKTOP_DATA: data },
+    stdio: "pipe",
+  });
   return { app, data };
 }
 
@@ -38,8 +44,31 @@ function exitOf(app: ChildProcess): Promise<number | null> {
 
 async function stop(app: ChildProcess) {
   if (app.exitCode !== null) return;
+  const exited = exitOf(app);
   app.kill("SIGTERM");
-  await exitOf(app);
+  const killed = setTimeout(() => app.kill("SIGKILL"), 5000);
+  await exited;
+  clearTimeout(killed);
+}
+
+/** A server of the test's own, that only the app started here asks: it notes each asker's user agent. */
+async function ownServer(): Promise<{ origin: string; agents: string[]; close(): void }> {
+  const agents: string[] = [];
+  const server = createServer((req, res) => {
+    agents.push(req.headers["user-agent"] ?? "");
+    res.end("");
+  });
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  const address = server.address();
+  const port = typeof address === "object" && address ? address.port : 0;
+  return {
+    origin: `http://127.0.0.1:${port}`,
+    agents,
+    close: () => {
+      server.closeAllConnections();
+      server.close();
+    },
+  };
 }
 
 /** Whether anything listens on the port. */
@@ -82,15 +111,17 @@ test("the packaged app claims quadit:// links and has the fuses that keep other 
   });
 });
 
-test("the packaged app starts and opens the server that was open, as the app", async ({ run }) => {
-  const server = { id: "a1b2c3d4e5f6", name: "Fake", origin: run.fake, open: true, handoff: 1 };
-  const { app } = start([], {}, [server]);
+test("the packaged app starts and opens the server that was open, as the app", async () => {
+  const server = await ownServer();
+  const { app } = start([], {}, [{ id: "a1b2c3d4e5f6", name: "Own", origin: server.origin, open: true, handoff: 1 }]);
   try {
-    const agents = async () => (await (await fetch(`${run.fake}/__fake/agents`)).json()) as string[];
-    await expect.poll(agents, { timeout: 30_000 }).toContainEqual(expect.stringMatching(/ QuaditDesktop\/0\.1\.0$/));
+    await expect
+      .poll(() => server.agents, { timeout: 30_000 })
+      .toContainEqual(expect.stringMatching(/ QuaditDesktop\/0\.1\.0$/));
     expect(app.exitCode).toBeNull();
   } finally {
     await stop(app);
+    server.close();
   }
 });
 
@@ -111,17 +142,19 @@ test("the packaged app refuses to start with a DevTools port or the inspector", 
 });
 
 test("the packaged app is no Node.js for whoever sets ELECTRON_RUN_AS_NODE", async () => {
-  const { app, data } = start(["-e", "process.stdout.write('ran as node'); process.exit(7)"], {
-    ELECTRON_RUN_AS_NODE: "1",
-  });
+  // As the app, it opens its window on its server; as Node, it would print, exit and ask nothing.
+  const server = await ownServer();
+  const { app } = start(["-e", "process.stdout.write('ran as node'); process.exit(7)"], { ELECTRON_RUN_AS_NODE: "1" }, [
+    { id: "b1c2d3e4f5a6", name: "Own", origin: server.origin, open: true, handoff: 1 },
+  ]);
   let stdout = "";
   app.stdout?.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
   try {
-    // As Node it would print and exit at once; as the app it starts Chromium, which writes its state.
-    await expect.poll(() => existsSync(join(data, "Local State")), { timeout: 30_000 }).toBe(true);
+    await expect.poll(() => server.agents.length, { timeout: 30_000 }).toBeGreaterThan(0);
     expect(stdout).not.toContain("ran as node");
     expect(app.exitCode).toBeNull();
   } finally {
     await stop(app);
+    server.close();
   }
 });

@@ -188,10 +188,14 @@ test("an inbox item arriving on the live feed is a native notification and a bad
   });
   const { token } = (await made.json()) as { token: string };
   await quadit({ ...run, token }, ["assign", key, "@ann-owner"]);
-
-  await expect.poll(async () => (await desktop.recorded()).notes.length, { timeout: 15_000 }).toBeGreaterThan(0);
-  await expect.poll(() => desktop.badge()).toBeGreaterThan(0);
-  await desktop.clickLastNotification();
-  const page = await desktop.pageOf(run.server);
-  await expect(page).toHaveURL(new RegExp(key));
+  try {
+    await expect.poll(async () => (await desktop.recorded()).notes.length, { timeout: 15_000 }).toBeGreaterThan(0);
+    await expect.poll(() => desktop.badge()).toBeGreaterThan(0);
+    await desktop.clickLastNotification();
+    const page = await desktop.pageOf(run.server);
+    await expect(page).toHaveURL(new RegExp(key));
+  } finally {
+    // The owner's inbox is shared by every test: read, it adds nothing to another test's badge.
+    await quadit(run, ["do", "notification.read", JSON.stringify({ all: true })]);
+  }
 });

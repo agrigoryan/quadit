@@ -6,17 +6,23 @@
 //   shell.openExternal          records the address instead of opening the system browser
 //   Notification.prototype.show records the notification instead of showing it
 //   dialog.showMessageBox       records the message and answers with its cancel button
+//   app.setBadgeCount           records the count (macOS shows a badge only once the app may
+//                               notify, which a test cannot wait for, so the system's own is unreliable)
 //
 // What was recorded is globalThis.e2e, which the tests read back.
 
-const { dialog, Notification, shell } = require("electron");
+const { app, dialog, Notification, shell } = require("electron");
 
-const recorded = { opened: [], notes: [], dialogs: [] };
+const recorded = { opened: [], notes: [], dialogs: [], badge: 0 };
 globalThis.e2e = recorded;
 
 shell.openExternal = async (url) => void recorded.opened.push(url);
 Notification.prototype.show = function show() {
   recorded.notes.push(this);
+};
+app.setBadgeCount = (count = 0) => {
+  recorded.badge = count;
+  return true;
 };
 dialog.showMessageBox = async (...args) => {
   const options = args.at(-1);
