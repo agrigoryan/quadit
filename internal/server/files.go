@@ -242,10 +242,11 @@ func (s *Server) startedAgain(x *c, f core.File) error {
 // Either is kept only if nothing came for the upload since the row was
 // made (another caller may have gone on from its start meanwhile);
 // otherwise f is the upload as it stands. Bytes are counted as they
-// arrive, never more than the size given, or the largest file taken.
+// arrive, never more than the size given, or the largest file taken. A
+// first part with no bytes stores nothing: the upload is kept at 0.
 //
-// A request that brings nothing to keep takes its row away with it, so
-// that a first request sent again starts afresh.
+// A request that fails takes its row away with it, unless bytes came for
+// the upload meanwhile, so that a first request sent again starts afresh.
 func (s *Server) receiveFirstPart(ctx context.Context, db store.DB, f *core.File, src io.Reader, sized bool, maxSize int64) (kept bool, err error) {
 	defer func() {
 		if err != nil {
@@ -287,9 +288,10 @@ func (s *Server) receiveFirstPart(ctx context.Context, db store.DB, f *core.File
 	}
 	set := map[string]any{"received": n, "size": f.Size}
 	received := core.File{ID: f.ID, Parts: []string{}}
-	if n == f.Size {
+	switch {
+	case n == f.Size:
 		err = os.Rename(out.Name(), s.partPath(f.ID))
-	} else {
+	case n > 0:
 		received.Parts = []string{partKey(*f, 0)}
 		set["parts"] = received.Parts
 		if err = s.putLocal(ctx, received.Parts[0], out.Name()); err != nil {

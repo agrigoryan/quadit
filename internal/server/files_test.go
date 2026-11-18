@@ -144,6 +144,32 @@ func TestAPartSentWhileFileStorageCannotBeUsedIsAskedForLater(t *testing.T) {
 	})
 }
 
+// TestAnUploadStartedWithNoBytesKeepsItsPlace: a first request of an
+// upload in parts that carries no bytes makes the upload, at 0, and stores
+// nothing; the parts sent after it make the file.
+func TestAnUploadStartedWithNoBytesKeepsItsPlace(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		disk, err := blob.NewDisk(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		files := &failingFiles{Store: disk}
+		s := newSiteWithFiles(t, st, files)
+		var f uploaded
+		s.call(t, s.owner, "", "POST", w+"/files?name=clip.bin&size=10", nil, 201, &f)
+		if f.State != "uploading" || f.Received != 0 {
+			t.Fatalf("started with no bytes, the upload is %+v", f)
+		}
+		if kept := files.keys(t, ""); len(kept) > 0 {
+			t.Fatalf("a first request with no bytes stored %v", kept)
+		}
+		s.call(t, s.owner, "", "PATCH", w+"/files/"+f.ID+"?offset=0", []byte("0123456789"), 200, &f)
+		if f.State != "ready" || f.SHA256 != sumOf([]byte("0123456789")) {
+			t.Fatalf("its parts sent, the file is %+v", f)
+		}
+	})
+}
+
 // awayFiles is file storage that, while away is set, stores nothing, as
 // a cloud store that is set but still being opened answers.
 type awayFiles struct {
