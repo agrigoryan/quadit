@@ -75,6 +75,38 @@ test("a notification's path is held to the server: one pointing elsewhere opens 
   expect((await desktop.recorded()).opened).toEqual([]);
 });
 
+test("the page cannot send the main process more than it would keep", async ({ desktop, run }) => {
+  await desktop.addServer(run.server);
+  const page = await desktop.signedIn(run.server);
+  // What reaches the main process over IPC, as the main process gets it (a long string by its length).
+  await desktop.app.evaluate(({ ipcMain }) => {
+    const sent: unknown[] = [];
+    Object.assign(globalThis, { sent });
+    const short = (value: unknown) => (typeof value === "string" && value.length > 20 ? `${value.length} long` : value);
+    for (const channel of ["bridge:notify", "bridge:badge"]) {
+      ipcMain.on(channel, (_event, raw: object) =>
+        sent.push(Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, short(value)]))),
+      );
+    }
+  });
+  const sent = () => desktop.app.evaluate(() => (globalThis as unknown as { sent: unknown[] }).sent);
+  await page.evaluate(() => {
+    const huge = "x".repeat(1_000_000);
+    const desktop = window.quaditDesktop;
+    desktop?.notify({ title: huge, body: huge, path: "/e2e", tag: "t", id: "n" });
+    // Too long to be kept: not sent at all.
+    desktop?.notify({ title: "t", body: "b", path: "/" + huge });
+    desktop?.notify({ title: "t", body: "b", path: "/e2e", tag: huge });
+    desktop?.notify({ title: "t", body: "b", path: "/e2e", id: huge });
+    desktop?.setBadge(1, huge);
+    desktop?.setBadge(2, "acme");
+  });
+  await expect.poll(sent).toEqual([
+    { title: "200 long", body: "1000 long", path: "/e2e", tag: "t", id: "n" },
+    { count: 2, workspace: "acme" },
+  ]);
+});
+
 test("each server's unread count adds up on the dock badge", async ({ desktop, run }) => {
   await desktop.addServer(run.server, "One");
   const one = await desktop.signedIn(run.server);

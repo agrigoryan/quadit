@@ -42,7 +42,7 @@ import { HANDOFF_HEADER } from "@/main/handoff";
 import { appPage, browserAddress, isHandoffPage, isOwnPage } from "@/main/origins";
 import { fitOf } from "@/main/probe";
 import type { Server, ServerStore } from "@/main/servers";
-import { BRIDGE_BADGE, BRIDGE_NOTIFY, ORIGIN_SWITCH, VERSION_SWITCH } from "@/shared/bridge";
+import { BRIDGE_BADGE, BRIDGE_NOTIFY, badgeOf, ORIGIN_SWITCH, VERSION_SWITCH } from "@/shared/bridge";
 
 /** The path of the web app's sign-in page: where the bar offering the browser sign-in shows. */
 const SIGN_IN_PATH = "/login";
@@ -100,10 +100,8 @@ export class ServerWindows {
     });
     ipcMain.on(BRIDGE_BADGE, (event, raw: unknown) => {
       const server = this.bridgeSender(event);
-      const { count, workspace } = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
-      if (!server || typeof count !== "number" || !Number.isFinite(count)) return;
-      if (typeof workspace !== "string" || workspace.length > 200) return;
-      setup.reportUnread(server.id, event.sender.id, workspace, Math.min(Math.max(Math.floor(count), 0), 99_999));
+      const badge = badgeOf(raw);
+      if (server && badge) setup.reportUnread(server.id, event.sender.id, badge.workspace, badge.count);
     });
   }
 
