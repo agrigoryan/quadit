@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,13 +35,11 @@ const releasedVersion = 13
 // as the last release left it, written row by row in that release's
 // columns (a person with a password, a session from before sessions said
 // how they signed in, an invitation from before invitations had a scope, a
-// secret in the vault, a stored file and an upload half sent), through
-// "quadit upgrade", and then: the server starts on it and starts again,
-// the session and the invitation still work, the person signs in, the
-// upload goes on to the file that was sent, a backup restores into a new
-// install given the install secret, and "quadit upgrade --undo" puts the
-// database back as it was, with the upload's parts where the last release
-// looks for them.
+// secret in the vault and a stored file), through "quadit upgrade", and
+// then: the server starts on it and starts again, the session and the
+// invitation still work, the person signs in, the file is served, a backup
+// restores into a new install given the install secret, and "quadit
+// upgrade --undo" puts the database back as it was.
 func TestAnInstallOfTheLastReleaseIsUpgradedAndKeepsWorking(t *testing.T) {
 	t.Setenv("QUADIT_SECRET", "")
 	t.Setenv("QUADIT_DATA", "")
@@ -118,11 +115,8 @@ func databasesNamed(admin *sql.DB, prefix string) ([]string, error) {
 // after the upgrade.
 type released struct {
 	ws, owner, ready string
-	// Uploads in parts, each with its first part kept: one the newer
-	// version finishes, and one it goes on with but does not finish.
-	upload, unfinished string
-	session, invite    string // the raw tokens
-	secret             []byte // the install secret
+	session, invite  string // the raw tokens
+	secret           []byte // the install secret
 }
 
 const (
@@ -155,7 +149,7 @@ func writeReleased(t *testing.T, dir, db string) released {
 	}
 	defer raw.db.Close()
 
-	r := released{ws: id.New(), owner: id.New(), upload: id.New(), unfinished: id.New(), ready: id.New(), session: auth.Random(32), invite: auth.Random(32),
+	r := released{ws: id.New(), owner: id.New(), ready: id.New(), session: auth.Random(32), invite: auth.Random(32),
 		secret: []byte(auth.Random(32))}
 	if err := os.WriteFile(filepath.Join(dir, "secret.key"), r.secret, 0o600); err != nil {
 		t.Fatal(err)
@@ -186,27 +180,16 @@ func writeReleased(t *testing.T, dir, db string) released {
 	raw.exec(t, `INSERT INTO secrets (id, workspace_id, name, value, created_by, created_at, updated_at, updated_seq) VALUES (?, ?, 'DEPLOY_TOKEN', ?, ?, ?, ?, 1)`,
 		id.New(), r.ws, sealed, r.owner, now, now)
 
-	// A stored file, and an upload in parts with its first part kept as the
-	// last release kept one: under a key made from its offset alone.
-	put := func(key, body string) {
-		path := filepath.Join(dir, "files", filepath.FromSlash(key))
-		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
 	readyKey := r.ws + "/" + r.ready
-	put(readyKey, "the notes")
+	path := filepath.Join(dir, "files", filepath.FromSlash(readyKey))
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("the notes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	raw.exec(t, `INSERT INTO files (id, workspace_id, name, content_type, size, received, sha256, storage_key, state, uploaded_by, created_at) VALUES (?, ?, 'notes.txt', 'text/plain', 9, 9, ?, ?, 'ready', ?, ?)`,
 		r.ready, r.ws, sumOf("the notes"), readyKey, r.owner, now)
-	for fid, size := range map[string]int{r.upload: 10, r.unfinished: 15} {
-		uploadKey := r.ws + "/" + fid
-		put(fmt.Sprintf("%s.parts/%020d", uploadKey, 0), "hello")
-		raw.exec(t, `INSERT INTO files (id, workspace_id, name, content_type, size, received, storage_key, state, uploaded_by, created_at) VALUES (?, ?, 'clip.bin', 'application/octet-stream', ?, 5, ?, 'uploading', ?, ?)`,
-			fid, r.ws, size, uploadKey, r.owner, now)
-	}
 	return r
 }
 
@@ -345,24 +328,14 @@ func upgradeAndUse(t *testing.T, dir, db string) {
 			t.Fatalf("start %d: the session from before the upgrade: %s", start, out)
 		}
 		if start == 0 {
-			// The upload goes on from the part the last release kept.
-			out := call(t, old, "PATCH", w+"/files/"+r.upload+"?offset=5", strings.NewReader("world"), http.StatusOK)
-			var f core.File
-			if err := json.Unmarshal([]byte(out), &f); err != nil || f.State != core.FileReady || f.SHA256 != sumOf("helloworld") {
-				t.Fatalf("the upload after the upgrade ended as %s, want the sum of helloworld", out)
-			}
-			out = call(t, old, "PATCH", w+"/files/"+r.unfinished+"?offset=5", strings.NewReader("world"), http.StatusOK)
-			if err := json.Unmarshal([]byte(out), &f); err != nil || f.State != core.FileUploading || f.Received != 10 {
-				t.Fatalf("the upload gone on with after the upgrade is %s, want 10 bytes received", out)
-			}
 			// The invitation from before invitations had a scope is taken.
 			call(t, withSession(t, srv.url, ""), "POST", srv.url+"/api/v1/auth/invite/"+r.invite,
 				strings.NewReader(`{"name":"New","email":"new@example.com","password":"another long password"}`), http.StatusOK)
 		}
 		signedIn := withSession(t, srv.url, "")
 		call(t, signedIn, "POST", srv.url+"/api/v1/auth/login", strings.NewReader(`{"email":"`+ownerEmail+`","password":"`+ownerPassword+`"}`), http.StatusOK)
-		if out := call(t, signedIn, "GET", w+"/files/"+r.upload, nil, http.StatusOK); !strings.Contains(out, `"state":"ready"`) {
-			t.Fatalf("start %d: the finished upload: %s", start, out)
+		if got := call(t, signedIn, "GET", srv.url+"/f/"+r.ready+"/file", nil, http.StatusOK); got != "the notes" {
+			t.Fatalf("start %d: the stored file holds %q", start, got)
 		}
 		if out := call(t, signedIn, "GET", w+"/list/members", nil, http.StatusOK); !strings.Contains(out, "new@example.com") && !strings.Contains(out, `"New"`) {
 			t.Fatalf("start %d: the invited person is not a member: %s", start, out)
@@ -386,14 +359,8 @@ func upgradeAndUse(t *testing.T, dir, db string) {
 	restored := serve(t, Options{Data: fresh})
 	signedIn := withSession(t, restored.url, "")
 	call(t, signedIn, "POST", restored.url+"/api/v1/auth/login", strings.NewReader(`{"email":"`+ownerEmail+`","password":"`+ownerPassword+`"}`), http.StatusOK)
-	for fid, want := range map[string]string{r.ready: "the notes", r.upload: "helloworld"} {
-		if got := call(t, signedIn, "GET", restored.url+"/f/"+fid+"/file", nil, http.StatusOK); got != want {
-			t.Fatalf("the restored file %s holds %q, want %q", fid, got, want)
-		}
-	}
-	// The archive holds no part of an upload still arriving: it starts again.
-	if out := call(t, signedIn, "GET", restored.url+"/api/v1/w/games/files/"+r.unfinished, nil, http.StatusOK); strings.Contains(out, `"received"`) {
-		t.Fatalf("the restored upload still arriving: %s, want it at 0", out)
+	if got := call(t, signedIn, "GET", restored.url+"/f/"+r.ready+"/file", nil, http.StatusOK); got != "the notes" {
+		t.Fatalf("the restored file holds %q", got)
 	}
 	restored.stop()
 	st, sealer, err := (&Options{Data: fresh}).Open(ctx)
@@ -425,42 +392,10 @@ func upgradeAndUse(t *testing.T, dir, db string) {
 	if err := back.db.QueryRowContext(ctx, `SELECT MAX(version) FROM schema_migrations`).Scan(&version); err != nil || version != releasedVersion {
 		t.Fatalf("after going back the schema is at %d (%v), want %d", version, err, releasedVersion)
 	}
-	for _, fid := range []string{r.upload, r.unfinished} {
-		var state string
-		var received int64
-		if err := back.db.QueryRowContext(ctx, `SELECT state, received FROM files WHERE id = `+placeholder(isPostgres), fid).Scan(&state, &received); err != nil {
-			t.Fatal(err)
-		}
-		if state != core.FileUploading || received != 5 {
-			t.Fatalf("after going back the upload %s is %s with %d bytes, want uploading with 5, as before the upgrade", fid, state, received)
-		}
-		// The last release goes on from the parts it finds, all of them: they
-		// must be the 5 bytes it counted, and nothing the newer version kept.
-		if got := releasedParts(t, dir, r.ws+"/"+fid); got != "hello" {
-			t.Fatalf("after going back the last release would go on with the upload %s from %q, want the %q it had", fid, got, "hello")
-		}
+	var name string
+	if err := back.db.QueryRowContext(ctx, `SELECT name FROM files WHERE id = `+placeholder(isPostgres), r.ready).Scan(&name); err != nil || name != "notes.txt" {
+		t.Fatalf("after going back the stored file is %q (%v)", name, err)
 	}
-}
-
-// releasedParts is what the last release puts together, to go on with an
-// upload in parts: every part in file storage under the upload's key and
-// ".parts/", in the order of their names.
-func releasedParts(t *testing.T, dir, key string) string {
-	t.Helper()
-	folder := filepath.Join(dir, "files", filepath.FromSlash(key)+".parts")
-	entries, err := os.ReadDir(folder)
-	if err != nil && !os.IsNotExist(err) {
-		t.Fatal(err)
-	}
-	var joined strings.Builder
-	for _, e := range entries { // ReadDir gives them in the order of their names
-		raw, err := os.ReadFile(filepath.Join(folder, e.Name()))
-		if err != nil {
-			t.Fatal(err)
-		}
-		joined.Write(raw)
-	}
-	return joined.String()
 }
 
 // placeholder is the first placeholder of a statement on the database.

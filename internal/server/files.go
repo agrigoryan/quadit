@@ -59,20 +59,10 @@ func (s *Server) partPath(fileID string) string {
 // partKey is a new key for one part of an upload that comes in several
 // requests, which waits in file storage so the next part can reach any
 // server. Each part sent gets a key of its own, so one sent at the same
-// time as another for the same place never writes over the one kept. It is
-// not under legacyParts, where an older version would take it for one of
-// its own.
+// time as another for the same place never writes over the one kept.
 func partKey(f core.File, offset int64) string {
-	return fmt.Sprintf("%s.upload-parts/%020d-%s", f.StorageKey, offset, id.New())
+	return fmt.Sprintf("%s.parts/%020d-%s", f.StorageKey, offset, id.New())
 }
-
-// legacyParts is where a server before schema version 14 kept the parts of
-// an upload, each under a key made from its offset alone, and where it
-// looks for them: it puts together every key there. This version takes
-// those parts over (adoptLegacyParts) but never removes one, so that a
-// database "quadit upgrade --undo" puts back finds the parts it counted,
-// and nothing else.
-func legacyParts(f core.File) string { return f.StorageKey + ".parts/" }
 
 // counter counts what is read through it.
 type counter struct {
@@ -181,7 +171,7 @@ func (s *Server) handleUploadFile(x *c) error {
 	// request under the same id that comes meanwhile finds the row and is
 	// told how far the upload has got, as a retry would be.
 	f := core.File{ID: fid, WorkspaceID: x.ws.ID, Name: up.name, ContentType: up.ctype, Size: size, SHA256: sum, State: core.FileUploading,
-		Parts: []string{}, UploadedBy: x.member.UserID, CreatedAt: time.Now().UnixMilli()}
+		UploadedBy: x.member.UserID, CreatedAt: time.Now().UnixMilli()}
 	f.StorageKey = x.ws.ID + "/" + f.ID
 	if err := x.db.Insert(ctx, f); err != nil {
 		if !errors.Is(err, store.ErrConflict) || q.Get("id") == "" {
@@ -232,14 +222,9 @@ func (s *Server) ownUpload(x *c, fid string) (core.File, bool, error) {
 // on from. One whose bytes all came but could not be stored is finished
 // now.
 func (s *Server) startedAgain(x *c, f core.File) error {
-	if f.State == core.FileUploading {
-		if err := s.adoptLegacyParts(x.ctx(), x.db, &f); err != nil {
+	if f.State == core.FileUploading && f.Received == f.Size {
+		if err := s.finishUpload(x.ctx(), x, &f); err != nil {
 			return err
-		}
-		if f.Received == f.Size {
-			if err := s.finishUpload(x.ctx(), x, &f); err != nil {
-				return err
-			}
 		}
 	}
 	return x.ok(s.fileOut(x, f))
@@ -297,7 +282,7 @@ func (s *Server) receiveFirstPart(ctx context.Context, db store.DB, f *core.File
 		f.Size = n
 	}
 	set := map[string]any{"received": n, "size": f.Size}
-	received := core.File{ID: f.ID, Parts: []string{}}
+	received := core.File{ID: f.ID}
 	switch {
 	case n == f.Size:
 		err = os.Rename(out.Name(), s.partPath(f.ID))
@@ -333,53 +318,6 @@ func (s *Server) putLocal(ctx context.Context, key, path string) error {
 	return s.fileStore().Put(ctx, key, in, "application/octet-stream")
 }
 
-// adoptLegacyParts lists the parts of an upload that a server before
-// schema version 14 started, which listed none (legacyParts). The parts
-// that follow each other from the start, within the bytes counted, become
-// the upload's parts, and the count is where they end: what is not there
-// (a part lost, or one stored but never counted) is asked for again. A
-// whole file waiting on this machine is left as it is.
-func (s *Server) adoptLegacyParts(ctx context.Context, db store.DB, f *core.File) error {
-	if f.State != core.FileUploading || f.Parts != nil {
-		return nil
-	}
-	if _, err := os.Stat(s.partPath(f.ID)); err == nil && f.Received == f.Size {
-		return nil
-	}
-	type part struct {
-		key  string
-		size int64
-	}
-	at := map[int64]part{}
-	prefix := legacyParts(*f)
-	err := s.fileStore().List(ctx, prefix, func(key string, size int64) error {
-		name := strings.TrimPrefix(key, prefix)
-		if offset, err := strconv.ParseInt(name, 10, 64); err == nil && len(name) == 20 {
-			at[offset] = part{key, size}
-		}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("file storage: %w", err)
-	}
-	parts := []string{}
-	var end int64
-	for p, ok := at[end]; ok && p.size > 0 && end+p.size <= f.Received; p, ok = at[end] {
-		parts = append(parts, p.key)
-		end += p.size
-	}
-	changed, err := db.Update(ctx, "files", map[string]any{"parts": parts, "received": end},
-		store.Eq("id", f.ID), store.Eq("state", core.FileUploading), store.Eq("received", f.Received), store.Null("parts"))
-	if err != nil {
-		return err
-	}
-	if changed == 0 {
-		return db.Get(ctx, f, store.Eq("id", f.ID))
-	}
-	f.Parts, f.Received = parts, end
-	return nil
-}
-
 // handleUploadFilePart appends the next part of a file. offset must be where the
 // last part ended; the answer says how much has arrived, so a broken upload
 // resumes from there. An upload whose bytes all came but could not be
@@ -398,9 +336,6 @@ func (s *Server) handleUploadFilePart(x *c) error {
 	}
 	if f.UploadedBy != x.member.UserID {
 		return errForbidden("only the one who started an upload can continue it")
-	}
-	if err := s.adoptLegacyParts(ctx, x.db, &f); err != nil {
-		return err
 	}
 	offset := int64(x.intParam("offset", -1))
 	if offset != f.Received {
@@ -475,10 +410,9 @@ func (s *Server) dropParts(ctx context.Context, keys ...string) {
 }
 
 // dropReceived removes what an upload received, once it is stored or
-// will not be, except the parts an older version kept (legacyParts).
+// will not be.
 func (s *Server) dropReceived(ctx context.Context, f core.File) {
-	ours := slices.DeleteFunc(slices.Clone(f.Parts), func(key string) bool { return strings.HasPrefix(key, legacyParts(f)) })
-	s.dropParts(ctx, ours...)
+	s.dropParts(ctx, f.Parts...)
 	if err := os.Remove(s.partPath(f.ID)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		s.log.Warn("upload: removing what was received", "file", f.ID, "err", err)
 	}
@@ -589,7 +523,7 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 // from the new one (finishUpload).
 func (s *Server) startUploadOver(ctx context.Context, db store.DB, f core.File, why string) error {
 	fresh := fmt.Sprintf("%s/%s-%s", f.WorkspaceID, f.ID, id.New())
-	changed, err := db.Update(ctx, "files", map[string]any{"received": 0, "parts": []string{}, "storage_key": fresh},
+	changed, err := db.Update(ctx, "files", map[string]any{"received": 0, "parts": nil, "storage_key": fresh},
 		store.Eq("id", f.ID), store.Eq("state", core.FileUploading), store.Eq("storage_key", f.StorageKey), store.Eq("received", f.Received))
 	if err != nil {
 		return err

@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/blob"
-	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
@@ -40,7 +39,7 @@ func (f *failingFiles) Open(ctx context.Context, key string) (io.ReadSeekCloser,
 }
 
 func (f *failingFiles) Put(ctx context.Context, key string, r io.Reader, ct string) error {
-	if f.failing.Load() && !strings.Contains(key, ".upload-parts/") {
+	if f.failing.Load() && !strings.Contains(key, ".parts/") {
 		return errors.New("the storage is down")
 	}
 	return f.Store.Put(ctx, key, r, ct)
@@ -96,7 +95,7 @@ func TestAnUploadWhoseStoringFailsCanBeFinishedLater(t *testing.T) {
 			if f.State != "ready" || f.SHA256 != sumOf(data) {
 				t.Fatalf("finished again, the file is %+v, want the sum %s", f, sumOf(data))
 			}
-			if left := files.keys(t, ""); strings.Contains(strings.Join(left, " "), ".upload-parts/") {
+			if left := files.keys(t, ""); strings.Contains(strings.Join(left, " "), ".parts/") {
 				t.Fatalf("parts left behind once the file is stored: %v", left)
 			}
 		})
@@ -216,7 +215,7 @@ type meetingFiles struct {
 }
 
 func (f *meetingFiles) Put(ctx context.Context, key string, r io.Reader, ct string) error {
-	if strings.Contains(key, ".upload-parts/") && !strings.Contains(key, ".upload-parts/00000000000000000000") {
+	if strings.Contains(key, ".parts/") && !strings.Contains(key, ".parts/00000000000000000000") {
 		if f.arrived.Add(1) == f.together {
 			close(f.all)
 		}
@@ -284,31 +283,6 @@ func TestPartsOfOneUploadSentAtOnceTakeTurns(t *testing.T) {
 	})
 }
 
-// legacyUpload writes an upload in parts as a server before schema version
-// 14 left it: each part in file storage under a key made from its offset
-// alone, the parts listed nowhere (the column for them came later and is
-// NULL), and what arrived counted on the row. It gives the file's id.
-func legacyUpload(t *testing.T, s *site, st store.Store, files blob.Store, size, received int64, parts map[int64]string) string {
-	t.Helper()
-	ctx := context.Background()
-	var ws core.Workspace
-	if err := st.Get(ctx, &ws, store.Eq("slug", "games")); err != nil {
-		t.Fatal(err)
-	}
-	f := core.File{ID: id.New(), WorkspaceID: ws.ID, Name: "clip.bin", ContentType: "application/octet-stream", Size: size, Received: received,
-		State: core.FileUploading, UploadedBy: s.ownerID(t), CreatedAt: time.Now().UnixMilli()}
-	f.StorageKey = ws.ID + "/" + f.ID
-	for offset, data := range parts {
-		if err := files.Put(ctx, fmt.Sprintf("%s.parts/%020d", f.StorageKey, offset), strings.NewReader(data), "application/octet-stream"); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := st.In(ws.ID).Insert(ctx, f); err != nil {
-		t.Fatal(err)
-	}
-	return f.ID
-}
-
 // TestAnUploadWhoseBytesAreGoneStartsAgain: an upload whose bytes all came
 // but are no longer kept where it was received (on another server, or on a
 // disk that was lost or restored without them) is not stuck: the caller is
@@ -346,7 +320,7 @@ func TestAnUploadWhoseBytesAreGoneStartsAgain(t *testing.T) {
 			var f uploaded
 			s.call(t, s.owner, "", "POST", w+"/files?name=clip.bin&size=10", []byte("hello"), 201, &f)
 			for _, key := range files.keys(t, "") {
-				if strings.Contains(key, f.ID+".upload-parts/") {
+				if strings.Contains(key, f.ID+".parts/") {
 					if err := files.Delete(context.Background(), key); err != nil {
 						t.Fatal(err)
 					}
@@ -359,73 +333,6 @@ func TestAnUploadWhoseBytesAreGoneStartsAgain(t *testing.T) {
 			if f.State != "ready" || f.SHA256 != sumOf([]byte("helloworld")) {
 				t.Fatalf("sent again from the start, the file is %+v", f)
 			}
-		})
-
-		t.Run("received before the upgrade", func(t *testing.T) {
-			fid := legacyUpload(t, s, st, files, int64(len(data)), int64(len(data)), nil)
-			if out := s.call(t, s.owner, "", "PATCH", fmt.Sprintf(w+"/files/%s?offset=%d", fid, len(data)), nil, 409, nil); !strings.Contains(out, "continue from 0") {
-				t.Fatalf("finished with its bytes gone: %s", out)
-			}
-			var f uploaded
-			s.call(t, s.owner, "", "PATCH", w+"/files/"+fid+"?offset=0", data, 200, &f)
-			if f.State != "ready" || f.SHA256 != sumOf(data) {
-				t.Fatalf("sent again from the start, the file is %+v", f)
-			}
-		})
-	})
-}
-
-// TestAnUploadFromBeforeTheUpgradeGoesOn: an upload in parts that a server
-// before version 14 had started goes on after the upgrade from what that
-// server kept, and ends as every byte that was sent: none dropped, none
-// counted that is not there.
-func TestAnUploadFromBeforeTheUpgradeGoesOn(t *testing.T) {
-	testdb.Each(t, func(t *testing.T, st store.Store) {
-		disk, err := blob.NewDisk(t.TempDir())
-		if err != nil {
-			t.Fatal(err)
-		}
-		files := &failingFiles{Store: disk}
-		s := newSiteWithFiles(t, st, files)
-		finish := func(t *testing.T, fid string, from int64, rest, whole string) {
-			t.Helper()
-			var f uploaded
-			s.call(t, s.owner, "", "PATCH", fmt.Sprintf(w+"/files/%s?offset=%d", fid, from), []byte(rest), 200, &f)
-			if f.State != "ready" || f.SHA256 != sumOf([]byte(whole)) {
-				t.Fatalf("the file ended as %+v, want the sum of %q", f, whole)
-			}
-			if left := files.keys(t, ""); strings.Contains(strings.Join(left, " "), fid+".upload-parts/") {
-				t.Fatalf("parts left behind once the file is stored: %v", left)
-			}
-		}
-
-		t.Run("from where it was", func(t *testing.T) {
-			fid := legacyUpload(t, s, st, files, 10, 5, map[int64]string{0: "hello"})
-			finish(t, fid, 5, "world", "helloworld")
-		})
-
-		t.Run("started again under its id, it says how far it got", func(t *testing.T) {
-			fid := legacyUpload(t, s, st, files, 6, 4, map[int64]string{0: "ab", 2: "cd"})
-			var f uploaded
-			s.call(t, s.owner, "", "POST", w+"/files?name=clip.bin&size=6&id="+fid, []byte("abcdef"), 200, &f)
-			if f.State != "uploading" || f.Received != 4 {
-				t.Fatalf("started again: %+v, want 4 bytes received", f)
-			}
-			finish(t, fid, 4, "ef", "abcdef")
-		})
-
-		t.Run("a part stored but never counted is left out", func(t *testing.T) {
-			fid := legacyUpload(t, s, st, files, 10, 5, map[int64]string{0: "hello", 5: "XXXXX"})
-			finish(t, fid, 5, "world", "helloworld")
-		})
-
-		t.Run("what is not there is asked for again", func(t *testing.T) {
-			fid := legacyUpload(t, s, st, files, 15, 10, map[int64]string{0: "hello"})
-			out := s.call(t, s.owner, "", "PATCH", w+"/files/"+fid+"?offset=10", []byte("again"), 409, nil)
-			if !strings.Contains(out, "continue from 5") {
-				t.Fatalf("a part sent after one that is lost: %s", out)
-			}
-			finish(t, fid, 5, "worldagain", "helloworldagain")
 		})
 	})
 }
@@ -447,7 +354,7 @@ func TestAnUploadIsCheckedBeforeItIsReady(t *testing.T) {
 			var f uploaded
 			s.call(t, s.owner, "", "POST", w+"/files?name=clip.bin&size=10", []byte("hello"), 201, &f)
 			for _, key := range files.keys(t, "") {
-				if strings.Contains(key, f.ID+".upload-parts/") {
+				if strings.Contains(key, f.ID+".parts/") {
 					if err := files.Put(context.Background(), key, strings.NewReader("hel"), ""); err != nil {
 						t.Fatal(err)
 					}
@@ -573,7 +480,7 @@ type heldFiles struct {
 }
 
 func (f *heldFiles) Put(ctx context.Context, key string, r io.Reader, ct string) error {
-	if !strings.Contains(key, ".upload-parts/") {
+	if !strings.Contains(key, ".parts/") {
 		first := false
 		f.once.Do(func() { first = true })
 		if first {

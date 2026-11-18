@@ -248,32 +248,23 @@ func TestAnArchiveHoldsTheFilesItsRowsName(t *testing.T) {
 }
 
 // TestARestoredUploadStartsAgain: an archive keeps no part of an upload
-// still arriving, so a restore sets each such upload back to its start,
-// whether the version that made the archive listed its parts or not: what
-// it had received is not there to go on from.
+// still arriving, so a restore sets each such upload back to its start:
+// what it had received is not there to go on from.
 func TestARestoredUploadStartsAgain(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		ctx := context.Background()
 		files, _ := blob.NewDisk(t.TempDir())
 		ws, owner, _ := fill(t, st, files)
-		// listed: the upload's row lists its parts, as from version 14 on.
-		uploading := func(listed bool) string {
-			f := core.File{ID: id.New(), WorkspaceID: ws.ID, Name: "clip.bin", ContentType: "application/octet-stream", Size: 10, Received: 5,
-				State: core.FileUploading, UploadedBy: owner.ID, CreatedAt: 1}
-			f.StorageKey = ws.ID + "/" + f.ID
-			key := f.StorageKey + ".parts/00000000000000000000"
-			if listed {
-				f.Parts = []string{key}
-			}
-			if err := files.Put(ctx, key, strings.NewReader("hello"), ""); err != nil {
-				t.Fatal(err)
-			}
-			if err := st.In(ws.ID).Insert(ctx, f); err != nil {
-				t.Fatal(err)
-			}
-			return f.ID
+		f := core.File{ID: id.New(), WorkspaceID: ws.ID, Name: "clip.bin", ContentType: "application/octet-stream", Size: 10, Received: 5,
+			State: core.FileUploading, UploadedBy: owner.ID, CreatedAt: 1}
+		f.StorageKey = ws.ID + "/" + f.ID
+		f.Parts = []string{f.StorageKey + ".parts/00000000000000000000-" + id.New()}
+		if err := files.Put(ctx, f.Parts[0], strings.NewReader("hello"), ""); err != nil {
+			t.Fatal(err)
 		}
-		listed, unlisted := uploading(true), uploading(false)
+		if err := st.In(ws.ID).Insert(ctx, f); err != nil {
+			t.Fatal(err)
+		}
 		var archive bytes.Buffer
 		if _, err := backup.Write(ctx, st, files, nil, "test", &archive); err != nil {
 			t.Fatal(err)
@@ -283,14 +274,12 @@ func TestARestoredUploadStartsAgain(t *testing.T) {
 			if _, err := backup.Restore(ctx, dst, dstFiles, nil, bytes.NewReader(archive.Bytes())); err != nil {
 				t.Fatal(err)
 			}
-			for _, fid := range []string{listed, unlisted} {
-				var f core.File
-				if err := dst.In(ws.ID).Get(ctx, &f, store.Eq("id", fid)); err != nil {
-					t.Fatal(err)
-				}
-				if f.State != core.FileUploading || f.Received != 0 || f.Parts == nil || len(f.Parts) != 0 {
-					t.Fatalf("a restored upload is %s with %d bytes and the parts %#v, want uploading from 0 with none", f.State, f.Received, f.Parts)
-				}
+			var got core.File
+			if err := dst.In(ws.ID).Get(ctx, &got, store.Eq("id", f.ID)); err != nil {
+				t.Fatal(err)
+			}
+			if got.State != core.FileUploading || got.Received != 0 || len(got.Parts) != 0 {
+				t.Fatalf("a restored upload is %s with %d bytes and the parts %#v, want uploading from 0 with none", got.State, got.Received, got.Parts)
 			}
 		})
 	})

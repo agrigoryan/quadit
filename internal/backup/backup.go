@@ -242,7 +242,7 @@ func storedFiles(row map[string]any) []string {
 // (storedFiles), so what it had received is not there to go on from.
 func startOver(row map[string]any) {
 	if str(row, "state") != core.FileReady {
-		row["received"], row["parts"] = 0, []any{}
+		row["received"], row["parts"] = 0, nil
 	}
 }
 

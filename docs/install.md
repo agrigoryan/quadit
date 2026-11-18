@@ -150,8 +150,6 @@ Then restart the server, if the upgrade did not. Take a backup first (`quadit ba
 - on SQLite, a file beside it: `quadit.sqlite.before-vN`, where N is the schema version being upgraded to;
 - on Postgres, a database beside it on the same server: `<name>_before_vN`. This needs the database to itself for a moment and a role allowed to create databases; with several servers on one database, stop them all first. Where that is not possible, take a backup yourself and set `QUADIT_UPGRADE_WITHOUT_COPY=1` to upgrade without the copy.
 
-An upload in parts that the older version had started goes on after the upgrade from the parts it kept; a part it had lost is asked for again, and a file is made ready only when its bytes add up to its size. Those parts are left in file storage where the older version keeps them, so that after going back (below) it finds what it had counted.
-
 An import of a folder (Obsidian, Markdown) is given a name when it is made from a zip, and importing again under the same name adds only what is new; a different name makes pages of its own. A folder imported before imports had names keeps its pages, and a named import never takes them for its own: to go on with that import instead, adding only what it lacks, import the folder again with no name and `unnamed=true` (`quadit import obsidian VAULT unnamed=true`, or `"unnamed": "true"` in the API's options). Every import of a kind made before names shares that one set of pages, so this is asked for, never guessed.
 
 A release that does not change the schema makes no copy. Copies are not removed by Quadit: delete old ones once the new version has proved itself. Uploaded files are not copied; an upgrade does not change them.
