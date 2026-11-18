@@ -7,8 +7,12 @@ import { registerServiceWorker } from "@/auth/pwa";
 import { fromBase64Url } from "@/auth/webauthn";
 import { api } from "@/data/api";
 
-/** unsupported: this browser cannot; blocked: the person said no in the browser; off / on: for this device. */
-export type PushState = "unsupported" | "blocked" | "off" | "on";
+/**
+ * unsupported: this browser cannot; blocked: the person said no in the
+ * browser; off / on: for this device; app: this is the Quadit desktop app,
+ * which has no push and shows notifications itself (shell/system-notices.ts).
+ */
+export type PushState = "unsupported" | "blocked" | "off" | "on" | "app";
 
 const SUBSCRIPTIONS = "/api/v1/push/subscriptions";
 
@@ -16,6 +20,7 @@ const supported = () =>
   typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 
 export async function pushState(): Promise<PushState> {
+  if (typeof window !== "undefined" && window.quaditDesktop) return "app";
   if (!supported()) return "unsupported";
   if (Notification.permission === "denied") return "blocked";
   const reg = await registerServiceWorker();

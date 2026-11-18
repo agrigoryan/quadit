@@ -69,6 +69,9 @@ export const meStrings = {
   "me.notify.state.unsupported": "Not available",
   "me.notify.state.unsupportedHint":
     "This browser cannot receive push. On an iPhone or iPad, add Quadit to the Home Screen and open it from there.",
+  "me.notify.state.app": "Quadit app",
+  "me.notify.state.appHint":
+    "The Quadit app shows a notification on this computer for each new item in the inbox of the workspace open in it, while the app runs.",
   "me.notify.turnOn": "Turn on for this device",
   "me.notify.turnOff": "Turn off",
   "me.notify.test": "Send a test",

@@ -83,6 +83,7 @@ const stateTone: Record<PushState, "ok" | "neutral" | "danger" | "wait"> = {
   off: "neutral",
   blocked: "danger",
   unsupported: "wait",
+  app: "ok",
 };
 
 function PushSection({ account }: { account: Account }) {
