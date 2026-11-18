@@ -11,7 +11,7 @@ export class ConnectPage {
 
   constructor(
     private pages: AppPages,
-    connections: Connections,
+    private connections: Connections,
   ) {
     pages.answer({
       connectState: () => connections.state(),
@@ -19,6 +19,7 @@ export class ConnectPage {
       applyConnect: (_sender, planId) => connections.applyConnect(String(planId)),
       planDisconnect: (_sender, harness) => connections.planDisconnect(String(harness)),
       applyDisconnect: (_sender, planId) => connections.applyDisconnect(String(planId)),
+      dropPlan: () => connections.dropPlans(),
       showBackups: async () => {
         mkdirSync(connections.backupsDir, { recursive: true });
         await shell.openPath(connections.backupsDir);
@@ -40,7 +41,10 @@ export class ConnectPage {
       minHeight: 480,
       title: "Connect Agents",
     });
-    this.win.on("closed", () => (this.win = undefined));
+    this.win.on("closed", () => {
+      this.win = undefined;
+      this.connections.dropPlans();
+    });
   }
 }
 
@@ -55,9 +59,11 @@ function choiceOf(raw: unknown): ConnectChoice {
     workspaceId: text(c.workspaceId),
     methods: Array.isArray(c.methods) ? c.methods.filter((m) => m === "cli" || m === "mcp") : [],
     agent:
-      typeof agent.id === "string"
-        ? { id: agent.id }
-        : { create: { name: text(create.name), handle: text(create.handle) } },
+      c.agent === null
+        ? null
+        : typeof agent.id === "string"
+          ? { id: agent.id }
+          : { create: { name: text(create.name), handle: text(create.handle) } },
     allowUnattended: c.allowUnattended === true,
   };
 }

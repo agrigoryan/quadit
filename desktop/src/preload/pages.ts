@@ -34,6 +34,7 @@ const api: PagesApi = {
   planConnect: call("planConnect"),
   applyConnect: call("applyConnect"),
   planDisconnect: call("planDisconnect"),
+  dropPlan: call("dropPlan"),
   applyDisconnect: call("applyDisconnect"),
   showBackups: call("showBackups"),
   onChanged(listener) {

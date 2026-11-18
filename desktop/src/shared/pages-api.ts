@@ -86,8 +86,12 @@ export interface ConnectView {
     linkInto: string | null;
     manual: string | null;
   };
-  /** The computer's default login, when there is one Connect did not make: its server. Connect leaves it as it is. */
-  defaultLogin: string | null;
+  /**
+   * The computer's default login, when there is one: its server, and the
+   * agent it is (null when its server could not be asked). The harnesses
+   * without a login of their own work as it.
+   */
+  defaultLogin: { server: string | null; agent: string | null } | null;
   /** The Quadit plugin for Claude Code is installed: its MCP entry needs QUADIT_URL and QUADIT_TOKEN. */
   claudePlugin: boolean;
 }
@@ -97,7 +101,8 @@ export interface ConnectChoice {
   serverId: string;
   workspaceId: string;
   methods: ConnectMethod[];
-  agent: { id: string } | { create: { name: string; handle: string } };
+  /** Null where no choice would hold: the quadit command alone, working as a default login already there. */
+  agent: { id: string } | { create: { name: string; handle: string } } | null;
   /** Let the harness use quadit without asking each time, where it has a setting for that. */
   allowUnattended: boolean;
 }
@@ -152,6 +157,8 @@ export interface PagesApi {
   planConnect(c: ConnectChoice): Promise<Planned>;
   applyConnect(planId: string): Promise<{ ok: true; hint: string } | { ok: false; error: string }>;
   planDisconnect(harness: string): Promise<Planned>;
+  /** Drops the plan under review (Cancel). */
+  dropPlan(): Promise<void>;
   applyDisconnect(planId: string): Promise<{ ok: true; notes: string[] } | { ok: false; error: string }>;
   showBackups(): Promise<void>;
 }

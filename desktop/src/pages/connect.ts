@@ -22,6 +22,8 @@ const result = element<HTMLParagraphElement>("result");
 const NEW_AGENT = "";
 
 let views: SummaryView[] = [];
+/** The computer's default login, as the last look at the harnesses found it. */
+let defaultLogin: ConnectView["defaultLogin"] = null;
 let harness: HarnessView | null = null;
 let plan: {
   view: PlanView;
@@ -61,6 +63,7 @@ function harnessRow(h: HarnessView): HTMLLIElement {
 
 async function render() {
   const view = await api.connectState();
+  defaultLogin = view.defaultLogin;
   element("unsupported").hidden = view.supported;
   cli.textContent = view.supported ? describeCli(view) : "";
   notices.replaceChildren(
@@ -68,7 +71,7 @@ async function render() {
       ? [
           make(
             "li",
-            `This computer's default quadit login is for ${view.defaultLogin}. Connect leaves it as it is.`,
+            `This computer's default quadit login is ${loginName(view.defaultLogin)}. The tools without a login of their own work as it.`,
             "hint",
           ),
         ]
@@ -121,6 +124,36 @@ function fillAgents() {
   agents.replaceChildren(...options);
   if (options.some((o) => o.value === previous)) agents.value = previous;
   newAgent.hidden = agents.value !== NEW_AGENT || options.length === 0;
+  showIdentity();
+}
+
+function loginName(login: NonNullable<ConnectView["defaultLogin"]>): string {
+  return `${login.agent ?? "an agent its server did not name"} on ${login.server ?? "its server"}`;
+}
+
+/**
+ * Whether choosing an agent holds: not for the quadit command alone in a
+ * tool that works as the default login already there. Says whom it works as.
+ */
+function showIdentity() {
+  if (!harness) return;
+  const h = harness;
+  const mcp = checked("mcp") && h.mcp;
+  const fixed = h.cliIdentity === "default" && defaultLogin !== null;
+  element("agent-choice").hidden = fixed && !mcp;
+  newAgent.hidden = (fixed && !mcp) || agents.value !== NEW_AGENT || agents.options.length === 0;
+  identity.textContent =
+    h.cliIdentity === "own"
+      ? `With the quadit command, ${h.name} gets a login of its own, as the agent chosen here.`
+      : fixed && defaultLogin
+        ? `With the quadit command, ${h.name} works as this computer's default login, ${loginName(defaultLogin)}: it has no setting the app can use to give it a login of its own.` +
+          (h.mcp
+            ? mcp
+              ? " The agent chosen here is the one to pick when it signs in to MCP."
+              : " Connect it by MCP to give it an agent of its own."
+            : "")
+        : `${h.name} has no setting the app can use to give the quadit command its own login: there it works as this computer's default login, made now for the agent chosen here.` +
+          (h.mcp ? " Connect it by MCP to give it an agent of its own." : "");
 }
 
 function startChoice(h: HarnessView) {
@@ -131,11 +164,7 @@ function startChoice(h: HarnessView) {
   element("choose-title").textContent = `Connect ${h.name}`;
   element("mcp-option").hidden = !h.mcp;
   (form.elements.namedItem("mcp") as HTMLInputElement).checked = false;
-  identity.textContent =
-    h.cliIdentity === "own"
-      ? `With the quadit command, ${h.name} gets a login of its own, as the agent chosen here.`
-      : `${h.name} has no setting the app can use to give the quadit command its own login: there it works as this computer's default login.` +
-        (h.mcp ? " Connect it by MCP to give it an agent of its own." : "");
+  showIdentity();
   if (views.length === 0) choiceError.textContent = "Open a workspace in one of Quadit's windows first.";
   choose.hidden = false;
 }
@@ -149,7 +178,11 @@ async function review() {
     serverId: view.serverId,
     workspaceId: view.summary.workspace.id,
     methods: [...(checked("cli") ? ["cli" as const] : []), ...(checked("mcp") && harness.mcp ? ["mcp" as const] : [])],
-    agent: create ? { create: { name: value("agent-name"), handle: value("agent-handle") } } : { id: agents.value },
+    agent: element("agent-choice").hidden
+      ? null
+      : create
+        ? { create: { name: value("agent-name"), handle: value("agent-handle") } }
+        : { id: agents.value },
     allowUnattended: checked("unattended"),
   };
   choiceError.textContent = "";
@@ -221,18 +254,21 @@ element<HTMLButtonElement>("apply").addEventListener("click", () => {
 element("cancel-plan").addEventListener("click", () => {
   plan = null;
   planSection.hidden = true;
+  void api.dropPlan();
 });
 element("cancel-choice").addEventListener("click", () => {
   choose.hidden = true;
   planSection.hidden = true;
+  void api.dropPlan();
 });
+(form.elements.namedItem("mcp") as HTMLInputElement).addEventListener("change", showIdentity);
 element("backups").addEventListener("click", () => void api.showBackups());
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   void review();
 });
 workspaces.addEventListener("change", fillAgents);
-agents.addEventListener("change", () => (newAgent.hidden = agents.value !== NEW_AGENT));
+agents.addEventListener("change", showIdentity);
 
 // The workspaces change as windows come and go; the harnesses only when the page asks again.
 api.onChanged(() => void fillWorkspaces());

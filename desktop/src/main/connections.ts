@@ -82,8 +82,10 @@ type Plan =
       harness: Harness;
       choice: ConnectChoice;
       origin: string;
-      /** The agent to work as; null when it is to be made at Apply. */
+      /** The agent chosen; null when it is to be made at Apply, or when no choice holds (worksAs). */
       agent: { id: string; handle: string; name: string } | null;
+      /** Who the quadit command will work as when that is the default login already there, not the agent chosen. */
+      worksAs: { id: string; handle: string } | null;
       edits: FileEdit[];
       applied: Applied[];
       /** Changes another connection made already, recorded for this one too. */
@@ -128,7 +130,16 @@ export class Connections {
     const binary = look.found?.path ?? cli.bundled;
     const defaultConfig = supported && binary ? await cli.defaultConfig(binary).catch(() => null) : null;
     const ledger = this.ledger();
-    const owned = this.targets(ledger, null);
+    const defaultLogin =
+      defaultConfig && binary && existsSync(defaultConfig)
+        ? {
+            server: savedServer(defaultConfig),
+            agent: await cli.whoIs(binary, defaultConfig).then(
+              (who) => `@${who.handle}`,
+              () => null,
+            ),
+          }
+        : null;
     return {
       supported,
       harnesses: HARNESSES.map((harness) => {
@@ -156,10 +167,7 @@ export class Connections {
         linkInto: look.found || !cli.bundled ? null : look.linkInto,
         manual: look.found || (cli.bundled && look.linkInto) ? null : manualInstall(cli.bundled),
       },
-      defaultLogin:
-        defaultConfig && !owned.has(targetOf({ kind: "file", path: defaultConfig, content: "" }))
-          ? savedServer(defaultConfig)
-          : null,
+      defaultLogin,
       claudePlugin: claudePluginInstalled(home),
     };
   }
@@ -192,23 +200,13 @@ export class Connections {
       )?.summary;
     const origin = this.parts.server(choice.serverId)?.origin;
     if (!summary || !origin) throw new EditRefused("Open that workspace in its server's window first.");
-    let agent: { id: string; handle: string; name: string } | null = null;
-    if ("create" in choice.agent) {
-      if (!summary.me.canCreateAgents) throw new EditRefused("You may not make agents in this workspace.");
-      if (!choice.agent.create.name.trim() || !choice.agent.create.handle.trim()) {
-        throw new EditRefused("Give the new agent a name and a handle.");
-      }
-    } else {
-      const id = choice.agent.id;
-      agent = summary.agents.find((a) => a.id === id && a.usable) ?? null;
-      if (!agent) throw new EditRefused("Pick an agent you may connect as.");
-    }
-
     // What another connection did already is shared with it, not done again.
     const others = this.recordsByTarget(ledger);
     const changes: Change[] = [];
     const warnings: string[] = [];
     let login: { binary: string; config: string } | null = null;
+    let worksAs: { id: string; handle: string } | null = null;
+    let sharedToken: Connection["token"] = null;
     if (methods.includes("cli")) {
       const look = await cli.look();
       const binary = look.found?.path ?? cli.bundled;
@@ -238,19 +236,34 @@ export class Connections {
         const config = join(dirname(defaultConfig), `${harness.id}.json`);
         changes.push({ kind: "written-by", path: config, shown }, ...harness.env(home, config));
         login = { binary, config };
+      } else if (existsSync(defaultConfig)) {
+        // The login there holds whatever agent is chosen here: the plan says whom it is, and records that.
+        const who = await cli.whoIs(binary, defaultConfig).catch((err: Error) => {
+          throw new EditRefused(
+            `The default login (${defaultConfig}) did not say who it is, so Connect cannot tell whom ${harness.name} would work as: ${err.message}`,
+          );
+        });
+        worksAs = { id: who.id, handle: who.handle };
+        const made = others.has(targetOf({ kind: "written-by", path: defaultConfig, shown }));
+        warnings.push(
+          `${harness.name} has no setting the app can use to give quadit its own login, so there quadit works as this ` +
+            `computer's default login: @${who.handle} on ${savedServer(defaultConfig) ?? "its server"}. ` +
+            (made ? "Connect made that login for another harness." : "Connect leaves that login as it is.") +
+            (harness.mcp ? " Connect it by MCP to give it an agent of its own." : ""),
+        );
+        if (made) {
+          changes.push({ kind: "written-by", path: defaultConfig, shown });
+          const config = realPath(defaultConfig);
+          sharedToken = Object.values(ledger.harnesses).find((c) => c.token?.config === config)?.token ?? null;
+        }
       } else {
         warnings.push(
           `${harness.name} has no setting the app can use to give quadit its own login, so there quadit works as ` +
-            `this computer's default login (${defaultConfig}). Connect it by MCP to give it an agent of its own.`,
+            `this computer's default login (${defaultConfig}), made now for the agent chosen.` +
+            (harness.mcp ? " Connect it by MCP to give it an agent of its own." : ""),
         );
-        if (!existsSync(defaultConfig) || others.has(targetOf({ kind: "written-by", path: defaultConfig, shown }))) {
-          changes.push({ kind: "written-by", path: defaultConfig, shown });
-          login = { binary, config: defaultConfig };
-        } else {
-          warnings.push(
-            `The default login is there already (${savedServer(defaultConfig) ?? "unknown server"}) and Connect leaves it as it is.`,
-          );
-        }
+        changes.push({ kind: "written-by", path: defaultConfig, shown });
+        login = { binary, config: defaultConfig };
       }
       if (choice.allowUnattended && harness.allowCli) {
         changes.push(...harness.allowCli.changes(home));
@@ -267,14 +280,24 @@ export class Connections {
       );
     }
 
+    // An agent is chosen only where the choice holds: not for the quadit command alone on a default login already there.
+    let agent: { id: string; handle: string; name: string } | null = null;
+    if (!worksAs || methods.includes("mcp")) {
+      if (!choice.agent) throw new EditRefused("Pick an agent you may connect as.");
+      if ("create" in choice.agent) {
+        if (!summary.me.canCreateAgents) throw new EditRefused("You may not make agents in this workspace.");
+        if (!choice.agent.create.name.trim() || !choice.agent.create.handle.trim()) {
+          throw new EditRefused("Give the new agent a name and a handle.");
+        }
+      } else {
+        const id = choice.agent.id;
+        agent = summary.agents.find((a) => a.id === id && a.usable) ?? null;
+        if (!agent) throw new EditRefused("Pick an agent you may connect as.");
+      }
+    }
+
     const own = changes.filter((change) => !others.has(targetOf(change)));
     const shared = changes.flatMap((change) => others.get(targetOf(change)) ?? []);
-    let sharedToken: Connection["token"] = null;
-    if (login && others.has(targetOf({ kind: "written-by", path: login.config, shown: "" }))) {
-      sharedToken =
-        Object.values(ledger.harnesses).find((c) => c.token?.config === realPath(login?.config ?? ""))?.token ?? null;
-      login = null;
-    }
     const { edits, applied } = planChanges(own);
     const plan: Plan = {
       kind: "connect",
@@ -283,6 +306,7 @@ export class Connections {
       choice: { ...choice, methods },
       origin,
       agent,
+      worksAs,
       edits,
       applied,
       shared,
@@ -291,8 +315,15 @@ export class Connections {
       backupDir: this.backupDir(harness.id),
       warnings,
     };
+    // One outstanding plan: a new one replaces any other.
+    this.plans.clear();
     this.plans.set(plan.id, plan);
     return plan;
+  }
+
+  /** Drops the outstanding plan (its page cancelled it or closed). */
+  dropPlans() {
+    this.plans.clear();
   }
 
   /** Carries out a connect plan the person saw; it is good for one Apply. */
@@ -306,18 +337,19 @@ export class Connections {
     const ask = (request: DesktopRequest) => this.parts.ask(choice.serverId, choice.workspaceId, request);
 
     let agent = plan.agent;
-    if (!agent && "create" in choice.agent) {
+    if (!agent && choice.agent && "create" in choice.agent) {
       const made = await ask({ kind: "agent", create: choice.agent.create });
       if (!made.ok || !made.agent) return { ok: false, error: made.ok ? "The agent was not made." : made.message };
       agent = made.agent;
     }
-    if (!agent) return { ok: false, error: "Pick an agent you may connect as." };
+    const worksAs = plan.worksAs ?? agent;
+    if (!worksAs) return { ok: false, error: "Pick an agent you may connect as." };
 
     const backups = backUp(plan.edits, plan.backupDir);
     let token = plan.sharedToken;
     if (plan.login) {
       const label = `${harness.name} on ${this.parts.hostName}`;
-      const issued = await ask({ kind: "agent-token", agent: agent.id, label });
+      const issued = await ask({ kind: "agent-token", agent: worksAs.id, label });
       if (!issued.ok || !issued.token) return { ok: false, error: issued.ok ? "No token was made." : issued.message };
       try {
         await this.parts.cli.login(plan.login.binary, plan.origin, issued.token.secret, plan.login.config);
@@ -345,13 +377,13 @@ export class Connections {
       serverId: choice.serverId,
       workspaceId: choice.workspaceId,
       methods: choice.methods,
-      agent: { id: agent.id, handle: agent.handle },
+      agent: { id: worksAs.id, handle: worksAs.handle },
       edits: [...records, ...plan.shared],
       token,
       at: Date.now(),
     };
     this.saveLedger(ledger);
-    return { ok: true, hint: connectedHint(harness, choice.methods, agent.handle) };
+    return { ok: true, hint: connectedHint(harness, choice.methods, worksAs.handle, agent?.handle ?? worksAs.handle) };
   }
 
   /** Plans taking back what Connect did for a harness, where its files still say what was written. */
@@ -383,6 +415,7 @@ export class Connections {
             : []),
         ],
       };
+      this.plans.clear();
       this.plans.set(plan.id, plan);
       return { ok: true, plan: this.view(plan) };
     } catch (err) {
@@ -484,22 +517,24 @@ export class Connections {
 }
 
 /** What the person does next, once connected. */
-function connectedHint(harness: Harness, methods: ConnectMethod[], handle: string): string {
+function connectedHint(harness: Harness, methods: ConnectMethod[], cliAs: string, mcpAs: string): string {
   const lines = [`Start a new ${harness.name} session to pick up the changes.`];
   if (methods.includes("cli")) {
     lines.push(
       harness.env
-        ? `There the quadit command works as @${handle}.`
-        : "There the quadit command works as this computer's default login.",
+        ? `There the quadit command works as @${cliAs}.`
+        : `There the quadit command works as this computer's default login, @${cliAs}.`,
     );
   }
-  if (methods.includes("mcp") && harness.mcp) lines.push(`${harness.mcp.signIn} When it asks, work as @${handle}.`);
+  if (methods.includes("mcp") && harness.mcp) lines.push(`${harness.mcp.signIn} When it asks, work as @${mcpAs}.`);
   return lines.join(" ");
 }
 
 /** How to put the quadit command on PATH by hand. */
 function manualInstall(bundled: string | null): string {
-  return bundled ? `sudo ln -s '${bundled}' /usr/local/bin/quadit` : "brew install agrigoryan/tap/quadit";
+  return bundled
+    ? `sudo ln -s '${bundled}' /usr/local/bin/quadit`
+    : "curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh";
 }
 
 /** The server a quadit config file is for (never its token), or null when it says none. */

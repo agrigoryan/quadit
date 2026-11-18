@@ -24,7 +24,11 @@ import type { ConnectChoice } from "@/shared/pages-api";
 
 const ORIGIN = "https://q.example";
 
-/** A quadit that answers what Connect runs: version, skill, login --path, and login URL - with the token on stdin. */
+/**
+ * A quadit that answers what Connect runs: version, skill, login --path,
+ * login URL - with the token on stdin, and --json me, which says the login
+ * with token T is the agent @as-T.
+ */
 function standIn(path: string, defaultConfig: string) {
   writeFileSync(
     path,
@@ -32,6 +36,12 @@ function standIn(path: string, defaultConfig: string) {
 default='${defaultConfig}'
 case "$1" in
   version) echo "quadit 9.9.9 (agent surface 2.0)" ;;
+  --json)
+    config="\${QUADIT_CONFIG:-$default}"
+    [ "$2" = me ] && [ -z "$QUADIT_TOKEN" ] && [ -f "$config" ] || exit 1
+    token=$(sed -n 's/.*"token": *"\\([^"]*\\)".*/\\1/p' "$config")
+    [ -n "$token" ] || { echo "not signed in" >&2; exit 1; }
+    printf '{"user_id":"id-%s","handle":"@as-%s","name":"As %s"}\\n' "$token" "$token" "$token" ;;
   skill) printf '# Quadit skill\\n' ;;
   login)
     if [ "$2" = "--path" ]; then echo "\${QUADIT_CONFIG:-$default}"; exit 0; fi
@@ -47,7 +57,7 @@ esac
   chmodSync(path, 0o755);
 }
 
-function setUp({ quaditOnPath = true } = {}) {
+function setUp({ quaditOnPath = true, bundled = true } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
   const home = join(root, "home");
   const bin = join(root, "bin");
@@ -64,7 +74,7 @@ function setUp({ quaditOnPath = true } = {}) {
     dataDir: join(root, "data"),
     platform: "darwin",
     hostName: "mac",
-    cli: new QuaditCli(quaditOnPath ? null : script, async () => `relative-folder:${bin}`),
+    cli: new QuaditCli(quaditOnPath || !bundled ? null : script, async () => `relative-folder:${bin}`),
     summaries: () => [
       {
         serverId: "s1",
@@ -281,7 +291,7 @@ describe("Connect and Disconnect", () => {
   it("shares the skill and the default login between harnesses, and takes them back with the last", async () => {
     const { connect, disconnect, asked, home, configDir, choice } = setUp();
     await connect(choice("gemini"));
-    await connect(choice("cursor"));
+    await connect(choice("cursor", { agent: null }));
     // One token for the default login, made once.
     expect(asked.filter((r) => r.kind === "agent-token")).toHaveLength(1);
     const skill = join(home, ".agents", "skills", "quadit", "SKILL.md");
@@ -300,8 +310,8 @@ describe("Connect and Disconnect", () => {
     const { connections, connect, disconnect, asked, configDir, choice } = setUp();
     mkdirSync(configDir, { recursive: true });
     writeFileSync(join(configDir, "config.json"), JSON.stringify({ url: "https://mine.example", token: "qd_mine" }));
-    expect((await connections.state()).defaultLogin).toBe("https://mine.example");
-    await connect(choice("pi"));
+    expect((await connections.state()).defaultLogin).toEqual({ server: "https://mine.example", agent: "@as-qd_mine" });
+    await connect(choice("pi", { agent: null }));
     expect(asked).toEqual([]);
     await disconnect("pi");
     expect(JSON.parse(readFileSync(join(configDir, "config.json"), "utf8"))).toEqual({
@@ -356,5 +366,65 @@ describe("an older quadit", () => {
       ok: false,
       error: expect.stringMatching(/is older than this app and cannot be connected: update it/),
     });
+  });
+});
+
+describe("the default login", () => {
+  it("says whom a harness without a login of its own will work as, and records that agent, not another", async () => {
+    const { connections, connect, choice, ledger } = setUp();
+    await connect(choice("gemini"));
+    // Cursor would share Gemini's login, made for @coder (token qd_secret1): no other agent holds.
+    const planned = await connections.planConnect(choice("cursor", { agent: null }));
+    if (!planned.ok) throw new Error(planned.error);
+    expect(planned.plan.warnings.join(" ")).toContain(
+      "works as this computer's default login: @as-qd_secret1 on https://q.example",
+    );
+    const hint = await connect(choice("cursor", { agent: null }));
+    expect(hint).toContain("default login, @as-qd_secret1");
+    expect(JSON.parse(ledger()).harnesses.cursor.agent).toEqual({ id: "id-qd_secret1", handle: "as-qd_secret1" });
+  });
+
+  it("still asks for an agent where the choice holds: with no default login yet, or for MCP", async () => {
+    const { connections, connect, choice } = setUp();
+    expect(await connections.planConnect(choice("gemini", { agent: null }))).toEqual({
+      ok: false,
+      error: "Pick an agent you may connect as.",
+    });
+    await connect(choice("pi"));
+    expect(await connections.planConnect(choice("gemini", { methods: ["cli", "mcp"], agent: null }))).toMatchObject({
+      ok: false,
+    });
+  });
+
+  it("refuses when the default login cannot say who it is", async () => {
+    const { connections, configDir, choice } = setUp();
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(join(configDir, "config.json"), "{}");
+    expect(await connections.planConnect(choice("pi", { agent: null }))).toEqual({
+      ok: false,
+      error: expect.stringContaining("did not say who it is"),
+    });
+  });
+});
+
+describe("plans", () => {
+  it("keeps one outstanding: a new one, or dropping, takes the last away", async () => {
+    const { connections, choice } = setUp();
+    const first = await connections.planConnect(choice("cursor", { methods: ["mcp"] }));
+    const second = await connections.planConnect(choice("cursor", { methods: ["mcp"] }));
+    if (!first.ok || !second.ok) throw new Error("not planned");
+    expect(await connections.applyConnect(first.plan.id)).toMatchObject({ ok: false });
+    connections.dropPlans();
+    expect(await connections.applyConnect(second.plan.id)).toMatchObject({ ok: false });
+  });
+
+  it("offers the install script, not a link, where the app has no copy it can link (an AppImage)", async () => {
+    const { connections, choice, bin } = setUp({ quaditOnPath: false, bundled: false });
+    expect((await connections.state()).cli.manual).toContain("install.sh | sh");
+    expect(await connections.planConnect(choice("pi"))).toEqual({
+      ok: false,
+      error: expect.stringContaining("install.sh | sh"),
+    });
+    expect(existsSync(join(bin, "quadit"))).toBe(false);
   });
 });

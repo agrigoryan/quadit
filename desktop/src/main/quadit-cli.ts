@@ -2,8 +2,8 @@
 // login shell (where the harnesses that run it look), or the app's own copy
 // (bundled in its resources) linked into the first folder on that PATH the
 // person may write to. The app runs only `quadit version`, `quadit skill`,
-// `quadit login --path` and `quadit login URL -` with the token on
-// standard input, so that it never shows on a command line.
+// `quadit me`, `quadit login --path` and `quadit login URL -` with the
+// token on standard input, so that it never shows on a command line.
 
 import { execFile } from "node:child_process";
 import { accessSync, constants, statSync } from "node:fs";
@@ -46,6 +46,19 @@ export class QuaditCli {
   /** The skill the command carries. */
   skill(binary: string): Promise<string> {
     return run(binary, ["skill"]);
+  }
+
+  /** Who the login saved in `config` is: asks its server (`quadit me`), whatever the app's environment says. */
+  async whoIs(binary: string, config: string): Promise<{ id: string; handle: string; name: string }> {
+    const said = await run(binary, ["--json", "me"], {
+      QUADIT_CONFIG: config,
+      QUADIT_URL: undefined,
+      QUADIT_TOKEN: undefined,
+    });
+    const me = JSON.parse(said) as { user_id?: unknown; handle?: unknown; name?: unknown };
+    if (typeof me.user_id !== "string" || typeof me.handle !== "string")
+      throw new Error("quadit me: no identity in its answer");
+    return { id: me.user_id, handle: me.handle.replace(/^@/, ""), name: typeof me.name === "string" ? me.name : "" };
   }
 
   /** Checks `token` against the server at `origin` and saves both to `config`. */
