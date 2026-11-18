@@ -20,17 +20,28 @@ type folder struct{ kind string }
 // Kind is "markdown" or "obsidian".
 func (f folder) Kind() string { return f.kind }
 
-// Read reads the folder, or the zip of it, at source.
+// Read reads the folder, or the zip of it, at source. A file's path names
+// it only within its folder, so the plan's origin is the folder: its full
+// path, or the zip's name, which stays the same each time the zip is
+// uploaded again.
 func (f folder) Read(source string, _ Options, _ *http.Client) (Plan, error) {
 	dir, tmp, err := unpacked(source, f.kind, zipByName)
 	if err != nil {
 		return Plan{}, err
 	}
+	origin := filepath.Base(source)
+	if tmp == "" {
+		if origin, err = filepath.Abs(source); err != nil {
+			return Plan{}, err
+		}
+	}
 	// A zip of one folder holds that folder: read inside it.
 	if entries, err := os.ReadDir(dir); tmp != "" && err == nil && len(entries) == 1 && entries[0].IsDir() {
 		dir = filepath.Join(dir, entries[0].Name())
 	}
-	return (&tree{source: f.kind, root: dir, tmp: tmp}).read()
+	plan, err := (&tree{source: f.kind, root: dir, tmp: tmp}).read()
+	plan.Origin = origin
+	return plan, err
 }
 
 // zipRule says which files unpacked takes for a zip.

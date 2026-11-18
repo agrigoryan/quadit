@@ -19,7 +19,14 @@ import "os"
 
 // Plan is everything one import will make.
 type Plan struct {
-	Source   string // linear, trello, …
+	Source string // linear, trello, …
+	// Origin says which of the source's exports or folders the plan was
+	// read from, for a source whose ids are unique only within one: a
+	// folder's path or a zip's name. It is part of every id the import
+	// makes, so two folders that both hold README.md make two pages, and
+	// the same folder imported again makes nothing twice. Empty for a
+	// source whose ids are unique wherever they come from.
+	Origin   string
 	Projects []Project
 	Statuses []Status
 	Labels   []Label
