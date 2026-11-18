@@ -31,14 +31,16 @@ func (c *cx) keepVersionIfDue(d core.Doc, rows []core.Block) error {
 	if (len(last) > 0 && c.at-last[0].CreatedAt < versionEvery) || len(rows) == 0 {
 		return nil
 	}
-	return c.keepVersion(d, rows, "")
+	_, err := c.keepVersion(d, rows, "")
+	return err
 }
 
-// keepVersion stores the page as it stands.
-func (c *cx) keepVersion(d core.Doc, rows []core.Block, label string) error {
-	snap := plainjson.Marshal(BlockTree(rows))
-	return c.tx.Insert(c.ctx, core.DocVersion{ID: id.New(), WorkspaceID: c.ws, DocID: d.ID, Seq: c.tx.Seq(), Label: label, Title: d.Title,
-		Snapshot: snap, CreatedBy: cmp.Or(d.UpdatedBy, d.CreatedBy), CreatedAt: c.at})
+// keepVersion stores the page as it stands, numbered by the last event
+// handed out in this write, and returns the version.
+func (c *cx) keepVersion(d core.Doc, rows []core.Block, label string) (core.DocVersion, error) {
+	v := core.DocVersion{ID: id.New(), WorkspaceID: c.ws, DocID: d.ID, Seq: c.tx.Seq(), Label: label, Title: d.Title,
+		Snapshot: plainjson.Marshal(BlockTree(rows)), CreatedBy: cmp.Or(d.UpdatedBy, d.CreatedBy), CreatedAt: c.at}
+	return v, c.tx.Insert(c.ctx, v)
 }
 
 type docSnapshotArgs struct {
@@ -46,7 +48,9 @@ type docSnapshotArgs struct {
 	Label string `json:"label"`
 }
 
-// docSnapshot keeps a named version of a page as it is now.
+// docSnapshot keeps a named version of a page as it is now. Nothing else
+// in the write changes, so the version has an event of its own: the
+// version's row without the page's content, which the version holds.
 func docSnapshot(c *cx, a docSnapshotArgs) error {
 	d, err := c.loadDoc("doc", a.Doc)
 	if err != nil {
@@ -58,7 +62,13 @@ func docSnapshot(c *cx, a docSnapshotArgs) error {
 	}
 	c.ref = d.ID
 	d.UpdatedBy = c.actor.UserID
-	return c.keepVersion(d, rows, a.Label)
+	seq := c.tx.NextSeq()
+	v, err := c.keepVersion(d, rows, a.Label)
+	if err != nil {
+		return err
+	}
+	v.Snapshot = nil
+	return c.emit(event{seq: seq, typ: "version.created", entity: "version", entityID: v.ID, place: inDoc(d), audience: docAudience(d), data: core.EventData{Row: v}})
 }
 
 type docRevertArgs struct {
@@ -88,7 +98,7 @@ func docRevert(c *cx, a docRevertArgs) error {
 	if err != nil {
 		return err
 	}
-	if err := c.keepVersion(d, rows, "before reverting"); err != nil {
+	if _, err := c.keepVersion(d, rows, "before reverting"); err != nil {
 		return err
 	}
 	ed := newEditor(c, d, rows)

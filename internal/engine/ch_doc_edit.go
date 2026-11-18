@@ -38,7 +38,7 @@ func (c *cx) commitEdit(d core.Doc, ed *editor, before []core.Block) error {
 		return err
 	}
 	if others {
-		err = c.keepVersion(d, before, "")
+		_, err = c.keepVersion(d, before, "")
 	} else {
 		err = c.keepVersionIfDue(d, before)
 	}
