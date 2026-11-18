@@ -866,7 +866,8 @@ func TestSecondAuditFindings(t *testing.T) {
 // form the vault sent it: as written, in base64, inside Basic sign-in's
 // base64 of user:value, escaped in an address, escaped in JSON. An answer
 // the vault cannot read as text (bytes, or compressed) is not passed on at
-// all, only what it is and how long; one cut at the limit is blanked
+// all, only what it is and how long, both blanked as the headers are, for
+// a service can say the value back in them; one cut at the limit is blanked
 // before it is cut; and the audit log has the address as the agent wrote
 // it, not with the value in it.
 func TestTheVaultBlanksTheValueInEveryFormItSends(t *testing.T) {
@@ -878,8 +879,12 @@ func TestTheVaultBlanksTheValueInEveryFormItSends(t *testing.T) {
 			said := r.Method + " " + r.URL.RequestURI() + " " + r.Header.Get("Authorization") + " " + string(body)
 			switch r.URL.Path {
 			case "/bytes":
-				rw.Header().Set("Content-Type", "application/octet-stream")
+				// What an answer says of itself can say the value back too.
+				rw.Header().Set("Content-Type", "application/octet-stream; echoed="+said)
 				rw.Write([]byte("\x00\x01" + said))
+			case "/encoded":
+				rw.Header().Set("Content-Encoding", "x-"+url.QueryEscape(said))
+				rw.Write([]byte(said))
 			case "/gzip":
 				rw.Header().Set("Content-Type", "application/json")
 				rw.Header().Set("Content-Encoding", "gzip")
@@ -929,7 +934,7 @@ func TestTheVaultBlanksTheValueInEveryFormItSends(t *testing.T) {
 			// Compressed, asked for by the agent: the vault asks for it
 			// itself and undoes it, so the answer is read as text.
 			leaks(t, ask(t, "/gzip", M{"Authorization": "Bearer {{secret}}", "Accept-Encoding": "gzip"}, ""))
-			for _, path := range []string{"/bytes"} {
+			for _, path := range []string{"/bytes", "/encoded"} {
 				var res struct {
 					OK         bool
 					Body       *string
@@ -945,6 +950,8 @@ func TestTheVaultBlanksTheValueInEveryFormItSends(t *testing.T) {
 				if !res.OK || res.Body != nil || res.BodyBase64 != nil || res.Omitted == "" || res.Size == 0 {
 					t.Fatalf("%s: %s", path, out)
 				}
+				leaks(t, s.call(s.owner, "", "POST", w+"/secrets/ODD_KEY/request?format=text",
+					M{"method": "POST", "url": api.URL + path, "headers": M{"Authorization": "Bearer {{secret}}"}}, 200, nil))
 			}
 		})
 		t.Run("cut at the limit", func(t *testing.T) {

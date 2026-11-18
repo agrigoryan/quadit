@@ -199,7 +199,9 @@ func (s *Server) handleSendRequestWithSecret(x *c) error {
 	} else {
 		// Bytes, or text compressed or in another encoding: the value could
 		// be in there in a form no search finds, so none of it is passed on.
-		out["body_omitted"] = "the answer is not text (" + cmp.Or(resp.Header.Get("Content-Encoding"), resp.Header.Get("Content-Type"), "no Content-Type") +
+		// What it says it is comes from the blanked headers: a service can
+		// say the value back there too.
+		out["body_omitted"] = "the answer is not text (" + cmp.Or(headers["Content-Encoding"], headers["Content-Type"], "no Content-Type") +
 			"), so the vault cannot blank the secret out of it and does not pass it on"
 	}
 	if x.wantText() {
