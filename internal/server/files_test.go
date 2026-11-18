@@ -31,7 +31,7 @@ type failingFiles struct {
 }
 
 func (f *failingFiles) Put(ctx context.Context, key string, r io.Reader, ct string) error {
-	if f.failing.Load() && !strings.Contains(key, ".parts/") {
+	if f.failing.Load() && !strings.Contains(key, ".upload-parts/") {
 		return errors.New("the storage is down")
 	}
 	return f.Store.Put(ctx, key, r, ct)
@@ -87,7 +87,7 @@ func TestAnUploadWhoseStoringFailsCanBeFinishedLater(t *testing.T) {
 			if f.State != "ready" || f.SHA256 != sumOf(data) {
 				t.Fatalf("finished again, the file is %+v, want the sum %s", f, sumOf(data))
 			}
-			if left := files.keys(t, ""); strings.Contains(strings.Join(left, " "), ".parts/") {
+			if left := files.keys(t, ""); strings.Contains(strings.Join(left, " "), ".upload-parts/") {
 				t.Fatalf("parts left behind once the file is stored: %v", left)
 			}
 		})
@@ -195,7 +195,7 @@ type meetingFiles struct {
 }
 
 func (f *meetingFiles) Put(ctx context.Context, key string, r io.Reader, ct string) error {
-	if strings.Contains(key, ".parts/") && !strings.Contains(key, ".parts/00000000000000000000") {
+	if strings.Contains(key, ".upload-parts/") && !strings.Contains(key, ".upload-parts/00000000000000000000") {
 		if f.arrived.Add(1) == f.together {
 			close(f.all)
 		}
@@ -354,7 +354,7 @@ func TestAnUploadFromBeforeTheUpgradeGoesOn(t *testing.T) {
 			if f.State != "ready" || f.SHA256 != sumOf([]byte(whole)) {
 				t.Fatalf("the file ended as %+v, want the sum of %q", f, whole)
 			}
-			if left := files.keys(t, ""); strings.Contains(strings.Join(left, " "), fid+".parts/") {
+			if left := files.keys(t, ""); strings.Contains(strings.Join(left, " "), fid+".upload-parts/") {
 				t.Fatalf("parts left behind once the file is stored: %v", left)
 			}
 		}
@@ -407,7 +407,7 @@ func TestAnUploadIsCheckedBeforeItIsReady(t *testing.T) {
 			var f uploaded
 			s.call(t, s.owner, "", "POST", w+"/files?name=clip.bin&size=10", []byte("hello"), 201, &f)
 			for _, key := range files.keys(t, "") {
-				if strings.Contains(key, f.ID+".parts/") {
+				if strings.Contains(key, f.ID+".upload-parts/") {
 					if err := files.Put(context.Background(), key, strings.NewReader("hel"), ""); err != nil {
 						t.Fatal(err)
 					}

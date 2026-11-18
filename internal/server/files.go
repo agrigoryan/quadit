@@ -59,10 +59,20 @@ func (s *Server) partPath(fileID string) string {
 // partKey is a new key for one part of an upload that comes in several
 // requests, which waits in file storage so the next part can reach any
 // server. Each part sent gets a key of its own, so one sent at the same
-// time as another for the same place never writes over the one kept.
+// time as another for the same place never writes over the one kept. It is
+// not under legacyParts, where an older version would take it for one of
+// its own.
 func partKey(f core.File, offset int64) string {
-	return fmt.Sprintf("%s.parts/%020d-%s", f.StorageKey, offset, id.New())
+	return fmt.Sprintf("%s.upload-parts/%020d-%s", f.StorageKey, offset, id.New())
 }
+
+// legacyParts is where a server before schema version 14 kept the parts of
+// an upload, each under a key made from its offset alone, and where it
+// looks for them: it puts together every key there. This version takes
+// those parts over (adoptLegacyParts) but never removes one, so that a
+// database "quadit upgrade --undo" puts back finds the parts it counted,
+// and nothing else.
+func legacyParts(f core.File) string { return f.StorageKey + ".parts/" }
 
 // counter counts what is read through it.
 type counter struct {
@@ -324,12 +334,11 @@ func (s *Server) putLocal(ctx context.Context, key, path string) error {
 }
 
 // adoptLegacyParts lists the parts of an upload that a server before
-// schema version 14 started, which listed none: it kept each part under a
-// key made from the part's offset alone and found them by those keys. The
-// parts that follow each other from the start, within the bytes counted,
-// become the upload's parts, and the count is where they end: what is not
-// there (a part lost, or one stored but never counted) is asked for again.
-// A whole file waiting on this machine is left as it is.
+// schema version 14 started, which listed none (legacyParts). The parts
+// that follow each other from the start, within the bytes counted, become
+// the upload's parts, and the count is where they end: what is not there
+// (a part lost, or one stored but never counted) is asked for again. A
+// whole file waiting on this machine is left as it is.
 func (s *Server) adoptLegacyParts(ctx context.Context, db store.DB, f *core.File) error {
 	if f.State != core.FileUploading || f.Parts != nil {
 		return nil
@@ -342,7 +351,7 @@ func (s *Server) adoptLegacyParts(ctx context.Context, db store.DB, f *core.File
 		size int64
 	}
 	at := map[int64]part{}
-	prefix := f.StorageKey + ".parts/"
+	prefix := legacyParts(*f)
 	err := s.fileStore().List(ctx, prefix, func(key string, size int64) error {
 		name := strings.TrimPrefix(key, prefix)
 		if offset, err := strconv.ParseInt(name, 10, 64); err == nil && len(name) == 20 {
@@ -357,7 +366,6 @@ func (s *Server) adoptLegacyParts(ctx context.Context, db store.DB, f *core.File
 	var end int64
 	for p, ok := at[end]; ok && p.size > 0 && end+p.size <= f.Received; p, ok = at[end] {
 		parts = append(parts, p.key)
-		delete(at, end)
 		end += p.size
 	}
 	changed, err := db.Update(ctx, "files", map[string]any{"parts": parts, "received": end},
@@ -369,9 +377,6 @@ func (s *Server) adoptLegacyParts(ctx context.Context, db store.DB, f *core.File
 		return db.Get(ctx, f, store.Eq("id", f.ID))
 	}
 	f.Parts, f.Received = parts, end
-	for _, p := range at {
-		s.dropParts(ctx, p.key)
-	}
 	return nil
 }
 
@@ -470,9 +475,9 @@ func (s *Server) dropParts(ctx context.Context, keys ...string) {
 }
 
 // dropReceived removes what an upload received, once it is stored or
-// will not be.
+// will not be, except the parts an older version kept (legacyParts).
 func (s *Server) dropReceived(ctx context.Context, f core.File) {
-	s.dropParts(ctx, f.Parts...)
+	s.dropParts(ctx, slices.DeleteFunc(slices.Clone(f.Parts), func(key string) bool { return strings.HasPrefix(key, legacyParts(f)) })...)
 	if err := os.Remove(s.partPath(f.ID)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		s.log.Warn("upload: removing what was received", "file", f.ID, "err", err)
 	}
