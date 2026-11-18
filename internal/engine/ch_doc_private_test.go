@@ -266,3 +266,31 @@ func TestAPageMadePrivateUnderASharedPageHasTheReadersGiven(t *testing.T) {
 		}
 	})
 }
+
+// TestOnlyTheOwnerChangesWhoSeesAPrivatePage: someone a private page is
+// shared with may edit it, but not take it out of private, share it with
+// more people or take people off; its owner may.
+func TestOnlyTheOwnerChangesWhoSeesAPrivatePage(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		me := w.owner.ID
+		bea, other := w.agent("bea"), w.agent("other")
+		page := w.do(me, "doc.create", M{"title": "Salaries", "private": true, "shared_with": []string{"@bea"}}).Ref
+
+		w.do(bea, "doc.update", M{"id": page, "title": "Salaries 2026"})
+		for name, args := range map[string]M{
+			"sharing it with more people": {"id": page, "shared_with": []string{"@bea", "@other"}},
+			"taking people off":           {"id": page, "shared_with": []string{}},
+			"making it everyone's":        {"id": page, "private": false},
+		} {
+			w.refused(engine.CodeForbidden, bea, "doc.update", args)
+			if d := w.doc(page); d.OwnerID != me || !slices.Equal(d.SharedWith, []string{bea}) {
+				t.Fatalf("%s: readers changed by someone it is shared with: owner %q, shared with %v", name, d.OwnerID, d.SharedWith)
+			}
+		}
+		w.do(me, "doc.update", M{"id": page, "shared_with": []string{"@bea", "@other"}})
+		if d := w.doc(page); !slices.Contains(d.SharedWith, other) {
+			t.Fatalf("the owner could not share their page: %v", d.SharedWith)
+		}
+	})
+}

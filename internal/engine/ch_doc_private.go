@@ -51,6 +51,28 @@ func sameReaders(a, b core.Doc) bool {
 	return a.OwnerID == "" || slices.Equal(slices.Sorted(slices.Values(a.SharedWith)), slices.Sorted(slices.Values(b.SharedWith)))
 }
 
+// mayChangeReaders refuses a change of who sees a page, from was to now,
+// by someone who is not the page's owner. A private page's readers are
+// changed by its owner alone, whichever way it is asked (making it
+// everyone's, sharing it, taking someone off); and a sharing list is set,
+// when sharing asks to, only by the one whose private page it was or
+// becomes. A page placed under a private page taking that page's readers
+// (underPrivate) is no such change: its own readers were everyone.
+func (c *cx) mayChangeReaders(was, now core.Doc, sharing bool) error {
+	me := c.actor.UserID
+	if c.system {
+		return nil
+	}
+	if was.OwnerID != "" && was.OwnerID != me && !sameReaders(was, now) {
+		return forbidden("only its owner can change who sees a private page")
+	}
+	sameList := slices.Equal(slices.Sorted(slices.Values(was.SharedWith)), slices.Sorted(slices.Values(now.SharedWith)))
+	if sharing && !sameList && was.OwnerID != me && now.OwnerID != me {
+		return forbidden("only its owner shares a private page")
+	}
+	return nil
+}
+
 // tellReaders announces a change to a page, written at seq, to those who
 // may see it. Those who no longer may are told too: everyone, when the page
 // was everyone's, so that each copy can drop it; else each of them alone,

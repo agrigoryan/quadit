@@ -311,11 +311,9 @@ func docUpdate(c *cx, a docUpdateArgs) error {
 	}
 
 	// Who sees it: its owner alone, or everyone again, and who it is
-	// shared with.
+	// shared with. Only the owner of a private page changes that, however
+	// it is asked for (checked once the patch is whole, below).
 	if a.Private.Set {
-		if d.OwnerID != "" && d.OwnerID != c.actor.UserID {
-			return forbidden("only its owner can change who sees a private page")
-		}
 		owner := ""
 		if a.Private.V {
 			owner = c.actor.UserID
@@ -334,6 +332,9 @@ func docUpdate(c *cx, a docUpdateArgs) error {
 		}
 		p.put("shared_with", d.SharedWith, ids)
 		d.SharedWith = ids
+	}
+	if err := c.mayChangeReaders(was, d, a.SharedWith.Set); err != nil {
+		return err
 	}
 
 	p.setStamp("archived_at", a.Archived, d.ArchivedAt, c.at)
