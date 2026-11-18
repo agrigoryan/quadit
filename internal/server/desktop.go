@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -119,16 +120,23 @@ func (s *Server) handleApproveDesktopSignIn(x *c) error {
 }
 
 // handleFinishDesktopSignIn trades a code and its verifier for a session in
-// the app's window. The code is spent before the verifier is checked, so a
-// code someone else caught is good for one wrong guess at most; of two
-// windows racing with one code, one gets the session. Every failure is the
-// same plain page: which check failed is not said.
+// the app's window. Only the app's window is answered: its user agent says
+// it is the app, and no other site sent it here. Otherwise a code made for
+// one account, opened in someone else's browser by a link or a page, would
+// sign that browser in as the account (login CSRF). The code is spent before
+// the verifier is checked, so a code someone else caught is good for one
+// wrong guess at most; of two windows racing with one code, one gets the
+// session. Every failure of the code is the same plain page: which check
+// failed is not said.
 func (s *Server) handleFinishDesktopSignIn(x *c) error {
 	x.w.Header().Set("Cache-Control", "no-store")
 	ctx := x.ctx()
 	// A finish is a sign-in: it counts against the address as one does.
 	if err := s.throttle(ctx, "login:ip:"+s.clientIP(x.r), signInsPerIP, signInWindow); err != nil {
 		return s.showDesktopFailure(x, err)
+	}
+	if !strings.Contains(x.r.UserAgent(), " QuaditDesktop/") || x.r.Header.Get("Sec-Fetch-Site") == "cross-site" || x.r.Header.Get("Sec-Fetch-Site") == "same-site" {
+		return s.showDesktopPage(x, http.StatusForbidden, desktopNotTheApp)
 	}
 	q := x.r.URL.Query()
 	verifier := q.Get("verifier")
@@ -175,6 +183,8 @@ var (
 		"Only Quadit's own page, in a browser where you are signed in, can sign the app in. Start again from the Quadit app."}
 	desktopSomeoneElse = desktopWords{"You are signed in as someone else now",
 		"This browser signed in to another account after the page was shown. Start again from the Quadit app."}
+	desktopNotTheApp = desktopWords{"Open this in the Quadit app",
+		"This page finishes signing the Quadit app in, and works only in the app's own window. Start again from the Quadit app."}
 	desktopExpired = desktopWords{"Signing in to the app did not work",
 		"The sign-in has expired or was used already. Start again from the Quadit app."}
 	desktopDisabled = desktopWords{"This account cannot sign in",

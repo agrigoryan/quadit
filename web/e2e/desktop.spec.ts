@@ -53,23 +53,31 @@ test("a browser signed out signs in, confirms, and the app's window comes out si
   await expect(page.getByText("Your browser asks to open the Quadit app")).toBeVisible();
   expect(refusals).toEqual([]);
 
+  // A plain browser given the link is refused before the code is spent: no page can sign someone in with its own code.
+  const elsewhere = await browser.newContext({ baseURL: currentRun().url, serviceWorkers: "block" });
+  const plain = await elsewhere.newPage();
+  await plain.goto(`/desktop/finish?code=${code}&verifier=${flow.verifier}`);
+  await expect(plain.getByRole("heading", { level: 1, name: "Open this in the Quadit app" })).toBeVisible();
+
   // The app's window: a browser of its own, signed in by nothing but the code and the verifier.
-  const app = await browser.newContext({
-    baseURL: currentRun().url,
-    storageState: { cookies: [], origins: [] },
-    serviceWorkers: "block",
-    userAgent: `${await page.evaluate(() => navigator.userAgent)} QuaditDesktop/0.1.0`,
-  });
-  const window = await app.newPage();
-  await window.goto(`/desktop/finish?code=${code}&verifier=${flow.verifier}`);
+  const appWindow = async () => {
+    const app = await browser.newContext({
+      baseURL: currentRun().url,
+      storageState: { cookies: [], origins: [] },
+      serviceWorkers: "block",
+      userAgent: `${await page.evaluate(() => navigator.userAgent)} QuaditDesktop/0.1.0`,
+    });
+    const window = await app.newPage();
+    await window.goto(`/desktop/finish?code=${code}&verifier=${flow.verifier}`);
+    return window;
+  };
+  const window = await appWindow();
   await expect(window.getByRole("heading", { level: 1, name: "My work" })).toBeVisible();
 
   // The code is spent: a second window gets the plain page, not a session.
-  const again = await (await browser.newContext({ baseURL: currentRun().url, serviceWorkers: "block" })).newPage();
-  await again.goto(`/desktop/finish?code=${code}&verifier=${flow.verifier}`);
+  const again = await appWindow();
   await expect(again.getByRole("heading", { level: 1, name: "Signing in to the app did not work" })).toBeVisible();
-  await app.close();
-  await again.context().close();
+  for (const context of [elsewhere, window.context(), again.context()]) await context.close();
 });
 
 test("a page loaded as the sign-in page hands over too", async ({ page }) => {

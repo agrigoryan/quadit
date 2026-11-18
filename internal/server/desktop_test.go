@@ -225,6 +225,38 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 			}
 		})
 
+		t.Run("only the app's window can trade a code, so no page signs a browser in as someone else", func(t *testing.T) {
+			// A code someone made for their own account, opened in another person's browser by a link or a page of theirs.
+			f := newDesktopFlow()
+			code := approve(t, s, s.owner, f, ownerID)
+			hc := noRedirects()
+			req, _ := http.NewRequest(http.MethodGet, finishURL(s, code, f.verifier), nil)
+			req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh) Chrome/142.0 Safari/537.36")
+			resp, err := hc.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusForbidden || resp.Header.Get("Set-Cookie") != "" {
+				t.Fatalf("a browser: status %d, cookie %q", resp.StatusCode, resp.Header.Get("Set-Cookie"))
+			}
+			a := app()
+			req, _ = http.NewRequest(http.MethodGet, finishURL(s, code, f.verifier), nil)
+			req.Header.Set("User-Agent", "Mozilla/5.0 Chrome/142.0 QuaditDesktop/0.1.0")
+			req.Header.Set("Sec-Fetch-Site", "cross-site")
+			if resp, err = a.hc.Do(req); err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != http.StatusForbidden {
+				t.Fatalf("sent by another site: status %d", resp.StatusCode)
+			}
+			// Refused before it was spent: the app's own window still gets in.
+			if resp, _ := a.get(t, finishURL(s, code, f.verifier)); resp.StatusCode != http.StatusFound {
+				t.Fatalf("the app after the refusals: status %d", resp.StatusCode)
+			}
+		})
+
 		t.Run("a page of another site cannot press Continue", func(t *testing.T) {
 			f := newDesktopFlow()
 			resp, body := post(t, s.owner, s.url+"/desktop/connect", f.form(ownerID), map[string]string{"Sec-Fetch-Site": "cross-site"})

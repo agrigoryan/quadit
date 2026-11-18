@@ -384,7 +384,7 @@ surface: 2.0 (within 2.x nothing is removed or renamed)
 
 
 === GET /desktop/finish?code=nope&verifier=nope
-400
+403
 
 
 === GET /mcp
