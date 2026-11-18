@@ -180,6 +180,8 @@ test("a link to a server not added yet still opens its page once the server is a
   desktop,
   run,
 }) => {
+  // Add It… on the app's question about the server it is not connected to.
+  await desktop.answerNextDialog(0);
   await desktop.openLink(
     `quadit://open?server=${encodeURIComponent(run.server)}&path=${encodeURIComponent("/e2e/inbox")}`,
   );

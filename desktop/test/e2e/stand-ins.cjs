@@ -5,7 +5,8 @@
 //
 //   shell.openExternal          records the address instead of opening the system browser
 //   Notification.prototype.show records the notification instead of showing it
-//   dialog.showMessageBox       records the message and answers with its cancel button
+//   dialog.showMessageBox       records the message and answers with its cancel button, or with the
+//                               button a test asked for (e2e.answers, first in first out)
 //   app.setBadgeCount           records the count (macOS shows a badge only once the app may
 //                               notify, which a test cannot wait for, so the system's own is unreliable)
 //
@@ -20,7 +21,7 @@ const { app, dialog, nativeTheme, Notification, shell } = require("electron");
 // The windows a run opens on the screen are dark, whatever the system's setting.
 nativeTheme.themeSource = "dark";
 
-const recorded = { opened: [], notes: [], dialogs: [], badge: 0, errors: [] };
+const recorded = { opened: [], notes: [], dialogs: [], answers: [], badge: 0, errors: [] };
 globalThis.e2e = recorded;
 process.on("uncaughtException", (err) => recorded.errors.push(String(err?.stack ?? err)));
 
@@ -35,5 +36,5 @@ app.setBadgeCount = (count = 0) => {
 dialog.showMessageBox = async (...args) => {
   const options = args.at(-1);
   recorded.dialogs.push(`${options.message} ${options.detail ?? ""}`.trim());
-  return { response: options.cancelId ?? 0, checkboxChecked: false };
+  return { response: recorded.answers.shift() ?? options.cancelId ?? 0, checkboxChecked: false };
 };

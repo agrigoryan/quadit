@@ -1,10 +1,11 @@
 // The `test` every desktop spec imports: Playwright's, with the app started
-// fresh for each test (its own empty data folder) and three things of the
-// main process stood in for from its start (stand-ins.cjs), so nothing
-// leaves the test and what the app did can be read back.
+// fresh for each test (its own empty data folder, setup marked done unless
+// a test asks for the first start) and some things of the main process
+// stood in for from its start (stand-ins.cjs), so nothing leaves the test
+// and what the app did can be read back.
 
 import { createHash, randomBytes } from "node:crypto";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { _electron as electron, type ElectronApplication, expect, type Page, test as base } from "@playwright/test";
@@ -30,14 +31,23 @@ export class Desktop {
   /**
    * Starts the app from out/ on the data folder `data`, with the stand-ins
    * in place. `args` are given to it as a system gives a link that starts
-   * the app (Windows and Linux; macOS reads the same argument at start).
+   * the app (Windows and Linux; macOS reads the same argument at start);
+   * `env` is added to its environment. A data folder without settings gets
+   * setup marked done, unless `firstStart`.
    */
-  static async launch(data: string, run: Run, args: string[] = []): Promise<Desktop> {
+  static async launch(
+    data: string,
+    run: Run,
+    args: string[] = [],
+    { env = {}, firstStart = false }: { env?: Record<string, string>; firstStart?: boolean } = {},
+  ): Promise<Desktop> {
+    const settings = join(data, "settings.json");
+    if (!firstStart && !existsSync(settings)) writeFileSync(settings, JSON.stringify({ setupDone: true }));
     const app = await electron.launch({
       // Chromium's stand-in keychain: a test never touches the person's login keychain, which
       // would stop the app on a prompt when another build of it made the key there.
       args: ["-r", join(__dirname, "stand-ins.cjs"), "--use-mock-keychain", APP_DIR, ...args],
-      env: { ...process.env, QUADIT_DESKTOP_DATA: data },
+      env: { ...process.env, ...env, QUADIT_DESKTOP_DATA: data },
     });
     return new Desktop(app, data, run);
   }
@@ -59,6 +69,52 @@ export class Desktop {
     });
   }
 
+  /** The buttons of the last notification shown, and whether it has a reply field. */
+  async lastNotificationOffers(): Promise<{ actions: string[]; reply: boolean }> {
+    return this.app.evaluate(() => {
+      const { notes } = (globalThis as unknown as { e2e: { notes: Electron.Notification[] } }).e2e;
+      const note = notes.at(-1);
+      return { actions: (note?.actions ?? []).map((a) => a.text ?? ""), reply: !!note?.hasReply };
+    });
+  }
+
+  /** Presses the button `index` of the last notification, as macOS reports it. */
+  async pressNotificationAction(index: number) {
+    await this.app.evaluate((_electron, actionIndex) => {
+      const { notes } = (globalThis as unknown as { e2e: { notes: Electron.Notification[] } }).e2e;
+      notes.at(-1)?.emit("action", { actionIndex, selectionIndex: -1 }, actionIndex);
+    }, index);
+  }
+
+  /** Sends `text` from the last notification's reply field, as macOS reports it. */
+  async replyToNotification(text: string) {
+    await this.app.evaluate((_electron, reply) => {
+      const { notes } = (globalThis as unknown as { e2e: { notes: Electron.Notification[] } }).e2e;
+      notes.at(-1)?.emit("reply", { reply }, reply);
+    }, text);
+  }
+
+  /** Chooses the application menu's item `id`, as a person choosing it. */
+  async chooseMenuItem(id: string) {
+    await this.app.evaluate(({ Menu }, item) => {
+      const found = Menu.getApplicationMenu()?.getMenuItemById(item);
+      if (!found) throw new Error(`no menu item ${item}`);
+      found.click();
+    }, id);
+  }
+
+  /** One of the app's own pages (`file` in out/pages), waiting for it to appear. */
+  async appPage(file: string): Promise<Page> {
+    return this.pageOf("file://", join(APP_DIR, "out/pages", file));
+  }
+
+  /** Has the app's next dialog answered with its button `index`, as a person pressing it (by default, its cancel button). */
+  async answerNextDialog(index: number) {
+    await this.app.evaluate((_electron, button) => {
+      (globalThis as unknown as { e2e: { answers: number[] } }).e2e.answers.push(button);
+    }, index);
+  }
+
   /** Hands the app a quadit:// link the way macOS does. */
   async openLink(url: string) {
     await this.app.evaluate(({ app }, link) => app.emit("open-url", { preventDefault() {} }, link), url);
@@ -77,12 +133,12 @@ export class Desktop {
 
   /** The server list window. */
   async serverList(): Promise<Page> {
-    return this.pageOf("file://", join(APP_DIR, "out/pages/servers.html"));
+    return this.appPage("servers.html");
   }
 
   /** The bar over a server window's sign-in page. */
   async signInBar(): Promise<Page> {
-    return this.pageOf("file://", join(APP_DIR, "out/pages/sign-in-bar.html"));
+    return this.appPage("sign-in-bar.html");
   }
 
   /**

@@ -1,7 +1,8 @@
 // Starts what the desktop tests talk to, once for the run: a real Quadit
 // server (the binary `make build` made, on a free port, with a new empty
 // data directory), its owner and workspace made through the first-run API,
-// an API token for the CLI, and the hand-off stand-in in front of it
+// an API token for the CLI, an agent with a token of its own, and the
+// hand-off stand-in in front of it
 // (handoff-fake.ts). Everything is handed to the tests through
 // QUADIT_DESKTOP_E2E (see desktop.ts); the function returned stops it all.
 //
@@ -16,7 +17,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startHandoffFake } from "./handoff-fake";
-import { BINARY, OWNER, type Run, WORKSPACE } from "./run";
+import { AGENT, BINARY, OWNER, quadit, type Run, WORKSPACE } from "./run";
 
 export default async function globalSetup() {
   const binary = process.env.QUADIT_BINARY || BINARY;
@@ -63,19 +64,25 @@ export default async function globalSetup() {
     const cookie = (setUp.headers.getSetCookie()[0] ?? "").split(";")[0] ?? "";
     const name = cookie.slice(0, cookie.indexOf("="));
     const value = cookie.slice(cookie.indexOf("=") + 1);
-    const made = await fetch(`${direct}/api/v1/w/${WORKSPACE.slug}/tokens`, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie, "sec-fetch-site": "same-origin" },
-      body: JSON.stringify({ name: "desktop-e2e" }),
-    });
-    if (!made.ok) throw new Error(`token: ${made.status} ${await made.text()}`);
-    const { token } = (await made.json()) as { token: string };
+    const tokenFor = async (body: Record<string, string>) => {
+      const made = await fetch(`${direct}/api/v1/w/${WORKSPACE.slug}/tokens`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie, "sec-fetch-site": "same-origin" },
+        body: JSON.stringify(body),
+      });
+      if (!made.ok) throw new Error(`token: ${made.status} ${await made.text()}`);
+      return ((await made.json()) as { token: string }).token;
+    };
+    const token = await tokenFor({ name: "desktop-e2e" });
+    await quadit({ direct, token, dir, binary }, ["do", "agent.create", JSON.stringify(AGENT)]);
+    const agentToken = await tokenFor({ name: "desktop-e2e", user: `@${AGENT.handle}` });
     const run: Run = {
       direct,
       server: standIn ? fake.url : direct,
       other: standIn ? direct : fake.url,
       fake: fake.url,
       token,
+      agentToken,
       session: { name, value },
       dir,
       binary,

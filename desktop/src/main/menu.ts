@@ -40,7 +40,11 @@ export const PANEL_LABEL = "Decisions and Agents";
 
 export function menuTemplate(state: MenuState, actions: MenuActions): MenuItemConstructorOptions[] {
   const mac = state.platform === "darwin";
-  const setup: MenuItemConstructorOptions = { label: `Set Up ${state.appName}…`, click: () => actions.showSetup() };
+  const setup: MenuItemConstructorOptions = {
+    id: "setup",
+    label: `Set Up ${state.appName}…`,
+    click: () => actions.showSetup(),
+  };
   const update: MenuItemConstructorOptions[] = state.update
     ? [
         {

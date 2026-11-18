@@ -8,7 +8,14 @@ import { promisify } from "node:util";
 export const BINARY = join(__dirname, "../../../bin/quadit");
 
 /** The owner the first-run API makes, and their workspace (its address is /e2e). */
-export const OWNER = { name: "Ann Owner", email: "ann@example.com", password: "correct-horse-battery" };
+export const OWNER = {
+  name: "Ann Owner",
+  handle: "ann-owner",
+  email: "ann@example.com",
+  password: "correct-horse-battery",
+};
+/** An agent of the workspace, made by the global set-up with a token of its own: someone other than the owner, to ask the owner things. */
+export const AGENT = { name: "Coder", handle: "coder" };
 export const WORKSPACE = { name: "E2E", slug: "e2e" };
 
 export interface Run {
@@ -22,6 +29,8 @@ export interface Run {
   fake: string;
   /** The owner's API token, for the CLI. */
   token: string;
+  /** The agent's API token (AGENT). */
+  agentToken: string;
   /** The owner's session cookie, made by the first run. */
   session: { name: string; value: string };
   dir: string;
@@ -36,14 +45,18 @@ export function currentRun(): Run {
 
 const exec = promisify(execFile);
 
-/** Runs `quadit ARGS…` as the owner against the run's server and gives what it printed. */
-export async function quadit(run: Run, args: string[]): Promise<string> {
+/** Runs `quadit ARGS…` as the owner (or as whoever `token` is) against the run's server and gives what it printed. */
+export async function quadit(
+  run: Pick<Run, "binary" | "direct" | "dir" | "token">,
+  args: string[],
+  token = run.token,
+): Promise<string> {
   try {
     const { stdout } = await exec(run.binary, args, {
       env: {
         PATH: process.env.PATH ?? "",
         QUADIT_URL: run.direct,
-        QUADIT_TOKEN: run.token,
+        QUADIT_TOKEN: token,
         QUADIT_CONFIG: join(run.dir, "cli.json"),
       },
     });
@@ -52,4 +65,23 @@ export async function quadit(run: Run, args: string[]): Promise<string> {
     const { stderr, stdout } = err as { stderr?: string; stdout?: string };
     throw new Error(`quadit ${args.join(" ")}: ${stderr || stdout || String(err)}`, { cause: err });
   }
+}
+
+/** A project of its own for a test, and a task in it, made by the owner. */
+export async function newTask(run: Run, title: string): Promise<{ project: string; key: string }> {
+  const project = `T${Date.now().toString(36).toUpperCase().slice(-5)}`;
+  await quadit(run, ["do", "project.create", JSON.stringify({ key: project, name: `Desktop ${project}` })]);
+  const { key } = JSON.parse(await quadit(run, ["--json", "new", project, title])) as { key: string };
+  return { project, key };
+}
+
+/** The first decision of a task, as `quadit --json show` gives it. */
+export async function firstDecision(
+  run: Run,
+  key: string,
+): Promise<{ state: string; picked_label?: string; decided_by?: string } | undefined> {
+  const shown = JSON.parse(await quadit(run, ["--json", "show", key])) as {
+    decisions?: { state: string; picked_label?: string; decided_by?: string }[];
+  };
+  return shown.decisions?.[0];
 }

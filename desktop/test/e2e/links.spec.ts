@@ -92,7 +92,26 @@ test("a quadit://open link shows the server's window at the path, from macOS and
   expect(await exited).toBe(0);
 });
 
-test("a quadit://open link for a server not added yet offers to add it", async ({ desktop, run }) => {
+test("a quadit://open link for a server the app is not connected to is refused, and nothing is added", async ({
+  desktop,
+  run,
+}) => {
+  await desktop.openLink(`quadit://open?server=${encodeURIComponent(run.server)}&path=/e2e/my-work`);
+  await expect
+    .poll(async () => (await desktop.recorded()).dialogs)
+    .toContainEqual(expect.stringContaining(`This app is not connected to ${run.server}`));
+  // Answered Cancel: the server list (open at the first start) makes no offer, and no server window opens.
+  const list = await desktop.serverList();
+  await expect(list.getByRole("status")).toBeHidden();
+  await expect(list.getByLabel("Address")).toHaveValue("");
+  expect(desktop.app.windows().some((page) => page.url().startsWith(run.server))).toBe(false);
+});
+
+test("a quadit://open link for a server not added yet offers to add it once the person says Add It…", async ({
+  desktop,
+  run,
+}) => {
+  await desktop.answerNextDialog(0);
   await desktop.openLink(`quadit://open?server=${encodeURIComponent(run.server)}&path=/e2e/my-work`);
   const list = await desktop.serverList();
   await expect(list.getByRole("status")).toHaveText(
