@@ -198,8 +198,6 @@ test("an inbox item is shown once whichever windows tell it, and not while its s
 });
 
 test("an inbox item arriving on the live feed is a native notification and a badge", async ({ desktop, run }) => {
-  // The web app's half of the bridge comes with the server side of the contract.
-  test.skip(!(await fetch(`${run.direct}/api/v1/version`)).ok, "the server's web app does not use the bridge yet");
   await desktop.addServer(run.server);
   await desktop.signedIn(run.server);
   await desktop.hide(run.server);
