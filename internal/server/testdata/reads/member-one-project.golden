@@ -6151,6 +6151,15 @@ SVA-1 "Which explosion?" -> Burst: reads better small
    "url": "http://quadit.test/games/task/SVA-1"
   },
   {
+   "entity_id": "<doc Release notes>",
+   "kind": "doc",
+   "scope_id": "<doc Release notes>",
+   "scope_type": "doc",
+   "snippet": "v0.1\na **boss**\na song\n",
+   "title": "Release notes",
+   "url": "http://quadit.test/games/docs/<doc Release notes>"
+  },
+  {
    "entity_id": "<comment SVA-1 for the webhook>",
    "kind": "comment",
    "project_id": "<project SVA>",
@@ -6184,6 +6193,7 @@ doc  doc <row Boss attack>  Boss attack — Wind up, then strike.
 comment  SVA-1  Boss design — Drew the burst.
 doc  doc <doc SVA design>  SVA design — The **boss** has four phases.
 comment  SVA-1  Boss design — @bea no rings please.
+doc  doc <doc Release notes>  Release notes — v0.1 a **boss** a song
 comment  SVA-1  Boss design — Phase three is drawn.
 task  SVA-1  Boss design — Four phases. The last one flies. See OPS-1.
 
@@ -6196,12 +6206,22 @@ task  SVA-1  Boss design — Four phases. The last one flies. See OPS-1.
 === GET /api/v1/w/games/search?q=vault
 200
 {
- "hits": []
+ "hits": [
+  {
+   "entity_id": "<id #194>",
+   "kind": "doc",
+   "scope_id": "<id #194>",
+   "scope_type": "doc",
+   "snippet": "Third shelf.\n",
+   "title": "Vault",
+   "url": "http://quadit.test/games/docs/<id #194>"
+  }
+ ]
 }
 
 === GET /api/v1/w/games/search?q=vault&format=text
 200
-nothing found
+doc  doc <id #194>  Vault — Third shelf.
 
 === GET /api/v1/w/games/search?q=phases
 200
@@ -6251,7 +6271,17 @@ nothing found
 === GET /api/v1/w/games/search?q=between
 200
 {
- "hits": []
+ "hits": [
+  {
+   "entity_id": "<doc For Bea>",
+   "kind": "doc",
+   "scope_id": "<doc For Bea>",
+   "scope_type": "doc",
+   "snippet": "**between** us, about SVA-2\n",
+   "title": "For Bea",
+   "url": "http://quadit.test/games/docs/<doc For Bea>"
+  }
+ ]
 }
 
 === GET /api/v1/w/games/search?q=cellar
@@ -6328,6 +6358,15 @@ nothing found
    "snippet": "The **boss** has four phases.\n",
    "title": "SVA design",
    "url": "http://quadit.test/games/docs/<doc SVA design>"
+  },
+  {
+   "entity_id": "<doc Release notes>",
+   "kind": "doc",
+   "scope_id": "<doc Release notes>",
+   "scope_type": "doc",
+   "snippet": "v0.1\na **boss**\na song\n",
+   "title": "Release notes",
+   "url": "http://quadit.test/games/docs/<doc Release notes>"
   }
  ]
 }
