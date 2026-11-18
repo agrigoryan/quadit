@@ -69,7 +69,7 @@ Everything else is set in the admin area of the web app. Each setting can also c
 | `auth.password`, `auth.passkeys` | `true` or `false`: turn a sign-in method on or off |
 | `auth.registration` | `true` lets anyone make an account. Off by default: people join by invitation |
 | `auth.allowed_domains` | `["example.com"]` limits new accounts to these email domains |
-| `auth.require_2fa` | `true` requires a second step (codes or a passkey) from everyone |
+| `auth.require_2fa` | `true` requires every sign-in to take two steps: a passkey, or a password or outside account followed by an app's code or the person's passkey. Someone with no second step is sent to set one up; sessions that signed in with one step before are asked for the second |
 | `auth.google`, `auth.github` | `{"enabled": true, "client_id": "…", "client_secret": "…"}`. Redirect address: `<url>/api/v1/auth/oauth/google/callback` |
 | `auth.oidc` | The same, plus `"issuer"` and a `"name"` for the button. Any OpenID Connect provider. Add `"trust_email": true` only if the provider checks every address but does not say so: an address it does not call verified is otherwise not enough to sign in to the account that has it |
 | `mail` | `{"host", "port", "username", "password", "from", "tls"}`. `tls` is `starttls` (default), `tls` or `none` |
