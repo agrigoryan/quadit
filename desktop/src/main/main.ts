@@ -26,9 +26,9 @@ const WEBSITE = "https://github.com/agrigoryan/quadit";
 // places) in another folder: for tests, and for trying a second profile.
 if (process.env.QUADIT_DESKTOP_DATA) app.setPath("userData", process.env.QUADIT_DESKTOP_DATA);
 
-/** Links that arrive before the app is ready (macOS sends the one that launched it early). */
+/** Links that arrive before the app has started (macOS sends the one that launched it early). */
 const earlyLinks: string[] = [];
-let handleLink = (link: string) => void earlyLinks.push(link);
+let handleLink: (link: string) => void = (link) => void earlyLinks.push(link);
 
 const refused = app.isPackaged ? refusedSwitches(process.argv, (name) => app.commandLine.hasSwitch(name)) : [];
 if (refused.length > 0) {
@@ -137,7 +137,7 @@ function start() {
   app.on("browser-window-focus", refreshMenu);
   refreshMenu();
 
-  handleLink = (raw) => {
+  const handleReadyLink = (raw: string) => {
     const link = parseDeepLink(raw);
     if (!link) return;
     if (link.kind === "connect") {
@@ -176,6 +176,10 @@ function start() {
   // Servers upgrade and downgrade while the app is away: ask each again.
   void checks.checkAll();
   if (app.isPackaged || process.env.QUADIT_DESKTOP_CHECK_UPDATES) updates.start();
+  // Only now that the windows are made: making one can run the system's
+  // event loop, which may hand in a link, and handled then it would make
+  // the server list a second time while the first is still being made.
+  handleLink = handleReadyLink;
   for (const link of earlyLinks.splice(0)) handleLink(link);
 }
 
