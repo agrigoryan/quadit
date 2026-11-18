@@ -1,6 +1,22 @@
-.git
-bin
-data
+# The image is built from these alone (Dockerfile): the Go module and its
+# root package, the binary's sources, the skill it carries, the web app's
+# sources, and the licence files it ships. Everything else (private notes,
+# release output, the website, local data) never enters the build context.
+*
+!go.mod
+!go.sum
+!*.go
+!cmd
+!internal
+!integrations
+!web
+!LICENSE
+!THIRD_PARTY_NOTICES
+
+# Inside those: what a local build left behind.
 web/node_modules
 web/dist
-*.sqlite*
+web/playwright-report
+web/test-results
+**/.DS_Store
+**/*.sqlite*
