@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { join } from "node:path";
-import { expect, test } from "./desktop";
+import { APP_VERSION, expect, test } from "./desktop";
 import type { HandoffEvent } from "./handoff-fake";
 import { quadit } from "./run";
 
@@ -39,7 +39,7 @@ test("window.open: the server's own pages open in another app window, other site
   const child = await opened;
   await expect(child).toHaveURL(`${run.server}/e2e/inbox`);
   // Held to the same rules: its own pages get the bridge, and it shares the server's session.
-  expect(await child.evaluate(() => window.quaditDesktop?.version)).toBe("0.1.0");
+  expect(await child.evaluate(() => window.quaditDesktop?.version)).toBe(APP_VERSION);
   expect((await desktop.recorded()).opened).toEqual(["https://example.org/elsewhere"]);
 });
 

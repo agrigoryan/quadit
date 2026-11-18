@@ -15,6 +15,9 @@ export { expect } from "@playwright/test";
 
 const APP_DIR = join(__dirname, "../..");
 
+/** The app's own version (package.json), which its pages are told through the bridge. */
+export const APP_VERSION: string = JSON.parse(readFileSync(join(APP_DIR, "package.json"), "utf8")).version;
+
 export interface Recorded {
   opened: string[];
   notes: { title: string; body: string }[];

@@ -1,4 +1,4 @@
-import { expect, test } from "./desktop";
+import { APP_VERSION, expect, test } from "./desktop";
 import { quadit } from "./run";
 
 test("the bridge is given to the server's own pages and to nothing else", async ({ desktop, run }) => {
@@ -12,7 +12,7 @@ test("the bridge is given to the server's own pages and to nothing else", async 
       frozen: Object.isFrozen(window.quaditDesktop),
       node: typeof (window as unknown as { require?: unknown }).require,
     })),
-  ).toEqual({ version: "0.1.0", notify: "function", setBadge: "function", frozen: true, node: "undefined" });
+  ).toEqual({ version: APP_VERSION, notify: "function", setBadge: "function", frozen: true, node: "undefined" });
 
   // The app's own server list has its own API, not the bridge.
   const list = await desktop.serverList();
