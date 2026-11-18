@@ -24,9 +24,9 @@ test("the bridge is given to the server's own pages and to nothing else", async 
       const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().startsWith(origin));
       void win?.webContents.loadURL(`${elsewhere}/login`);
     },
-    { origin: run.server, elsewhere: run.direct },
+    { origin: run.server, elsewhere: run.other },
   );
-  const away = await desktop.pageOf(run.direct);
+  const away = await desktop.pageOf(run.other);
   await away.waitForLoadState();
   expect(await away.evaluate(() => typeof window.quaditDesktop)).toBe("undefined");
 });
@@ -83,8 +83,8 @@ test("a notification's path is held to the server: one pointing elsewhere opens 
 test("each server's unread count adds up on the dock badge", async ({ desktop, run }) => {
   await desktop.addServer(run.server, "One");
   const one = await desktop.signedIn(run.server);
-  await desktop.addServer(run.direct, "Two");
-  const two = await desktop.signedIn(run.direct);
+  await desktop.addServer(run.other, "Two");
+  const two = await desktop.signedIn(run.other);
 
   await one.evaluate(() => window.quaditDesktop?.setBadge(3));
   await two.evaluate(() => window.quaditDesktop?.setBadge(4));

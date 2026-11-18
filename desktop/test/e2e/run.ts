@@ -14,8 +14,10 @@ export const WORKSPACE = { name: "E2E", slug: "e2e" };
 export interface Run {
   /** The server the app adds: the hand-off stand-in in front of the real server, or the real server when it speaks the hand-off. */
   server: string;
-  /** The real server, at its own address: a second origin, so a second server as the app sees it. */
+  /** The real server, at its own address. */
   direct: string;
+  /** Another address of the same server (the one of direct and the stand-in that is not `server`): a second server, as the app sees it. */
+  other: string;
   /** The hand-off stand-in (handoff-fake.ts), whose /__fake/log the tests read. */
   fake: string;
   /** The owner's API token, for the CLI. */

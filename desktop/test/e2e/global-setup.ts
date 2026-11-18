@@ -73,6 +73,7 @@ export default async function globalSetup() {
     const run: Run = {
       direct,
       server: realHandoff ? direct : fake.url,
+      other: realHandoff ? fake.url : direct,
       fake: fake.url,
       token,
       session: { name, value },

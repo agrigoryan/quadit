@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
+import { chromium } from "@playwright/test";
 import { expect, signInWithPassword, test } from "./desktop";
 import type { HandoffEvent } from "./handoff-fake";
+import { OWNER, type Run } from "./run";
 
 test("signing in with a password in the server's window opens the workspace", async ({ desktop, run }) => {
   const page = await desktop.addServer(run.server);
@@ -8,20 +10,48 @@ test("signing in with a password in the server's window opens the workspace", as
   await expect(page.getByRole("navigation").first()).toBeVisible();
 });
 
-/** Plays the system browser's part: opens the connect address the app sent it to and gives the quadit:// link it is sent back with. */
-async function browserApproves(connect: string): Promise<string> {
-  const answer = await fetch(connect, { redirect: "manual" });
-  expect(answer.status).toBe(302);
-  const link = answer.headers.get("location") ?? "";
-  expect(link).toMatch(/^quadit:\/\/connect\?/);
-  return link;
+/**
+ * Plays the system browser's part: opens the connect address the app sent it
+ * to, approves, and gives the quadit:// link the browser is sent back with.
+ * The stand-in approves at once; a real server shows its page, where a
+ * browser signed in as the owner presses Continue.
+ */
+async function browserApproves(run: Run, connect: string): Promise<string> {
+  if (run.server === run.fake) {
+    const answer = await fetch(connect, { redirect: "manual" });
+    expect(answer.status).toBe(302);
+    return answer.headers.get("location") ?? "";
+  }
+  const browser = await chromium.launch();
+  try {
+    const context = await browser.newContext();
+    await context.addCookies([{ name: run.session.name, value: run.session.value, url: run.server, httpOnly: true }]);
+    const page = await context.newPage();
+    let link = "";
+    // The browser cannot follow a quadit:// redirect here: take it off the answer to Continue.
+    await page.route(
+      (url) => url.pathname === "/desktop/connect",
+      async (route) => {
+        if (route.request().method() !== "POST") return route.continue();
+        const answer = await route.fetch({ maxRedirects: 0 });
+        link = answer.headers()["location"] ?? "";
+        await route.fulfill({ status: 200, contentType: "text/plain", body: "Handed to the app." });
+      },
+    );
+    await page.goto(connect);
+    await expect(page.getByText(`Sign in to the Quadit app on this computer as ${OWNER.name}?`)).toBeVisible();
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect.poll(() => link).toMatch(/^quadit:\/\/connect\?/);
+    return link;
+  } finally {
+    await browser.close();
+  }
 }
 
 test("signing in through the browser: the bar on the sign-in page starts it, the quadit:// link finishes it", async ({
   desktop,
   run,
 }) => {
-  test.skip(run.server !== run.fake, "the stand-in plays the browser's part; with the real server it is a person");
   const page = await desktop.addServer(run.server);
   await expect(page).toHaveURL(/\/login/);
 
@@ -37,29 +67,35 @@ test("signing in through the browser: the bar on the sign-in page starts it, the
   expect(connect.searchParams.get("state")).toMatch(/^[A-Za-z0-9_-]{43}$/);
   expect(connect.searchParams.get("challenge")).toMatch(/^[A-Za-z0-9_-]{43}$/);
 
-  const link = await browserApproves(connect.href);
+  const link = await browserApproves(run, connect.href);
+  expect(link).toMatch(/^quadit:\/\/connect\?/);
+  expect(new URL(link).searchParams.get("state")).toBe(connect.searchParams.get("state"));
   await desktop.openLink(link);
 
   // The window redeemed the code with the verifier, and is signed in.
+  await expect(page).toHaveURL(/\/e2e(\/|$)/);
+  await expect(page.getByRole("navigation").first()).toBeVisible();
+  // The bar is gone with the sign-in page.
+  await expect.poll(() => desktop.barShown(run.server)).toBe(false);
+  if (run.server !== run.fake) return;
+  // The stand-in checked the verifier against the challenge for this state.
   const finished = async () =>
     ((await (await fetch(`${run.fake}/__fake/log`)).json()) as HandoffEvent[]).filter(
       (event) => event.step === "finish",
     );
   await expect.poll(finished).toEqual([{ step: "finish", ok: true, detail: connect.searchParams.get("state") }]);
-  await expect(page).toHaveURL(/\/e2e(\/|$)/);
-  await expect(page.getByRole("navigation").first()).toBeVisible();
-  // The bar is gone with the sign-in page.
-  await expect.poll(() => desktop.barShown(run.server)).toBe(false);
 });
 
 test("a quadit://connect link the app did not start, or for another server, is refused", async ({ desktop, run }) => {
-  test.skip(run.server !== run.fake, "uses the stand-in's connect page");
   const page = await desktop.addServer(run.server);
   await expect(page).toHaveURL(/\/login/);
 
   // A link made by someone else: a state this app never made.
   const challenge = createHash("sha256").update("x".repeat(43)).digest("base64url");
-  const forged = await browserApproves(`${run.server}/desktop/connect?state=${"A".repeat(43)}&challenge=${challenge}`);
+  const forged = await browserApproves(
+    run,
+    `${run.server}/desktop/connect?state=${"A".repeat(43)}&challenge=${challenge}`,
+  );
   await desktop.openLink(forged);
   await expect
     .poll(async () => (await desktop.recorded()).dialogs)
@@ -69,14 +105,16 @@ test("a quadit://connect link the app did not start, or for another server, is r
   const list = await desktop.serverList();
   await list.getByRole("button", { name: /with your browser/ }).click();
   await expect.poll(async () => (await desktop.recorded()).opened.length).toBe(1);
-  const link = new URL(await browserApproves((await desktop.recorded()).opened[0] ?? ""));
+  const link = new URL(await browserApproves(run, (await desktop.recorded()).opened[0] ?? ""));
   link.searchParams.set("server", "https://evil.example.com");
   await desktop.openLink(link.href);
   await expect
     .poll(async () => (await desktop.recorded()).dialogs.at(-1))
     .toMatch(/came from https:\/\/evil\.example\.com/);
 
+  // Neither code was redeemed: the window is still at the sign-in page.
   await expect(page).toHaveURL(/\/login/);
+  if (run.server !== run.fake) return;
   const log = (await (await fetch(`${run.fake}/__fake/log`)).json()) as HandoffEvent[];
   expect(log.filter((event) => event.step === "finish" && event.detail === link.searchParams.get("state"))).toEqual([]);
 });
