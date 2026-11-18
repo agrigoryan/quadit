@@ -1,0 +1,363 @@
+// Edits to other programs' files (harness settings, skill files, the quadit
+// command's link), planned first and written only once the person has seen
+// them, and each recorded so that it can be taken back later, but only
+// where the file still says what was written.
+//
+// A change is planned against the files as they are now, into the text each
+// file will have (FileEdit) and a record of what was done (Applied). JSON
+// and JSONC are edited with jsonc-parser, which keeps comments and
+// formatting. TOML is edited only by appending a table, never by rewriting
+// it: a table that is already there is refused with what to add by hand.
+// Writing checks first that every file is still as planned.
+
+import { createHash } from "node:crypto";
+import {
+  chmodSync,
+  copyFileSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  renameSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
+import { createTwoFilesPatch } from "diff";
+import { applyEdits, type ModificationOptions, modify, type ParseError, parse as parseJsonc } from "jsonc-parser";
+import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
+
+/** A change the app may make to a file. */
+export type Change =
+  /** Sets a key of a JSON or JSONC file to `value`. */
+  | { kind: "json"; path: string; keyPath: string[]; value: unknown }
+  /** Adds the string `value` to the array at a key of a JSON or JSONC file, when it is not there. */
+  | { kind: "json-item"; path: string; keyPath: string[]; value: string }
+  /** Appends a table `[table]` holding `entries` to a TOML file. */
+  | { kind: "toml"; path: string; table: string[]; entries: Record<string, string | boolean> }
+  /** Writes a whole file. */
+  | { kind: "file"; path: string; content: string }
+  /**
+   * A file another program writes (quadit login): planned and backed up
+   * here, written by that program. `shown` is what the plan shows of it.
+   */
+  | { kind: "written-by"; path: string; shown: string }
+  /** Makes `path` a symbolic link to `target`. */
+  | { kind: "link"; path: string; target: string };
+
+/**
+ * What a change did, enough to take it back: the value a key had (absent
+ * when it had none) and the value written, how many keys of its path were
+ * there before, the block appended, a file's hash and its backup.
+ */
+export type Applied =
+  | { kind: "json"; path: string; keyPath: string[]; prior?: unknown; wrote: unknown; existed: number }
+  | { kind: "json-item"; path: string; keyPath: string[]; value: string; existed: number }
+  | { kind: "toml"; path: string; block: string }
+  | { kind: "file"; path: string; sha256: string; backup: string | null }
+  | { kind: "link"; path: string; target: string };
+
+/** A file as it is and as it will be: text, or for a link its target; null for no file. */
+export interface FileEdit {
+  path: string;
+  link: boolean;
+  before: string | null;
+  after: string | null;
+  /** Written by another program (quadit login): `after` is only what the plan shows. */
+  writtenBy?: true;
+}
+
+/** A plan that cannot be made, with what the person should know. */
+export class EditRefused extends Error {}
+
+const JSON_FORMAT: ModificationOptions = { formattingOptions: { insertSpaces: true, tabSize: 2, eol: "\n" } };
+const TOML_MARK = "# Added by the Quadit app; Disconnect in the app takes it out.";
+
+/**
+ * The edits that make `changes`, from the files as they are now, and what
+ * each change did. Several changes to one file are made one after another
+ * on its text. A change that finds its result already there does nothing
+ * and records nothing. Throws EditRefused when a file cannot be read or a
+ * TOML table is already there.
+ */
+export function planChanges(changes: Change[]): { edits: FileEdit[]; applied: Applied[] } {
+  const edits = new Map<string, FileEdit>();
+  const applied: Applied[] = [];
+  for (const change of changes) {
+    let edit = edits.get(change.path);
+    if (!edit) {
+      const link = change.kind === "link";
+      const before = link ? readLink(change.path) : readText(change.path);
+      edit = { path: change.path, link, before, after: before };
+      edits.set(change.path, edit);
+    }
+    const done = applyChange(edit, change);
+    if (done) applied.push(done);
+  }
+  return { edits: [...edits.values()].filter((e) => e.after !== e.before || e.writtenBy), applied };
+}
+
+function applyChange(edit: FileEdit, change: Change): Applied | null {
+  const { path } = change;
+  switch (change.kind) {
+    case "json": {
+      const text = edit.after ?? "";
+      const root = readJson(text, path);
+      const { value: prior, existed } = lookUp(root, change.keyPath);
+      if (existed === change.keyPath.length && same(prior, change.value)) return null;
+      edit.after = applyEdits(text, modify(text, change.keyPath, change.value, JSON_FORMAT));
+      return { kind: "json", path, keyPath: change.keyPath, prior, wrote: change.value, existed };
+    }
+    case "json-item": {
+      const text = edit.after ?? "";
+      const { value: list, existed } = lookUp(readJson(text, path), change.keyPath);
+      if (list !== undefined && !Array.isArray(list)) {
+        throw new EditRefused(`${path}: ${change.keyPath.join(".")} is not a list, so the app cannot add to it.`);
+      }
+      if (list?.includes(change.value)) return null;
+      edit.after = applyEdits(
+        text,
+        modify(text, [...change.keyPath, -1], change.value, { ...JSON_FORMAT, isArrayInsertion: true }),
+      );
+      return { kind: "json-item", path, keyPath: change.keyPath, value: change.value, existed };
+    }
+    case "toml": {
+      const text = edit.after ?? "";
+      let root = readToml(text, path);
+      const name = change.table.join(".");
+      const block = `${text === "" || text.endsWith("\n") ? "" : "\n"}\n${TOML_MARK}\n${stringifyToml(nest(change.table, change.entries))}\n`;
+      for (let i = 1; i <= change.table.length; i++) {
+        const found = lookUp(root, change.table.slice(0, i));
+        if (found.existed === i && (i === change.table.length || typeof found.value !== "object")) {
+          throw new EditRefused(
+            `${path} already has ${name}, so the app does not change it. Add these lines to it yourself, or take it out and try again:\n${block.trim()}`,
+          );
+        }
+      }
+      // Appended to whatever the file has, the table must still read as TOML (a dotted key elsewhere may define it).
+      root = readToml(text + block, path);
+      if (lookUp(root, change.table).existed !== change.table.length) throw new Error(`${path}: ${name} was not added`);
+      edit.after = text + block;
+      return { kind: "toml", path, block };
+    }
+    case "file":
+      if (edit.after === change.content) return null;
+      edit.after = change.content;
+      return { kind: "file", path, sha256: "", backup: null };
+    case "written-by":
+      edit.after = change.shown;
+      edit.writtenBy = true;
+      return { kind: "file", path, sha256: "", backup: null };
+    case "link":
+      if (edit.before !== null && edit.before !== change.target && !isLink(path)) {
+        throw new EditRefused(`${path} is already there and is not the app's link.`);
+      }
+      if (edit.after === change.target) return null;
+      edit.after = change.target;
+      return { kind: "link", path, target: change.target };
+  }
+}
+
+/**
+ * The edits that take back what `applied` did, where each file still says
+ * what was written, and a note for each that no longer does. A file that
+ * is gone, or a key or block no longer there, needs nothing.
+ */
+export function planReverts(applied: Applied[]): { edits: FileEdit[]; notes: string[] } {
+  const edits = new Map<string, FileEdit>();
+  const notes: string[] = [];
+  for (const record of applied) {
+    let edit = edits.get(record.path);
+    if (!edit) {
+      const link = record.kind === "link";
+      const before = link ? readLink(record.path) : readText(record.path);
+      edit = { path: record.path, link, before, after: before };
+      edits.set(record.path, edit);
+    }
+    if (edit.after === null) continue;
+    const kept = revertOne(edit, record);
+    if (kept) notes.push(`${record.path}: ${kept}; left as it is.`);
+  }
+  return { edits: [...edits.values()].filter((e) => e.after !== e.before), notes };
+}
+
+/** Takes back one record on `edit`'s text; gives why not when the file no longer says what was written. */
+function revertOne(edit: FileEdit, record: Applied): string | null {
+  const text = edit.after ?? "";
+  switch (record.kind) {
+    case "json": {
+      const { value, existed } = lookUp(readJson(text, record.path), record.keyPath);
+      if (existed < record.keyPath.length) return null;
+      if (!same(value, record.wrote)) return `${record.keyPath.join(".")} changed since the app set it`;
+      const after = applyEdits(text, modify(text, record.keyPath, record.prior, JSON_FORMAT));
+      edit.after = prune(after, record, record.keyPath.length - 1);
+      return null;
+    }
+    case "json-item": {
+      const { value } = lookUp(readJson(text, record.path), record.keyPath);
+      const index = Array.isArray(value) ? value.indexOf(record.value) : -1;
+      if (index < 0) return null;
+      const after = applyEdits(text, modify(text, [...record.keyPath, index], undefined, JSON_FORMAT));
+      edit.after = prune(after, record, record.keyPath.length);
+      return null;
+    }
+    case "toml":
+      if (!text.includes(record.block))
+        return text.includes(TOML_MARK) ? "the table the app added changed since" : null;
+      edit.after = text.replace(record.block, "");
+      return null;
+    case "file":
+      if (sha256(text) !== record.sha256) return "it changed since the app wrote it";
+      edit.after = record.backup ? readFileSync(record.backup, "utf8") : null;
+      return null;
+    case "link":
+      if (text !== record.target) return "it no longer links to the app's quadit";
+      edit.after = null;
+      return null;
+  }
+}
+
+/**
+ * Removes the objects and lists on a record's key path, from `depth` keys
+ * deep up, that the app made (deeper than the keys that were there) and
+ * that are empty now.
+ */
+function prune(text: string, record: { path: string; keyPath: string[]; existed: number }, depth: number): string {
+  for (; depth > record.existed; depth--) {
+    const keyPath = record.keyPath.slice(0, depth);
+    const { value } = lookUp(readJson(text, record.path), keyPath);
+    const empty = Array.isArray(value) ? value.length === 0 : !!value && Object.keys(value).length === 0;
+    if (!empty) break;
+    text = applyEdits(text, modify(text, keyPath, undefined, JSON_FORMAT));
+  }
+  return text;
+}
+
+/** The first edit whose file is no longer as it was when planned, or null when none is. */
+export function changedSince(edits: FileEdit[]): FileEdit | null {
+  return edits.find((edit) => (edit.link ? readLink(edit.path) : readText(edit.path)) !== edit.before) ?? null;
+}
+
+/**
+ * Backs up every file `edits` replace into `backupDir` (0600: a backup may
+ * hold a token) and writes the edits, except those another program writes.
+ * Gives each backed-up path's backup.
+ */
+export function writeEdits(edits: FileEdit[], backupDir: string): Map<string, string> {
+  const backups = new Map<string, string>();
+  for (const edit of edits) {
+    if (edit.before === null || edit.link) continue;
+    mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+    const backup = join(backupDir, edit.path.replace(/^\/+/, "").replaceAll("/", "__"));
+    copyFileSync(edit.path, backup);
+    chmodSync(backup, 0o600);
+    backups.set(edit.path, backup);
+  }
+  for (const edit of edits) {
+    if (edit.writtenBy) continue;
+    if (edit.after === null) rmSync(edit.path, { force: true });
+    else if (edit.link) {
+      rmSync(edit.path, { force: true });
+      symlinkSync(edit.after, edit.path);
+    } else writeText(edit.path, edit.after);
+  }
+  return backups;
+}
+
+/** Writes beside and renames over, keeping the file's mode, so a reader never sees half a file. */
+function writeText(path: string, text: string) {
+  mkdirSync(dirname(path), { recursive: true });
+  let mode = 0o644;
+  try {
+    mode = statSync(path).mode & 0o777;
+  } catch {
+    // A new file.
+  }
+  const next = `${path}.quadit-next`;
+  writeFileSync(next, text, { mode });
+  chmodSync(next, mode);
+  renameSync(next, path);
+}
+
+/** The unified diff of an edit, as the plan shows it. */
+export function diffOf(edit: FileEdit): string {
+  const show = (side: string | null) => (side === null ? "" : edit.link ? `→ ${side}\n` : side);
+  return createTwoFilesPatch(edit.path, edit.path, show(edit.before), show(edit.after), "", "", { context: 3 })
+    .split("\n")
+    .slice(2)
+    .join("\n");
+}
+
+export function sha256(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
+}
+
+/** The text of a file, or null when there is none. */
+export function readText(path: string): string | null {
+  try {
+    return readFileSync(path, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw new EditRefused(`${path} cannot be read: ${(err as Error).message}`);
+  }
+}
+
+function readLink(path: string): string | null {
+  try {
+    return readlinkSync(path);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    // Not a link: what it holds stands in, so a plan sees it as something other than the target.
+    return readText(path);
+  }
+}
+
+function isLink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+/** A JSON or JSONC file's value; an empty file has none (undefined). */
+function readJson(text: string, path: string): unknown {
+  if (text.trim() === "") return undefined;
+  const errors: ParseError[] = [];
+  const value: unknown = parseJsonc(text, errors, { allowTrailingComma: true });
+  if (errors.length > 0) throw new EditRefused(`${path} is not valid JSON, so the app does not change it.`);
+  return value;
+}
+
+function readToml(text: string, path: string): unknown {
+  try {
+    return parseToml(text);
+  } catch {
+    throw new EditRefused(`${path} is not valid TOML, so the app does not change it.`);
+  }
+}
+
+/** The value at `keyPath` in `root`, and how many keys of the path are there (all of them when the value is). */
+function lookUp(root: unknown, keyPath: string[]): { value: unknown; existed: number } {
+  let value = root;
+  for (let i = 0; i < keyPath.length; i++) {
+    const key = keyPath[i] ?? "";
+    if (typeof value !== "object" || value === null || !Object.hasOwn(value, key))
+      return { value: undefined, existed: i };
+    value = (value as Record<string, unknown>)[key];
+  }
+  return { value, existed: keyPath.length };
+}
+
+function nest(keyPath: string[], leaf: unknown): Record<string, unknown> {
+  return keyPath.reduceRight<Record<string, unknown>>(
+    (inner, key) => ({ [key]: inner }),
+    leaf as Record<string, unknown>,
+  );
+}
+
+function same(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
