@@ -1,6 +1,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Rectangle } from "electron";
 import { Desktop, expect, signInWithPassword, test } from "./desktop";
 
 test("a server added by its address opens in its own window, on its own session, at its sign-in page", async ({
@@ -118,30 +119,58 @@ test("at start the app asks each server again, says when one became too new for 
   }
 });
 
-test("the app reopens the server windows that were open, where they were, still signed in", async ({ run }) => {
+test("the app reopens the server windows that were open, where they were, still signed in, and on screen", async ({
+  run,
+}) => {
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   let desktop = await Desktop.launch(data, run);
   const page = await desktop.addServer(run.server);
   await signInWithPassword(page);
-  const bounds = { x: 140, y: 120, width: 1010, height: 700 };
-  await desktop.app.evaluate(({ BrowserWindow }, wanted) => {
-    BrowserWindow.getAllWindows()
-      .find((w) => w.getTitle() !== "Quadit Servers" && w.isVisible())
-      ?.setBounds(wanted);
-  }, bounds);
-  await desktop.close();
-
-  desktop = await Desktop.launch(data, run);
-  try {
-    const again = await desktop.pageOf(run.server);
-    await expect(again).toHaveURL(/\/e2e(\/|$)/);
-    const restored = await desktop.app.evaluate(({ BrowserWindow }, origin) => {
+  /** The server's window: where it is, and whether it shows. */
+  const serverWindow = () =>
+    desktop.app.evaluate(({ BrowserWindow }, origin) => {
       const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().startsWith(origin));
       return { bounds: win?.getBounds(), visible: win?.isVisible() };
     }, run.server);
-    expect(restored).toEqual({ bounds, visible: true });
+  const place = (bounds: Rectangle) =>
+    desktop.app.evaluate(
+      ({ BrowserWindow }, [origin, wanted]) => {
+        BrowserWindow.getAllWindows()
+          .find((w) => w.webContents.getURL().startsWith(origin))
+          ?.setBounds(wanted);
+      },
+      [run.server, bounds] as const,
+    );
+  const reopen = async () => {
+    await desktop.close();
+    desktop = await Desktop.launch(data, run);
+    await expect(await desktop.pageOf(run.server)).toHaveURL(/\/e2e(\/|$)/);
+  };
+  // Off the centre the app would first open it at, and inside the screen, whatever its size (a hosted Mac's is small).
+  const area = await desktop.app.evaluate(({ screen }) => screen.getPrimaryDisplay().workArea);
+  const width = Math.min(1010, area.width - 100);
+  const height = Math.min(700, area.height - 80);
+  const bounds = { x: area.x + 24, y: area.y + 16, width, height };
+  await place(bounds);
+
+  try {
+    await reopen();
+    expect(await serverWindow()).toEqual({ bounds, visible: true });
     // With a server open, the list does not show at start.
     expect(desktop.app.windows().some((p) => p.url().endsWith("servers.html"))).toBe(false);
+
+    // Left half off the screen (the screen it was on got smaller, say), it comes back whole, against the edges it crossed.
+    await place({
+      x: area.x + area.width - Math.round(width / 2),
+      y: area.y + area.height - Math.round(height / 2),
+      width,
+      height,
+    });
+    await reopen();
+    expect(await serverWindow()).toEqual({
+      bounds: { x: area.x + area.width - width, y: area.y + area.height - height, width, height },
+      visible: true,
+    });
   } finally {
     await desktop.close();
   }
