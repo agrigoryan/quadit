@@ -18,7 +18,8 @@ import (
 
 // TestCopiesOfABackup: a backup's file is copied to a folder or a bucket
 // under its own name, and only the newest copies there are kept; what is
-// not a backup's file is left alone.
+// not named exactly as a backup's file is, though it looks like one, is
+// left alone.
 func TestCopiesOfABackup(t *testing.T) {
 	ctx := context.Background()
 	b := memblob.OpenBucket(nil)
@@ -33,8 +34,11 @@ func TestCopiesOfABackup(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			local := t.TempDir()
-			if err := to.store.Put(ctx, to.dir+"notes.txt", strings.NewReader("mine"), ""); err != nil {
-				t.Fatal(err)
+			others := []string{"notes.txt", "quadit-manual.tar.gz", "quadit-20200101-000000-old.tar.gz"}
+			for _, name := range others {
+				if err := to.store.Put(ctx, to.dir+name, strings.NewReader("mine"), ""); err != nil {
+					t.Fatal(err)
+				}
 			}
 			at := time.Date(2026, 11, 18, 3, 0, 0, 0, time.UTC)
 			var names []string
@@ -70,7 +74,10 @@ func TestCopiesOfABackup(t *testing.T) {
 				t.Fatal(err)
 			}
 			slices.Sort(kept)
-			want := []string{to.dir + "notes.txt", to.dir + names[2], to.dir + names[3]}
+			want := []string{to.dir + names[2], to.dir + names[3]}
+			for _, name := range others {
+				want = append(want, to.dir+name)
+			}
 			slices.Sort(want)
 			if !slices.Equal(kept, want) {
 				t.Fatalf("kept %v, want %v", kept, want)

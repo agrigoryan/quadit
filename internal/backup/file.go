@@ -24,7 +24,7 @@ import (
 func NewFile(dir string, at time.Time) (*os.File, error) {
 	at = at.UTC()
 	for range 3600 {
-		path := filepath.Join(dir, "quadit-"+at.Format("20060102-150405")+".tar.gz")
+		path := filepath.Join(dir, at.Format(fileName))
 		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 		if err == nil {
 			return f, nil
@@ -37,9 +37,15 @@ func NewFile(dir string, at time.Time) (*os.File, error) {
 	return nil, fmt.Errorf("no free name for a backup in %s", dir)
 }
 
-// IsFile reports whether name is a name NewFile gives a backup's file.
+// fileName is the layout of a backup's file name, for time.Format.
+const fileName = "quadit-20060102-150405.tar.gz"
+
+// IsFile reports whether name is exactly a name NewFile gives a backup's
+// file. Backups are dropped by this test, in folders and buckets others may
+// share, so a name that only looks like one (quadit-manual.tar.gz) is not.
 func IsFile(name string) bool {
-	return strings.HasPrefix(name, "quadit-") && strings.HasSuffix(name, ".tar.gz") && !strings.Contains(name, "/")
+	at, err := time.Parse(fileName, name)
+	return err == nil && at.Format(fileName) == name
 }
 
 // Copy puts a copy of the backup's file at path in a store, under dir (a
