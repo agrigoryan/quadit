@@ -490,8 +490,9 @@ func (s *Server) fileOut(x *c, f core.File) core.File {
 // checksum, real type, size on screen and a reduced copy, and marks it
 // ready. The bytes put together must be the file the upload was started
 // as: as many as its size, and matching the checksum given, if one was;
-// when they are not, what was received is let go and the caller is told
-// to send the file again from the start. What was received (the parts,
+// when they are not, or a file received whole is not on this machine, what
+// was received is let go and the caller is told to send the file again
+// from the start. What was received (the parts,
 // or the file on this machine) is removed only once the file is stored
 // and marked: until then a failure leaves it all, and finishing again
 // starts from it.
@@ -507,7 +508,9 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 	}
 	in, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return &httpError{Status: 409, Code: "conflict", Message: "this upload's bytes were received by another server: send it again from there, or start it again"}
+		// Received whole by another server, or kept on a disk since lost: no
+		// request here can finish it, and the caller cannot pick a server.
+		return s.startUploadOver(ctx, x.db, *f, "this upload's bytes are not kept on this server")
 	}
 	if err != nil {
 		return err

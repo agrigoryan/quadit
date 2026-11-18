@@ -288,6 +288,53 @@ func legacyUpload(t *testing.T, s *site, st store.Store, files blob.Store, size,
 	return f.ID
 }
 
+// TestAnUploadWhoseBytesAreGoneStartsAgain: an upload whose bytes all came
+// but are no longer kept where it was received (on another server, or on a
+// disk that was lost or restored without them) is not stuck: the caller is
+// told to send it again from the start, and that makes the file.
+func TestAnUploadWhoseBytesAreGoneStartsAgain(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		disk, err := blob.NewDisk(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		files := &failingFiles{Store: disk}
+		s := newSiteWithFiles(t, st, files)
+		data := []byte("hello")
+
+		t.Run("received in one request", func(t *testing.T) {
+			fid := id.New()
+			path := fmt.Sprintf(w+"/files?name=notes.txt&size=%d&id=%s", len(data), fid)
+			files.failing.Store(true)
+			s.call(t, s.owner, "", "POST", path, data, 500, nil)
+			files.failing.Store(false)
+			if err := os.Remove(filepath.Join(s.dir, "uploads", fid+".part")); err != nil {
+				t.Fatal(err)
+			}
+			if out := s.call(t, s.owner, "", "POST", path, data, 409, nil); !strings.Contains(out, "continue from 0") {
+				t.Fatalf("asked again once its bytes are gone: %s", out)
+			}
+			var f uploaded
+			s.call(t, s.owner, "", "PATCH", w+"/files/"+fid+"?offset=0", data, 200, &f)
+			if f.State != "ready" || f.SHA256 != sumOf(data) {
+				t.Fatalf("sent again from the start, the file is %+v", f)
+			}
+		})
+
+		t.Run("received before the upgrade", func(t *testing.T) {
+			fid := legacyUpload(t, s, st, files, int64(len(data)), int64(len(data)), nil)
+			if out := s.call(t, s.owner, "", "PATCH", fmt.Sprintf(w+"/files/%s?offset=%d", fid, len(data)), nil, 409, nil); !strings.Contains(out, "continue from 0") {
+				t.Fatalf("finished with its bytes gone: %s", out)
+			}
+			var f uploaded
+			s.call(t, s.owner, "", "PATCH", w+"/files/"+fid+"?offset=0", data, 200, &f)
+			if f.State != "ready" || f.SHA256 != sumOf(data) {
+				t.Fatalf("sent again from the start, the file is %+v", f)
+			}
+		})
+	})
+}
+
 // TestAnUploadFromBeforeTheUpgradeGoesOn: an upload in parts that a server
 // before version 14 had started goes on after the upgrade from what that
 // server kept, and ends as every byte that was sent: none dropped, none
