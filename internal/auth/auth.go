@@ -121,6 +121,27 @@ func (s *Sealer) Seal(plain string) (string, error) {
 	return "v1:" + base64.RawStdEncoding.EncodeToString(s.aead.Seal(nonce, nonce, []byte(plain), nil)), nil
 }
 
+// LooksSealed reports whether a stored value has the form Seal gives, so
+// that sealed values can be found among others (in a backup's rows)
+// without a list of where they are kept. Whether one opens is Open's to
+// say.
+func LooksSealed(v string) bool {
+	rest, ok := strings.CutPrefix(v, "v1:")
+	if !ok {
+		return false
+	}
+	raw, err := base64.RawStdEncoding.DecodeString(rest)
+	// A nonce, a tag, and at least one sealed byte: Seal leaves "" as it is.
+	return err == nil && len(raw) > gcmNonceSize+gcmTagSize
+}
+
+// gcmNonceSize and gcmTagSize are the lengths, in bytes, of the nonce Seal
+// puts before what it seals and of the tag after it (cipher.NewGCM's).
+const (
+	gcmNonceSize = 12
+	gcmTagSize   = 16
+)
+
 // Open decrypts what Seal made.
 func (s *Sealer) Open(sealed string) (string, error) {
 	if sealed == "" {

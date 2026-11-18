@@ -465,3 +465,66 @@ func TestARestoreNeedsTheSecretThatSealedTheArchive(t *testing.T) {
 		}
 	})
 }
+
+// TestARestoreOfAnArchiveWithoutAKeyCheckTriesWhatItSealed: an archive
+// made before archives carried a key check (or made without the install's
+// secret) is held to the same rule by what it holds: a restore with a
+// secret that opens none of its stored secrets is refused before anything
+// is written, one with the secret that sealed them goes ahead, and so does
+// one that says the secret is lost. An archive that holds no stored secret
+// has nothing a wrong secret could lose.
+func TestARestoreOfAnArchiveWithoutAKeyCheckTriesWhatItSealed(t *testing.T) {
+	ctx := context.Background()
+	original, _ := auth.NewSealer([]byte("the original install secret"))
+	other, _ := auth.NewSealer([]byte("a secret made by a new install"))
+	archiveOf := func(t *testing.T, sealSomething bool) []byte {
+		t.Helper()
+		st := testdb.SQLite(t)
+		files, _ := blob.NewDisk(t.TempDir())
+		fill(t, st, files)
+		if sealSomething {
+			// A mail password, sealed inside the setting's JSON as the
+			// admin area keeps it.
+			sealed, err := original.Seal("a mail password")
+			if err != nil {
+				t.Fatal(err)
+			}
+			mail := core.Setting{Name: "mail", Value: json.RawMessage(`{"host":"smtp.example.com","password":"` + sealed + `"}`), UpdatedAt: 1}
+			if err := st.Insert(ctx, mail); err != nil {
+				t.Fatal(err)
+			}
+		}
+		var archive bytes.Buffer
+		if _, err := backup.Write(ctx, st, files, nil, "test", &archive); err != nil {
+			t.Fatal(err)
+		}
+		return archive.Bytes()
+	}
+	withSecrets := archiveOf(t, true)
+
+	t.Run("another secret is refused", func(t *testing.T) {
+		dst, dstFiles := fresh(t, testdb.SQLite(t))
+		if _, err := backup.Restore(ctx, dst, dstFiles, other, bytes.NewReader(withSecrets)); !errors.Is(err, backup.ErrOtherSecret) {
+			t.Fatalf("restoring with another secret = %v", err)
+		}
+		emptyAfterwards(t, dst, dstFiles)
+	})
+	t.Run("the secret that sealed it", func(t *testing.T) {
+		dst, dstFiles := fresh(t, testdb.SQLite(t))
+		if _, err := backup.Restore(ctx, dst, dstFiles, original, bytes.NewReader(withSecrets)); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("a secret said to be lost", func(t *testing.T) {
+		dst, dstFiles := fresh(t, testdb.SQLite(t))
+		if _, err := backup.Restore(ctx, dst, dstFiles, nil, bytes.NewReader(withSecrets)); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("nothing sealed", func(t *testing.T) {
+		dst, dstFiles := fresh(t, testdb.SQLite(t))
+		if _, err := backup.Restore(ctx, dst, dstFiles, other, bytes.NewReader(archiveOf(t, false))); err != nil {
+			t.Fatal(err)
+		}
+	})
+}

@@ -13,9 +13,10 @@
 // made at, the Quadit that made it, and a value sealed with the install's
 // secret, so a restore can refuse an archive it cannot read whole, or
 // whose stored secrets the destination could not open, before it writes
-// anything; its last (manifest.json) lists every member with its
-// checksum. An archive made before the first member existed has only the
-// last.
+// anything (an archive made without that value is tried on the sealed
+// values its rows hold); its last (manifest.json) lists every member with
+// its checksum. An archive made before the first member existed has only
+// the last.
 //
 // A full restore reads the archive twice: once to check all of it, the
 // rows against each other included, then to load it, every row in one
@@ -345,14 +346,15 @@ func read(r io.Reader, each func(name string, body io.Reader) error) (Manifest, 
 // depends on it (a workspace's feed is not ahead of its sequence; every
 // stored file a row names is in it, or was missing when it was made).
 func Verify(r io.Reader) (Manifest, error) {
-	return check(r, nil)
+	return check(r, nil, nil)
 }
 
 // check is Verify, handing what the first member says to first, when the
-// archive has one, before it reads further.
-func check(r io.Reader, first func(madeBy) error) (Manifest, error) {
+// archive has one, before it reads further, and each value its rows hold
+// sealed (auth.LooksSealed) to sawSealed. Either may be nil.
+func check(r io.Reader, first func(madeBy) error, sawSealed func(string)) (Manifest, error) {
 	sums := map[string]Entry{}
-	rows := &consistency{seq: map[string]int64{}, lastEvent: map[string]int64{}, named: map[string]bool{}}
+	rows := &consistency{seq: map[string]int64{}, lastEvent: map[string]int64{}, named: map[string]bool{}, sawSealed: sawSealed}
 	m, err := read(r, func(name string, body io.Reader) error {
 		h := sha256.New()
 		counted := &countingWriter{w: h}
@@ -409,14 +411,20 @@ func (c *countingWriter) Write(p []byte) (int, error) {
 
 // consistency is what check learns of the rows of an archive that must
 // agree with each other: each workspace's sequence and the last event of
-// its feed, and the stored files the rows name.
+// its feed, and the stored files the rows name; and, for a restore, the
+// values the rows hold sealed.
 type consistency struct {
 	seq       map[string]int64 // workspace id -> its sequence
 	lastEvent map[string]int64 // workspace id -> the number of its last event
 	named     map[string]bool  // storage keys
+	// sawSealed is given every value of every row that looks sealed, at any
+	// depth of a JSON column (a setting keeps its password inside); nil
+	// when nobody asked.
+	sawSealed func(string)
 }
 
-// read takes in the rows of one table, when they are of a table it checks.
+// read takes in the rows of one table, when they are of a table it checks,
+// or when it looks for sealed values.
 func (c *consistency) read(table string, body io.Reader) error {
 	number := func(row map[string]any, col string) int64 { n, _ := row[col].(float64); return int64(n) }
 	var take func(row map[string]any)
@@ -434,15 +442,42 @@ func (c *consistency) read(table string, body io.Reader) error {
 				c.named[key] = true
 			}
 		}
-	default:
+	}
+	if take == nil && c.sawSealed == nil {
 		return nil
 	}
 	return lines(body, 1000, func(rows []map[string]any) error {
 		for _, row := range rows {
-			take(row)
+			if take != nil {
+				take(row)
+			}
+			if c.sawSealed != nil {
+				eachString(row, func(v string) {
+					if auth.LooksSealed(v) {
+						c.sawSealed(v)
+					}
+				})
+			}
 		}
 		return nil
 	})
+}
+
+// eachString calls fn with every string in v, a value as JSON decodes, as
+// deep as it goes.
+func eachString(v any, fn func(string)) {
+	switch v := v.(type) {
+	case string:
+		fn(v)
+	case map[string]any:
+		for _, inner := range v {
+			eachString(inner, fn)
+		}
+	case []any:
+		for _, inner := range v {
+			eachString(inner, fn)
+		}
+	}
 }
 
 // check says how the rows disagree, if they do: a workspace whose feed is
@@ -562,27 +597,25 @@ func readable(ctx context.Context, st store.Store, made madeBy) error {
 // upgrade made is not undone by a restore.
 //
 // sealer is the install secret the restored install will run with: an
-// archive that says its stored secrets were sealed with another is
-// refused (ErrOtherSecret). nil is for an install whose secret is lost:
-// the archive is restored, and what it sealed stays sealed for good.
+// archive whose stored secrets were sealed with another is refused
+// (secretProof, ErrOtherSecret). nil is for an install whose secret is
+// lost: the archive is restored, and what it sealed stays sealed for good.
 func Restore(ctx context.Context, st store.Store, files blob.Store, sealer *auth.Sealer, archive io.ReadSeeker) (Manifest, error) {
 	if n, err := st.Count(ctx, "users"); err != nil {
 		return Manifest{}, err
 	} else if n > 0 {
 		return Manifest{}, errors.New("this database already has data; a full restore goes into an empty one (to bring back one task or page, name it)")
 	}
+	proof := &secretProof{sealer: sealer}
 	m, err := check(archive, func(made madeBy) error {
 		if err := readable(ctx, st, made); err != nil {
 			return err
 		}
-		if sealer == nil || made.KeyCheck == "" {
-			return nil
-		}
-		if opened, err := sealer.Open(made.KeyCheck); err != nil || opened != keyCheck {
-			return ErrOtherSecret
-		}
-		return nil
-	})
+		return proof.keyCheck(made)
+	}, proof.sawSealed)
+	if err == nil {
+		err = proof.result()
+	}
 	if err != nil {
 		return m, err
 	}
@@ -616,6 +649,50 @@ func Restore(ctx context.Context, st store.Store, files blob.Store, sealer *auth
 		return m, err
 	}
 	return m, nil
+}
+
+// secretProof is how a full restore knows that the install secret it has
+// opens the archive's stored secrets: by the key check an archive carries,
+// or, in one made without it (before archives had one, or without the
+// install's secret at hand), by a stored secret of its rows that opens. An
+// archive that holds no stored secret has nothing a wrong secret could
+// lose, and passes. With no secret (a lost one), nothing is asked.
+type secretProof struct {
+	sealer  *auth.Sealer
+	checked bool // the archive carries a key check (which opened, or check stopped)
+	sealed  bool // the rows hold a sealed value
+	opened  bool // and one of them opened
+}
+
+// keyCheck opens the key check of an archive that has one.
+func (p *secretProof) keyCheck(made madeBy) error {
+	if p.sealer == nil || made.KeyCheck == "" {
+		return nil
+	}
+	p.checked = true
+	if opened, err := p.sealer.Open(made.KeyCheck); err != nil || opened != keyCheck {
+		return ErrOtherSecret
+	}
+	return nil
+}
+
+// sawSealed tries a value the rows hold sealed, until one opens.
+func (p *secretProof) sawSealed(v string) {
+	if p.sealer == nil || p.checked || p.opened {
+		return
+	}
+	p.sealed = true
+	_, err := p.sealer.Open(v)
+	p.opened = err == nil
+}
+
+// result refuses an archive whose rows hold sealed values, none of which
+// opened, when it had no key check to say so first.
+func (p *secretProof) result() error {
+	if p.sealed && !p.opened {
+		return ErrOtherSecret
+	}
+	return nil
 }
 
 // load loads one member of an archive that holds a table's rows.
