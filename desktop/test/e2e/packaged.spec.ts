@@ -1,51 +1,127 @@
-import { existsSync, mkdtempSync } from "node:fs";
+// The app electron-builder made (pnpm dist), for this Mac: what only the
+// packaged app has. It cannot be driven like the app run from source:
+// Playwright attaches through the inspector and a DevTools port, which the
+// packaged app refuses (src/main/switches.ts, and its Electron fuses). So it
+// is started as a person starts it, and watched from outside.
+
+import { type ChildProcess, execFileSync, spawn } from "node:child_process";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Desktop, expect, test } from "./desktop";
+import { FuseV1Options, getCurrentFuseWire } from "@electron/fuses";
+import { expect, test } from "./desktop";
 
-/** The app electron-builder made (pnpm dist), for this Mac's architecture. */
-const PACKAGED = join(
-  __dirname,
-  "../../dist",
-  process.arch === "arm64" ? "mac-arm64" : "mac",
-  "Quadit.app/Contents/MacOS/Quadit",
-);
+const APP = join(__dirname, "../../dist", process.arch === "arm64" ? "mac-arm64" : "mac", "Quadit.app");
+const BINARY = join(APP, "Contents/MacOS/Quadit");
+/** A fuse's state as the binary holds it: the characters "1" and "0" (@electron/fuses' FuseState, which it does not export). */
+const ON = "1".charCodeAt(0);
+const OFF = "0".charCodeAt(0);
 
-test("the packaged app starts, adds a server and gives its pages the bridge", async ({ run }) => {
-  test.skip(process.platform !== "darwin" || !existsSync(PACKAGED), "no packaged app: run pnpm dist first");
-  const desktop = await Desktop.launch(mkdtempSync(join(tmpdir(), "quadit-desktop-packaged-")), run, {
-    executable: PACKAGED,
+test.skip(process.platform !== "darwin" || !existsSync(BINARY), "no packaged app: run pnpm dist first");
+
+/** Starts the packaged app on a data folder of its own (holding `servers` when given), with `args` and `env`. */
+function start(
+  args: string[] = [],
+  env: Record<string, string> = {},
+  servers?: unknown[],
+): { app: ChildProcess; data: string } {
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-packaged-"));
+  if (servers) writeFileSync(join(data, "servers.json"), JSON.stringify({ servers }));
+  const app = spawn(BINARY, args, { env: { ...process.env, ...env, QUADIT_DESKTOP_DATA: data }, stdio: "pipe" });
+  return { app, data };
+}
+
+function exitOf(app: ChildProcess): Promise<number | null> {
+  return new Promise((done) => (app.exitCode !== null ? done(app.exitCode) : app.once("exit", done)));
+}
+
+async function stop(app: ChildProcess) {
+  if (app.exitCode !== null) return;
+  app.kill("SIGTERM");
+  await exitOf(app);
+}
+
+/** Whether anything listens on the port. */
+function listening(port: number): Promise<boolean> {
+  return new Promise((done) => {
+    const socket = connect(port, "127.0.0.1");
+    socket.once("connect", () => {
+      socket.destroy();
+      done(true);
+    });
+    socket.once("error", () => done(false));
   });
+}
+
+test("the packaged app claims quadit:// links and has the fuses that keep other programs out", async () => {
+  const types = execFileSync("plutil", [
+    "-extract",
+    "CFBundleURLTypes",
+    "json",
+    "-o",
+    "-",
+    join(APP, "Contents/Info.plist"),
+  ]);
+  expect(JSON.parse(types.toString())).toEqual([expect.objectContaining({ CFBundleURLSchemes: ["quadit"] })]);
+  const fuses = await getCurrentFuseWire(BINARY);
+  expect({
+    runAsNode: fuses[FuseV1Options.RunAsNode],
+    nodeOptions: fuses[FuseV1Options.EnableNodeOptionsEnvironmentVariable],
+    inspect: fuses[FuseV1Options.EnableNodeCliInspectArguments],
+    asarIntegrity: fuses[FuseV1Options.EnableEmbeddedAsarIntegrityValidation],
+    onlyAsar: fuses[FuseV1Options.OnlyLoadAppFromAsar],
+    cookieEncryption: fuses[FuseV1Options.EnableCookieEncryption],
+  }).toEqual({
+    runAsNode: OFF,
+    nodeOptions: OFF,
+    inspect: OFF,
+    asarIntegrity: ON,
+    onlyAsar: ON,
+    cookieEncryption: ON,
+  });
+});
+
+test("the packaged app starts and opens the server that was open, as the app", async ({ run }) => {
+  const server = { id: "a1b2c3d4e5f6", name: "Fake", origin: run.fake, open: true, handoff: 1 };
+  const { app } = start([], {}, [server]);
   try {
-    expect(
-      await desktop.app.evaluate(({ app }) => ({
-        packaged: app.isPackaged,
-        name: app.name,
-        version: app.getVersion(),
-      })),
-    ).toEqual({
-      packaged: true,
-      name: "Quadit",
-      version: "0.1.0",
-    });
-    const list =
-      desktop.app.windows().find((page) => page.url().endsWith("/out/pages/servers.html")) ??
-      (await desktop.app.waitForEvent("window"));
-    await expect(list.getByRole("heading", { name: "Quadit" })).toBeVisible();
-    await list.getByLabel("Address").fill(run.server);
-    await list.getByRole("button", { name: "Add server" }).click();
-    await desktop.pageOf(run.server);
-    const page = await desktop.signedIn(run.server);
-    expect(await page.evaluate(() => window.quaditDesktop?.version)).toBe("0.1.0");
-    // No developer tools in the menu of a packaged app.
-    const roles = await desktop.app.evaluate(({ Menu }) => {
-      const walk = (items: Electron.MenuItem[]): string[] =>
-        items.flatMap((item) => [item.role ?? "", ...walk(item.submenu?.items ?? [])]);
-      return walk(Menu.getApplicationMenu()?.items ?? []);
-    });
-    expect(roles).not.toContain("toggledevtools");
-    expect(roles).toContain("selectall");
+    const agents = async () => (await (await fetch(`${run.fake}/__fake/agents`)).json()) as string[];
+    await expect.poll(agents, { timeout: 30_000 }).toContainEqual(expect.stringMatching(/ QuaditDesktop\/0\.1\.0$/));
+    expect(app.exitCode).toBeNull();
   } finally {
-    await desktop.close();
+    await stop(app);
+  }
+});
+
+test("the packaged app refuses to start with a DevTools port or the inspector", async () => {
+  for (const flag of ["--remote-debugging-port", "--inspect"]) {
+    const port = 39_000 + Math.floor(Math.random() * 1000);
+    const { app } = start([`${flag}=${port}`]);
+    let stderr = "";
+    app.stderr?.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
+    try {
+      expect(await exitOf(app), flag).toBe(1);
+      expect(stderr).toContain(`does not start with ${flag}`);
+      expect(await listening(port), `${flag}: something listens on ${port}`).toBe(false);
+    } finally {
+      await stop(app);
+    }
+  }
+});
+
+test("the packaged app is no Node.js for whoever sets ELECTRON_RUN_AS_NODE", async () => {
+  const { app, data } = start(["-e", "process.stdout.write('ran as node'); process.exit(7)"], {
+    ELECTRON_RUN_AS_NODE: "1",
+  });
+  let stdout = "";
+  app.stdout?.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
+  try {
+    // As Node it would print and exit at once; as the app it starts Chromium, which writes its state.
+    await expect.poll(() => existsSync(join(data, "Local State")), { timeout: 30_000 }).toBe(true);
+    expect(stdout).not.toContain("ran as node");
+    expect(app.exitCode).toBeNull();
+  } finally {
+    await stop(app);
   }
 });

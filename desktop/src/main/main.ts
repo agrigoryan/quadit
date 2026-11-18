@@ -1,4 +1,5 @@
-// The app's start: one running copy, the quadit:// scheme, and the parts
+// The app's start: no switches that open it to other programs
+// (switches.ts), one running copy, the quadit:// scheme, and the parts
 // put together: the servers (servers.ts), their windows
 // (server-windows.ts), the server list page (server-list.ts), the browser
 // sign-in (handoff.ts), the unread badge (unread.ts), the menu (menu.ts)
@@ -14,6 +15,7 @@ import { menuTemplate } from "@/main/menu";
 import { ServerList } from "@/main/server-list";
 import { ServerWindows } from "@/main/server-windows";
 import { ServerStore } from "@/main/servers";
+import { refusedSwitches } from "@/main/switches";
 import { Unread } from "@/main/unread";
 import { type Release, UpdateWatch } from "@/main/updates";
 
@@ -27,7 +29,11 @@ if (process.env.QUADIT_DESKTOP_DATA) app.setPath("userData", process.env.QUADIT_
 const earlyLinks: string[] = [];
 let handleLink = (link: string) => void earlyLinks.push(link);
 
-if (!app.requestSingleInstanceLock()) {
+const refused = app.isPackaged ? refusedSwitches(process.argv, (name) => app.commandLine.hasSwitch(name)) : [];
+if (refused.length > 0) {
+  process.stderr.write(`${app.name} does not start with ${refused.map((name) => `--${name}`).join(", ")}.\n`);
+  app.exit(1);
+} else if (!app.requestSingleInstanceLock()) {
   // Another copy runs: it receives this one's arguments (and any link in them) as second-instance.
   app.quit();
 } else {

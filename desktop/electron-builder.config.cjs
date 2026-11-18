@@ -59,6 +59,21 @@ module.exports = {
   extraMetadata: { quaditDesktop: keychainGroup ? { keychainAccessGroup: keychainGroup } : {} },
   artifactName: "Quadit-${version}-${os}-${arch}.${ext}",
   protocols: [{ name: "Quadit link", schemes: ["quadit"] }],
+  // Off: what lets another program on the computer run code as the app or
+  // attach to it (ELECTRON_RUN_AS_NODE, NODE_OPTIONS, --inspect). On: the
+  // app's code is only its checked app.asar, and its cookies (the servers'
+  // sessions) are encrypted with the system's keychain. The switches
+  // Chromium reads are refused by the app itself (src/main/switches.ts).
+  electronFuses: {
+    runAsNode: false,
+    enableNodeOptionsEnvironmentVariable: false,
+    enableNodeCliInspectArguments: false,
+    enableEmbeddedAsarIntegrityValidation: true,
+    onlyLoadAppFromAsar: true,
+    enableCookieEncryption: true,
+    // Changing the fuses breaks the ad-hoc signature an unsigned Apple silicon build needs to start.
+    resetAdHocDarwinSignature: !signing,
+  },
   // Releases are attached by the desktop-release workflow, never by electron-builder.
   publish: null,
 

@@ -1,8 +1,11 @@
 name: desktop-ci
 
-# The desktop app's gate (desktop/): types, lint, format and unit tests.
-# Its end-to-end suite drives the app against a server and runs locally:
-# make desktop-e2e.
+# The desktop app's gate (desktop/): types, lint, format and unit tests; and
+# on a Mac, the app packaged as a release packages it (unsigned), checked for
+# what only the packaged app has: the quadit:// scheme in its Info.plist, its
+# Electron fuses, and that it refuses a DevTools port. Its end-to-end suite
+# drives the app against a server and runs locally: make desktop-e2e (with
+# pnpm dist first, it checks the packaged app the same way and more).
 on:
   push:
     branches: [main]
@@ -28,3 +31,38 @@ jobs:
           cache-dependency-path: desktop/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+
+  package-mac:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Package for this Mac, unsigned
+        run: pnpm build && pnpm exec electron-builder --config electron-builder.config.cjs --mac --arm64 --dir --publish never
+      - name: The packaged app claims quadit:// links, has its fuses and refuses a DevTools port
+        shell: bash
+        run: |
+          app=dist/mac-arm64/Quadit.app
+          plutil -extract CFBundleURLTypes json -o - "$app/Contents/Info.plist" | grep -q '"quadit"'
+          fuses=$(pnpm exec electron-fuses read --app "$app")
+          echo "$fuses"
+          for want in "RunAsNode is Disabled" "EnableNodeOptionsEnvironmentVariable is Disabled" \
+            "EnableNodeCliInspectArguments is Disabled" "EnableEmbeddedAsarIntegrityValidation is Enabled" \
+            "OnlyLoadAppFromAsar is Enabled" "EnableCookieEncryption is Enabled"; do
+            grep -qF "$want" <<< "$fuses" || { echo "::error::The fuse is not as it should be: $want"; exit 1; }
+          done
+          # It quits at once with status 1; started anyway, the alarm stops it after 60 s.
+          status=0
+          perl -e 'alarm 60; exec @ARGV' "$app/Contents/MacOS/Quadit" --remote-debugging-port=9222 || status=$?
+          test "$status" -eq 1 || { echo "::error::The app started with a DevTools port (status $status)"; exit 1; }
