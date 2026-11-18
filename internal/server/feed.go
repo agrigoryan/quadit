@@ -232,16 +232,10 @@ func (s *Server) setCursor(x *c, name string, seq int64) error {
 	if seq > ws.Seq {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "seq", Message: fmt.Sprintf("the feed is at %d; %d has not happened yet", ws.Seq, seq)}
 	}
-	var cur core.Cursor
-	there, err := store.Find(x.ctx(), x.db, &cur, store.Eq("user_id", x.member.UserID), store.Eq("name", name))
-	if err != nil {
-		return err
-	}
-	if there && cur.Seq >= seq {
-		return nil
-	}
-	return x.db.Upsert(x.ctx(), core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: name, Seq: seq, UpdatedAt: time.Now().UnixMilli()},
-		"workspace_id", "user_id", "name")
+	// One conditional statement, so acknowledgments racing each other
+	// leave the cursor at the furthest, whichever lands last.
+	return x.db.Advance(x.ctx(), core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: name, Seq: seq, UpdatedAt: time.Now().UnixMilli()},
+		"seq", "workspace_id", "user_id", "name")
 }
 
 // handleShowFeedCursor says where one of the caller's cursors stands; one

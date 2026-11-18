@@ -92,6 +92,58 @@ func TestFindTellsAMissingRowFromAFailure(t *testing.T) {
 	})
 }
 
+// TestAdvanceOnlyMovesForward: Advance makes the row, moves it forward,
+// leaves it where it is when asked to move back, and callers racing on it
+// leave it at the furthest of their positions.
+func TestAdvanceOnlyMovesForward(t *testing.T) {
+	eachDB(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		ws := fillTasks(t, s, 1)
+		var project core.Project
+		if err := s.In(ws).Get(ctx, &project); err != nil {
+			t.Fatal(err)
+		}
+		db := s.In(ws)
+		key := []string{"workspace_id", "user_id", "name"}
+		at := func(name string) int64 {
+			t.Helper()
+			var cur core.Cursor
+			if err := db.Get(ctx, &cur, store.Eq("user_id", project.CreatedBy), store.Eq("name", name)); err != nil {
+				t.Fatal(err)
+			}
+			return cur.Seq
+		}
+		move := func(name string, seq int64) error {
+			return db.Advance(ctx, core.Cursor{WorkspaceID: ws, UserID: project.CreatedBy, Name: name, Seq: seq, UpdatedAt: seq}, "seq", key...)
+		}
+
+		for _, step := range []struct{ to, want int64 }{{5, 5}, {9, 9}, {7, 9}, {9, 9}} {
+			if err := move("main", step.to); err != nil {
+				t.Fatal(err)
+			}
+			if got := at("main"); got != step.want {
+				t.Fatalf("after moving to %d the row stands at %d, want %d", step.to, got, step.want)
+			}
+		}
+
+		t.Run("by many at once", func(t *testing.T) {
+			const callers = 40
+			var wg sync.WaitGroup
+			for seq := range int64(callers) {
+				wg.Go(func() {
+					if err := move("raced", seq+1); err != nil {
+						t.Error(err)
+					}
+				})
+			}
+			wg.Wait()
+			if got := at("raced"); got != callers {
+				t.Fatalf("after %d racing moves the row stands at %d", callers, got)
+			}
+		})
+	})
+}
+
 // TestIncrStartsACounterThatIsNotThere: Incr on a counter with no row makes
 // the row, once, however many callers start it at the same time.
 func TestIncrStartsACounterThatIsNotThere(t *testing.T) {

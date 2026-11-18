@@ -596,6 +596,22 @@ func (c conn) Insert(ctx context.Context, row any) error {
 // Upsert inserts row, or updates every non-key column if a row with the
 // same key columns exists.
 func (c conn) Upsert(ctx context.Context, row any, key ...string) error {
+	return c.upsert(ctx, row, "", key)
+}
+
+// Advance inserts row, or updates the row with the same key columns when
+// row's col is greater than the stored one (see store.DB).
+func (c conn) Advance(ctx context.Context, row any, col string, key ...string) error {
+	if col == "" {
+		return errors.New("store: Advance needs the column that only moves forward")
+	}
+	return c.upsert(ctx, row, col, key)
+}
+
+// upsert is Upsert and Advance: one INSERT … ON CONFLICT, whose update,
+// when forward names a column, applies only if it moves that column
+// forward. Both databases spell the conditional update alike.
+func (c conn) upsert(ctx context.Context, row any, forward string, key []string) error {
 	v, m, err := structOf(row)
 	if err != nil {
 		return err
@@ -623,6 +639,13 @@ func (c conn) Upsert(ctx context.Context, row any, key ...string) error {
 	action := "DO NOTHING"
 	if len(sets) > 0 {
 		action = "DO UPDATE SET " + strings.Join(sets, ", ")
+		if forward != "" {
+			col, err := m.column(forward)
+			if err != nil {
+				return err
+			}
+			action += " WHERE " + m.name + "." + col + " < excluded." + col
+		}
 	}
 	_, err = c.exec(ctx, "INSERT INTO "+m.name+" ("+m.cols+") VALUES ("+placeholders(len(args))+
 		") ON CONFLICT ("+strings.Join(keys, ", ")+") "+action, args...)

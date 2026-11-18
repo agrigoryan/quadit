@@ -162,6 +162,12 @@ type DB interface {
 	// Upsert inserts row, or updates every non-key column if a row with the
 	// same key columns exists.
 	Upsert(ctx context.Context, row any, key ...string) error
+	// Advance is Upsert for a position that only moves forward: a row with
+	// the same key columns is updated only when row's col is greater than
+	// the stored one, and is otherwise left as it is. It is one statement,
+	// so callers racing on the same row leave it at the greatest of their
+	// positions, whatever order they arrive in.
+	Advance(ctx context.Context, row any, col string, key ...string) error
 	// Update sets columns on the matching rows and returns how many changed.
 	Update(ctx context.Context, table string, set map[string]any, where ...Cond) (int64, error)
 	// Delete removes the matching rows for good, and returns how many there
