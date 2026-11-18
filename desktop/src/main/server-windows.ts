@@ -34,6 +34,7 @@ import {
   type WebPreferences,
 } from "electron";
 import { giveContextMenu } from "@/main/context-menu";
+import { NoticeGate } from "@/main/notices";
 import { HANDOFF_HEADER } from "@/main/handoff";
 import { appPage, browserAddress, isHandoffPage, isOwnPage } from "@/main/origins";
 import { fitOf } from "@/main/probe";
@@ -54,8 +55,10 @@ export interface WindowsSetup {
   signInBarUrl(serverId: string): string;
   /** Starts the browser sign-in for a server. */
   signIn(serverId: string): void;
-  /** A server's page reported its unread count. */
-  setUnread(serverId: string, count: number): void;
+  /** A page of a server (the web contents `reporter`) reported the unread count of one of its workspaces. */
+  reportUnread(serverId: string, reporter: number, workspace: string, count: number): void;
+  /** A page went away: what it reported no longer counts. */
+  forgetUnread(reporter: number): void;
   /** A window was shown, hidden or focused: the menus that list them change. */
   changed(): void;
 }
@@ -69,6 +72,7 @@ export class ServerWindows {
   private barDismissed = new Set<string>();
   /** Shown notifications, held so their click still arrives (macOS forgets the handlers of collected ones). */
   private notifications = new Map<string, Notification>();
+  private gate = new NoticeGate();
   private sessions = new WeakSet<Session>();
   private quitting = false;
 
@@ -76,19 +80,20 @@ export class ServerWindows {
     private store: ServerStore,
     private setup: WindowsSetup,
   ) {
-    ipcMain.on(BRIDGE_NOTIFY, (event, n: { title: string; body: string; path: string; tag?: string }) => {
+    ipcMain.on(BRIDGE_NOTIFY, (event, raw: unknown) => {
       const server = this.bridgeSender(event);
-      if (server) this.notify(server, n);
+      if (server) this.notify(server, raw);
     });
     // A server's answer changed (its hand-off at start, say): the sign-in bar may come or go.
     store.onChange(() => {
       for (const [serverId, win] of this.windows) this.placeBar(win, serverId);
     });
-    ipcMain.on(BRIDGE_BADGE, (event, count: unknown) => {
+    ipcMain.on(BRIDGE_BADGE, (event, raw: unknown) => {
       const server = this.bridgeSender(event);
-      if (server && typeof count === "number" && Number.isFinite(count)) {
-        setup.setUnread(server.id, Math.min(Math.max(Math.floor(count), 0), 99_999));
-      }
+      const { count, workspace } = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+      if (!server || typeof count !== "number" || !Number.isFinite(count)) return;
+      if (typeof workspace !== "string" || workspace.length > 200) return;
+      setup.reportUnread(server.id, event.sender.id, workspace, Math.min(Math.max(Math.floor(count), 0), 99_999));
     });
   }
 
@@ -153,6 +158,12 @@ export class ServerWindows {
     return id ? this.store.get(id) : undefined;
   }
 
+  /** Whether a window of the server is in front of the person: focused, shown and not minimized. */
+  private inFront(serverId: string): boolean {
+    const win = BrowserWindow.getFocusedWindow();
+    return !!win && win.isVisible() && !win.isMinimized() && this.owners.get(win.webContents.id) === serverId;
+  }
+
   /** Whether a server's window is shown now. */
   isShown(serverId: string): boolean {
     return this.windows.get(serverId)?.isVisible() ?? false;
@@ -163,6 +174,7 @@ export class ServerWindows {
     const win = this.windows.get(server.id);
     this.windows.delete(server.id);
     this.bars.delete(server.id);
+    this.gate.forget(server.id);
     win?.destroy();
     BrowserWindow.clearPersistedState(windowName(server.id));
     await session.fromPartition(partitionOf(server.id)).clearStorageData();
@@ -219,7 +231,6 @@ export class ServerWindows {
     win.on("resize", () => this.placeBar(win, server.id));
     win.on("closed", () => {
       if (this.windows.get(server.id) === win) this.windows.delete(server.id);
-      this.setup.setUnread(server.id, 0);
     });
     void win.webContents.loadURL(firstUrl);
     return win;
@@ -266,7 +277,11 @@ export class ServerWindows {
   /** Holds a server's web contents (its window, or one its page opened) to the rules at the top of this file. */
   private guard(contents: WebContents, serverId: string) {
     this.owners.set(contents.id, serverId);
-    contents.once("destroyed", () => this.owners.delete(contents.id));
+    const reporter = contents.id;
+    contents.once("destroyed", () => {
+      this.owners.delete(reporter);
+      this.setup.forgetUnread(reporter);
+    });
     giveContextMenu(contents);
 
     const stopIfAway = (event: { preventDefault(): void }, url: string) => {
@@ -296,7 +311,11 @@ export class ServerWindows {
       const win = this.windows.get(serverId);
       if (win?.webContents === contents) this.placeBar(win, serverId);
     };
-    contents.on("did-navigate", pageChanged);
+    contents.on("did-navigate", () => {
+      // A new page: what the last one reported goes with it, and this one reports anew.
+      this.setup.forgetUnread(reporter);
+      pageChanged();
+    });
     contents.on("did-navigate-in-page", pageChanged);
   }
 
@@ -334,11 +353,17 @@ export class ServerWindows {
     return isOwnPage(frame.url, server.origin) ? server : undefined;
   }
 
-  private notify(server: Server, n: { title: string; body: string; path: string; tag?: string }) {
-    if (!Notification.isSupported()) return;
+  /**
+   * Shows what a server's page sent as a native notification, when the gate
+   * lets it through (notices.ts) and the person is not looking at that
+   * server's window already, where the web app shows it.
+   */
+  private notify(server: Server, raw: unknown) {
+    const n = this.gate.admit(server.id, raw, Date.now());
+    if (!n || !Notification.isSupported() || this.inFront(server.id)) return;
     const key = n.tag ? `${server.id}:${n.tag}` : `${server.id}:${Date.now()}:${Math.random()}`;
     this.notifications.get(key)?.close();
-    const note = new Notification({ title: n.title.slice(0, 200), body: n.body.slice(0, 1000) });
+    const note = new Notification({ title: n.title, body: n.body });
     const path = appPage(server.origin, n.path) ? n.path : "/";
     note.on("click", () => {
       this.notifications.delete(key);

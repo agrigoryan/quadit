@@ -160,6 +160,7 @@ test("nothing but the app's own hand-off reaches the sign-in finish: not a link,
   // A link, while the app runs.
   await desktop.openLink(finishLink(run, code, verifier));
   // A notification pointing there.
+  await desktop.hide(run.server);
   await page.evaluate((path) => window.quaditDesktop?.notify({ title: "t", body: "b", path }), finish);
   await expect.poll(async () => (await desktop.recorded()).notes.length).toBe(1);
   await desktop.clickLastNotification();

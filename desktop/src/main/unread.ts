@@ -1,6 +1,9 @@
-// Unread counts: each server's page reports its own through the bridge, and
-// the app shows their sum on the dock icon (the taskbar where the system
-// has a badge) and beside the menu-bar icon, whose menu opens a server.
+// Unread counts: each window of a server reports the count of the workspace
+// it shows, through the bridge, and the app shows the sum on the dock icon
+// (the taskbar where the system has a badge) and beside the menu-bar icon,
+// whose menu opens a server. A server's count is the sum of its workspaces,
+// each counted once however many windows show it; a window that leaves a
+// workspace or closes takes off only what it reported.
 
 import { app, Menu, nativeImage, Tray } from "electron";
 import type { ServerStore } from "@/main/servers";
@@ -13,7 +16,11 @@ export interface UnreadSetup {
 }
 
 export class Unread {
-  private counts = new Map<string, number>();
+  /**
+   * Per server, per workspace, what each reporter (a web contents, by id)
+   * said, in the order said: the last is the newest, and the workspace's count.
+   */
+  private counts = new Map<string, Map<string, Map<number, number>>>();
   private tray: Tray | undefined;
 
   constructor(
@@ -35,17 +42,40 @@ export class Unread {
     this.render();
   }
 
-  /** Records a server's count (0 clears it) and shows the new total. */
-  set(serverId: string, count: number) {
-    if ((this.counts.get(serverId) ?? 0) === count) return;
-    if (count > 0) this.counts.set(serverId, count);
-    else this.counts.delete(serverId);
+  /** What `reporter` says `workspace` of the server has unread now; 0 takes its word back. */
+  report(serverId: string, reporter: number, workspace: string, count: number) {
+    let workspaces = this.counts.get(serverId);
+    if (!workspaces) this.counts.set(serverId, (workspaces = new Map()));
+    let reporters = workspaces.get(workspace);
+    if (!reporters) workspaces.set(workspace, (reporters = new Map()));
+    reporters.delete(reporter);
+    if (count > 0) reporters.set(reporter, count);
+    if (reporters.size === 0) workspaces.delete(workspace);
     this.render();
+  }
+
+  /** Takes back everything `reporter` said: its page went away. */
+  forget(reporter: number) {
+    let changed = false;
+    for (const workspaces of this.counts.values()) {
+      for (const [workspace, reporters] of workspaces) {
+        changed = reporters.delete(reporter) || changed;
+        if (reporters.size === 0) workspaces.delete(workspace);
+      }
+    }
+    if (changed) this.render();
+  }
+
+  /** A server's count: each workspace's newest report, added up. */
+  of(serverId: string): number {
+    let sum = 0;
+    for (const reporters of this.counts.get(serverId)?.values() ?? []) sum += [...reporters.values()].at(-1) ?? 0;
+    return sum;
   }
 
   get total(): number {
     let sum = 0;
-    for (const count of this.counts.values()) sum += count;
+    for (const serverId of this.counts.keys()) sum += this.of(serverId);
     return sum;
   }
 
@@ -58,7 +88,7 @@ export class Unread {
     this.tray.setContextMenu(
       Menu.buildFromTemplate([
         ...this.store.list().map((server) => {
-          const count = this.counts.get(server.id) ?? 0;
+          const count = this.of(server.id);
           return {
             label: count > 0 ? `${server.name} (${count})` : server.name,
             click: () => this.setup.openServer(server.id),

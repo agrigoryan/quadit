@@ -167,6 +167,8 @@ export function useMe(): Member {
 }
 
 export const useSlug = () => useStore((s) => s.slug);
+/** The open workspace's id ("" until its copy is loaded): unlike its slug, it never changes. */
+export const useWorkspaceId = () => useStore((s) => s.workspace?.id ?? "");
 
 const projectList = perTable((projects: Dict<Project>) => [...liveList(projects)].sort(byRank) as Project[]);
 

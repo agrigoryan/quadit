@@ -32,10 +32,11 @@ if (origin && window.location.origin === origin) {
         body: String(n?.body ?? ""),
         path: String(n?.path ?? "/"),
         tag: n?.tag === undefined ? undefined : String(n.tag),
+        id: n?.id === undefined ? undefined : String(n.id),
       });
     },
-    setBadge(count: number) {
-      ipcRenderer.send(BRIDGE_BADGE, Number(count));
+    setBadge(count: number, workspace?: string) {
+      ipcRenderer.send(BRIDGE_BADGE, { count: Number(count), workspace: String(workspace ?? "") });
     },
   };
   contextBridge.exposeInMainWorld("quaditDesktop", Object.freeze(bridge));

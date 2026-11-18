@@ -104,6 +104,18 @@ export class Desktop {
     return page;
   }
 
+  /** Closes the window of the server at `origin`, which hides it: its page keeps running, out of the person's sight. */
+  async hide(origin: string) {
+    await this.app.evaluate(
+      ({ BrowserWindow }, wanted) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => w.webContents.getURL().startsWith(wanted))
+          ?.close(),
+      origin,
+    );
+    await expect.poll(() => this.isShown(origin)).toBe(false);
+  }
+
   /** Whether the window of the server at `origin` is on screen. */
   async isShown(origin: string): Promise<boolean> {
     return this.app.evaluate(

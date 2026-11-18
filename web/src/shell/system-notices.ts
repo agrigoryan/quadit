@@ -13,7 +13,7 @@
 
 import { useEffect } from "react";
 import { useSession } from "@/auth/session";
-import { getRowEvenIfGone, useUnreadCount } from "@/data/selectors";
+import { getRowEvenIfGone, useUnreadCount, useWorkspaceId } from "@/data/selectors";
 import { getState } from "@/data/store";
 import { onStreamEvents } from "@/data/sync";
 import { docPath } from "@/docs/area";
@@ -26,22 +26,24 @@ import type { QuaditDesktop } from "@/types/desktop";
 /** Keeps the computer told about the workspace open in the shell, for as long as the shell is on screen. */
 export function useSystemNotices() {
   const unread = useUnreadCount();
+  // The app adds up the workspaces of a server, each once however many of its windows report it.
+  const workspace = useWorkspaceId();
 
   useEffect(() => {
     const desktop = window.quaditDesktop;
-    desktop?.setBadge(unread);
+    desktop?.setBadge(unread, workspace);
     // Where a browser has no badge, or keeps it to installed apps, there is nothing to set.
     if ("setAppBadge" in navigator) void navigator.setAppBadge(unread).catch(() => {});
-  }, [unread]);
+  }, [unread, workspace]);
 
-  // Leaving the workspace, or signing out, takes the count off the icon.
+  // Leaving the workspace, or signing out, takes this window's count off the icon.
   useEffect(() => {
     const desktop = window.quaditDesktop;
     return () => {
-      desktop?.setBadge(0);
+      desktop?.setBadge(0, workspace);
       if ("clearAppBadge" in navigator) void navigator.clearAppBadge().catch(() => {});
     };
-  }, []);
+  }, [workspace]);
 
   useEffect(() => {
     const desktop = window.quaditDesktop;
@@ -75,5 +77,7 @@ function noticeOf(item: Notification): Parameters<QuaditDesktop["notify"]>[0] {
     path,
     // The same task or page replaces its earlier notification, as push does.
     tag: (item.task_id ?? "") + (item.doc_id ?? "") || undefined,
+    // The app shows an item once, however many of its windows hear it.
+    id: item.id,
   };
 }

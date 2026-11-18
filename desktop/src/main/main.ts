@@ -85,7 +85,8 @@ function start() {
     pagesPreload: join(outDir, "preload-pages.js"),
     signInBarUrl: (serverId) => `${pagesUrl}sign-in-bar.html?server=${encodeURIComponent(serverId)}`,
     signIn,
-    setUnread: (serverId, count) => unread.set(serverId, count),
+    reportUnread: (serverId, reporter, workspace, count) => unread.report(serverId, reporter, workspace, count),
+    forgetUnread: (reporter) => unread.forget(reporter),
     changed: () => refreshMenu(),
   });
   const list = new ServerList(store, windows, {

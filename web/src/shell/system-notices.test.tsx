@@ -108,6 +108,7 @@ describe("in the desktop app", () => {
           body: "SVA-5 Jump feels floaty\nCan you look at this today?",
           path: "/acme/task/SVA-5",
           tag: "t1",
+          id: "n11",
         },
       ],
       [
@@ -116,6 +117,7 @@ describe("in the desktop app", () => {
           body: "SVA-5 Jump feels floaty",
           path: "/acme/task/SVA-5#decision-d1",
           tag: "t1",
+          id: "n13",
         },
       ],
     ]);
@@ -134,14 +136,20 @@ describe("in the desktop app", () => {
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it("keeps the badge at the unread count", () => {
+  it("keeps the badge at the workspace's unread count, naming the workspace so the app adds each once", () => {
     const { unmount } = renderHook(() => useSystemNotices());
-    expect(setBadge).toHaveBeenLastCalledWith(1);
+    expect(setBadge).toHaveBeenLastCalledWith(1, "w");
     streamed(created({ task_id: "t1", title: "SVA-5 Jump feels floaty" }));
-    expect(setBadge).toHaveBeenLastCalledWith(2);
-    // Leaving the workspace, or signing out, takes the count off.
+    expect(setBadge).toHaveBeenLastCalledWith(2, "w");
+    // Leaving the workspace, or signing out, takes this window's count off.
     unmount();
-    expect(setBadge).toHaveBeenLastCalledWith(0);
+    expect(setBadge).toHaveBeenLastCalledWith(0, "w");
+  });
+
+  it("names each notification by its inbox item, so the app shows it once however many windows hear it", () => {
+    renderHook(() => useSystemNotices());
+    streamed(created({ task_id: "t1", title: "SVA-5 Jump feels floaty" }));
+    expect(notify).toHaveBeenLastCalledWith(expect.objectContaining({ id: "n11" }));
   });
 });
 

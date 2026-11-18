@@ -8,6 +8,8 @@ export interface DesktopNotification {
   path: string;
   /** A notification with the tag of an earlier one replaces it. */
   tag?: string;
+  /** The inbox item's id: the app shows each once, whichever of a server's windows tells it. */
+  id?: string;
 }
 
 export interface QuaditDesktop {
@@ -15,8 +17,12 @@ export interface QuaditDesktop {
   version: string;
   /** Show a native notification; clicking it focuses the window and navigates to `path`. */
   notify(n: DesktopNotification): void;
-  /** The unread count for this server (0 clears); the app sums servers for the dock and tray badge. */
-  setBadge(count: number): void;
+  /**
+   * The unread count of `workspace` (its id) as this window sees it; 0 takes
+   * this window's count back. The app counts each workspace of a server once
+   * and adds the servers up for the dock and tray badge.
+   */
+  setBadge(count: number, workspace?: string): void;
 }
 
 export const BRIDGE_NOTIFY = "bridge:notify";
