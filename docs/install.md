@@ -175,6 +175,14 @@ A webhook to an agent on the same machine or network, or a secret for a service 
 
 The Quadit desktop app opens a server's own web address in a window of its own; the server needs nothing turned on for it.
 
+Download it from [Releases](https://github.com/agrigoryan/quadit/releases), under the newest `desktop-v…` release: the `.dmg` for macOS (`arm64` for Apple silicon, `x64` for Intel; drag Quadit to Applications), the `.exe` installer for Windows, or the AppImage or `.deb` for Linux. Builds so far are pre-releases and are not signed, so the system warns the first time one is opened:
+
+- macOS refuses to open it. Allow it under System Settings → Privacy & Security, "Open Anyway", or run `xattr -dr com.apple.quarantine /Applications/Quadit.app` once.
+- Windows SmartScreen says it protected the PC: choose "More info", then "Run anyway".
+
+The app does not update itself: it tells you when a newer version is out, and you download it the same way.
+
+
 - Adding a server, the app asks `GET /api/v1/version` (no sign-in needed) whether the address is a Quadit server and which version of the sign-in hand-off it speaks.
 - Passkeys and Google, GitHub or OpenID Connect sign-in do not work inside the app's window, so the app signs in through the system browser: it opens `/desktop/connect` there, the person signs in as usual (second step included) and presses Continue, and the browser hands the app a code that works once, for two minutes. The app trades it at `/desktop/finish` for a session of its own, of the steps the browser's session took: a browser signed in with one step hands over a session that still owes the second, where one is owed. That address answers only the app's own windows, so no link or page can sign a browser in with a code made for another account.
 - The browser hands the app this server's address as set with `--url`, and the app checks it is the address it was given: add the server in the app by that same address.
