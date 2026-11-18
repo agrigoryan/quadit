@@ -2,7 +2,7 @@
 // `make build` made on a free port with a new, empty data directory (as
 // web/e2e/global-setup.ts does), fills it with seed.sh, signs in as the
 // demo workspace's owner and photographs each screen the site shows, at
-// device pixel ratio 2 in the light theme: desktop 1440×900, phone 390×844.
+// device pixel ratio 2 in the dark theme: desktop 1440×900, phone 390×844.
 // The PNGs land in website/shots/raw/; optimize.sh turns them into the
 // AVIF, WebP and PNG files the page uses.
 //
@@ -75,17 +75,17 @@ async function startAndSeed() {
   return { url, stop };
 }
 
-/** A browser signed in as the owner, in the light theme, at twice the pixels. */
+/** A browser signed in as the owner, in the dark theme, at twice the pixels. */
 async function signedIn(browser: Browser, url: string, phone: boolean): Promise<BrowserContext> {
   const context = await browser.newContext({
     baseURL: url,
     viewport: phone ? PHONE : DESKTOP,
     deviceScaleFactor: 2,
-    colorScheme: "light",
+    colorScheme: "dark",
     reducedMotion: "reduce",
     ...(phone ? { isMobile: true, hasTouch: true } : {}),
   });
-  await context.addInitScript(() => localStorage.setItem("quadit.theme", "light"));
+  await context.addInitScript(() => localStorage.setItem("quadit.theme", "dark"));
   const res = await context.request.post("/api/v1/auth/login", { data: OWNER });
   if (!res.ok()) throw new Error(`sign-in: ${res.status()} ${await res.text()}`);
   return context;
@@ -159,6 +159,10 @@ async function desktopShots(browser: Browser, url: string) {
   await page.goto(`/${WS}/decisions`);
   await page.getByText("Which direction for the 2.0 icon?").first().waitFor();
   await shot(page, "decisions");
+
+  await page.goto(`/${WS}/inbox`);
+  await page.getByRole("main").getByText(/TDW-\d/).first().waitFor();
+  await shot(page, "inbox"); // for the README only
 
   await context.close();
 }

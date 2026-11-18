@@ -6,8 +6,8 @@ Everything in `website/img/` is a screenshot of the real app, taken from a demo 
 | --- | --- |
 | `seed.sh` | Fills a fresh server with the demo workspace "Harbor Studio": three people, four agents (Atlas, Iris, Forge, Scout), the Tidewell project with a cycle, epics, milestones, tasks across statuses, results with evidence, an open decision with a picture per option, answered decisions, a launch plan page with a comment thread on selected words, and a Tide stations database. All made up |
 | `art/` | The decision's option pictures (three app icons), made for this workspace with the image generation of the Codex CLI. Original; nothing copied |
-| `capture.ts` | Starts `bin/quadit` on a free port with a new, empty data directory, runs `seed.sh`, signs in as the owner and takes the screenshots into `raw/` (ignored by git): light theme, device pixel ratio 2, desktop 1440×900 and phone 390×844 |
-| `optimize.sh` | Turns `raw/*.png` into `website/img/`: AVIF and WebP at full and half size for `srcset`, and a PNG at half size as the fallback |
+| `capture.ts` | Starts `bin/quadit` on a free port with a new, empty data directory, runs `seed.sh`, signs in as the owner and takes the screenshots into `raw/` (ignored by git): the app's dark theme, device pixel ratio 2, desktop 1440×900 and phone 390×844 |
+| `optimize.sh` | Turns `raw/*.png` into `website/img/`: AVIF and WebP at full and half size for `srcset`, and a PNG at half size as the fallback. Screens only the repository's README shows (the inbox) get the PNG alone |
 | `og.html` | The 1200×630 sharing picture, rendered to `website/og.png` by `preview.ts` |
 | `preview.ts` | Serves `website/`, takes whole-page screenshots at 1440, 768, 390 and 360 pixels wide in both themes into `preview/` (ignored by git), fails if the page scrolls sideways, and with `AXE=` runs axe-core on each |
 
