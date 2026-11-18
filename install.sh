@@ -4,15 +4,20 @@
 #   curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh
 #
 # Settings, all optional:
-#   QUADIT_VERSION      a release tag such as v0.1.0; default the newest release
+#   QUADIT_VERSION      a release tag such as v0.1.0; default the newest server
+#                       release (the highest vX.Y.Z, so no pre-release)
 #   QUADIT_INSTALL_DIR  where the binary goes; default /usr/local/bin if it can
 #                       be written to, else ~/.local/bin
 #   QUADIT_RELEASES_URL where releases are downloaded from; default
 #                       https://github.com/agrigoryan/quadit/releases (for testing
 #                       against a copy laid out the same way)
+#   QUADIT_RELEASES_API the GitHub API's list of those releases, where the
+#                       newest is looked up; default
+#                       https://api.github.com/repos/agrigoryan/quadit/releases
 set -eu
 
 releases=${QUADIT_RELEASES_URL:-https://github.com/agrigoryan/quadit/releases}
+releases_api=${QUADIT_RELEASES_API:-https://api.github.com/repos/agrigoryan/quadit/releases}
 version=${QUADIT_VERSION:-latest}
 
 fail() {
@@ -31,16 +36,6 @@ x86_64 | amd64) arch=amd64 ;;
 arm64 | aarch64) arch=arm64 ;;
 *) fail "no release for $(uname -m): build from source (https://github.com/agrigoryan/quadit)" ;;
 esac
-
-if [ "$version" = latest ]; then
-	base="$releases/latest/download"
-else
-	case $version in
-	v*) ;;
-	*) version="v$version" ;;
-	esac
-	base="$releases/download/$version"
-fi
 
 if command -v curl >/dev/null 2>&1; then
 	fetch() { curl -fsSL -o "$2" "$1"; }
@@ -61,6 +56,36 @@ fi
 archive="quadit_${os}_${arch}.tar.gz"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+
+# The newest server release, from the API: the highest vX.Y.Z tag. Not
+# GitHub's "Latest", whatever it is at the moment: the desktop app is
+# released from the same repository (desktop-v1.2.3). JSON without jq: each
+# member on a line of its own; a tag_name in a release's notes has its
+# quotes escaped and does not match.
+newest_release() {
+	fetch "$releases_api?per_page=100" "$tmp/releases.json" || return 1
+	# shellcheck disable=SC2020 # one newline for each of the three characters, as meant
+	tr ',{}' '\n\n\n' <"$tmp/releases.json" |
+		sed -n 's/^[[:space:]]*"tag_name":[[:space:]]*"v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)"[[:space:]]*$/\1/p' |
+		sort -t . -k 1,1n -k 2,2n -k 3,3n | tail -n 1
+}
+
+if [ "$version" = latest ]; then
+	newest=$(newest_release) || newest=""
+	if [ -n "$newest" ]; then
+		version="v$newest"
+	else
+		echo "quadit install: could not list the releases ($releases_api); taking the one GitHub marks Latest" >&2
+	fi
+fi
+case $version in
+latest) base="$releases/latest/download" ;;
+v*) base="$releases/download/$version" ;;
+*)
+	version="v$version"
+	base="$releases/download/$version"
+	;;
+esac
 
 echo "Downloading $archive ($version)"
 fetch "$base/$archive" "$tmp/$archive" || fail "could not download $base/$archive"

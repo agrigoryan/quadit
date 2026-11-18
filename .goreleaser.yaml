@@ -33,8 +33,7 @@ archives:
   - id: quadit
     formats: [tar.gz]
     # No version in the name, so the newest release's archive has a fixed
-    # address: releases/latest/download/quadit_linux_amd64.tar.gz
-    # (install.sh relies on it).
+    # address: releases/latest/download/quadit_linux_amd64.tar.gz.
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
@@ -72,6 +71,11 @@ release:
     owner: agrigoryan
     name: quadit
   prerelease: auto
+  # A server release that is no pre-release is the repository's Latest, said
+  # outright rather than left to GitHub's guess: releases/latest is the
+  # server's, and the desktop app is released from the same repository
+  # (.github/workflows/desktop-release.yml, never Latest).
+  make_latest: '{{ if .Prerelease }}false{{ else }}true{{ end }}'
 
 # .deb and .rpm: /usr/bin/quadit, and a systemd service that is installed
 # but not enabled (packaging/). Upgrading is installing the newer package.

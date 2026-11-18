@@ -61,6 +61,12 @@ jobs:
       # the LGPL or the AGPL (CONTRIBUTING.md, Dependencies).
       - name: Licences
         run: go run ./scripts/notices -check
+      # install.sh finds the newest server release among the desktop app's,
+      # against a copy of the releases laid out as GitHub serves them.
+      - name: The install script
+        run: |
+          shellcheck install.sh scripts/install-test.sh
+          sh scripts/install-test.sh
 
   # The end-to-end suite (web/e2e): Chromium against the binary built here.
   e2e:
