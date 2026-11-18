@@ -1,0 +1,13 @@
+# Every text file is checked out with LF endings on every system, as it is
+# stored: the formatters, the tests and the shell scripts expect LF, and
+# Windows would otherwise get CRLF. Binary files are named so they are never
+# touched.
+* text=auto eol=lf
+
+*.png binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.icns binary
+*.woff2 binary
+*.zip binary
