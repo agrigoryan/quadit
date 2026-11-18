@@ -11,7 +11,7 @@ import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FuseV1Options, getCurrentFuseWire } from "@electron/fuses";
-import { expect, test } from "./desktop";
+import { APP_VERSION, expect, test } from "./desktop";
 
 const APP = join(__dirname, "../../dist", process.arch === "arm64" ? "mac-arm64" : "mac", "Quadit.app");
 const BINARY = join(APP, "Contents/MacOS/Quadit");
@@ -136,8 +136,8 @@ test("the packaged app starts and opens the server that was open, as the app", a
   const { app } = start([], {}, [{ id: "a1b2c3d4e5f6", name: "Own", origin: server.origin, open: true, handoff: 1 }]);
   try {
     await expect
-      .poll(() => server.agents, { timeout: 30_000 })
-      .toContainEqual(expect.stringMatching(/ QuaditDesktop\/0\.1\.0$/));
+      .poll(() => server.agents.map((agent) => agent.split(" ").at(-1)), { timeout: 30_000 })
+      .toContain(`QuaditDesktop/${APP_VERSION}`);
     expect(app.exitCode).toBeNull();
   } finally {
     await stop(app);

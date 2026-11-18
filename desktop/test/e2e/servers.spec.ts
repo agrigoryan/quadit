@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Rectangle } from "electron";
-import { Desktop, expect, signInWithPassword, test } from "./desktop";
+import { APP_VERSION, Desktop, expect, signInWithPassword, test } from "./desktop";
 
 test("a server added by its address opens in its own window, on its own session, at its sign-in page", async ({
   desktop,
@@ -42,7 +42,7 @@ test("a server added by its address opens in its own window, on its own session,
     { origin: run.server, partition: `persist:server-${id}` },
   );
   expect(own).toEqual({ sameSession: true, persistent: true, sandboxed: true, isolated: true, node: false });
-  expect(await page.evaluate(() => navigator.userAgent)).toMatch(/ QuaditDesktop\/0\.1\.0$/);
+  expect((await page.evaluate(() => navigator.userAgent)).split(" ").at(-1)).toBe(`QuaditDesktop/${APP_VERSION}`);
 });
 
 test("an address that is not a Quadit server is refused with the reason", async ({ desktop }) => {
