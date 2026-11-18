@@ -1,17 +1,34 @@
 name: desktop-ci
 
 # The desktop app's gate (desktop/): types, lint, format and unit tests; and
-# on a Mac, the app packaged as a release packages it (unsigned), checked for
-# what only the packaged app has: the quadit:// scheme in its Info.plist, its
-# Electron fuses, and that it refuses a DevTools port. Its end-to-end suite
-# drives the app against a server and runs locally: make desktop-e2e (with
-# pnpm dist first, it checks the packaged app the same way and more).
+# on a Mac, its end-to-end suite (desktop/test/e2e): the app driven against
+# the server built here, signing in through the server's own hand-off, and
+# the app packaged as a release packages it (unsigned), checked for what
+# only the packaged app has (the quadit:// scheme, its Electron fuses, no
+# DevTools port, no Node.js). Locally: make desktop-e2e, with pnpm dist in
+# desktop/ first for the packaged checks.
+#
+# Besides the app, it runs for the server's and the web app's side of the
+# desktop contract. The desktop release runs it on the tagged commit before
+# it publishes anything.
 on:
   push:
     branches: [main]
-    paths: ["desktop/**", ".github/workflows/desktop-*.yml"]
+    paths: &paths
+      - "desktop/**"
+      - ".github/workflows/desktop-*.yml"
+      - "internal/server/desktop*.go"
+      - "internal/app/web.go"
+      - "web/src/auth/desktop-*"
+      - "web/src/shell/system-notices.ts"
+      - "web/src/types/desktop.ts"
+      - "web/public/sw.js"
   pull_request:
-    paths: ["desktop/**", ".github/workflows/desktop-*.yml"]
+    paths: *paths
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   check:
@@ -32,13 +49,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
 
-  package-mac:
+  e2e:
     runs-on: macos-latest
-    defaults:
-      run:
-        working-directory: desktop
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -46,23 +63,23 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          cache-dependency-path: desktop/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - name: Package for this Mac, unsigned
-        run: pnpm build && pnpm exec electron-builder --config electron-builder.config.cjs --mac --arm64 --dir --publish never
-      - name: The packaged app claims quadit:// links, has its fuses and refuses a DevTools port
-        shell: bash
+          cache-dependency-path: |
+            web/pnpm-lock.yaml
+            desktop/pnpm-lock.yaml
+      - name: The server, with the web app inside
+        run: make build
+      - name: The app, and the app packaged for this Mac, unsigned
+        working-directory: desktop
         run: |
-          app=dist/mac-arm64/Quadit.app
-          plutil -extract CFBundleURLTypes json -o - "$app/Contents/Info.plist" | grep -q '"quadit"'
-          fuses=$(pnpm exec electron-fuses read --app "$app")
-          echo "$fuses"
-          for want in "RunAsNode is Disabled" "EnableNodeOptionsEnvironmentVariable is Disabled" \
-            "EnableNodeCliInspectArguments is Disabled" "EnableEmbeddedAsarIntegrityValidation is Enabled" \
-            "OnlyLoadAppFromAsar is Enabled" "EnableCookieEncryption is Enabled"; do
-            grep -qF "$want" <<< "$fuses" || { echo "::error::The fuse is not as it should be: $want"; exit 1; }
-          done
-          # It quits at once with status 1; started anyway, the alarm stops it after 60 s.
-          status=0
-          perl -e 'alarm 60; exec @ARGV' "$app/Contents/MacOS/Quadit" --remote-debugging-port=9222 || status=$?
-          test "$status" -eq 1 || { echo "::error::The app started with a DevTools port (status $status)"; exit 1; }
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm exec electron-builder --config electron-builder.config.cjs --mac --arm64 --dir --publish never
+      - name: End-to-end
+        working-directory: desktop
+        run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: desktop-e2e-results
+          path: desktop/test-results
+          if-no-files-found: ignore

@@ -7,7 +7,8 @@ name: desktop-release
 # pre-release part (1.2.3-beta.1) is published as a GitHub pre-release
 # (desktop/scripts/release-tag.mjs reads the tag). A desktop release is
 # never the repository's Latest: that is the server's, which install.sh and
-# the docs download.
+# the docs download. Nothing is built for release until the desktop CI
+# (desktop-ci.yml, its end-to-end suite among it) passed on the tagged commit.
 #
 # macOS must be signed and notarized, or the release fails: CSC_LINK (the
 # Developer ID Application certificate, a base64 .p12) with
@@ -42,8 +43,11 @@ jobs:
         id: tag
         run: node desktop/scripts/release-tag.mjs "$GITHUB_REF_NAME"
 
+  ci:
+    uses: ./.github/workflows/desktop-ci.yml
+
   build:
-    needs: tag
+    needs: [tag, ci]
     strategy:
       fail-fast: false
       matrix:
