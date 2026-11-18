@@ -21,7 +21,7 @@ func TestLoginTakesTheTokenFromStandardInput(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen = r.Header.Get("Authorization")
 		if seen != "Bearer qd_secret" {
-			w.WriteHeader(401)
+			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = io.WriteString(w, `{"error":{"code":"unauthorized","message":"bad token"}}`)
 			return
 		}
