@@ -477,7 +477,8 @@ func (s *Server) dropParts(ctx context.Context, keys ...string) {
 // dropReceived removes what an upload received, once it is stored or
 // will not be, except the parts an older version kept (legacyParts).
 func (s *Server) dropReceived(ctx context.Context, f core.File) {
-	s.dropParts(ctx, slices.DeleteFunc(slices.Clone(f.Parts), func(key string) bool { return strings.HasPrefix(key, legacyParts(f)) })...)
+	ours := slices.DeleteFunc(slices.Clone(f.Parts), func(key string) bool { return strings.HasPrefix(key, legacyParts(f)) })
+	s.dropParts(ctx, ours...)
 	if err := os.Remove(s.partPath(f.ID)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		s.log.Warn("upload: removing what was received", "file", f.ID, "err", err)
 	}
@@ -497,10 +498,9 @@ func (s *Server) fileOut(x *c, f core.File) core.File {
 // as: as many as its size, and matching the checksum given, if one was;
 // when they are not, or a file received whole is not on this machine, what
 // was received is let go and the caller is told to send the file again
-// from the start. What was received (the parts,
-// or the file on this machine) is removed only once the file is stored
-// and marked: until then a failure leaves it all, and finishing again
-// starts from it.
+// from the start. What was received (the parts, or the file on this
+// machine) is removed only once the file is stored and marked: until then
+// a failure leaves it all, and finishing again starts from it.
 func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 	path := s.partPath(f.ID)
 	if len(f.Parts) > 0 {
