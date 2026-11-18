@@ -43,7 +43,12 @@ function signedOut() {
 }
 
 // Any call that answers 401 ends the session; the router then shows /login.
-onUnauthorized(signedOut);
+// One that says the second step is owed (an install that requires two steps
+// asks a session that signed in with one for it) shows that step there.
+onUnauthorized((code) => {
+  signedOut();
+  useSession.setState({ half: code === "second_step" });
+});
 
 /** Asks the server who is signed in. Safe to call again after sign-in. */
 export async function loadSession(): Promise<void> {
@@ -89,6 +94,14 @@ export async function signIn(email: string, password: string): Promise<"ok" | "s
   await loadSession();
   return "ok";
 }
+
+/** How a session that owes its second step may give it: a code from the app, a passkey, or both. */
+export interface SecondStepWays {
+  code: boolean;
+  passkey: boolean;
+}
+
+export const secondStepWays = () => api.get<SecondStepWays>("/api/v1/auth/second-step");
 
 /** Finishes a sign-in with a code from the authenticator app, or a recovery code. */
 export async function secondStep(code: string): Promise<void> {

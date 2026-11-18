@@ -787,11 +787,8 @@ func (s *Server) enter(ctx context.Context, x *c, ws core.Workspace) error {
 		return errForbidden("your membership in this workspace is suspended")
 	}
 	x.viewer = *s.viewerFor(ws, member)
-	if x.sess != nil && s.settings.Bool(ctx, "auth.require_2fa", false) && x.user.TOTPAt == 0 {
-		// Fails closed: when the passkeys cannot be counted, the answer is no.
-		if n, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID)); err != nil || n == 0 {
-			return &httpError{Status: 403, Code: "second_step_required", Message: "this install requires two-step verification: set it up in your profile first"}
-		}
+	if err := s.holdToTwoSteps(ctx, x); err != nil {
+		return err
 	}
 	// The credential narrows the account: "read" makes the actor
 	// read-only, and "project:ID" limits the actor to those projects, and

@@ -1,6 +1,7 @@
 package server
 
-// Two-step verification: authenticator codes and recovery codes.
+// Two-step verification: authenticator codes and recovery codes, and the
+// rule of when a session owes its second step.
 
 import (
 	"context"
@@ -36,6 +37,77 @@ func (s *Server) checkSecond(ctx context.Context, u core.User, code string) bool
 	return err == nil && n == 1
 }
 
+// hasSecondStep reports whether a person has a second step to give: an
+// authenticator app, or a passkey.
+func (s *Server) hasSecondStep(ctx context.Context, u core.User) (bool, error) {
+	if u.TOTPAt != 0 {
+		return true, nil
+	}
+	n, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", u.ID))
+	return n > 0, err
+}
+
+// secondStepOwed reports whether a sign-in of one step (a password, an
+// outside account) owes a second: when the person has an authenticator
+// app, or, where the install requires two steps, any second step at all.
+// A passkey is then the second step (handleShowSecondSteps).
+func (s *Server) secondStepOwed(ctx context.Context, u core.User) (bool, error) {
+	if u.TOTPAt != 0 {
+		return true, nil
+	}
+	if !s.settings.Bool(ctx, "auth.require_2fa", false) {
+		return false, nil
+	}
+	return s.hasSecondStep(ctx, u)
+}
+
+// holdToTwoSteps refuses a session into a workspace where the install
+// requires two steps and its sign-in took one. What counts is how this
+// session signed in, not what the account has set up: a person who has a
+// second step owes it now (the session goes back to waiting for it, and
+// the answer is the 401 a half-signed-in session gets); a person with none
+// is sent to set one up. A session made to take a picture is let through:
+// the request that made it was held here already.
+func (s *Server) holdToTwoSteps(ctx context.Context, x *c) error {
+	if x.sess == nil || x.sess.Stage != core.SessionFull || x.sess.TwoStep || !s.settings.Bool(ctx, "auth.require_2fa", false) {
+		return nil
+	}
+	// Fails closed: when the second steps cannot be counted, the answer is no.
+	has, err := s.hasSecondStep(ctx, x.user)
+	if err != nil {
+		return err
+	}
+	if !has {
+		return &httpError{Status: 403, Code: "second_step_required", Message: "this install requires two-step verification: set it up in your profile first"}
+	}
+	if _, err := s.st.Update(ctx, "sessions", map[string]any{"stage": core.SessionMFA}, store.Eq("id", x.sess.ID)); err != nil {
+		return err
+	}
+	return &httpError{Status: 401, Code: "second_step", Message: "this install requires two-step verification: finish signing in with your second step"}
+}
+
+// tookTwoSteps marks the session as signed in with two steps, once the
+// person in it set up their first second step: setting it up is that step.
+// Someone who had one already gives it to sign in, not a new one.
+func (s *Server) tookTwoSteps(ctx context.Context, x *c, hadOne bool) error {
+	if hadOne || x.sess == nil {
+		return nil
+	}
+	_, err := s.st.Update(ctx, "sessions", map[string]any{"two_step": true}, store.Eq("id", x.sess.ID))
+	return err
+}
+
+// handleShowSecondSteps says how a session that owes its second step may
+// give it: a code from the app, a passkey, or both.
+func (s *Server) handleShowSecondSteps(x *c) error {
+	ctx := x.ctx()
+	passkeys, err := s.st.Count(ctx, "passkeys", store.Eq("user_id", x.user.ID))
+	if err != nil {
+		return err
+	}
+	return x.ok(map[string]any{"code": x.user.TOTPAt != 0, "passkey": passkeys > 0 && s.settings.Bool(ctx, "auth.passkeys", true)})
+}
+
 type codeBody struct {
 	Code     string `json:"code"`
 	Password string `json:"password"`
@@ -47,7 +119,7 @@ func (s *Server) handleFinishSecondStep(x *c) error {
 	if err := x.body(&b); err != nil {
 		return err
 	}
-	if x.sess == nil || x.sess.Stage == core.SessionFull {
+	if x.sess == nil || x.sess.TwoStep {
 		return x.ok(map[string]any{"user": x.user})
 	}
 	ctx := x.ctx()
@@ -58,7 +130,7 @@ func (s *Server) handleFinishSecondStep(x *c) error {
 		s.audit(x.r, "", x.user, "signin.second_step_failed", "user", x.user.ID, nil)
 		return errUnauthorized("that code is not right; codes change every 30 seconds")
 	}
-	if _, err := s.st.Update(ctx, "sessions", map[string]any{"stage": core.SessionFull}, store.Eq("id", x.sess.ID)); err != nil {
+	if _, err := s.st.Update(ctx, "sessions", map[string]any{"stage": core.SessionFull, "two_step": true}, store.Eq("id", x.sess.ID)); err != nil {
 		return err
 	}
 	s.audit(x.r, "", x.user, "signin", "user", x.user.ID, map[string]string{"method": "password+code"})
@@ -120,7 +192,14 @@ func (s *Server) handleEnableTwoStep(x *c) error {
 	if _, ok := auth.CheckTOTP(secret, b.Code, time.Now()); !ok {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "code", Message: "that code is not right; check the time on your phone and try the next code"}
 	}
+	hadOne, err := s.hasSecondStep(ctx, x.user)
+	if err != nil {
+		return err
+	}
 	if _, err := s.st.Update(ctx, "users", map[string]any{"totp_at": time.Now().UnixMilli()}, store.Eq("id", x.user.ID)); err != nil {
+		return err
+	}
+	if err := s.tookTwoSteps(ctx, x, hadOne); err != nil {
 		return err
 	}
 	codes, err := s.newRecoveryCodes(ctx, x.user.ID)

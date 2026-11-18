@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/json"
@@ -19,6 +20,8 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 
 	"github.com/agrigoryan/quadit/internal/auth"
+	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/server"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
@@ -322,4 +325,87 @@ func postFrom127(t *testing.T, s *site, path string, body any, forwarded string)
 	}
 	resp.Body.Close()
 	return resp.StatusCode
+}
+
+// TestTwoStepsRequiredMeansThisSignInTookTwo: where the install requires
+// two-step verification, what lets a session in is how it signed in, not
+// what the account has set up. A password, or an outside account, is one
+// step: a person with a passkey is asked for it next, and a session that
+// took one step before the rule was turned on is asked again. A person
+// with nothing set up gets in once they set a second step up.
+func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		ctx := context.Background()
+		var gh []string
+		fake := fakeGitHub(t, &gh)
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.github", M{"enabled": true, "client_id": "Iv1.abc", "client_secret": "s3cret",
+			"auth_url": fake.URL + "/login/oauth/authorize", "token_url": fake.URL + "/login/oauth/access_token", "api_url": fake.URL}, 200, nil)
+		var inv struct{ Link string }
+		s.call(s.owner, "", "POST", w+"/invites", M{"email": "octo@example.com"}, 201, &inv)
+		token := inv.Link[strings.LastIndex(inv.Link, "/")+1:]
+		octo := browser()
+		resp, err := octo.Get(s.url + "/api/v1/auth/oauth/github/start?invite=" + token)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		s.call(octo, "", "POST", "/api/v1/auth/invite/"+token, nil, 200, nil)
+
+		// The owner has a passkey, and no authenticator app.
+		passkey := func(userID string) {
+			t.Helper()
+			if err := st.Insert(ctx, core.Passkey{ID: id.New(), UserID: userID, Name: "laptop", CredentialID: id.New(), Credential: json.RawMessage(`{}`), CreatedAt: 1}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		passkey(s.ownerID())
+		s.call(s.owner, "", "PUT", "/api/v1/admin/settings/auth.require_2fa", true, 200, nil)
+		login := M{"email": "owner@example.com", "password": ownerPassword}
+
+		t.Run("a password is one step: the passkey is asked for next", func(t *testing.T) {
+			s := s.in(t)
+			b := browser()
+			var first struct {
+				SecondStep bool `json:"second_step"`
+			}
+			s.call(b, "", "POST", "/api/v1/auth/login", login, 200, &first)
+			if !first.SecondStep {
+				t.Fatal("a password let a person with a passkey in where two steps are required")
+			}
+			s.call(b, "", "GET", w+"/me", nil, 401, nil)
+			var ways struct{ Code, Passkey bool }
+			s.call(b, "", "GET", "/api/v1/auth/second-step", nil, 200, &ways)
+			if ways.Code || !ways.Passkey {
+				t.Fatalf("the second step offered: %+v", ways)
+			}
+			s.call(b, "", "POST", "/api/v1/auth/second-step", M{"code": "123456"}, 401, nil)
+		})
+		t.Run("a session of one step from before is asked again", func(t *testing.T) {
+			s := s.in(t)
+			if out := s.call(s.owner, "", "GET", w+"/me", nil, 401, nil); !strings.Contains(out, "second_step") {
+				t.Fatalf("a one-step session went on into the workspace: %s", out)
+			}
+			s.call(s.owner, "", "GET", "/api/v1/auth/me", nil, 401, nil)
+		})
+		t.Run("an outside account is one step too", func(t *testing.T) {
+			s := s.in(t)
+			if out := s.call(octo, "", "GET", w+"/me", nil, 403, nil); !strings.Contains(out, "second_step_required") {
+				t.Fatalf("a person with no second step got in: %s", out)
+			}
+			// Setting one up is the second step of this sign-in.
+			var setup struct{ Secret string }
+			s.call(octo, "", "POST", "/api/v1/auth/totp/start", M{}, 200, &setup)
+			s.call(octo, "", "POST", "/api/v1/auth/totp/enable", M{"code": auth.TOTPCode(setup.Secret, time.Now())}, 200, nil)
+			s.call(octo, "", "GET", w+"/me", nil, 200, nil)
+			// Next time GitHub alone is not enough: the code is asked for.
+			again := browser()
+			resp, err := again.Get(s.url + "/api/v1/auth/oauth/github/start")
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			s.call(again, "", "GET", w+"/me", nil, 401, nil)
+		})
+	})
 }

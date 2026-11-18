@@ -73,6 +73,13 @@ ready
  "passkeys": []
 }
 
+=== GET /api/v1/auth/second-step
+200
+{
+ "code": false,
+ "passkey": false
+}
+
 === GET /api/v1/auth/identities
 200
 {

@@ -24,6 +24,7 @@ import (
 func (s *Server) authRoutes() []route {
 	const w = "/api/v1/w/{ws}"
 	return []route{
+		{"GET /api/v1/auth/second-step", s.firstStepPassed(s.handleShowSecondSteps), "How a sign-in that waits for its second step may give it: {code, passkey}. A passkey is given by signing in with it.", "", "account"},
 		{"POST /api/v1/auth/second-step", s.firstStepPassed(s.handleFinishSecondStep), "Finish signing in with an authenticator code or a recovery code. Body: {code}.", "", "account"},
 		{"POST /api/v1/auth/totp/start", s.signedIn(s.handleStartTwoStepSetup), "Begin setting up two-step codes; answers with the secret to scan.", "", "account"},
 		{"POST /api/v1/auth/totp/enable", s.signedIn(s.handleEnableTwoStep), "Turn two-step on with a first code. Body: {code}. Answers with recovery codes.", "", "account"},
@@ -125,17 +126,38 @@ func (s *Server) useOneTime(ctx context.Context, kind, token string, keep bool) 
 	return spent, nil
 }
 
-// startSession signs a person in on this browser.
-func (s *Server) startSession(x *c, u core.User, stage string) error {
+// startSession signs a person in on this browser, after a first step made
+// by method: "password", "passkey" or a provider's id. A passkey is both
+// steps at once. After any other first step the session owes a second
+// (stage mfa, which reaches only the firstStepPassed routes) when the
+// person has one to give (secondStepOwed). A session this browser had is
+// ended: a sign-in takes its place.
+func (s *Server) startSession(x *c, u core.User, method string) error {
+	ctx := x.ctx()
+	stage, twoStep := core.SessionFull, method == "passkey"
+	if !twoStep {
+		owed, err := s.secondStepOwed(ctx, u)
+		if err != nil {
+			return err
+		}
+		if owed {
+			stage = core.SessionMFA
+		}
+	}
+	if ck, err := x.r.Cookie(sessionCookie); err == nil && ck.Value != "" {
+		if _, err := s.st.Update(ctx, "sessions", map[string]any{"revoked_at": time.Now().UnixMilli()}, store.Eq("token_hash", auth.Hash(ck.Value)), store.Null("revoked_at")); err != nil {
+			return err
+		}
+	}
 	token := auth.Random(32)
 	now := time.Now()
 	ua := x.r.UserAgent()
 	if len(ua) > 200 {
 		ua = ua[:200]
 	}
-	sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: u.ID, Stage: stage, IP: s.clientIP(x.r), UserAgent: ua,
+	sess := core.Session{ID: id.New(), TokenHash: auth.Hash(token), UserID: u.ID, Stage: stage, TwoStep: twoStep, IP: s.clientIP(x.r), UserAgent: ua,
 		CreatedAt: now.UnixMilli(), LastSeenAt: now.UnixMilli(), ExpiresAt: now.Add(sessionLife).UnixMilli()}
-	if err := s.st.Insert(x.ctx(), sess); err != nil {
+	if err := s.st.Insert(ctx, sess); err != nil {
 		return err
 	}
 	http.SetCookie(x.w, &http.Cookie{Name: sessionCookie, Value: token, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
@@ -208,7 +230,7 @@ func (s *Server) handleSetUpInstall(x *c) error {
 		return err
 	}
 	s.audit(x.r, ws.ID, owner, "install.setup", "workspace", ws.ID, nil)
-	if err := s.startSession(x, owner, core.SessionFull); err != nil {
+	if err := s.startSession(x, owner, "password"); err != nil {
 		return err
 	}
 	return x.json(201, map[string]any{"user": owner, "workspace": ws})
@@ -278,16 +300,12 @@ func (s *Server) handleSignIn(x *c) error {
 }
 
 // finishSignIn starts the session after the first step, asking for the
-// second when the person has one.
+// second when the person owes one.
 func (s *Server) finishSignIn(x *c, u core.User, method string) error {
-	stage := core.SessionFull
-	if u.TOTPAt != 0 && method != "passkey" {
-		stage = core.SessionMFA
-	}
-	if err := s.startSession(x, u, stage); err != nil {
+	if err := s.startSession(x, u, method); err != nil {
 		return err
 	}
-	if stage == core.SessionMFA {
+	if x.sess.Stage == core.SessionMFA {
 		return x.ok(map[string]any{"second_step": true})
 	}
 	s.audit(x.r, "", u, "signin", "user", u.ID, map[string]string{"method": method})

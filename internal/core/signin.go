@@ -31,6 +31,11 @@ type Session struct {
 	TokenHash string `json:"-" db:"token_hash"`
 	UserID    string `json:"user_id" db:"user_id"`
 	Stage     string `json:"stage" db:"stage"` // one of the Session* stages
+	// TwoStep is whether the sign-in took two steps: a passkey, or a first
+	// step and a code, or a first step and setting up the person's first
+	// second step. Where the install requires two steps, it is what lets
+	// the session into a workspace.
+	TwoStep bool `json:"two_step,omitempty" db:"two_step"`
 	// WorkspaceID and Scopes, on a session made to take a picture, are the
 	// reach of the request that asked for it: the workspace, and the scopes
 	// of its credential as a token's are written ("read", "project:ID").

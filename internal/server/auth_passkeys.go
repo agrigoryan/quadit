@@ -174,8 +174,15 @@ func (s *Server) handleFinishPasskeyRegistration(x *c) error {
 	}
 	pk := core.Passkey{ID: id.New(), UserID: x.user.ID, Name: name, CredentialID: base64.RawURLEncoding.EncodeToString(cred.ID), Credential: raw,
 		CreatedAt: time.Now().UnixMilli()}
+	hadOne, err := s.hasSecondStep(ctx, x.user)
+	if err != nil {
+		return err
+	}
 	if err := s.st.Insert(ctx, pk); err != nil {
 		return &engine.Error{Code: engine.CodeConflict, Message: "this passkey is already registered"}
+	}
+	if err := s.tookTwoSteps(ctx, x, hadOne); err != nil {
+		return err
 	}
 	s.audit(x.r, "", x.user, "passkey.added", "passkey", pk.ID, nil)
 	return x.json(201, pk)

@@ -23,6 +23,7 @@ api GET /api/v1/auth/oauth/{provider}/callback
 api GET /api/v1/auth/oauth/{provider}/start
 api GET /api/v1/auth/passkeys
 api GET /api/v1/auth/render-session
+api GET /api/v1/auth/second-step
 api GET /api/v1/auth/sessions
 api GET /api/v1/changes
 api GET /api/v1/events/types

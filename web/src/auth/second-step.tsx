@@ -1,18 +1,27 @@
+import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
-import { AuthLayout, FormError } from "@/auth/auth-layout";
-import { secondStep, signOut } from "@/auth/session";
+import { AuthLayout, FormError, OrLine } from "@/auth/auth-layout";
+import { PasskeyButton } from "@/auth/providers";
+import { secondStep, secondStepWays, signOut } from "@/auth/session";
 import { t } from "@/lib/i18n";
 import { FormField, useFieldErrors } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 
 /**
- * The second step of signing in: a six-digit code from the authenticator
- * app, or one of the recovery codes. The first step is already done; going
- * back signs that half-finished session out.
+ * The second step of signing in, in the ways the person has: a six-digit
+ * code from the authenticator app or one of the recovery codes, and, where
+ * the install requires two steps, their passkey (signing in with it is both
+ * steps at once). The first step is already done; going back signs that
+ * half-finished session out.
  */
 export function SecondStep() {
+  // Until the server says, the code is offered: it is the second step most people have.
+  const ways = useQuery({ queryKey: ["auth", "second-step"], queryFn: secondStepWays }).data;
+  const withCode = ways?.code ?? true;
+  const withPasskey = ways?.passkey ?? false;
   const [recovery, setRecovery] = useState(false);
+  const [passkeyError, setPasskeyError] = useState("");
   const [code, setCode] = useState("");
   /** A refusal about the code itself goes under the field; anything else above the button. */
   const errors = useFieldErrors(["code"]);
@@ -56,19 +65,26 @@ export function SecondStep() {
     errors.clear();
   }
 
+  const lead = !withCode
+    ? t("auth.second.passkeyLead")
+    : recovery
+      ? t("auth.second.recoveryLead")
+      : t("auth.second.lead");
   return (
     <AuthLayout
       title={t("auth.secondStep.title")}
-      lead={recovery ? t("auth.second.recoveryLead") : t("auth.second.lead")}
+      lead={lead}
       footer={
         <>
-          <button
-            type="button"
-            onClick={swap}
-            className="self-start font-medium text-accent-text underline-offset-2 hover:underline"
-          >
-            {recovery ? t("auth.second.useCode") : t("auth.second.useRecovery")}
-          </button>
+          {withCode && (
+            <button
+              type="button"
+              onClick={swap}
+              className="self-start font-medium text-accent-text underline-offset-2 hover:underline"
+            >
+              {recovery ? t("auth.second.useCode") : t("auth.second.useRecovery")}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => void signOut()}
@@ -79,53 +95,64 @@ export function SecondStep() {
         </>
       }
     >
-      <form onSubmit={submit} className="flex flex-col gap-3.5">
-        {recovery ? (
-          <FormField
-            label={t("auth.second.recovery")}
-            htmlFor="recovery"
-            hint={t("auth.second.recoveryHint")}
-            error={codeError}
-          >
-            <Input
-              key="recovery"
-              id="recovery"
-              autoFocus
-              required
-              autoComplete="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              placeholder="xxxxx-xxxxx"
-              className="h-10 font-mono text-base"
-              value={code}
-              aria-invalid={!!codeError}
-              onChange={(e) => typed(e.target.value)}
-            />
-          </FormField>
-        ) : (
-          <FormField label={t("auth.second.code")} htmlFor="code" error={codeError}>
-            <Input
-              key="code"
-              id="code"
-              autoFocus
-              required
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              placeholder="000000"
-              className="h-11 pl-[calc(0.625rem+0.4em)] text-center font-mono text-lg tracking-[0.4em] tnum"
-              value={code}
-              aria-invalid={!!codeError}
-              onChange={(e) => typed(e.target.value)}
-            />
-          </FormField>
+      <div className="flex flex-col gap-3.5">
+        {withCode && (
+          <form onSubmit={submit} className="flex flex-col gap-3.5">
+            {recovery ? (
+              <FormField
+                label={t("auth.second.recovery")}
+                htmlFor="recovery"
+                hint={t("auth.second.recoveryHint")}
+                error={codeError}
+              >
+                <Input
+                  key="recovery"
+                  id="recovery"
+                  autoFocus
+                  required
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder="xxxxx-xxxxx"
+                  className="h-10 font-mono text-base"
+                  value={code}
+                  aria-invalid={!!codeError}
+                  onChange={(e) => typed(e.target.value)}
+                />
+              </FormField>
+            ) : (
+              <FormField label={t("auth.second.code")} htmlFor="code" error={codeError}>
+                <Input
+                  key="code"
+                  id="code"
+                  autoFocus
+                  required
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  placeholder="000000"
+                  className="h-11 pl-[calc(0.625rem+0.4em)] text-center font-mono text-lg tracking-[0.4em] tnum"
+                  value={code}
+                  aria-invalid={!!codeError}
+                  onChange={(e) => typed(e.target.value)}
+                />
+              </FormField>
+            )}
+            <FormError>{errors.form}</FormError>
+            <Button type="submit" variant="primary" size="lg" disabled={busy} className="mt-1 w-full">
+              {busy ? t("auth.second.busy") : t("auth.second.submit")}
+            </Button>
+          </form>
         )}
-        <FormError>{errors.form}</FormError>
-        <Button type="submit" variant="primary" size="lg" disabled={busy} className="mt-1 w-full">
-          {busy ? t("auth.second.busy") : t("auth.second.submit")}
-        </Button>
-      </form>
+        {withPasskey && (
+          <div className="flex flex-col gap-2">
+            {withCode && <OrLine>{t("auth.or")}</OrLine>}
+            <PasskeyButton onError={setPasskeyError} />
+            <FormError>{passkeyError}</FormError>
+          </div>
+        )}
+      </div>
     </AuthLayout>
   );
 }

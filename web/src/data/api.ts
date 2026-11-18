@@ -36,9 +36,10 @@ export class NetworkError extends Error {
   }
 }
 
-let unauthorized: () => void = () => {};
+/** Called with a 401's code (e.g. "second_step": the session owes its second step). Set by onUnauthorized. */
+let unauthorized: (code: string | undefined) => void = () => {};
 
-export function onUnauthorized(handler: () => void) {
+export function onUnauthorized(handler: (code: string | undefined) => void) {
   unauthorized = handler;
 }
 
@@ -111,7 +112,7 @@ function answer<T>(status: number, text: string, { quiet401, plain }: RequestOpt
     // The server always says why it refused. A 5xx without a reason came from
     // something in front of it (a proxy whose server is away): same as offline.
     if (status >= 500 && !err) throw new NetworkError();
-    if (status === 401 && !quiet401) unauthorized();
+    if (status === 401 && !quiet401) unauthorized(err?.code);
     throw new ApiError(status, err ?? {});
   }
   return data as T;

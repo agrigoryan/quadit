@@ -16,6 +16,7 @@ export const authStrings = {
     "Every way of signing in is turned off on this install. Whoever runs it can turn one back on from the server.",
 
   "auth.second.lead": "Enter the six-digit code from your authenticator app.",
+  "auth.second.passkeyLead": "This install asks for two steps. Confirm it is you with your passkey.",
   "auth.second.recoveryLead":
     "Enter one of the recovery codes you saved when you turned on two-step verification. Each works once.",
   "auth.second.code": "Code",

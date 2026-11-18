@@ -635,6 +635,7 @@ export interface Session {
   id: string;
   user_id: string;
   stage: string;
+  two_step?: boolean;
   workspace_id?: string;
   scopes?: string;
   ip?: string;
