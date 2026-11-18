@@ -34,7 +34,9 @@ export class Desktop {
    */
   static async launch(data: string, run: Run, args: string[] = []): Promise<Desktop> {
     const app = await electron.launch({
-      args: ["-r", join(__dirname, "stand-ins.cjs"), APP_DIR, ...args],
+      // Chromium's stand-in keychain: a test never touches the person's login keychain, which
+      // would stop the app on a prompt when another build of it made the key there.
+      args: ["-r", join(__dirname, "stand-ins.cjs"), "--use-mock-keychain", APP_DIR, ...args],
       env: { ...process.env, QUADIT_DESKTOP_DATA: data },
     });
     return new Desktop(app, data, run);
@@ -157,8 +159,26 @@ export class Desktop {
     return this.app.evaluate(() => (globalThis as unknown as { e2e: { badge: number } }).e2e.badge);
   }
 
+  /**
+   * Closes the app, failing the test on any exception its main process did
+   * not catch. The servers' service workers are let go first: started again
+   * under Playwright, which attaches to every worker before it may run, a
+   * worker is not always let run, and the next start's first page waits for
+   * it for ever. The app on its own starts them again without fail.
+   */
   async close() {
+    const errors = await this.app
+      .evaluate(() => (globalThis as unknown as { e2e: { errors: string[] } }).e2e.errors)
+      .catch(() => []);
+    for (const page of this.app.windows().filter((p) => p.url().startsWith("http"))) {
+      await page
+        .evaluate(async () => {
+          for (const registration of await navigator.serviceWorker.getRegistrations()) await registration.unregister();
+        })
+        .catch(() => {}); // A page that is going or gone has nothing to let go.
+    }
     await this.app.close();
+    expect(errors, "exceptions the app's main process did not catch").toEqual([]);
   }
 }
 

@@ -9,12 +9,17 @@
 //   app.setBadgeCount           records the count (macOS shows a badge only once the app may
 //                               notify, which a test cannot wait for, so the system's own is unreliable)
 //
+// An exception the main process does not catch is recorded too, instead of
+// Electron's dialog about it, which would stop the app until someone closes
+// it: every test fails on one (desktop.ts, close).
+//
 // What was recorded is globalThis.e2e, which the tests read back.
 
 const { app, dialog, Notification, shell } = require("electron");
 
-const recorded = { opened: [], notes: [], dialogs: [], badge: 0 };
+const recorded = { opened: [], notes: [], dialogs: [], badge: 0, errors: [] };
 globalThis.e2e = recorded;
+process.on("uncaughtException", (err) => recorded.errors.push(String(err?.stack ?? err)));
 
 shell.openExternal = async (url) => void recorded.opened.push(url);
 Notification.prototype.show = function show() {
