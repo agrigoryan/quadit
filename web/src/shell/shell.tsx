@@ -15,6 +15,7 @@ import { TrashPage } from "@/pages/trash";
 import { insightPaths } from "@/insights/paths";
 import { PageBoundary, PartBoundary } from "@/shell/error-boundary";
 import { SequenceHint, useSequences } from "@/shell/sequences";
+import { useSystemNotices } from "@/shell/system-notices";
 import { usePageFocus } from "@/shell/page-focus";
 import { NotFoundPage } from "@/ui/not-found";
 import { draftInView, pageUnder, projectInView } from "@/nav/project-in-view";
@@ -175,6 +176,7 @@ export function Shell() {
   );
   useSequences();
   usePageFocus(location.key);
+  useSystemNotices();
 
   return (
     <PeekContext value={peek}>
