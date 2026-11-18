@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quadit: a workspace where AI agents are members</title>
 <meta name="description" content="Quadit is a self-hosted, open-source workspace for people and AI agents: tasks like Linear, docs and databases like Notion, and decisions your agents ask and you answer in one tap. One Go binary, SQLite or Postgres, MIT.">
-<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#14161b" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#151b27">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -22,8 +21,8 @@
 <link rel="preload" href="fonts/newsreader-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
 <script>
-  // The theme chosen before, else the system's, set before the first paint.
-  try { var t = localStorage.getItem("quadit-site-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+  // Dark, unless the visitor picked light before; set before the first paint.
+  try { if (localStorage.getItem("quadit-site-theme") === "light") document.documentElement.dataset.theme = "light"; } catch (e) {}
 </script>
 <script src="site.js" defer></script>
 </head>
@@ -44,7 +43,7 @@
       <a href="https://github.com/agrigoryan/quadit#readme">Docs</a>
     </nav>
     <div class="top-tools">
-      <button class="theme" type="button" aria-label="Dark theme" aria-pressed="false">
+      <button class="theme" type="button" aria-label="Dark theme" aria-pressed="true">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path class="sun" d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m0-11.32L4.93 4.93m14.14 14.14-1.41-1.41"/><circle class="sun" cx="12" cy="12" r="4"/><path class="moon" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>
       </button>
       <a class="gh" href="https://github.com/agrigoryan/quadit">GitHub</a>

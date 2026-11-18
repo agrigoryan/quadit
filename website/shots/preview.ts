@@ -1,6 +1,6 @@
 // Looks at the site itself: serves website/ on a free port, photographs the
-// whole page at 1440, 768, 390 and 360 pixels wide in the light and the dark
-// theme into website/shots/preview/ (kept out of the deployed site), and
+// whole page at 1440, 768, 390 and 360 pixels wide in the dark theme (the
+// site's own) and the light one a visitor can pick, into website/shots/preview/ (kept out of the deployed site), and
 // renders the 1200×630 sharing picture og.html describes into website/og.png.
 //
 //   node website/shots/preview.ts
@@ -48,9 +48,11 @@ const browser = await chromium.launch();
 const axe = process.env.AXE ? await readFile(process.env.AXE, "utf8") : "";
 let problems = 0;
 try {
-  for (const theme of ["light", "dark"] as const) {
+  for (const theme of ["dark", "light"] as const) {
     for (const width of [1440, 768, 390, 360]) {
-      const page = await browser.newPage({ viewport: { width, height: 900 }, deviceScaleFactor: width < 800 ? 2 : 1, colorScheme: theme });
+      // The system's preference is the opposite on purpose: the site must not follow it.
+      const page = await browser.newPage({ viewport: { width, height: 900 }, deviceScaleFactor: width < 800 ? 2 : 1, colorScheme: theme === "dark" ? "light" : "dark" });
+      if (theme === "light") await page.addInitScript(() => localStorage.setItem("quadit-site-theme", "light"));
       await page.goto(`${url}/`);
       await page.evaluate(() => document.fonts.ready);
       // Bring every lazy picture in before the whole-page picture.

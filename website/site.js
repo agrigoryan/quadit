@@ -5,26 +5,22 @@
   var root = document.documentElement;
   var KEY = "quadit-site-theme";
 
-  // Theme: the system's until the visitor picks one; the pick is remembered.
+  // Theme: dark whatever the system prefers; light only when picked, and
+  // then remembered. The switch is a toggle button pressed while dark.
   var toggle = document.querySelector(".theme");
-  var systemDark = window.matchMedia("(prefers-color-scheme: dark)");
   function isDark() {
-    return root.dataset.theme ? root.dataset.theme === "dark" : systemDark.matches;
+    return root.dataset.theme !== "light";
   }
   function showTheme() {
-    if (!toggle) return;
-    var dark = isDark();
-    toggle.setAttribute("aria-pressed", String(dark));
-    toggle.setAttribute("aria-label", "Dark theme");
+    if (toggle) toggle.setAttribute("aria-pressed", String(isDark()));
   }
   if (toggle) {
     toggle.addEventListener("click", function () {
-      var next = isDark() ? "light" : "dark";
-      root.dataset.theme = next;
-      try { localStorage.setItem(KEY, next); } catch (e) {}
+      var dark = !isDark();
+      if (dark) delete root.dataset.theme; else root.dataset.theme = "light";
+      try { if (dark) localStorage.removeItem(KEY); else localStorage.setItem(KEY, "light"); } catch (e) {}
       showTheme();
     });
-    systemDark.addEventListener("change", showTheme);
     showTheme();
   }
 
