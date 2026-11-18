@@ -149,7 +149,7 @@ func TestFileStorageWaitsForItsSettingToBeRead(t *testing.T) {
 		if status, said := ready(); status != http.StatusServiceUnavailable || !strings.Contains(said, "file") {
 			t.Fatalf("/readyz with the files setting unreadable: %d %q, want 503 naming the file store", status, said)
 		}
-		req, _ := http.NewRequest("POST", s.url+w+"/files?name=notes.txt", strings.NewReader("hello"))
+		req, _ := http.NewRequest(http.MethodPost, s.url+w+"/files?name=notes.txt", strings.NewReader("hello"))
 		resp, err := s.owner.Do(req)
 		if err != nil {
 			t.Fatal(err)

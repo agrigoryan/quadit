@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -125,7 +126,7 @@ func TestAPartSentWhileFileStorageCannotBeUsedIsAskedForLater(t *testing.T) {
 		s.call(t, s.owner, "", "POST", fmt.Sprintf(w+"/files?name=clip.bin&size=%d", len(data)), data[:2000], 201, &f)
 
 		files.away.Store(true)
-		req, _ := http.NewRequest("PATCH", s.url+w+"/files/"+f.ID+"?offset=2000", strings.NewReader(string(data[2000:])))
+		req, _ := http.NewRequest(http.MethodPatch, s.url+w+"/files/"+f.ID+"?offset=2000", bytes.NewReader(data[2000:]))
 		resp, err := s.owner.Do(req)
 		if err != nil {
 			t.Fatal(err)

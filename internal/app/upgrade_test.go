@@ -121,8 +121,8 @@ type released struct {
 	// Uploads in parts, each with its first part kept: one the newer
 	// version finishes, and one it goes on with but does not finish.
 	upload, unfinished string
-	session, invite          string // the raw tokens
-	secret                   []byte // the install secret
+	session, invite    string // the raw tokens
+	secret             []byte // the install secret
 }
 
 const (
