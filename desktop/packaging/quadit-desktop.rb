@@ -22,7 +22,8 @@ cask "quadit-desktop" do
     strategy :github_releases
   end
 
-  depends_on macos: ">= :monterey"
+  # The app needs macOS 13 (its Info.plist, and Electron itself).
+  depends_on macos: ">= :ventura"
 
   app "Quadit.app"
 

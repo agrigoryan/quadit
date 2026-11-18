@@ -4,7 +4,8 @@
 // pnpm dist --mac dmg --arm64 (one).
 //
 // Signing and notarizing on macOS come from the environment and are skipped
-// cleanly without it, which makes an unsigned build for trying out:
+// cleanly without it, which makes an unsigned build for trying out (a
+// release refuses that: .github/workflows/desktop-release.yml):
 //   CSC_LINK + CSC_KEY_PASSWORD   the Developer ID Application certificate (.p12, base64 or path),
 //                                 or CSC_NAME for one already in the keychain
 //   APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID, or
