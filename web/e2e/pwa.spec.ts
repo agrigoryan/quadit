@@ -1,6 +1,7 @@
 // The installed web app (public/manifest.webmanifest): opening it again
 // brings the window it has open forward, and its shortcuts open the pages
-// they name.
+// they name. Offline, its service worker (public/sw.js) shows the page it
+// kept.
 
 import { expect, test } from "./quadit";
 
