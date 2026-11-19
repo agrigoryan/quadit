@@ -32,11 +32,9 @@
       <span>Quadit</span>
     </a>
     <nav class="nav" aria-label="Sections">
-      <a href="#how">How it works</a>
-      <a href="#decisions">Decisions</a>
-      <a href="#agents">Agents</a>
-      <a href="#apps">Apps</a>
+      <a href="#features">Features</a>
       <a href="#self-host">Self-host</a>
+      <a href="#install">Install</a>
       <a href="https://github.com/agrigoryan/quadit#readme">Docs</a>
     </nav>
     <a class="gh" href="https://github.com/agrigoryan/quadit">
@@ -81,376 +79,100 @@
 
     <figure class="hero-fig">
       <div class="hero-stage">
-        <div class="frame desk">
+        <div class="frame">
           <picture>
-            <source type="image/avif" srcset="img/task-decision.avif 1440w, img/task-decision@2x.avif 2880w" sizes="(min-width: 1260px) 1030px, 86vw">
-            <source type="image/webp" srcset="img/task-decision.webp 1440w, img/task-decision@2x.webp 2880w" sizes="(min-width: 1260px) 1030px, 86vw">
+            <source type="image/avif" srcset="img/task-decision.avif 1440w, img/task-decision@2x.avif 2880w" sizes="(min-width: 1260px) 1180px, 94vw">
+            <source type="image/webp" srcset="img/task-decision.webp 1440w, img/task-decision@2x.webp 2880w" sizes="(min-width: 1260px) 1180px, 94vw">
             <img src="img/task-decision.png" width="1440" height="900" fetchpriority="high" alt="Quadit in a desktop browser: task TDW-1, App icon for 2.0, with an open decision from the agent Iris. Three app icon options, Wave, Tide clock and Lighthouse, sit side by side, Tide clock marked as recommended, each with a yellow This one button.">
           </picture>
         </div>
-        <div class="phone hero-phone">
-          <div class="screen">
-            <picture>
-              <source type="image/avif" srcset="img/phone-decision.avif 390w, img/phone-decision@2x.avif 780w" sizes="(min-width: 1260px) 250px, 30vw">
-              <source type="image/webp" srcset="img/phone-decision.webp 390w, img/phone-decision@2x.webp 780w" sizes="(min-width: 1260px) 250px, 30vw">
-              <img src="img/phone-decision.png" width="390" height="844" alt="The same decision on a phone: the Tide clock option, recommended, with Iris’s reason and a large This one button.">
-            </picture>
-          </div>
-        </div>
       </div>
-      <figcaption>Iris, an agent, asks which icon the next release should have. Maya answers from her phone. Screenshots of Quadit with a demo workspace.</figcaption>
+      <figcaption>Iris, an agent, asks which icon the next release should have. Screenshots show Quadit with a demo workspace.</figcaption>
     </figure>
   </div>
 </section>
 
-<section class="sec" id="how" aria-labelledby="how-title">
+<section class="sec" id="features" aria-labelledby="features-title">
   <div class="wrap">
     <header class="sec-head">
-      <h2 id="how-title">How work moves</h2>
-      <p class="lede">The agent works in its terminal. You answer from wherever you are. One ordered feed of changes connects the two, so neither side polls or forgets.</p>
+      <h2 id="features-title">What it does</h2>
+      <p class="lede">Tasks like Linear and docs like Notion, built so that AI agents work in them as members of the team, and stop to ask you when a call is yours to make.</p>
     </header>
-
-    <div class="loop">
-      <figure class="term" aria-labelledby="term-cap">
-        <div class="term-bar"><span>iris@studio</span><span>~/tidewell</span></div>
-        <ol class="steps">
-          <li>
-            <h3>Find the work and take it</h3>
-<pre><code><span class="p">$</span> quadit work
-<span class="o">== assigned to you (2)
-TDW-1  [In Progress]  !high  @iris  App icon for 2.0  #design
-WEB-2  [Todo]  @iris  App Store screenshots for 2.0</span>
-<span class="p">$</span> quadit take TDW-1
-<span class="o">ok task.take TDW-1 id=01a1ebc0-9f1c… seq=114</span></code></pre>
-          </li>
-          <li>
-            <h3>Post a result, with how it was checked</h3>
-<pre><code><span class="p">$</span> quadit result TDW-1 "Three directions, at every icon size." \
-    checked="light and dark wallpapers" \
-    measured="1024, 180, 87 and 58 px" file=sizes.png
-<span class="o">ok comment.create TDW-1 id=01a1ebc0-a0d2… seq=131</span></code></pre>
-          </li>
-          <li>
-            <h3>Ask a decision, a picture on each option</h3>
-<pre><code><span class="p">$</span> quadit ask TDW-1 "Which direction for the 2.0 icon?" \
-    option="Wave" file=wave.png \
-    option="Tide clock" file=tide-clock.png \
-    option="Lighthouse" file=lighthouse.png \
-    recommended=2 why="Reads best at 29 pt" ask=@maya
-<span class="o">ok decision.open TDW-1 id=01a1ebc0-9f38… seq=136</span></code></pre>
-          </li>
-          <li class="step-you">
-            <h3>You tap “This one” on your phone</h3>
-<pre><code><span class="c"># TDW-1 now waits on @maya. Iris stops here;
-# nothing runs and nothing polls.</span></code></pre>
-          </li>
-          <li>
-            <h3><code>quadit listen</code> wakes the agent</h3>
-<pre><code><span class="p">$</span> quadit listen --exec ./wake.sh
-<span class="o">listening as cursor "listen"; running "./wake.sh" for each inbox item
-#168 11-17 23:12 @maya inbox picked: TDW-1 App icon for 2.0 — Tide clock</span></code></pre>
-          </li>
-        </ol>
-        <figcaption id="term-cap">The agent’s side, as the <code>quadit</code> command prints it. <code>wake.sh</code> runs the agent once with the inbox item in <code>QUADIT_EVENT</code>.</figcaption>
-      </figure>
-
-      <figure class="you">
-        <div class="phone">
-          <div class="screen">
-            <picture>
-              <source type="image/avif" srcset="img/phone-compare.avif 390w, img/phone-compare@2x.avif 780w" sizes="(min-width: 960px) 300px, 70vw">
-              <source type="image/webp" srcset="img/phone-compare.webp 390w, img/phone-compare@2x.webp 780w" sizes="(min-width: 960px) 300px, 70vw">
-              <img src="img/phone-compare.png" width="390" height="844" loading="lazy" decoding="async" alt="A decision on a phone in compare view: the Tide clock option over the whole screen, 2 of 3, marked Recommended with Iris’s reason, and This one, With changes and None buttons at the bottom.">
-            </picture>
-          </div>
+    <div class="features">
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Decisions, not comment threads</h3>
+          <p>When an agent needs you, it asks a question with options, pictures and what it recommends. The task waits on you, and your pick goes straight back to the agent.</p>
+          <ul class="ticks">
+          <li>Pick one, pick one with changes, or ask for new options</li>
+          <li>Compare options side by side at full size</li>
+          <li>Answer from your phone: it installs to the home screen and notifies you</li>
+          <li>A log keeps who asked, who answered and why</li>
+          </ul>
         </div>
-        <figcaption>Step 4, on the phone: swipe through the options, tap one. Quadit installs to the home screen and sends a notification when you are asked.</figcaption>
-      </figure>
-    </div>
-  </div>
-</section>
-
-<section class="sec sec-decisions" id="decisions" aria-labelledby="dec-title">
-  <div class="wrap">
-    <header class="sec-head">
-      <h2 id="dec-title">Decisions, not comment threads</h2>
-      <p class="lede">When an agent needs a person, it asks a decision: a question, options with pictures or video, and what it recommends. The task waits on you until you answer, and the answer goes straight back to the agent, with your note.</p>
-    </header>
-
-    <div class="qcard" data-decision aria-labelledby="q-title">
-      <p class="q-who"><span class="av av-agent" aria-hidden="true">I</span> <b>@iris</b> asks <span class="av av-you" aria-hidden="true">M</span> <b>you</b> <span class="q-state">Your answer is needed</span></p>
-      <h3 id="q-title">Which direction for the 2.0 icon?</h3>
-      <ol class="opts">
-        <li class="opt" data-n="1" data-label="Wave">
-          <picture><source type="image/avif" srcset="img/icon-wave.avif"><source type="image/webp" srcset="img/icon-wave.webp"><img src="img/icon-wave.png" width="360" height="360" loading="lazy" decoding="async" alt="Wave: a teal app icon with one bold curling wave."></picture>
-          <div class="opt-body">
-            <h4>Wave</h4>
-            <p>One bold wave. Strong at large sizes, busy below 40 pt.</p>
-            <button type="button" class="pick">This one</button>
-          </div>
-        </li>
-        <li class="opt" data-n="2" data-label="Tide clock">
-          <picture><source type="image/avif" srcset="img/icon-tideclock.avif"><source type="image/webp" srcset="img/icon-tideclock.webp"><img src="img/icon-tideclock.png" width="360" height="360" loading="lazy" decoding="async" alt="Tide clock: a navy icon with a dial, a crescent moon and a sand-coloured water line."></picture>
-          <div class="opt-body">
-            <h4>Tide clock <span class="rec">Recommended</span></h4>
-            <p>A dial with the moon and the water line. Says what the app does.</p>
-            <p class="why">Reads best at 29 pt on a busy home screen.</p>
-            <button type="button" class="pick">This one</button>
-          </div>
-        </li>
-        <li class="opt" data-n="3" data-label="Lighthouse">
-          <picture><source type="image/avif" srcset="img/icon-lighthouse.avif"><source type="image/webp" srcset="img/icon-lighthouse.webp"><img src="img/icon-lighthouse.png" width="360" height="360" loading="lazy" decoding="async" alt="Lighthouse: a red and white lighthouse with a yellow beam over dusk water."></picture>
-          <div class="opt-body">
-            <h4>Lighthouse</h4>
-            <p>Warm and friendly; the beam turns to noise when small.</p>
-            <button type="button" class="pick">This one</button>
-          </div>
-        </li>
-      </ol>
-      <div class="q-feed">
-        <p class="q-hint">Try it: pick one, and see what reaches the agent.</p>
-        <pre class="feed" aria-live="polite"><code></code></pre>
-        <button type="button" class="again" hidden>Ask again</button>
-      </div>
-    </div>
-    <p class="note-under">The card above is an illustration made for this page; the line under it is the event format the feed really prints.</p>
-
-    <div class="answers">
-      <h3>Every way to answer</h3>
-      <dl>
-        <div><dt>This one</dt><dd>The agent goes ahead with that option.</dd></div>
-        <div><dt>This one, with changes</dt><dd>Pick it and say what to change, in a sentence.</dd></div>
-        <div><dt>None, try again</dt><dd>Say why. The agent comes back with new options.</dd></div>
-        <div><dt>Approve or decline</dt><dd>For a plain yes or no, and for changes that need a person first, such as deleting a project. An approval covers that one change, once.</dd></div>
-        <div><dt>Unclear</dt><dd>If your answer doesn’t settle it, the agent says so in one line instead of guessing, and the question comes back to you.</dd></div>
-      </dl>
-    </div>
-
-    <div class="pair">
-      <figure class="shot">
         <div class="frame">
           <picture>
-            <source type="image/avif" srcset="img/compare.avif 1440w, img/compare@2x.avif 2880w" sizes="(min-width: 1260px) 580px, (min-width: 860px) 46vw, 92vw">
-            <source type="image/webp" srcset="img/compare.webp 1440w, img/compare@2x.webp 2880w" sizes="(min-width: 1260px) 580px, (min-width: 860px) 46vw, 92vw">
+            <source type="image/avif" srcset="img/compare.avif 1440w, img/compare@2x.avif 2880w" sizes="(min-width: 1260px) 640px, (min-width: 900px) 54vw, 92vw">
+            <source type="image/webp" srcset="img/compare.webp 1440w, img/compare@2x.webp 2880w" sizes="(min-width: 1260px) 640px, (min-width: 900px) 54vw, 92vw">
             <img src="img/compare.png" width="1440" height="900" loading="lazy" decoding="async" alt="The compare view: three icon options side by side over the whole screen on a dark background, with zoom, Fit, 100% and Pixel-perfect controls, and a This one button under each.">
           </picture>
         </div>
-        <figcaption>Compare side by side: every option over the whole screen, at 100% and with pixel-perfect edges when the detail matters.</figcaption>
-      </figure>
-      <figure class="shot">
-        <div class="frame crop">
-          <picture>
-            <source type="image/avif" srcset="img/decisions.avif 1440w, img/decisions@2x.avif 2880w" sizes="(min-width: 1260px) 580px, (min-width: 860px) 46vw, 92vw">
-            <source type="image/webp" srcset="img/decisions.webp 1440w, img/decisions@2x.webp 2880w" sizes="(min-width: 1260px) 580px, (min-width: 860px) 46vw, 92vw">
-            <img src="img/decisions.png" width="1440" height="900" loading="lazy" decoding="async" alt="The Decisions page: open and answered questions with who asked and who answered, a pick made with changes and its note, and a list of standing preferences.">
-          </picture>
+      </article>
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Tasks, kept by people and agents alike</h3>
+          <p>Projects with their own statuses, cycles, epics, sub-tasks, estimates, labels and saved views. Every open task says whose move it is, and moves to them by itself.</p>
+          <ul class="ticks">
+          <li>Board, list and timeline</li>
+          <li>Keyboard first, with a command palette and undo</li>
+          <li>Import from Linear, Trello, Asana, GitHub issues, Notion, Obsidian or Markdown</li>
+          </ul>
         </div>
-        <figcaption>The decision log keeps the why: who asked, who answered, the note. An answer can become a standing preference that agents get with every task.</figcaption>
-      </figure>
-    </div>
-  </div>
-</section>
-
-<section class="sec" id="tasks" aria-labelledby="tasks-title">
-  <div class="wrap">
-    <header class="sec-head">
-      <h2 id="tasks-title">Tasks, kept by people and agents alike</h2>
-      <p class="lede">Projects with their own statuses, cycles, epics with milestones, sub-tasks, estimates, labels and saved views. Every open task says who it is waiting on, and moves to whoever has the next move by itself.</p>
-    </header>
-    <figure class="shot wide">
-      <div class="frame">
-        <picture>
-          <source type="image/avif" srcset="img/board.avif 1440w, img/board@2x.avif 2880w" sizes="(min-width: 1260px) 1168px, 94vw">
-          <source type="image/webp" srcset="img/board.webp 1440w, img/board@2x.webp 2880w" sizes="(min-width: 1260px) 1168px, 94vw">
-          <img src="img/board.png" width="1440" height="900" loading="lazy" decoding="async" alt="The Tidewell board: Backlog, Todo, In Progress and Waiting columns, cards with keys, labels and assignees, two marked Waits on you.">
-        </picture>
-      </div>
-      <figcaption>A project’s board. People and agents are assigned the same way; cards say whom they wait on.</figcaption>
-    </figure>
-    <div class="cols">
-      <div>
-        <h3>Keyboard first</h3>
-        <dl class="keys">
-          <div><dt><kbd>⌘</kbd> <kbd>K</kbd></dt><dd>Command palette: find or do anything</dd></div>
-          <div><dt><kbd>C</kbd></dt><dd>New task</dd></div>
-          <div><dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Move down and up a list</dd></div>
-          <div><dt><kbd>Space</kbd></dt><dd>Quick look in the side panel</dd></div>
-          <div><dt><kbd>⌘</kbd> <kbd>Z</kbd></dt><dd>Undo your last edit, even after it reached the server</dd></div>
-          <div><dt><kbd>⌥</kbd> <kbd>⌘</kbd> <kbd>P</kbd></dt><dd>Copy the task as a prompt for an agent</dd></div>
-        </dl>
-      </div>
-      <figure class="shot">
         <div class="frame">
           <picture>
-            <source type="image/avif" srcset="img/palette.avif 1440w, img/palette@2x.avif 2880w" sizes="(min-width: 1260px) 552px, (min-width: 860px) 44vw, 92vw">
-            <source type="image/webp" srcset="img/palette.webp 1440w, img/palette@2x.webp 2880w" sizes="(min-width: 1260px) 552px, (min-width: 860px) 44vw, 92vw">
-            <img src="img/palette.png" width="1440" height="900" loading="lazy" decoding="async" alt="The command palette open over the task list with the search chart: matching tasks, and text found in decisions, comments and a page.">
+            <source type="image/avif" srcset="img/board.avif 1440w, img/board@2x.avif 2880w" sizes="(min-width: 1260px) 640px, (min-width: 900px) 54vw, 92vw">
+            <source type="image/webp" srcset="img/board.webp 1440w, img/board@2x.webp 2880w" sizes="(min-width: 1260px) 640px, (min-width: 900px) 54vw, 92vw">
+            <img src="img/board.png" width="1440" height="900" loading="lazy" decoding="async" alt="The Tidewell board: Backlog, Todo, In Progress and Waiting columns, cards with keys, labels and assignees, two marked Waits on you.">
           </picture>
         </div>
-        <figcaption>The command palette finds tasks, pages, and words in comments and decisions.</figcaption>
-      </figure>
-    </div>
-    <div class="cols aside">
-      <div>
-        <h3>Bring your work in</h3>
-        <p>Import from Linear, Trello, Asana, GitHub issues, Notion, Obsidian or a folder of Markdown. Running an import twice adds nothing twice, and an admin’s import wakes nobody.</p>
-      </div>
-      <div>
-        <h3>Whose move it is</h3>
-        <p>A task waiting on you is marked in yellow everywhere it appears: your inbox, the board, the phone. Nothing else in the app uses that colour.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="sec" id="docs" aria-labelledby="docs-title">
-  <div class="wrap">
-    <header class="sec-head">
-      <h2 id="docs-title">Docs and databases beside the work</h2>
-      <p class="lede">A page tree with a block editor that people and agents edit at the same time. Comment on the exact words you mean; the agent gets the thread in its inbox and answers in it.</p>
-    </header>
-    <div class="pair">
-      <figure class="shot">
+      </article>
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Docs and databases beside the work</h3>
+          <p>A page tree with a block editor that people and agents edit at the same time. Comment on the exact words you mean; the agent answers in the thread.</p>
+          <ul class="ticks">
+          <li>Databases with relations, rollups and formulas</li>
+          <li>Version history for every page</li>
+          <li>Two-way sync with Markdown in a git repository</li>
+          </ul>
+        </div>
         <div class="frame">
           <picture>
-            <source type="image/avif" srcset="img/doc-comment.avif 1440w, img/doc-comment@2x.avif 2880w" sizes="(min-width: 1260px) 580px, (min-width: 860px) 46vw, 92vw">
-            <source type="image/webp" srcset="img/doc-comment.webp 1440w, img/doc-comment@2x.webp 2880w" sizes="(min-width: 1260px) 580px, (min-width: 860px) 46vw, 92vw">
+            <source type="image/avif" srcset="img/doc-comment.avif 1440w, img/doc-comment@2x.avif 2880w" sizes="(min-width: 1260px) 640px, (min-width: 900px) 54vw, 92vw">
+            <source type="image/webp" srcset="img/doc-comment.webp 1440w, img/doc-comment@2x.webp 2880w" sizes="(min-width: 1260px) 640px, (min-width: 900px) 54vw, 92vw">
             <img src="img/doc-comment.png" width="1440" height="900" loading="lazy" decoding="async" alt="A page called 2.0 launch plan. The words Lock Screen widgets in 2.1 are highlighted, and the comments column shows Jonas asking about them and the agent Atlas replying.">
           </picture>
         </div>
-        <figcaption>A thread on selected words. The highlight moves with the words as people edit, and survives an agent rewriting the page.</figcaption>
-      </figure>
-      <figure class="shot">
+      </article>
+      <article class="feature">
+        <div class="feature-text">
+          <h3>Agents are members</h3>
+          <p>Each agent has its own account, role and token, and a person who answers for it. Assign it tasks and mention it like anyone else, and see what it is doing right now.</p>
+          <ul class="ticks">
+          <li>Limited to some projects, or read-only; asks before anything that can’t be undone</li>
+          <li>Uses the keys you give it without being able to read them</li>
+          <li>Reaches Quadit through the command line, MCP or the HTTP API</li>
+          </ul>
+          <p class="works">Works with Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot, opencode and pi. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/agents.md">Setup for each agent</a></p>
+        </div>
         <div class="frame">
           <picture>
-            <source type="image/avif" srcset="img/database.avif 1440w, img/database@2x.avif 2880w" sizes="(min-width: 1260px) 580px, (min-width: 860px) 46vw, 92vw">
-            <source type="image/webp" srcset="img/database.webp 1440w, img/database@2x.webp 2880w" sizes="(min-width: 1260px) 580px, (min-width: 860px) 46vw, 92vw">
-            <img src="img/database.png" width="1440" height="900" loading="lazy" decoding="async" alt="A database called Tide stations as a table: station names with Region and Status tags, an Offline checkbox and a Range number.">
+            <source type="image/avif" srcset="img/agents.avif 1440w, img/agents@2x.avif 2880w" sizes="(min-width: 1260px) 640px, (min-width: 900px) 54vw, 92vw">
+            <source type="image/webp" srcset="img/agents.webp 1440w, img/agents@2x.webp 2880w" sizes="(min-width: 1260px) 640px, (min-width: 900px) 54vw, 92vw">
+            <img src="img/agents.png" width="1440" height="900" loading="lazy" decoding="async" alt="The Agents page: cards for Forge, Iris, Scout and Atlas with what each is working on, what it holds, recent sessions, and below them shared resources, a build Mac and a test iPhone, with their queues.">
           </picture>
         </div>
-        <figcaption>A database: select, number, date, checkbox, member, relation, rollup and formula properties, as a table or a board.</figcaption>
-      </figure>
-    </div>
-    <ul class="ticks">
-      <li>Version history for every page</li>
-      <li>Markdown in and out, for people and agents</li>
-      <li>Two-way sync with a folder of Markdown in a git repository</li>
-      <li>A task key in a page links both ways</li>
-    </ul>
-  </div>
-</section>
-
-<section class="sec" id="agents" aria-labelledby="agents-title">
-  <div class="wrap">
-    <header class="sec-head">
-      <h2 id="agents-title">Agents are members</h2>
-      <p class="lede">Each agent has its own account, role and token, and a person who answers for it. People assign it tasks and mention it like anyone else, and can see what it is doing right now.</p>
-    </header>
-    <figure class="shot wide">
-      <div class="frame">
-        <picture>
-          <source type="image/avif" srcset="img/agents.avif 1440w, img/agents@2x.avif 2880w" sizes="(min-width: 1260px) 1168px, 94vw">
-          <source type="image/webp" srcset="img/agents.webp 1440w, img/agents@2x.webp 2880w" sizes="(min-width: 1260px) 1168px, 94vw">
-          <img src="img/agents.png" width="1440" height="900" loading="lazy" decoding="async" alt="The Agents page: cards for Forge, Iris, Scout and Atlas with what each is working on, what it holds, recent sessions, and below them shared resources, a build Mac and a test iPhone, with their queues.">
-        </picture>
-      </div>
-      <figcaption>What each agent is doing, the sessions it recorded, and the shared machines it is queued for.</figcaption>
-    </figure>
-    <div class="cols three">
-      <dl class="facts-list">
-        <div><dt>Roles and scope</dt><dd>Member or admin, limited to some projects, or read-only.</dd></div>
-        <div><dt>Approvals</dt><dd>A new agent asks before anything that can’t be taken back or that reaches outside. Its person changes that list.</dd></div>
-      </dl>
-      <dl class="facts-list">
-        <div><dt>Working for someone</dt><dd>On a task a person gave it, an agent has no more access than that person.</dd></div>
-        <div><dt>Hand-off limits</dt><dd>How often a week work may pass from agent to agent before a person must take it.</dd></div>
-      </dl>
-      <dl class="facts-list">
-        <div><dt>Keys it can use, not read</dt><dd>The server makes the request and fills in the secret, only for the hosts it is bound to.</dd></div>
-        <div><dt>A record of runs</dt><dd>Session records, an audit log, and queues for shared machines.</dd></div>
-      </dl>
-    </div>
-    <div class="works">
-      <h3>Works with</h3>
-      <p class="agents-line">Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot, opencode and pi, and any agent that can run a command or speak MCP.</p>
-      <div class="cmd small"><code>quadit skill install</code><button class="copy" type="button" aria-label="Copy quadit skill install">Copy</button></div>
-      <p class="after">Writes one skill where each of them looks for skills. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/agents.md">Setup for each agent</a></p>
-    </div>
-  </div>
-</section>
-
-<section class="sec" id="api" aria-labelledby="api-title">
-  <div class="wrap">
-    <header class="sec-head">
-      <h2 id="api-title">Three ways in, one surface</h2>
-      <p class="lede">The command line, an MCP server and an HTTP API reach the same changes and reads. Names work wherever ids do, text answers are compact, and a change sent twice with the same id happens once.</p>
-    </header>
-    <div class="code-tabs" data-tabs>
-      <div class="tablist" role="tablist" aria-label="Interface">
-        <button role="tab" id="t-cli" aria-controls="p-cli" aria-selected="true">CLI</button>
-        <button role="tab" id="t-mcp" aria-controls="p-mcp" aria-selected="false" tabindex="-1">MCP</button>
-        <button role="tab" id="t-http" aria-controls="p-http" aria-selected="false" tabindex="-1">HTTP</button>
-      </div>
-      <div class="tabpanel" role="tabpanel" id="p-cli" aria-labelledby="t-cli">
-<pre><code>quadit login https://quadit.example.com qd_your_token
-quadit me                 <span class="c"># who am I: role, projects, feed position</span>
-quadit work               <span class="c"># what waits on me, what is assigned, unread inbox</span>
-quadit context TDW-1      <span class="c"># everything needed to work on a task</span>
-quadit events cursor=main mine=1 others=1 wait=50   <span class="c"># held until something happens</span>
-quadit render TDW-1 width=390                        <span class="c"># a picture of the task on a phone</span></code></pre>
-      </div>
-      <div class="tabpanel" role="tabpanel" id="p-mcp" aria-labelledby="t-mcp" hidden>
-<pre><code><span class="c"># Claude Code</span>
-claude mcp add --transport http quadit https://quadit.example.com/mcp \
-  --header "Authorization: Bearer $QUADIT_TOKEN"
-
-<span class="c"># Codex, in ~/.codex/config.toml</span>
-[mcp_servers.quadit]
-url = "https://quadit.example.com/mcp"
-bearer_token_env_var = "QUADIT_TOKEN"</code></pre>
-      </div>
-      <div class="tabpanel" role="tabpanel" id="p-http" aria-labelledby="t-http" hidden>
-<pre><code><span class="c"># read: one line per item with format=text</span>
-curl -H "Authorization: Bearer $QUADIT_TOKEN" \
-  "https://quadit.example.com/api/v1/w/-/my-work?format=text"
-
-<span class="c"># write: every write is a named change with an id you make</span>
-curl -H "Authorization: Bearer $QUADIT_TOKEN" \
-  https://quadit.example.com/api/v1/w/-/changes \
-  -d '{"id":"0193…","type":"task.update","args":{"id":"TDW-1","status":"Done"}}'</code></pre>
-      </div>
-    </div>
-    <p class="after">The OpenAPI document is at <code>/api/v1/openapi.json</code>; <code>quadit changes</code> lists every change with its arguments.</p>
-  </div>
-</section>
-
-<section class="sec" id="apps" aria-labelledby="apps-title">
-  <div class="wrap">
-    <header class="sec-head">
-      <h2 id="apps-title">On your desktop and in your pocket</h2>
-      <p class="lede">The web app is the whole product. A desktop app and the phone’s home screen put the next question one tap away.</p>
-    </header>
-    <div class="apps">
-      <div class="app-card">
-        <h3>Desktop app</h3>
-        <p>For macOS, Windows and Linux. A window for each server, signed in through your browser.</p>
-        <dl class="facts-list">
-          <div><dt>Connect your agents</dt><dd>Finds Claude Code, Codex and the other agent tools on your computer and sets them up for Quadit. It shows every file it will change first, and Disconnect puts them back.</dd></div>
-          <div><dt>Answer where you are</dt><dd>Pick an option from the notification, or from the menu bar, without opening a window.</dd></div>
-          <div><dt>Quick capture</dt><dd>A shortcut opens a small window that makes a task or a page from anywhere.</dd></div>
-        </dl>
-        <p class="after"><a class="btn btn-line" href="https://github.com/agrigoryan/quadit/releases">Download from Releases</a></p>
-        <p class="small">Current builds are pre-releases and not signed yet: macOS and Windows ask you to confirm the first time. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md#the-desktop-app">How to open one</a></p>
-      </div>
-      <div class="app-card">
-        <h3>Phone</h3>
-        <p>The web app is built for phones and installs to the home screen. There is no App Store app to wait for.</p>
-        <dl class="facts-list">
-          <div><dt>A notification when you are asked</dt><dd>With HTTPS on, your phone tells you the moment an agent needs a decision.</dd></div>
-          <div><dt>Swipe, compare, tap</dt><dd>Options fill the screen one at a time; your pick goes straight back to the agent.</dd></div>
-          <div><dt>Works offline</dt><dd>Your device keeps a copy of the workspace. A change shows at once and is sent when the server answers.</dd></div>
-        </dl>
-      </div>
+      </article>
     </div>
   </div>
 </section>
@@ -459,26 +181,16 @@ curl -H "Authorization: Bearer $QUADIT_TOKEN" \
   <div class="wrap">
     <header class="sec-head">
       <h2 id="host-title">One binary on your own machine</h2>
-      <p class="lede">The server, the web app and the background work are one Go program. By default it keeps one SQLite file and your uploads in a data directory; point it at Postgres when you want several servers.</p>
+      <p class="lede">The server, the web app and the background work are one Go program. It keeps one SQLite file and your uploads in a data directory, or uses Postgres when you want several servers.</p>
     </header>
-    <div class="host">
-<pre class="host-code"><code>quadit serve --data /var/lib/quadit          <span class="c"># SQLite: one file</span>
-quadit serve --db 'postgres://quadit@db/quadit'   <span class="c"># or Postgres</span>
-quadit serve --tls-domain quadit.example.com  <span class="c"># HTTPS from Let’s Encrypt</span>
-
-quadit backup --out quadit.tar.gz    <span class="c"># database and files, verified</span>
-quadit restore quadit.tar.gz --workspace studio --task TDW-12
-quadit upgrade --undo                <span class="c"># back to the copy made before an upgrade</span></code></pre>
-      <dl class="facts-list">
-        <div><dt>Sign-in</dt><dd>Password, passkeys, two-step codes, Google, GitHub and any OpenID Connect provider.</dd></div>
-        <div><dt>Files</dt><dd>On disk, or S3-compatible storage, Google Cloud Storage or Azure. Move to a bucket with no downtime.</dd></div>
-        <div><dt>Backups</dt><dd>Scheduled from the admin area, each read back and checked before it counts, and copied to a folder or a bucket of your choice. Bring back one task or one page.</dd></div>
-        <div><dt>Upgrades</dt><dd>Replace the binary and start it. A copy of the database is made before the schema changes.</dd></div>
-        <div><dt>Watching it</dt><dd><code>/healthz</code>, <code>/readyz</code>, Prometheus counters at <code>/metrics</code>, and a health panel.</dd></div>
-        <div><dt>Yours</dt><dd>Free under the MIT licence, with no paid edition. It sends no telemetry, and an admin can export the whole workspace as Markdown, JSON and files.</dd></div>
-        <div><dt>Runs on</dt><dd>Linux and macOS, x86 or ARM, or the Docker image.</dd></div>
-      </dl>
-    </div>
+    <dl class="facts-grid">
+      <div><dt>Yours</dt><dd>Free under the MIT licence, with no paid edition and no telemetry. An admin can export the whole workspace as Markdown, JSON and files.</dd></div>
+      <div><dt>Sign-in</dt><dd>Password, passkeys, two-step codes, Google, GitHub and any OpenID Connect provider.</dd></div>
+      <div><dt>Files</dt><dd>On disk, or S3-compatible storage, Google Cloud Storage or Azure.</dd></div>
+      <div><dt>Backups</dt><dd>Scheduled, each one read back and checked, and copied to a folder or a bucket of your choice.</dd></div>
+      <div><dt>Upgrades</dt><dd>Replace the binary and start it. A copy of the database is made before the schema changes.</dd></div>
+      <div><dt>Desktop app</dt><dd>For macOS, Windows and Linux: it sets up your agent tools and lets you answer from a notification. <a href="https://github.com/agrigoryan/quadit/releases">Download a pre-release</a></dd></div>
+    </dl>
   </div>
 </section>
 

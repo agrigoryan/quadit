@@ -29,11 +29,3 @@ for src in "$raw"/*.png; do
   magick "$src" -strip -resize "${half}x" -quality 82 "$out/$name.webp"
   echo "$name: ${w}px -> $(du -ch "$out/$name".* "$out/$name@2x".* | tail -1 | cut -f1)"
 done
-
-# The decision options' pictures, small, for the page's own decision card.
-for src in "$here"/art/icon-*.png; do
-  name=$(basename "$src" .png)
-  magick "$src" -strip -resize 360x -quality 62 "$out/$name.avif"
-  magick "$src" -strip -resize 360x -quality 82 "$out/$name.webp"
-  magick "$src" -strip -resize 360x -define png:compression-level=9 "$out/$name.png"
-done

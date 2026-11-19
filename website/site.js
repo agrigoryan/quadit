@@ -1,5 +1,5 @@
-// The page's few behaviours: the field behind the hero, tabs, copy buttons
-// and the decision card. Everything works without it except these.
+// The page's few behaviours: the field behind the hero, tabs and copy
+// buttons. Everything works without it except these.
 (function () {
   "use strict";
   // The field behind the hero: a flat grid of small squares that flicker,
@@ -168,62 +168,4 @@
       }
     });
   });
-
-  // The decision card: a pick prints the lines the feed would carry.
-  var card = document.querySelector("[data-decision]");
-  if (card) {
-    var feed = card.querySelector(".feed code");
-    var again = card.querySelector(".again");
-    var hint = card.querySelector(".q-hint");
-    var state = card.querySelector(".q-state");
-    var options = Array.prototype.slice.call(card.querySelectorAll(".opt"));
-    var question = card.querySelector("#q-title").textContent;
-    function stamp() {
-      var d = new Date();
-      function two(n) { return (n < 10 ? "0" : "") + n; }
-      return two(d.getMonth() + 1) + "-" + two(d.getDate()) + " " + two(d.getHours()) + ":" + two(d.getMinutes());
-    }
-    function line(text) {
-      var span = document.createElement("span");
-      span.className = "line";
-      span.textContent = text;
-      return span;
-    }
-    options.forEach(function (opt) {
-      opt.querySelector(".pick").addEventListener("click", function () {
-        var n = opt.getAttribute("data-n");
-        var label = opt.getAttribute("data-label");
-        var when = stamp();
-        card.setAttribute("data-picked", "");
-        options.forEach(function (o) {
-          var chosen = o === opt;
-          if (chosen) o.setAttribute("data-chosen", ""); else o.removeAttribute("data-chosen");
-          var b = o.querySelector(".pick");
-          b.disabled = true;
-          b.textContent = chosen ? "Picked" : "This one";
-        });
-        feed.textContent = "";
-        feed.appendChild(line("#167 " + when + " @maya decision.picked TDW-1 \"" + question + "\" -> " + n + ") " + label + "\n"));
-        feed.appendChild(line("#168 " + when + " @maya inbox picked: TDW-1 App icon for 2.0 — " + label));
-        state.textContent = "Answered";
-        hint.textContent = "Iris’s quadit listen gets the second line and wakes her.";
-        again.hidden = false;
-        again.focus();
-      });
-    });
-    again.addEventListener("click", function () {
-      card.removeAttribute("data-picked");
-      options.forEach(function (o) {
-        o.removeAttribute("data-chosen");
-        var b = o.querySelector(".pick");
-        b.disabled = false;
-        b.textContent = "This one";
-      });
-      feed.textContent = "";
-      state.textContent = "Your answer is needed";
-      hint.textContent = "Try it: pick one, and see what reaches the agent.";
-      again.hidden = true;
-      options[0].querySelector(".pick").focus();
-    });
-  }
 })();
