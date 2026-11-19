@@ -1,5 +1,5 @@
 // Files as a grid of thumbnails: pictures and videos open over the whole
-// screen, anything else downloads. Used for the task's own files and for
+// screen, with the others of the grid a step away; anything else downloads. Used for the task's own files and for
 // the files of a comment.
 
 import { useState } from "react";
@@ -80,7 +80,12 @@ export function FileGrid({ files, pending = [], canRemove, onRemove, small, clas
           </li>
         ))}
       </ul>
-      <Lightbox file={shown} onClose={() => setShown(null)} />
+      <Lightbox
+        file={shown}
+        files={files.filter((a) => isMedia(a.file)).map((a) => a.file)}
+        onShow={setShown}
+        onClose={() => setShown(null)}
+      />
     </>
   );
 }

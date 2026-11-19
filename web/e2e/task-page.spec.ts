@@ -40,6 +40,42 @@ test("a file is attached and listed", async ({ page, project }) => {
   expect(await served.text()).toContain("a small text file to attach");
 });
 
+test("the pictures of a task open one after another", async ({ page, project }) => {
+  const key = await project.newTask("Pick a sprite");
+  await page.goto(`/e2e/task/${key}`);
+  const chooser = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Attach", exact: true }).click();
+  // One dot, three times over.
+  const dot = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  await (
+    await chooser
+  ).setFiles(["a.png", "b.png", "c.png"].map((name) => ({ name, mimeType: "image/png", buffer: dot })));
+  const thumbs = page.getByRole("region", { name: "Files" }).getByRole("button", { name: /^Open / });
+  await expect(thumbs).toHaveCount(3);
+  const names = await thumbs.evaluateAll((all) => all.map((el) => (el.getAttribute("aria-label") ?? "").slice(5)));
+  const [first, second, third] = names as [string, string, string];
+
+  await thumbs.first().click();
+  const shown = page.getByRole("dialog");
+  await expect(shown.getByRole("img", { name: first })).toBeVisible();
+  await expect(shown.getByText("1 / 3")).toBeVisible();
+
+  await page.keyboard.press("ArrowRight");
+  await expect(shown.getByRole("img", { name: second })).toBeVisible();
+  await shown.getByRole("button", { name: "Previous" }).click();
+  await expect(shown.getByRole("img", { name: first })).toBeVisible();
+  // Round from the first to the last.
+  await page.keyboard.press("ArrowLeft");
+  await expect(shown.getByRole("img", { name: third })).toBeVisible();
+  await expect(shown.getByText("3 / 3")).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(shown).toBeHidden();
+});
+
 test("Ctrl+M starts a comment, Escape leaves the box with the draft kept, and Escape again closes the panel", async ({
   page,
   project,

@@ -71,7 +71,7 @@ export function QuestionFiles({ files }: { files: OptionFile[] }) {
         </ul>
       )}
       <OptionDocs files={docs} />
-      <Lightbox file={shown} onClose={() => setShown(null)} />
+      <Lightbox file={shown} files={media} onShow={setShown} onClose={() => setShown(null)} />
     </div>
   );
 }

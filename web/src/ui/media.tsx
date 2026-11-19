@@ -1,4 +1,4 @@
-import { FileText, Play, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Play, X } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { cx } from "@/lib/cx";
 import { fileSize, isImage, isVideo } from "@/data/files";
@@ -81,8 +81,31 @@ function MediaFull({ file, className }: { file: FileRow; className?: string }) {
   );
 }
 
-/** One file over the whole screen. Escape or a click outside closes it. */
-export function Lightbox({ file, onClose }: { file: FileRow | null; onClose: () => void }) {
+interface LightboxProps {
+  /** The file shown; null while it is closed. */
+  file: FileRow | null;
+  /** The pictures and videos it is one of, in their order. */
+  files: FileRow[];
+  /** Asked for another of them. */
+  onShow: (file: FileRow) => void;
+  onClose: () => void;
+}
+
+const round = "flex size-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20";
+
+/**
+ * One file over the whole screen. Escape or a click outside closes it. When
+ * it is one of several, the arrows on its sides and the arrow keys go to the
+ * ones beside it, and round from the last to the first.
+ */
+export function Lightbox({ file, files, onShow, onClose }: LightboxProps) {
+  const at = file ? files.findIndex((f) => f.id === file.id) : -1;
+  const several = at >= 0 && files.length > 1;
+  const step = (by: number) => {
+    const next = files[(at + by + files.length) % files.length];
+    if (several && next) onShow(next);
+  };
+
   return (
     <RDialog.Root open={file !== null} onOpenChange={(open) => !open && onClose()}>
       <RDialog.Portal>
@@ -91,15 +114,43 @@ export function Lightbox({ file, onClose }: { file: FileRow | null; onClose: () 
           aria-describedby={undefined}
           className="fixed inset-0 z-[70] flex items-center justify-center p-4 outline-none sm:p-10"
           onClick={(e) => e.target === e.currentTarget && onClose()}
+          onKeyDown={(e) => {
+            // A video's own controls seek with the same keys.
+            if (!several || e.target instanceof HTMLVideoElement) return;
+            if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+            e.preventDefault();
+            step(e.key === "ArrowLeft" ? -1 : 1);
+          }}
         >
           <VisuallyHidden.Root>
             <RDialog.Title>{file?.name}</RDialog.Title>
           </VisuallyHidden.Root>
-          {file && (isImage(file) || isVideo(file)) && <MediaFull file={file} className="rounded-md" />}
-          <RDialog.Close
-            aria-label={t("common.close")}
-            className="absolute top-3 right-3 flex size-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
-          >
+          {/* Keyed, so the picture before does not stay up while the next one loads. */}
+          {file && (isImage(file) || isVideo(file)) && <MediaFull key={file.id} file={file} className="rounded-md" />}
+          {several && (
+            <>
+              <button
+                type="button"
+                aria-label={t("common.previous")}
+                onClick={() => step(-1)}
+                className={cx("absolute top-1/2 left-3 -translate-y-1/2", round)}
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+              <button
+                type="button"
+                aria-label={t("common.next")}
+                onClick={() => step(1)}
+                className={cx("absolute top-1/2 right-3 -translate-y-1/2", round)}
+              >
+                <ChevronRight className="size-5" />
+              </button>
+              <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-2.5 py-1 text-xs text-white tnum">
+                {t("common.position", { n: at + 1, total: files.length })}
+              </span>
+            </>
+          )}
+          <RDialog.Close aria-label={t("common.close")} className={cx("absolute top-3 right-3", round)}>
             <X className="size-5" />
           </RDialog.Close>
         </RDialog.Content>
