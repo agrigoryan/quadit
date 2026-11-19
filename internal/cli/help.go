@@ -21,11 +21,12 @@ act       new PROJECT TITLE [field=value ...]      description=- reads it from s
           update KEY field=value ... status=done assignee=@ann priority=high add_labels=a,b
           status KEY NAME | assign KEY @WHO|none | take KEY | release KEY
           delete KEY | restore KEY   to the trash, and back from it
-          comment KEY TEXT [waiting_on=@WHO] [decision=ID | option=ID]
+          comment KEY TEXT [waiting_on=@WHO] [decision=ID | option=ID] [file=PATH ...]
           comment page=PAGE_ID [block=BLOCK_ID] TEXT   a thread on a page, or on one of its blocks
           comment page=PAGE_ID block=BLOCK_ID quote=WORDS [occurrence=N] TEXT
                                      a thread on those words of the block (the Nth time they are there)
-          reply COMMENT_ID TEXT      answer in that comment's thread, on a task or a page
+          reply COMMENT_ID TEXT [file=PATH ...]        answer in that comment's thread, on a task or a page
+                                     a file= on a comment, a reply or a result is shown with it: pictures, clips, any file
           resolve COMMENT_ID | reopen COMMENT_ID       a thread, through any of its comments
           result KEY TEXT [checked=...] [measured=...] [not_verified=...] [file=PATH ...]
           ask KEY QUESTION option=A [file=PATH ...] option=B [file=PATH ...] [recommended=2] [why=...] [ask=@WHO]

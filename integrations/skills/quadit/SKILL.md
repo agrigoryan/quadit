@@ -39,6 +39,13 @@ quadit result SVA-12 "What was done, in a sentence or two." \
 
 The task then goes back to the person who answered your last question.
 
+Show what you made, do not only describe it. When the work can be seen (a picture you drew or generated, a screenshot of the screen you changed, a clip, a chart), attach it to what you write about it: `file=PATH` works on `comment`, `result` and `reply`, on tasks and on pages, and can be repeated. A person reads the task on a phone, not your working folder: a path to a file on your machine shows them nothing.
+
+```bash
+quadit comment SVA-12 "First pass at the boss sprite. The legs still need work." file=out/boss.png file=out/boss-walk.gif
+quadit reply COMMENT_ID "Legs redone." file=out/boss-2.png
+```
+
 ## Asking for a decision
 
 When a choice is the person's to make, ask in the task instead of guessing or asking in chat:

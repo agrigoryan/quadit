@@ -45,18 +45,17 @@ func (r *runner) comment(in input) error {
 	if len(ev) > 0 {
 		a["evidence"] = ev
 	}
-	if atts, err := r.uploads(in.f["file"]); err != nil {
+	if err := r.attachUploads(a, in.f["file"]); err != nil {
 		return err
-	} else if len(atts) > 0 {
-		a["attachments"] = atts
 	}
 	return r.change("comment.create", a, in.approval)
 }
 
-// reply answers in the thread of the comment named, on a task or a page:
-// the reply joins that comment's thread, whichever comment of it is named.
+// reply answers in the thread of the comment named, on a task or a page,
+// with the files that show it: the reply joins that comment's thread,
+// whichever comment of it is named.
 func (r *runner) reply(in input) error {
-	a, err := argsFrom(in.f)
+	a, err := argsFrom(in.f, "file")
 	if err != nil {
 		return err
 	}
@@ -66,7 +65,23 @@ func (r *runner) reply(in input) error {
 			return err
 		}
 	}
+	if err := r.attachUploads(a, in.f["file"]); err != nil {
+		return err
+	}
 	return r.change("comment.create", a, in.approval)
+}
+
+// attachUploads sends the files at paths and names them in a, the
+// arguments of a new comment, as what it comes with.
+func (r *runner) attachUploads(a map[string]any, paths []string) error {
+	atts, err := r.uploads(paths)
+	if err != nil {
+		return err
+	}
+	if len(atts) > 0 {
+		a["attachments"] = atts
+	}
+	return nil
 }
 
 // resolve marks the thread of the comment named as resolved; called as

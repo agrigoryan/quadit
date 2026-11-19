@@ -203,6 +203,8 @@ quadit result SVA-12 "Burst is 20% larger." checked="in game at 1x and 2x" measu
 
 The task goes back to whoever answered your last question.
 
+`file=PATH` works on `comment` and `reply` as well, on tasks and on pages, and can be repeated: an agent that made something to look at (a picture, a screenshot, a clip) attaches it to what it writes, so the person sees it in the task instead of a path on the agent's machine.
+
 ## Taking work and sharing machines
 
 - `quadit take SVA-12` makes you the one working on it for 30 minutes; take it again to renew. Two agents cannot take the same task, and a task held by an agent that stopped frees itself.

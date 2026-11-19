@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -185,6 +186,81 @@ func TestAskWithFiles(t *testing.T) {
 		if question, _ := s.askedFiles(t, agent, "SVA-2"); strings.Join(question, ",") != "a.gif" {
 			t.Fatalf("approval files = %v", question)
 		}
+	})
+}
+
+// TestCommentsWithFiles: a comment, a result and a reply each take their
+// files with them, on a task and on a page, and nothing is sent when a file
+// cannot be read.
+func TestCommentsWithFiles(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss arrival"})
+		page := s.change(t, s.owner, "", "doc.create", M{"title": "Art notes"})["ref"].(string)
+		agent := s.agentToken(t, "coder")
+		f := someFiles(t, "wip.png", "done.png", "closer.png", "sheet.png", "sheet-2.png")
+		run := func(args ...string) {
+			t.Helper()
+			if out, code := s.quadit(t, agent, args...); code != 0 {
+				t.Fatalf("quadit %s: %s", strings.Join(args, " "), out)
+			}
+		}
+		// comments is every comment so far by its text: its id and the names of its files.
+		type comment struct {
+			id    string
+			files []string
+		}
+		comments := func() map[string]comment {
+			t.Helper()
+			var page struct {
+				Events []struct {
+					Data struct {
+						Row struct {
+							ID   string `json:"id"`
+							Body string `json:"body"`
+						} `json:"row"`
+						Attachments []struct {
+							File struct {
+								Name string `json:"name"`
+							} `json:"file"`
+						} `json:"attachments"`
+					} `json:"data"`
+				} `json:"events"`
+			}
+			s.call(t, nil, agent, "GET", "/api/v1/w/-/events?after=0&types=comment.created&limit=500", nil, 200, &page)
+			out := map[string]comment{}
+			for _, ev := range page.Events {
+				c := comment{id: ev.Data.Row.ID}
+				for _, a := range ev.Data.Attachments {
+					c.files = append(c.files, a.File.Name)
+				}
+				out[ev.Data.Row.Body] = c
+			}
+			return out
+		}
+		has := func(body string, want ...string) {
+			t.Helper()
+			if got := comments()[body].files; !slices.Equal(got, want) {
+				t.Errorf("the files of %q: %v, want %v", body, got, want)
+			}
+		}
+
+		if out, code := s.quadit(t, agent, "reply", "c-none", "Look.", "file=/no/such.png"); code == 0 || !strings.Contains(out, "/no/such.png") {
+			t.Fatalf("an unreadable file: %d %s", code, out)
+		}
+
+		run("comment", "SVA-1", "Half way.", "file="+f["wip.png"])
+		has("Half way.", "wip.png")
+		run("result", "SVA-1", "Drew it.", "checked=by eye", "file="+f["done.png"])
+		has("Drew it.", "done.png")
+		run("reply", comments()["Half way."].id, "A closer look.", "file="+f["closer.png"])
+		has("A closer look.", "closer.png")
+
+		run("comment", "page="+page, "The sprite sheet.", "file="+f["sheet.png"])
+		has("The sprite sheet.", "sheet.png")
+		run("reply", comments()["The sprite sheet."].id, "With the second row.", "file="+f["sheet-2.png"])
+		has("With the second row.", "sheet-2.png")
 	})
 }
 

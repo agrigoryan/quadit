@@ -72,7 +72,7 @@ var tools = []tool{
 		Run:   toolRemember},
 	{Name: "changes", Desc: "Every change type with its arguments. Read once to learn what change can do.", Run: readPathTool("/api/v1/changes")},
 	{Name: "change", Desc: "Make one change. Common types: task.create {project, title, description, assignee, labels, parent}; task.update {id, status, assignee, waiting_on, priority, add_labels}; " +
-		"task.take {id}; comment.create {task, body, waiting_on} (add evidence {checked, measured, not_verified} to post a result); " +
+		"task.take {id}; comment.create {task, body, waiting_on} (add evidence {checked, measured, not_verified} to post a result, and attachments:[{file}] with ids from upload to show what you made: a picture, a screenshot, a clip); " +
 		"comment.create {doc, block, quote, body} on words of a page (quote: the exact words of the block; occurrence: N picks one when they are there more than once), without quote on a block, without block on the page, {parent, body} to reply in a comment's thread; comment.update {id, resolved}; " +
 		"decision.open {task, question, options:[{label, description, attachments:[{file}]}], recommended, recommendation, ask} (the ask tool does this, with files, in one call); decision.pick {id, option, note}; " +
 		"doc.create {title, markdown, parent}; doc.write {doc, markdown, mode} (a write that takes out the words a comment thread is on says so in its warnings; the thread stays open, on the page). Names work wherever ids do (SVA-12, @handle, status and label names). " +
