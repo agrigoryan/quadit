@@ -2,16 +2,17 @@
 // and the decision card. Everything works without it except these.
 (function () {
   "use strict";
-  // The field behind the hero: the icon's squares as a floor in perspective,
-  // drifting towards the visitor. Tiles glow in slow waves and near the
-  // pointer, and now and then one turns the yellow of "your move". Drawn on
-  // one canvas; still when motion is not wanted, and asleep off screen.
+  // The field behind the hero: a flat grid of small squares that flicker,
+  // brighten in slow waves and under the pointer. Now and then four of them
+  // light up as the icon does, three pale and one the yellow of "your move".
+  // Drawn on one canvas; still when motion is not wanted, asleep off screen.
   var canvas = document.querySelector(".field");
   if (canvas && canvas.getContext) {
     var ctx = canvas.getContext("2d");
     var still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    var w = 0, h = 0, horizon = 0, near = 2.2, focal = 0, lift = 0;
-    var pointer = null, moves = [], lastMove = 0, last = 0, running = false;
+    var PITCH = 28, DOT = 3;
+    var w = 0, h = 0, cols = 0, rows = 0;
+    var pointer = null, quads = [], lastQuad = 0, last = 0, running = false;
 
     function size() {
       var box = canvas.getBoundingClientRect();
@@ -19,80 +20,67 @@
       w = box.width; h = box.height;
       canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      horizon = h * 0.05;
-      focal = Math.max(110, Math.min(170, w / 9)) * near; // a tile at the front edge is about this wide
-      lift = (h - horizon) * near;                        // puts the front row on the bottom edge
+      cols = Math.ceil(w / PITCH) + 1; rows = Math.ceil(h / PITCH) + 1;
     }
-    // A number in 0..1 that stays the same for a tile.
+    // A number in 0..1 that stays the same for a square.
     function seed(i, k) {
       var n = Math.sin(i * 127.1 + k * 311.7) * 43758.5453;
       return n - Math.floor(n);
     }
+    // How strongly the square (i, k) is part of a lit quad, and whether it is the yellow one.
+    function quadAt(i, k, t) {
+      for (var q = 0; q < quads.length; q++) {
+        var di = i - quads[q].i, dk = k - quads[q].k;
+        if (di < 0 || di > 1 || dk < 0 || dk > 1) continue;
+        var lit = Math.sin(Math.PI * Math.min(1, (t - quads[q].at) / quads[q].for));
+        return { lit: lit, yours: di === 1 && dk === 0 };
+      }
+      return null;
+    }
     function draw(t) {
       ctx.clearRect(0, 0, w, h);
-      var drift = t * 0.11, row0 = Math.floor(drift), frac = drift - row0;
-      for (var r = 0; r < 26; r++) {
-        var z0 = near + r - frac, z1 = z0 + 1;
-        if (z0 < 0.6) continue;
-        var yNear = horizon + lift / z0, yFar = horizon + lift / z1;
-        if (yFar > h) continue;
-        var depth = Math.min(1, (yFar - horizon) / (h * 0.22)); // fades into the horizon
-        var half = Math.ceil(((w / 2) * z1) / focal) + 1, k = r + row0;
-        for (var i = -half; i < half; i++) {
-          var g = 0.07, xa = i + g, xb = i + 1 - g;
-          var za = z0 + g, zb = z1 - g;
-          var ya = horizon + lift / za, yb = horizon + lift / zb;
-          var x1 = w / 2 + (focal * xa) / za, x2 = w / 2 + (focal * xb) / za;
-          var x3 = w / 2 + (focal * xb) / zb, x4 = w / 2 + (focal * xa) / zb;
-          var wave = Math.sin(i * 0.33 + t * 0.5) * Math.sin(k * 0.41 - t * 0.37) + Math.sin((i + k) * 0.19 + t * 0.23);
-          var glow = Math.pow(Math.max(0, wave - 0.55), 2) * 0.2;
-          var s = seed(i, k);
-          glow += Math.pow(Math.max(0, Math.sin(t * (0.5 + s) + s * 40)), 10) * 0.2;
+      var left = (w - (cols - 1) * PITCH) / 2;
+      for (var k = 0; k < rows; k++) {
+        for (var i = 0; i < cols; i++) {
+          var x = left + i * PITCH, y = k * PITCH + 12, s = seed(i, k);
+          var a = 0.13;
+          a += Math.pow(Math.max(0, Math.sin(t * (0.6 + s * 1.6) + s * 50)), 14) * 0.55;         // its own flicker
+          a += Math.pow(Math.max(0, Math.sin(i * 0.19 + k * 0.15 - t * 0.7)), 4) * 0.38;         // a wave passing
           if (pointer) {
-            var dx = (x1 + x3) / 2 - pointer.x, dy = (ya + yb) / 2 - pointer.y;
-            glow += Math.pow(Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / 230), 2) * 0.4;
+            var dx = x - pointer.x, dy = y - pointer.y;
+            a += Math.pow(Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) / 190), 2) * 0.7;
           }
-          var move = 0;
-          for (var m = 0; m < moves.length; m++) {
-            if (moves[m].i === i && moves[m].k === k) move = Math.sin(Math.PI * Math.min(1, (t - moves[m].at) / moves[m].for));
+          var quad = quadAt(i, k, t), d = DOT;
+          if (quad) {
+            d = DOT + quad.lit * 8;
+            ctx.fillStyle = quad.yours ? "rgba(255,214,10," + (0.15 + 0.85 * quad.lit).toFixed(3) + ")" : "rgba(226,231,255," + (a + 0.6 * quad.lit).toFixed(3) + ")";
+          } else {
+            ctx.fillStyle = (s > 0.6 ? "rgba(176,150,255," : "rgba(150,166,255,") + Math.min(0.95, a).toFixed(3) + ")";
           }
-          ctx.beginPath();
-          ctx.moveTo(x1, ya); ctx.lineTo(x2, ya); ctx.lineTo(x3, yb); ctx.lineTo(x4, yb); ctx.closePath();
-          if (move > 0) {
-            ctx.fillStyle = "rgba(255,214,10," + (0.9 * move * depth).toFixed(3) + ")";
-            ctx.fill();
-          } else if (glow > 0.004) {
-            ctx.fillStyle = (s > 0.5 ? "rgba(122,140,255," : "rgba(160,120,255,") + (glow * depth).toFixed(3) + ")";
-            ctx.fill();
-          }
-          ctx.strokeStyle = "rgba(170,182,255," + ((0.075 + glow * 0.5) * depth).toFixed(3) + ")";
-          ctx.lineWidth = 1;
-          ctx.stroke();
+          ctx.fillRect(x - d / 2, y - d / 2, d, d);
         }
-        if (yNear < 0) break;
       }
     }
-    // Every so often a tile somewhere in the middle becomes somebody's move.
-    function askSomeone(t) {
-      moves = moves.filter(function (m) { return t - m.at < m.for; });
-      if (t - lastMove < 1.4 || moves.length >= 3) return;
-      lastMove = t;
-      // Not behind the words: a tile is tried a few times until it lands clear of them.
+    // Every so often a quad lights up somewhere, clear of the words.
+    function lightOne(t) {
+      quads = quads.filter(function (q) { return t - q.at < q.for; });
+      if (t - lastQuad < 1.1 || quads.length >= 4) return;
+      lastQuad = t;
       for (var tries = 0; tries < 8; tries++) {
-        var ahead = 1 + Math.floor(Math.random() * 12), i = Math.floor(Math.random() * 18) - 9;
-        var z = near + ahead + 0.5, x = w / 2 + (focal * (i + 0.5)) / z, y = horizon + lift / z;
-        if (Math.abs(x - w / 2) < 480 && y > 150 && y < 720) continue;
-        moves.push({ i: i, k: Math.floor(t * 0.11) + ahead, at: t, for: 3 + Math.random() * 2 });
+        var i = Math.floor(Math.random() * (cols - 2)), k = 1 + Math.floor(Math.random() * Math.min(rows - 3, 22));
+        var x = (w - (cols - 1) * PITCH) / 2 + i * PITCH, y = k * PITCH;
+        if (Math.abs(x - w / 2) < 470 && y > 110 && y < 680) continue;
+        quads.push({ i: i, k: k, at: t, for: 2.6 + Math.random() * 2 });
         return;
       }
     }
     function frame(now) {
       if (!running) return;
       requestAnimationFrame(frame);
-      if (now - last < 30) return;
+      if (now - last < 32) return;
       last = now;
       var t = now / 1000;
-      askSomeone(t);
+      lightOne(t);
       draw(t);
     }
     function wake(on) {
@@ -100,12 +88,13 @@
       if (on && !running) { running = true; requestAnimationFrame(frame); }
       else if (!on) running = false;
     }
-    size();
-    if (still) {
-      moves = [{ i: 2, k: 6, at: 0, for: 2 }, { i: -4, k: 9, at: 0, for: 2 }];
+    function rest() {
+      quads = [{ i: Math.floor(cols * 0.14), k: 6, at: 0, for: 2 }, { i: Math.floor(cols * 0.84), k: 10, at: 0, for: 2 }];
       draw(1);
     }
-    window.addEventListener("resize", function () { size(); if (still) draw(1); });
+    size();
+    if (still) rest();
+    window.addEventListener("resize", function () { size(); if (still) rest(); });
     window.addEventListener("pointermove", function (e) {
       var box = canvas.getBoundingClientRect();
       pointer = e.clientY < box.bottom ? { x: e.clientX - box.left, y: e.clientY - box.top } : null;
