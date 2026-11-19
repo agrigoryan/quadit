@@ -1,6 +1,7 @@
 # Quadit build. "make" builds the binary with the web app inside it.
 
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+# The server's own tags only (v*): the desktop app's (desktop-v*) are another product's.
+VERSION ?= $(shell git describe --tags --match 'v*' --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
 .PHONY: all build server web generate test test-all e2e lint notices dev seed clean fmt release smoke image desktop desktop-e2e
