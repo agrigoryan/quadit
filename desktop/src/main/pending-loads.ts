@@ -5,7 +5,8 @@
 // one waiting, so the restored start page never lands over it.
 
 export class PendingLoads<Key, Load, Gate> {
-  private waiting = new Map<Key, Load>();
+  /** The newest load asked for each key whose gate is not open yet. */
+  private newest = new Map<Key, Load>();
 
   /**
    * `gate` is asked once per wait and says, when it resolves, whether and
@@ -18,19 +19,24 @@ export class PendingLoads<Key, Load, Gate> {
 
   /** Asks for `load` once the gate opens; a load already waiting for `key` is replaced, under the same wait. */
   ask(key: Key, load: Load) {
-    const already = this.waiting.has(key);
-    this.waiting.set(key, load);
+    const already = this.newest.has(key);
+    this.newest.set(key, load);
     if (already) return;
     void this.gate(key).then((opened) => {
-      const latest = this.waiting.get(key);
+      const latest = this.newest.get(key);
       if (latest === undefined) return;
-      this.waiting.delete(key);
+      this.newest.delete(key);
       this.arrive(key, latest, opened);
     });
   }
 
+  /** Whether a load waits for `key`'s gate. */
+  waiting(key: Key): boolean {
+    return this.newest.has(key);
+  }
+
   /** Drops what waits for `key` (its window went). */
   forget(key: Key) {
-    this.waiting.delete(key);
+    this.newest.delete(key);
   }
 }

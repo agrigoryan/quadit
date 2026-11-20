@@ -25,6 +25,8 @@
 //   - where the app can sign the window in without a form (the server on
 //     this computer: signInWithoutForm), it does before a load and when the
 //     page lands on the sign-in page, as often as app-sign-in.ts allows;
+//     after one from the sign-in page, that page goes on to where it was
+//     headed, unless the window has moved on or a newer load waits;
 //   - a frame of a page stays on the server's own pages;
 //   - window.open of the same origin opens another window held to the same
 //     rules; anything else goes to the system browser;
@@ -112,6 +114,8 @@ export interface WindowsSetup {
    * reached through `fetch`, has none; true when it did just now.
    */
   signInWithoutForm(serverId: string, fetch: Fetch): Promise<boolean>;
+  /** Whether a server's window, its session reached through `fetch`, is signed in, where the app can ask (as for signInWithoutForm). */
+  isSignedIn(serverId: string, fetch: Fetch): Promise<boolean>;
 }
 
 export class ServerWindows {
@@ -142,7 +146,6 @@ export class ServerWindows {
       const server = this.bridgeSender(event);
       const summary = raw === null ? null : summaryOf(raw);
       if (server && (raw === null || summary)) setup.requests.publish(event.sender.id, server.id, summary);
-      if (server && summary) this.appSignIn.showedWorkspace(server.id);
     });
     ipcMain.on(BRIDGE_LISTENING, (event, raw: unknown) => {
       const server = this.bridgeSender(event);
@@ -151,7 +154,10 @@ export class ServerWindows {
     ipcMain.on(BRIDGE_OUTCOME, (event, raw: unknown) => {
       if (this.bridgeSender(event)) setup.requests.answer(event.sender.id, raw);
     });
-    this.appSignIn = new AppSignIn((serverId) => setup.signInWithoutForm(serverId, this.fetcher(serverId)));
+    this.appSignIn = new AppSignIn({
+      signIn: (serverId) => setup.signInWithoutForm(serverId, this.fetcher(serverId)),
+      isSignedIn: (serverId) => setup.isSignedIn(serverId, this.fetcher(serverId)),
+    });
     this.loads = new PendingLoads(
       async (serverId) => {
         const reach = await setup.whenReachable(serverId);
@@ -293,8 +299,12 @@ export class ServerWindows {
     }
   }
 
-  /** Tries a server's window again now, when its page could not be loaded: the server has just started. */
-  retry(serverId: string) {
+  /**
+   * The server has just started (again): its window, when its page could
+   * not be loaded, tries again now, and the app may sign it in again.
+   */
+  serverStarted(serverId: string) {
+    this.appSignIn.serverStarted(serverId);
     const win = this.windows.get(serverId);
     if (win) this.errors.retry(win);
   }
@@ -467,16 +477,25 @@ export class ServerWindows {
     });
     contents.on("did-create-window", (child) => this.guard(child.webContents, serverId));
 
+    // Counts the window's navigations, so that a sign-in finishing late can tell whether its page is still there.
+    let navigations = 0;
     const pageChanged = () => {
+      navigations++;
       const win = this.windows.get(serverId);
       const server = this.store.get(serverId);
       if (!win || win.webContents !== contents || !server) return;
       this.placeBar(win, serverId);
-      // Landed on the sign-in page: signed in without the form where the app can, and on to where the page was headed.
-      if (!onSignInPage(contents, server)) return;
+      const signInPage = onSignInPage(contents, server);
+      this.appSignIn.navigated(serverId, signInPage);
+      // Landed on the sign-in page: signed in without the form where the app can, unless a sign-in is under way
+      // already, whose asker goes on itself.
+      if (!signInPage || this.appSignIn.inFlight(serverId)) return;
+      const landed = navigations;
+      const target = appPage(server.origin, this.waitingFor(serverId) ?? "/");
       void this.appSignIn.attempt(serverId).then((signedIn) => {
-        const target = appPage(server.origin, this.waitingFor(serverId) ?? "/");
-        if (signedIn && target) this.load(serverId, { url: target });
+        // On to where the sign-in page was headed, only while the window still shows it and no newer load waits.
+        const still = !contents.isDestroyed() && landed === navigations && !this.loads.waiting(serverId);
+        if (signedIn && still && target) this.load(serverId, { url: target });
       });
     };
     contents.on("did-navigate", () => {

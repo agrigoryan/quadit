@@ -57,4 +57,14 @@ describe("PendingLoads", () => {
     await open("a");
     expect(arrived).toEqual([]);
   });
+
+  it("says whether a load waits for a key", async () => {
+    const { loads, open } = setUp();
+    expect(loads.waiting("a")).toBe(false);
+    loads.ask("a", "/");
+    expect(loads.waiting("a")).toBe(true);
+    expect(loads.waiting("b")).toBe(false);
+    await open("a");
+    expect(loads.waiting("a")).toBe(false);
+  });
 });

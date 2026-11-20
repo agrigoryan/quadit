@@ -145,6 +145,8 @@ function start() {
       serverId === list.localServer()?.id ? local.whenRunning() : Promise.resolve({ ok: true as const }),
     signInWithoutForm: (serverId, fetch) =>
       serverId === list.localServer()?.id ? local.signInOwner(fetch) : Promise.resolve(false),
+    isSignedIn: (serverId, fetch) =>
+      serverId === list.localServer()?.id ? local.isSignedIn(fetch) : Promise.resolve(false),
   });
   const list = new ServerList(store, windows, pages, requests, {
     fetcher,
@@ -248,7 +250,7 @@ function start() {
     if (entry && local.state().kind === "running") {
       // Up: what it speaks is asked now, and a window that found it down tries again.
       void checks.check(entry.id);
-      windows.retry(entry.id);
+      windows.serverStarted(entry.id);
     }
   });
   refreshMenu();
