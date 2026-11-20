@@ -40,7 +40,8 @@ import { isReleasePage, type Release, UpdateWatch } from "@/main/updates";
 import { Welcome } from "@/main/welcome-page";
 import { BRIDGE_REQUEST } from "@/shared/bridge";
 
-const WEBSITE = "https://github.com/agrigoryan/quadit";
+const WEBSITE = "https://agrigoryan.github.io/quadit/";
+const ISSUES = "https://github.com/agrigoryan/quadit/issues";
 
 // QUADIT_DESKTOP_DATA keeps a whole profile (servers, sessions, window
 // places) in another folder: for tests, and for trying a second profile.
@@ -231,7 +232,7 @@ function start() {
             signInInFront: () => front && signIn(front.id),
             openUpdate: (release) => void tellAboutUpdate(release),
             openWebsite: () => void shell.openExternal(WEBSITE),
-            reportIssue: () => void shell.openExternal(`${WEBSITE}/issues`),
+            reportIssue: () => void shell.openExternal(ISSUES),
             showWelcome: () => welcome.show(),
             controlLocalServer: (control) => void list.control(control),
             showLocalServerFiles: (what) =>
