@@ -14,11 +14,14 @@ name: desktop-ci
 # (desktop/scripts/cli.mjs) and Connect runs, and for what "Set up on this
 # computer" runs of the server: quadit serve's flags (the app key among
 # them), the set-up and the sign-in the app makes with that key (an owner
-# with no email), and the web app's first-run and sign-in pages. The desktop
-# release runs it on the tagged commit before it publishes anything.
+# with no email), the web app's first-run and sign-in pages, and its layout
+# in a window without a title bar. The desktop release runs it on the tagged
+# commit before it publishes anything.
 #
 # Every run of the end-to-end suite keeps the pictures of the first run it
-# took (test/e2e/onboarding.spec.ts) as the artifact desktop-onboarding-screens.
+# took (test/e2e/onboarding.spec.ts), and of a window without a title bar with
+# the numbers macOS gave it (test/e2e/window-frame.spec.ts), as the artifact
+# desktop-onboarding-screens.
 on:
   push:
     branches: [main]
@@ -39,6 +42,11 @@ on:
       - "web/src/auth/login.tsx"
       - "web/src/auth/desktop-*"
       - "web/src/shell/system-notices.ts"
+      - "web/src/lib/window-inset.ts"
+      - "web/src/ui/window-strip.tsx"
+      - "web/src/shell/sidebar.tsx"
+      - "web/src/shell/topbar.tsx"
+      - "web/src/styles/index.css"
       - "web/src/types/desktop.ts"
       - "web/src/insights/agents/agents-page.tsx"
       - "web/public/sw.js"
