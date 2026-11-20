@@ -184,7 +184,11 @@ describe("LocalServer", () => {
     const { server, clock, spawned } = setUp({ ready: false });
     await server.setUp();
     await clock.advance(121_000);
-    expect(server.state()).toMatchObject({ kind: "failed", reason: expect.stringContaining("did not start") });
+    expect(server.state()).toMatchObject({
+      kind: "failed",
+      reason: expect.stringContaining("did not start"),
+      log: [expect.stringMatching(/^Started by the Quadit app at /)],
+    });
     expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
   });
 
