@@ -156,6 +156,7 @@ Quadit follows [Semantic Versioning](https://semver.org): releases are tagged `v
 | `.deb` / `.rpm` | Install the newer package: `sudo apt install ./quadit_X.Y.Z_amd64.deb` or `sudo dnf install ./quadit-X.Y.Z-1.x86_64.rpm`. A running `quadit` service is restarted on the new version |
 | An archive from Releases | Download the new one, replace the binary, restart the server |
 | From source | `git pull && make build`, then restart the server |
+| The desktop app ([its own server](#a-server-on-this-computer)) | Install the newer app: it carries the newer server, which upgrades the database at its next start |
 
 Then restart the server, if the upgrade did not. Take a backup first (`quadit backup --out …`, see [Backups](#backups)): it is the only copy of the files as well as the database.
 
@@ -196,6 +197,8 @@ Download it from [Releases](https://github.com/agrigoryan/quadit/releases), unde
 
 The app does not update itself: it tells you when a newer version is out, and you download it the same way.
 
+It can also be a server itself, so that downloading it is the whole install: see [A server on this computer](#a-server-on-this-computer).
+
 What the app adds to the web app:
 
 - **Connect your agents.** Set Up Quadit… in the app menu finds the agent harnesses on the computer (Claude Code, Codex, Gemini CLI, Cursor, opencode, pi, GitHub Copilot) and sets each up to work in Quadit: with the `quadit` command and the skill, through Quadit's MCP server with the harness's own sign-in, or both. It shows every file it will change before changing it, keeps a copy of each, and Disconnect puts them back. [Connect from the desktop app](agents.md#connect-from-the-desktop-app) says what each choice writes.
@@ -212,6 +215,17 @@ What the app adds to the web app:
 - The app adds a server over plain `http://` without asking only on this computer or a private network (a private address, `localhost`, a `.local`, `.home.arpa` or `.internal` name); anywhere else it asks first, and says the connection is not encrypted.
 - The app's session is listed under Settings → Sign-in and security, Signed-in browsers, as "Quadit desktop", and is signed out there like any browser. Each hand-off is in the audit log as a sign-in with the method `desktop`.
 - The app shows a notification for each new inbox item of the workspace open in it, from the live connection (it has no push). "Send push notifications" off, under Settings → Notifications, turns these off too.
+
+### A server on this computer
+
+The app can run Quadit for you on the computer it is on, with no terminal: choose **Run Quadit on this computer** on its first start (step 1 of setup), in the server list, or under File → Run Quadit on This Computer…. It starts the `quadit` it carries (the same server, with the web app inside), adds it to the server list as "This computer", and opens its first-run page in a window, where you make your account and the first workspace and are signed in. It can sit in the list beside servers elsewhere.
+
+- macOS and Linux. The Windows app has no server to run.
+- The server runs while the app does: the app starts it when it starts, and stops it when you quit (it waits a few seconds for the server to finish what it is doing). Closing the windows leaves the app in the menu bar (the tray on Linux) and the server running. If the app ends any other way, the server stops with it (`quadit serve --stop-on-stdin-close`). On macOS, "Start Quadit when I log in" (in the server list, and in File → Server on This Computer) starts the app at login without opening a window.
+- It listens on this computer only, at `http://127.0.0.1:4780`, or at another free port when 4780 was taken when it was first set up. That address never changes afterwards, because sign-ins and agents' settings are tied to it: if another program holds the port at a later start, the app says so instead of moving, and you start the server again once the port is free. Other devices cannot reach it.
+- Its data is the folder `server` in the app's own data folder: `~/Library/Application Support/Quadit/server` on macOS, `~/.config/Quadit/server` on Linux. The app never deletes it. Removing "This computer" from the server list stops the server and keeps the folder; running Quadit on this computer again uses it. Show Data Folder and Show Log open it. Its log is `server.log` there, started anew at a start once it is over 5 MB, with the one before kept as `server.log.1`.
+- The server list shows whether it is starting, running, stopped or failed (with the reason and the last lines of its log), with Start, Stop and Restart; File → Server on This Computer has the same. If it exits on its own, the app starts it again, up to three times, then shows it as failed.
+- `quadit backup` and the other commands work on it as on any server, with `--data` set to that folder. A newer app carries a newer server, which upgrades the database at its first start, copying it first ([Upgrades](#upgrades)).
 
 ## Several servers
 
