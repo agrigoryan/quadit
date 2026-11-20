@@ -27,7 +27,7 @@ on:
       - ".gitattributes"
       - ".github/workflows/desktop-*.yml"
       - "internal/server/desktop*.go"
-      - "internal/server/app_key.go"
+      - "internal/server/app_key*.go"
       - "internal/server/auth.go"
       - "internal/server/origin.go"
       - "internal/engine/ch_bootstrap.go"
