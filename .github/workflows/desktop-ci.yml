@@ -31,6 +31,7 @@ on:
       - "internal/server/auth.go"
       - "internal/server/origin.go"
       - "internal/engine/ch_bootstrap.go"
+      - "internal/settings/settings.go"
       - "internal/app/web.go"
       - "internal/cli/**"
       - "internal/app/app.go"
