@@ -31,6 +31,7 @@ await Promise.all([
   build({
     ...common,
     entryPoints: [
+      "src/pages/welcome.ts",
       "src/pages/servers.ts",
       "src/pages/sign-in-bar.ts",
       "src/pages/connection-error.ts",
@@ -45,7 +46,7 @@ await Promise.all([
   }),
 ]);
 
-const pages = ["servers", "sign-in-bar", "connection-error", "setup", "connect", "panel", "capture"];
+const pages = ["welcome", "servers", "sign-in-bar", "connection-error", "setup", "connect", "panel", "capture"];
 for (const file of [...pages.map((page) => `${page}.html`), "pages.css"])
   cpSync(`src/pages/${file}`, `out/pages/${file}`);
 cpSync("assets/icon.png", "out/pages/icon.png");

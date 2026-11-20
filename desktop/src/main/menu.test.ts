@@ -49,7 +49,7 @@ const actions = {
   openUpdate: noop,
   openWebsite: noop,
   reportIssue: noop,
-  runLocalServer: noop,
+  showWelcome: noop,
   controlLocalServer: noop,
   showLocalServerFiles: noop,
   setOpenAtLogin: noop,
@@ -134,12 +134,21 @@ describe("menuTemplate", () => {
     expect(labels).toContain("Quadit 0.2.0 Is Available…");
   });
 
-  it("offers to run Quadit on this computer only where the app can", () => {
-    const labels = (local: MenuState["local"]) =>
-      items(menuTemplate(state("linux", { local }), actions)).map((item) => item.label);
-    expect(labels(null)).not.toContain("Run Quadit on This Computer…");
-    expect(labels({ setUp: false, state: "stopped", openAtLogin: null })).toContain("Run Quadit on This Computer…");
-    expect(labels({ setUp: true, state: "running", openAtLogin: null })).not.toContain("Run Quadit on This Computer…");
+  it("offers to set Quadit up on this computer only where the app can and has not, through Welcome", () => {
+    const welcome = vi.fn();
+    const all = (local: MenuState["local"]) =>
+      items(menuTemplate(state("linux", { local }), { ...actions, showWelcome: welcome }));
+    const labels = (local: MenuState["local"]) => all(local).map((item) => item.label);
+    expect(labels(null)).not.toContain("Set Up on This Computer…");
+    expect(labels({ setUp: false, state: "stopped", openAtLogin: null })).toContain("Set Up on This Computer…");
+    expect(labels({ setUp: true, state: "running", openAtLogin: null })).not.toContain("Set Up on This Computer…");
+
+    all({ setUp: false, state: "stopped", openAtLogin: null })
+      .find((item) => item.id === "set-up-here")
+      ?.click?.({} as never, undefined, {});
+    expect(welcome).toHaveBeenCalledOnce();
+    // The checklist stays in the menu.
+    expect(labels(null)).toContain("Set Up Quadit…");
   });
 
   it("has the server on this computer's state and controls, each where it makes sense", () => {

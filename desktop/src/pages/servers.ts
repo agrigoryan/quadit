@@ -79,7 +79,7 @@ function row(server: ServerView, local: LocalServerView): HTMLLIElement {
       "span",
       server.local
         ? `Remove ${server.name}? The server on this computer stops, its window closes and the app forgets its sign-in. ` +
-            `Its data stays in ${local.dataDir}: run Quadit on this computer again to use it.`
+            `Its data stays in ${local.dataDir}: set Quadit up on this computer again to use it.`
         : `Remove ${server.name}? Its window closes and the app forgets its sign-in.`,
     ),
   );

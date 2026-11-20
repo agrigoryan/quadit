@@ -1,6 +1,6 @@
 // The server the app runs on this computer, as the server list and setup
-// show it (src/main/local-server.ts): the choice to run it, and its state
-// and controls once it is in the list.
+// show it (src/main/local-server.ts): the way to set it up, which is
+// Welcome's, and its state and controls once it is in the list.
 
 import { button, make } from "@/pages/dom";
 import type { LocalServerView, LocalState, PagesApi } from "@/shared/pages-api";
@@ -22,9 +22,10 @@ export function describeLocal(state: LocalState): { text: string; warn: boolean 
 }
 
 /**
- * The choice to run Quadit on this computer, under the page's own heading:
- * a button, or one sentence where this build cannot. Empty once the server
- * is in the list, where its row has its controls.
+ * The choice to set Quadit up on this computer, under the page's own
+ * heading: a sentence and a button that opens Welcome, where the name is
+ * asked and the set-up runs; or one sentence where this build cannot. Empty
+ * once the server is in the list, where its row has its controls.
  */
 export function runLocalChoice(view: LocalServerView): HTMLElement[] {
   if (view.serverId) return [];
@@ -43,21 +44,7 @@ export function runLocalChoice(view: LocalServerView): HTMLElement[] {
       : "No server to set up elsewhere: the app runs Quadit here, while it is open, for you and the agents on this computer.",
     "hint",
   );
-  const error = make("p", "", "error");
-  error.setAttribute("role", "alert");
-  const run = button(
-    "Run Quadit on this computer",
-    () => {
-      run.disabled = true;
-      error.textContent = "";
-      void api.runLocalServer().then((result) => {
-        run.disabled = false;
-        if (!result.ok) error.textContent = result.error;
-      });
-    },
-    "primary",
-  );
-  return [hint, run, error];
+  return [hint, button("Set up on this computer…", () => void api.showWelcome(), "primary")];
 }
 
 /** The server's state, the reason and last log lines when it failed, and its controls. */

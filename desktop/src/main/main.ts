@@ -2,18 +2,20 @@
 // (switches.ts), one running copy, the quadit:// scheme, and the parts
 // put together: the servers (servers.ts), their windows
 // (server-windows.ts), what the windows' pages publish and are asked
-// (requests.ts), the app's own pages (app-pages.ts: the server list,
-// setup, Connect, the menu-bar panel, quick capture), the browser sign-in
+// (requests.ts), the app's own pages (app-pages.ts: Welcome, the server
+// list, setup, Connect, the menu-bar panel, quick capture), the browser sign-in
 // (handoff.ts), the unread badge (unread.ts), the menu (menu.ts), the
 // update notice (updates.ts) and the server on this computer
 // (local-server.ts), which runs while the app does.
 
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { homedir, hostname } from "node:os";
+import { homedir, hostname, userInfo } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import { app, BrowserWindow, dialog, Menu, net, powerMonitor, shell, webContents } from "electron";
+import { accountName } from "@/main/account-name";
 import { AppPages } from "@/main/app-pages";
 import { Capture } from "@/main/capture";
 import { ConnectPage } from "@/main/connect-page";
@@ -34,6 +36,7 @@ import { Setup } from "@/main/setup-page";
 import { refusedSwitches } from "@/main/switches";
 import { Unread } from "@/main/unread";
 import { isReleasePage, type Release, UpdateWatch } from "@/main/updates";
+import { Welcome } from "@/main/welcome-page";
 import { BRIDGE_REQUEST } from "@/shared/bridge";
 
 const WEBSITE = "https://github.com/agrigoryan/quadit";
@@ -140,8 +143,17 @@ function start() {
     changed: () => refreshMenu(),
     whenReachable: (serverId) =>
       serverId === list.localServer()?.id ? local.whenRunning() : Promise.resolve({ ok: true as const }),
+    signInWithoutForm: (serverId, fetch) =>
+      serverId === list.localServer()?.id ? local.signInOwner(fetch) : Promise.resolve(false),
   });
-  const list = new ServerList(store, windows, pages, requests, { fetcher, checks, signIn, local, loginItem });
+  const list = new ServerList(store, windows, pages, requests, {
+    fetcher,
+    checks,
+    signIn,
+    local,
+    loginItem,
+    openConnect: () => connect.show(),
+  });
   const panel = new Panel(pages, requests);
   const capture = new Capture(pages, settings, requests);
   const connect = new ConnectPage(
@@ -164,6 +176,16 @@ function start() {
     applyShortcut: () => capture.applyShortcut(),
     signedIn: () => [...new Set([...unread.showing(), ...requests.summaries().map((s) => s.serverId)])],
     openConnect: () => connect.show(),
+  });
+  const run = promisify(execFile);
+  const welcome = new Welcome({
+    pages,
+    settings,
+    accountName: () =>
+      accountName(process.platform, userInfo().username, async (command, args) => {
+        const { stdout } = await run(command, args, { timeout: 5_000 });
+        return stdout;
+      }),
   });
 
   const updates = new UpdateWatch(
@@ -203,10 +225,7 @@ function start() {
             openUpdate: (release) => void tellAboutUpdate(release),
             openWebsite: () => void shell.openExternal(WEBSITE),
             reportIssue: () => void shell.openExternal(`${WEBSITE}/issues`),
-            runLocalServer: () =>
-              void list.runLocal().then((ran) => {
-                if (!ran.ok) void warn({ title: "Quadit could not be run on this computer", detail: ran.error });
-              }),
+            showWelcome: () => welcome.show(),
             controlLocalServer: (control) => void list.control(control),
             showLocalServerFiles: (what) =>
               what === "log" ? shell.showItemInFolder(local.logFile) : void shell.openPath(local.dataDir),
@@ -285,7 +304,7 @@ function start() {
   const shown = windows.restore({ show: !atLogin });
   if (atLogin) {
     // Nothing to show.
-  } else if (!settings.get().setupDone) setup.show();
+  } else if (!settings.get().setupDone && store.list().length === 0) welcome.show();
   else if (!shown) list.show();
   // Servers upgrade and downgrade while the app is away: ask each again.
   void checks.checkAll();

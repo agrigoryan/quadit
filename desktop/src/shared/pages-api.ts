@@ -1,5 +1,5 @@
-// What the app's own bundled pages (the server list, the sign-in bar, the
-// connection error, setup, Connect, the menu-bar panel and quick capture)
+// What the app's own bundled pages (Welcome, the server list, the sign-in
+// bar, the connection error, setup, Connect, the menu-bar panel and quick capture)
 // may ask of the app, through the preload src/preload/pages.ts. The server's
 // web pages never see this: they get only the bridge of the contract.
 
@@ -163,8 +163,12 @@ export interface PagesApi {
   retryServer(): void;
 
   localServer(): Promise<LocalServerView>;
-  /** Sets up the server on this computer (or uses the one set up before), starts it and opens its window. */
-  runLocalServer(): Promise<{ ok: true } | { ok: false; error: string }>;
+  /**
+   * Sets Quadit up on this computer: starts the server here (or the one set
+   * up before), makes its owner, named `name`, and opens its window on their
+   * workspace, signed in; on one set up already, signs in instead.
+   */
+  setUpHere(name: string): Promise<{ ok: true } | { ok: false; error: string }>;
   controlLocalServer(control: LocalControl): Promise<void>;
   /** Shows the local server's data folder, or its log, in the system's file manager. */
   showLocalServerFiles(what: "data" | "log"): Promise<void>;
@@ -180,6 +184,11 @@ export interface PagesApi {
   /** Makes a task or a page through the workspace's window, and remembers where. */
   capture(c: CaptureTarget & { title: string; body: string }): Promise<DesktopOutcome>;
   lastCapture(): Promise<CaptureTarget | null>;
+
+  /** Shows Welcome, where Quadit is set up on this computer or a server is connected to. */
+  showWelcome(): Promise<void>;
+  /** The full name of the person's account on this computer, which Welcome offers as their name. */
+  accountName(): Promise<string>;
 
   setupState(): Promise<SetupState>;
   saveSetup(s: { setupDone?: boolean; captureShortcut?: boolean }): Promise<SetupState>;

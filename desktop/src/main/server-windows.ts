@@ -22,6 +22,9 @@
 //     sign-in; until then the window waits, dark, and if the server is not
 //     running it shows why, over it; a later load asked meanwhile (a link)
 //     replaces an earlier one (pending-loads.ts);
+//   - where the app can sign the window in without a form (the server on
+//     this computer: signInWithoutForm), it does before a load and when the
+//     page lands on the sign-in page, as often as app-sign-in.ts allows;
 //   - a frame of a page stays on the server's own pages;
 //   - window.open of the same origin opens another window held to the same
 //     rules; anything else goes to the system browser;
@@ -43,13 +46,14 @@ import {
   webContents,
   type WebPreferences,
 } from "electron";
+import { AppSignIn } from "@/main/app-sign-in";
 import { ConnectionErrors } from "@/main/connection-error";
 import { giveContextMenu } from "@/main/context-menu";
 import { NoticeGate } from "@/main/notices";
 import { PendingLoads } from "@/main/pending-loads";
 import { HANDOFF_HEADER } from "@/main/handoff";
 import { appPage, browserAddress, isHandoffPage, isOwnPage } from "@/main/origins";
-import { fitOf } from "@/main/probe";
+import { type Fetch, fitOf } from "@/main/probe";
 import type { Requests } from "@/main/requests";
 import type { Server, ServerStore } from "@/main/servers";
 import {
@@ -67,8 +71,6 @@ import {
 
 /** The path of the web app's sign-in page: where the bar offering the browser sign-in shows. */
 const SIGN_IN_PATH = "/login";
-/** The web app's first-run page, where a new server's owner and first workspace are made. */
-const SET_UP_PATH = "/setup";
 const BAR_HEIGHT = 52;
 
 /** A load of a server's window: the address, the headers it carries, and what to do once it has loaded. */
@@ -104,6 +106,12 @@ export interface WindowsSetup {
    * it has started (ok) or failed to (not, and why).
    */
   whenReachable(serverId: string): Promise<{ ok: true } | { ok: false; reason: string }>;
+  /**
+   * Signs a server's window in without a form where the app can (the
+   * server on this computer, through its app key) and the window's session,
+   * reached through `fetch`, has none; true when it did just now.
+   */
+  signInWithoutForm(serverId: string, fetch: Fetch): Promise<boolean>;
 }
 
 export class ServerWindows {
@@ -119,6 +127,7 @@ export class ServerWindows {
   private errors: ConnectionErrors;
   private sessions = new WeakSet<Session>();
   private loads: PendingLoads<string, Load, { ok: true } | { ok: false; reason: string }>;
+  private appSignIn: AppSignIn;
   private quitting = false;
 
   constructor(
@@ -133,6 +142,7 @@ export class ServerWindows {
       const server = this.bridgeSender(event);
       const summary = raw === null ? null : summaryOf(raw);
       if (server && (raw === null || summary)) setup.requests.publish(event.sender.id, server.id, summary);
+      if (server && summary) this.appSignIn.showedWorkspace(server.id);
     });
     ipcMain.on(BRIDGE_LISTENING, (event, raw: unknown) => {
       const server = this.bridgeSender(event);
@@ -141,8 +151,14 @@ export class ServerWindows {
     ipcMain.on(BRIDGE_OUTCOME, (event, raw: unknown) => {
       if (this.bridgeSender(event)) setup.requests.answer(event.sender.id, raw);
     });
+    this.appSignIn = new AppSignIn((serverId) => setup.signInWithoutForm(serverId, this.fetcher(serverId)));
     this.loads = new PendingLoads(
-      (serverId) => setup.whenReachable(serverId),
+      async (serverId) => {
+        const reach = await setup.whenReachable(serverId);
+        // Signed in before the page loads, so that it does not show the sign-in page first.
+        if (reach.ok) await this.appSignIn.attempt(serverId);
+        return reach;
+      },
       (serverId, load, reach) => this.arrive(serverId, load, reach),
     );
     this.errors = new ConnectionErrors({
@@ -184,18 +200,12 @@ export class ServerWindows {
   }
 
   /**
-   * Shows a new server's window on the web app's first-run page, where the
-   * person makes its owner and first workspace and is signed in, in the
-   * window. Only the app opens that page: a link or a notification may not
-   * (appPage). The page itself goes on to sign-in on a server set up already.
+   * The network as a server's window has it: its own session, whose cookies
+   * the requests carry and whose jar the answers' cookies land in.
    */
-  showSetUp(serverId: string) {
-    const server = this.store.get(serverId);
-    if (!server) return;
-    const target = server.origin + SET_UP_PATH;
-    if (this.windows.has(serverId)) this.load(serverId, { url: target });
-    else this.ensure(server, target, true);
-    this.show(serverId);
+  fetcher(serverId: string): Fetch {
+    const own = session.fromPartition(partitionOf(serverId));
+    return (url, init) => own.fetch(url, init);
   }
 
   /**
@@ -459,7 +469,15 @@ export class ServerWindows {
 
     const pageChanged = () => {
       const win = this.windows.get(serverId);
-      if (win?.webContents === contents) this.placeBar(win, serverId);
+      const server = this.store.get(serverId);
+      if (!win || win.webContents !== contents || !server) return;
+      this.placeBar(win, serverId);
+      // Landed on the sign-in page: signed in without the form where the app can, and on to where the page was headed.
+      if (!onSignInPage(contents, server)) return;
+      void this.appSignIn.attempt(serverId).then((signedIn) => {
+        const target = appPage(server.origin, this.waitingFor(serverId) ?? "/");
+        if (signedIn && target) this.load(serverId, { url: target });
+      });
     };
     contents.on("did-navigate", () => {
       // A new page: what the last one reported and published goes with it, and this one reports anew.

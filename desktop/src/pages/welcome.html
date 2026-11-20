@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'"
+    />
+    <title>Welcome to Quadit</title>
+    <link rel="stylesheet" href="pages.css" />
+  </head>
+  <body class="welcome-page">
+    <main class="welcome">
+      <img class="welcome-icon" src="icon.png" alt="" width="72" height="72" />
+      <h1>Welcome to Quadit</h1>
+      <p class="lead">Tasks and pages for you and your agents.</p>
+
+      <form id="here" class="add" novalidate aria-label="Set up on this computer" hidden>
+        <label>
+          <span>Your name</span>
+          <input name="name" type="text" autocomplete="name" spellcheck="false" />
+        </label>
+        <p id="name-error" class="error" role="alert"></p>
+        <p id="kept" class="fine" hidden>
+          Quadit on this computer still has its data from before: setting it up opens it again.
+        </p>
+        <button type="submit" class="primary">Set up on this computer</button>
+        <p class="fine">
+          Quadit runs on this computer while the app is open. Nothing else to install, no password to choose.
+        </p>
+      </form>
+
+      <section id="progress" class="add progress" role="status" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        <p>Starting Quadit…</p>
+      </section>
+
+      <section id="failed" class="add" hidden>
+        <p><strong>Quadit could not be set up on this computer.</strong></p>
+        <p id="failed-reason" class="error" role="alert"></p>
+        <button id="retry" type="button" class="primary">Try again</button>
+      </section>
+
+      <button id="to-connect" type="button" class="quiet" hidden>Connect to a server</button>
+
+      <form id="connect" class="add" novalidate aria-labelledby="connect-title" hidden>
+        <h2 id="connect-title">Connect to a server</h2>
+        <label>
+          <span>Address</span>
+          <input name="address" type="text" inputmode="url" autocomplete="url" placeholder="quadit.example.com" />
+        </label>
+        <p class="fine">The address of the Quadit server you use. You sign in with your browser next.</p>
+        <p id="connect-error" class="error" role="alert"></p>
+        <button id="add-insecure" type="button" class="danger" hidden>Add without encryption</button>
+        <button type="submit" class="primary">Add server</button>
+      </form>
+
+      <button id="back" type="button" class="quiet" hidden>Back</button>
+    </main>
+    <script src="welcome.js"></script>
+  </body>
+</html>

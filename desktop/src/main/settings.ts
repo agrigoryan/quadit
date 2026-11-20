@@ -6,7 +6,7 @@ import { dirname } from "node:path";
 import type { CaptureTarget } from "@/shared/pages-api";
 
 export interface AppSettings {
-  /** Setup was finished or skipped: it no longer opens at the start. */
+  /** The first run is over: Welcome (or setup) was closed, and Welcome no longer opens at the start. */
   setupDone: boolean;
   /** Whether quick capture has its global key. */
   captureShortcut: boolean;

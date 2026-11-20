@@ -1,4 +1,4 @@
-/* The app's own pages: the server list, the sign-in bar, setup, Connect, the menu-bar panel and quick capture. Dark, the app's default theme; they have no theme setting of their own. */
+/* The app's own pages: Welcome, the server list, the sign-in bar, setup, Connect, the menu-bar panel and quick capture. Dark, the app's default theme; they have no theme setting of their own. */
 
 :root {
   color-scheme: dark;
@@ -236,6 +236,109 @@ h2 {
 
 .error:empty {
   display: none;
+}
+
+/* Welcome: the first page, one calm column in the middle of its window. */
+
+body.welcome-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.welcome {
+  width: 100%;
+  max-width: 400px;
+  padding: 32px 24px;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+}
+
+.welcome-icon {
+  filter: drop-shadow(0 8px 24px rgb(255 214 10 / 0.14));
+}
+
+.welcome h1 {
+  font-size: 26px;
+  letter-spacing: -0.01em;
+  margin: 8px 0 0;
+}
+
+.welcome .lead {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.welcome .add {
+  width: 100%;
+  padding: 18px;
+  text-align: left;
+}
+
+.welcome .add + .add {
+  margin-top: 0;
+}
+
+.welcome .add input {
+  font-size: 15px;
+  padding: 9px 11px;
+}
+
+.welcome .add button.primary {
+  justify-self: stretch;
+  padding: 9px 12px;
+}
+
+.welcome h2 {
+  font-size: 15px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text);
+  margin: 0;
+}
+
+.welcome p {
+  margin: 0;
+}
+
+.welcome .fine {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.welcome button.quiet:hover {
+  color: var(--text);
+}
+
+.welcome .progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
 }
 
 /* The sign-in bar over a server's sign-in page. */

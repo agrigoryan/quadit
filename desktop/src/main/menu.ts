@@ -42,7 +42,7 @@ export interface MenuActions {
   openUpdate(release: Release): void;
   openWebsite(): void;
   reportIssue(): void;
-  runLocalServer(): void;
+  showWelcome(): void;
   controlLocalServer(control: LocalControl): void;
   showLocalServerFiles(what: "data" | "log"): void;
   setOpenAtLogin(on: boolean): void;
@@ -59,11 +59,11 @@ const LOCAL_STATE_LABEL: Record<LocalState["kind"], string> = {
   failed: "Failed",
 };
 
-/** Running Quadit on this computer, or the controls of the server that runs here. */
+/** Setting Quadit up on this computer (in Welcome), or the controls of the server that runs here. */
 function localItems(local: MenuState["local"], actions: MenuActions): MenuItemConstructorOptions[] {
   if (!local) return [];
   if (!local.setUp)
-    return [{ id: "run-local", label: "Run Quadit on This Computer…", click: () => actions.runLocalServer() }];
+    return [{ id: "set-up-here", label: "Set Up on This Computer…", click: () => actions.showWelcome() }];
   const up = local.state === "starting" || local.state === "running";
   return [
     {

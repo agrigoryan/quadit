@@ -5,6 +5,7 @@
 // The server the app runs on this computer (local-server.ts) is one of the
 // list's servers, named "This computer", with its state and controls beside
 // it. There is one at most. Removing it stops it and keeps its data folder.
+// Setting it up (Welcome's "Set up on this computer") is here too.
 
 import { type BrowserWindow, shell } from "electron";
 import type { AppPages } from "@/main/app-pages";
@@ -28,6 +29,15 @@ import type {
 /** What the server on this computer is called in the list. */
 export const LOCAL_NAME = "This computer";
 
+/** What the list needs of the server on this computer. */
+type Local = Pick<
+  LocalServer,
+  "available" | "dataDir" | "logFile" | "origin" | "state" | "setUp" | "setUpOwner" | "start" | "stop" | "restart"
+>;
+
+/** What the list needs of the servers' windows. */
+type Windows = Pick<ServerWindows, "show" | "fetcher" | "forget" | "dismissBar" | "retryFrom">;
+
 export interface ServerListSetup {
   /** The network the probes of servers being added go through (Electron's net.fetch). */
   fetcher: Fetch;
@@ -35,9 +45,11 @@ export interface ServerListSetup {
   checks: ServerChecks;
   signIn(serverId: string): void;
   /** The server the app runs on this computer. */
-  local: LocalServer;
+  local: Local;
   /** Whether the app starts at login, and the switch; null where the app does not offer it. */
   loginItem: { get(): boolean; set(on: boolean): void } | null;
+  /** Shows the Connect agents window. */
+  openConnect(): void;
 }
 
 export class ServerList {
@@ -48,9 +60,9 @@ export class ServerList {
 
   constructor(
     private store: ServerStore,
-    private windows: ServerWindows,
-    private pages: AppPages,
-    requests: Requests,
+    private windows: Windows,
+    private pages: Pick<AppPages, "answer" | "changed" | "window">,
+    requests: Pick<Requests, "summaries">,
     private setup: ServerListSetup,
   ) {
     pages.answer({
@@ -87,7 +99,7 @@ export class ServerList {
         }),
       openPath: (_sender, serverId, path) => windows.show(String(serverId), String(path)),
       localServer: () => this.localView(),
-      runLocalServer: () => this.runLocal(),
+      setUpHere: (_sender, name) => this.setUpHere(typeof name === "string" ? name : ""),
       controlLocalServer: (_sender, control) => this.control(control),
       showLocalServerFiles: (_sender, what) => {
         if (what === "log") shell.showItemInFolder(setup.local.logFile);
@@ -108,20 +120,28 @@ export class ServerList {
   }
 
   /**
-   * Sets up the server on this computer, or uses the one set up before (its
-   * data folder and port), adds it to the list and opens its window on the
-   * web app's first-run page, which goes on to sign-in when it is set up already.
+   * Sets Quadit up on this computer (desktop contract §7): starts the server
+   * the app runs here (the one set up before, with its data, when there is
+   * one), adds it to the list, makes its owner `name` and their workspace
+   * through its window's own session, and opens that window on the
+   * workspace, signed in. On an install set up already it signs in instead,
+   * so trying again after a half-finished attempt works. Right after the
+   * owner is made, and only then, Connect agents opens over the window.
    */
-  async runLocal(): Promise<{ ok: true } | { ok: false; error: string }> {
+  async setUpHere(name: string): Promise<{ ok: true } | { ok: false; error: string }> {
+    const { local } = this.setup;
     let origin: string;
     try {
-      origin = await this.setup.local.setUp();
+      origin = await local.setUp();
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
     // Its hand-off is asked once it runs (main.ts).
     const server = this.store.add(origin, LOCAL_NAME, 0);
-    this.windows.showSetUp(server.id);
+    const owner = await local.setUpOwner(this.windows.fetcher(server.id), name.trim());
+    if (!owner.ok) return owner;
+    this.windows.show(server.id, owner.path);
+    if (owner.first) this.setup.openConnect();
     return { ok: true };
   }
 
