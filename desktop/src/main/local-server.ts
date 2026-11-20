@@ -27,15 +27,20 @@
 //   - It is reached directly, never through a proxy (--trusted-proxies=),
 //     and has passkeys off: no passkey can be made for an address that is
 //     a number, and the sign-in page would offer them.
-//   - It is running once /healthz answers 200: its listener opens only
-//     after the database is open and upgraded (internal/app, Serve), while
+//   - It is running once /healthz answers 200 (its listener opens only
+//     after the database is open and upgraded, internal/app, Serve, while
 //     /readyz also asks a cloud file store, which may be away while the
-//     server is usable. A window loads its address only while it runs
-//     (whenRunning): what else answers there must not get its sign-in.
+//     server is usable) and it has then proved that it holds this start's
+//     key (contract §7, "The proof"): another program may answer on its
+//     port, having taken it between the app's check and the server's
+//     start. Until then nothing with the key or with cookies is sent there,
+//     and a window loads its address only while it runs (whenRunning):
+//     what else answers there must not get its sign-in. A start whose proof
+//     fails is stopped and shown as failed.
 //   - One that exits on its own is started again a few times, a little
 //     later each time, then shown as failed with the last lines of its log.
 
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { closeSync, mkdirSync, openSync, readSync, renameSync, statSync, writeSync } from "node:fs";
 import { createConnection, createServer } from "node:net";
 import { join } from "node:path";
@@ -108,7 +113,7 @@ const LOG_LIMIT_BYTES = 5 * 1024 * 1024;
 const LOG_LINES = 20;
 /** The header that says a request is the app that runs the server: the app key. */
 const APP_KEY_HEADER = "X-Quadit-App-Key";
-/** The bytes of randomness in an app key; the server refuses fewer than 32. */
+/** The bytes of randomness in an app key (the server refuses fewer than 32), and in a proof's nonce. */
 const APP_KEY_BYTES = 32;
 /** The workspace the app makes with the owner. */
 const FIRST_WORKSPACE = "Personal";
@@ -263,19 +268,64 @@ export class LocalServer {
 
   /**
    * Signs the session behind `fetch` (a server window's) in as the
-   * install's owner when it has no session there. True when it did just
-   * now; false when it was signed in already, and when it cannot: the server
-   * is not running, it was set up with the web form (409), it runs without
-   * an app key (404), or it could not be asked. Never throws.
+   * install's owner when the server says, in its ordinary way (401
+   * "unauthorized"), that it has no session. True when it did just now.
+   * False otherwise: signed in already; a second step under way, throttled,
+   * a server error or no answer, where the session is left as it is; and
+   * when it cannot: the server is not running (proved), it was set up with
+   * the web form (409), or it runs without an app key (404). Never throws.
    */
   async signInOwner(fetch: Fetch): Promise<boolean> {
-    if (this.current.kind !== "running") return false;
+    if ((await this.sessionOf(fetch)) !== "out") return false;
     try {
-      const me = await this.ask(fetch, "GET", "/api/v1/auth/me");
-      if (me.ok) return false;
       return (await this.ask(fetch, "POST", "/api/v1/auth/app-session", {})).status === 204;
     } catch {
       return false;
+    }
+  }
+
+  /** Whether the session behind `fetch` (a server window's) is signed in on the running server. Never throws. */
+  async isSignedIn(fetch: Fetch): Promise<boolean> {
+    return (await this.sessionOf(fetch)) === "in";
+  }
+
+  /**
+   * Whether the running server still waits for the app to set it up (its
+   * sign-in options say setup_needed): a set-up the app did not finish,
+   * this one or an older version of it. Asked without cookies; false when
+   * it is not running or cannot say. Never throws.
+   */
+  async setupNeeded(): Promise<boolean> {
+    const origin = this.origin();
+    if (!origin || this.current.kind !== "running") return false;
+    try {
+      const answer = await this.parts.fetch(`${origin}/api/v1/auth/config`, {
+        credentials: "omit",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(ASK_LIMIT_MS),
+      });
+      if (!answer.ok) return false;
+      return ((await answer.json()) as { setup_needed?: unknown }).setup_needed === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * What the running server says of the session behind `fetch`: "in",
+   * "out" only on its ordinary not-signed-in answer, and "unknown" for
+   * anything else (a second step under way, throttling, an error, no
+   * answer, or no server running).
+   */
+  private async sessionOf(fetch: Fetch): Promise<"in" | "out" | "unknown"> {
+    try {
+      const me = await this.ask(fetch, "GET", "/api/v1/auth/me");
+      if (me.ok) return "in";
+      if (me.status !== 401) return "unknown";
+      const body = (await me.json().catch(() => null)) as { error?: { code?: unknown } } | null;
+      return body?.error?.code === "unauthorized" ? "out" : "unknown";
+    } catch {
+      return "unknown";
     }
   }
 
@@ -286,7 +336,9 @@ export class LocalServer {
    */
   private ask(fetch: Fetch, method: "GET" | "POST", path: string, body?: object): Promise<Response> {
     const origin = this.origin();
-    if (!origin || !this.key) return Promise.reject(new Error("the server is not running"));
+    // Running is proved: whatever answers there holds this start's key.
+    if (!origin || !this.key || this.current.kind !== "running")
+      return Promise.reject(new Error("the server is not running"));
     return fetch(origin + path, {
       method,
       credentials: "include",
@@ -307,6 +359,31 @@ export class LocalServer {
     }
     this.start();
     return originOf(port);
+  }
+
+  /**
+   * Whether what answers at `origin` is the server started with `key`: it
+   * makes the HMAC of a fresh nonce with the key (contract §7, "The proof").
+   * Asked without the key and without cookies; any other answer, or none, is no.
+   */
+  private async proves(origin: string, key: string): Promise<boolean> {
+    const nonce = randomBytes(APP_KEY_BYTES).toString("base64url");
+    try {
+      const answer = await this.parts.fetch(`${origin}/api/v1/auth/app-proof`, {
+        method: "POST",
+        credentials: "omit",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ nonce }),
+        signal: AbortSignal.timeout(ASK_LIMIT_MS),
+      });
+      if (answer.status !== 200) return false;
+      const { proof } = (await answer.json()) as { proof?: unknown };
+      const expected = Buffer.from(createHmac("sha256", key).update(nonce).digest("hex"));
+      const given = Buffer.from(typeof proof === "string" ? proof : "");
+      return given.length === expected.length && timingSafeEqual(given, expected);
+    } catch {
+      return false;
+    }
   }
 
   /** SIGTERM, then SIGKILL when the server has not exited in time; resolves once it has. */
@@ -410,11 +487,26 @@ export class LocalServer {
 
     const started = clock.now();
     while (generation === this.generation && !ended) {
-      const ready = await fetch(`${origin}/healthz`, { signal: AbortSignal.timeout(2_000) })
+      const ready = await fetch(`${origin}/healthz`, { credentials: "omit", signal: AbortSignal.timeout(2_000) })
         .then((response) => response.status === 200)
         .catch(() => false);
       if (generation !== this.generation || ended) return;
       if (ready) {
+        const proved = await this.proves(origin, key);
+        if (generation !== this.generation || ended) return;
+        if (!proved) {
+          // Stopped as Stop stops it: its own server, if it is still there, is not left behind a failed state.
+          const stopping = ++this.generation;
+          await this.terminate(child, exited);
+          if (stopping === this.generation) {
+            this.fail(
+              `Another program answers on port ${port} of this computer, not the Quadit server the app started. ` +
+                "Quit that program, then start the server again.",
+              true,
+            );
+          }
+          return;
+        }
         this.runningSince = clock.now();
         this.set({ kind: "running" });
         return;

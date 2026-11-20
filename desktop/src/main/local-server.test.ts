@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
@@ -85,6 +86,10 @@ function setUp(
     port?: number | null;
     obeys?: boolean;
     spawn?: () => never;
+    /** How what answers at the server's address answers the app's proof: as the server it started, or not. */
+    proof?: "right" | "wrong" | "missing" | "away";
+    /** What its sign-in options say of set-up. */
+    setupNeeded?: boolean;
   } = {},
 ) {
   const userData = mkdtempSync(join(tmpdir(), "quadit-desktop-local-"));
@@ -94,6 +99,7 @@ function setUp(
     lastCapture: null,
     localPort: options.port ?? null,
   };
+  const addressed: Asked[] = [];
   const spawned: { binary: string; args: string[]; env: NodeJS.ProcessEnv; stdio: unknown[]; process: FakeProcess }[] =
     [];
   const clock = new FakeClock();
@@ -113,9 +119,27 @@ function setUp(
       return process;
     },
     clock,
-    fetch: async (url) => {
-      if (!ready || !url.endsWith("/healthz")) throw new TypeError("fetch failed");
-      return new Response("ok");
+    // What answers at the server's address, asked by the app outside any window.
+    fetch: async (url, init = {}) => {
+      addressed.push({
+        url,
+        method: init.method ?? "GET",
+        headers: new Headers(init.headers),
+        body: typeof init.body === "string" ? JSON.parse(init.body) : undefined,
+        credentials: init.credentials,
+      });
+      const path = new URL(url).pathname;
+      if (!ready) throw new TypeError("fetch failed");
+      if (path === "/healthz") return new Response("ok");
+      if (path === "/api/v1/auth/config") return json(200, { setup_needed: options.setupNeeded ?? false });
+      if (path !== "/api/v1/auth/app-proof") throw new TypeError("fetch failed");
+      const proof = options.proof ?? "right";
+      if (proof === "away") throw new TypeError("fetch failed");
+      if (proof === "missing") return json(404, { error: { code: "not_found", message: "not found" } });
+      // The key as the server read it: the first line of its input.
+      const key = proof === "right" ? (spawned.at(-1)?.process.input.join("").split("\n")[0] ?? "") : "another key";
+      const { nonce } = JSON.parse(String(init.body)) as { nonce: string };
+      return json(200, { proof: createHmac("sha256", key).update(nonce).digest("hex") });
     },
     ports,
     env: { PATH: "/usr/bin", HOME: "/home/ann", QUADIT_DB: "postgres://elsewhere", QUADIT_SECRET: "x".repeat(20) },
@@ -130,6 +154,7 @@ function setUp(
     clock,
     spawned,
     states,
+    addressed,
     settings: () => settings,
     setReady: (now: boolean) => (ready = now),
     take: (port: number) => taken.add(port),
@@ -488,6 +513,91 @@ async function running() {
   return { ...made, key };
 }
 
+describe("LocalServer's proof", () => {
+  it("counts the server as running only once it has proved, with a fresh nonce, that it holds this start's key", async () => {
+    const { server, clock, addressed, states } = setUp();
+    await server.setUp();
+    await clock.advance(0);
+    expect(server.state().kind).toBe("running");
+    expect(states).toEqual(["starting", "running"]);
+    const proofs = () => addressed.filter((asked) => asked.url.endsWith("/api/v1/auth/app-proof"));
+    expect(proofs()).toHaveLength(1);
+    const [asked] = proofs();
+    expect(asked).toMatchObject({
+      url: "http://127.0.0.1:4780/api/v1/auth/app-proof",
+      method: "POST",
+      credentials: "omit",
+    });
+    // The key itself never goes there: only what the server makes of the nonce with it comes back.
+    expect(asked?.headers.has("X-Quadit-App-Key")).toBe(false);
+    const { nonce } = asked?.body as { nonce: string };
+    expect(nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);
+
+    await server.restart();
+    await clock.advance(0);
+    expect(proofs()).toHaveLength(2);
+    expect((proofs()[1]?.body as { nonce: string }).nonce).not.toBe(nonce);
+  });
+
+  for (const [proof, what] of [
+    ["wrong", "a proof made with another key"],
+    ["missing", "no proof (404)"],
+    ["away", "no answer to the proof"],
+  ] as const) {
+    it(`fails the start on ${what}: another program answers there, which is stopped being asked anything`, async () => {
+      const { server, clock, spawned, addressed } = setUp({ proof });
+      await server.setUp();
+      await clock.advance(0);
+      expect(server.state()).toMatchObject({
+        kind: "failed",
+        reason:
+          "Another program answers on port 4780 of this computer, not the Quadit server the app started. " +
+          "Quit that program, then start the server again.",
+      });
+      // Its own server is stopped, and not started again by itself.
+      expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
+      await clock.advance(60_000);
+      expect(spawned).toHaveLength(1);
+      // Nothing with the key or cookies went there, and the owner's calls ask nothing.
+      expect(addressed.map((asked) => new URL(asked.url).pathname)).toEqual(["/healthz", "/api/v1/auth/app-proof"]);
+      const session = windowSession(() => json(200, {}));
+      expect(await server.signInOwner(session.fetch)).toBe(false);
+      expect(await server.setUpOwner(session.fetch, "Lou")).toMatchObject({ ok: false });
+      expect(session.asked).toEqual([]);
+    });
+  }
+});
+
+describe("LocalServer.setupNeeded", () => {
+  it("says whether the running server still waits for the app to set it up, asked without cookies", async () => {
+    const waiting = setUp({ setupNeeded: true });
+    await waiting.server.setUp();
+    await waiting.clock.advance(0);
+    expect(await waiting.server.setupNeeded()).toBe(true);
+    expect(waiting.addressed.at(-1)).toMatchObject({
+      url: "http://127.0.0.1:4780/api/v1/auth/config",
+      credentials: "omit",
+    });
+
+    const done = setUp({ setupNeeded: false });
+    await done.server.setUp();
+    await done.clock.advance(0);
+    expect(await done.server.setupNeeded()).toBe(false);
+  });
+
+  it("asks nothing of a server that is not running, and is false when it cannot say", async () => {
+    const stopped = setUp({ port: 4780 });
+    expect(await stopped.server.setupNeeded()).toBe(false);
+    expect(stopped.addressed).toEqual([]);
+
+    const { server, clock, setReady } = setUp({ setupNeeded: true });
+    await server.setUp();
+    await clock.advance(0);
+    setReady(false);
+    expect(await server.setupNeeded()).toBe(false);
+  });
+});
+
 describe("LocalServer's app key", () => {
   it("is new at every start, given as the first line of the server's input, and written nowhere else", async () => {
     const { server, spawned, clock, settings, key } = await running();
@@ -603,6 +713,24 @@ describe("LocalServer.setUpOwner", () => {
   });
 });
 
+describe("LocalServer.isSignedIn", () => {
+  it("is whether the session behind the fetch is signed in on the running server", async () => {
+    const { server } = await running();
+    expect(await server.isSignedIn(windowSession(() => json(200, { user: {} })).fetch)).toBe(true);
+    expect(await server.isSignedIn(windowSession(() => json(401, { error: { code: "unauthorized" } })).fetch)).toBe(
+      false,
+    );
+    expect(await server.isSignedIn(windowSession(() => json(503, {})).fetch)).toBe(false);
+  });
+
+  it("asks nothing of a server that is not running", async () => {
+    const { server } = setUp({ port: 4780 });
+    const session = windowSession(() => json(200, {}));
+    expect(await server.isSignedIn(session.fetch)).toBe(false);
+    expect(session.asked).toEqual([]);
+  });
+});
+
 describe("LocalServer.signInOwner", () => {
   it("leaves a session that is signed in alone", async () => {
     const { server } = await running();
@@ -615,10 +743,12 @@ describe("LocalServer.signInOwner", () => {
     expect(session.asked[0]?.headers.has("X-Quadit-App-Key")).toBe(false);
   });
 
-  it("asks for the owner's session with the app key when there is none", async () => {
+  it("asks for the owner's session with the app key when the server says, in its ordinary way, that there is none", async () => {
     const { server, key } = await running();
     const session = windowSession((path) =>
-      path === "/api/v1/auth/me" ? json(401, { error: { code: "unauthorized" } }) : new Response(null, { status: 204 }),
+      path === "/api/v1/auth/me"
+        ? json(401, { error: { code: "unauthorized", message: "sign in first" } })
+        : new Response(null, { status: 204 }),
     );
     expect(await server.signInOwner(session.fetch)).toBe(true);
     const asked = session.asked.at(-1);
@@ -630,15 +760,39 @@ describe("LocalServer.signInOwner", () => {
     expect(asked?.headers.get("X-Quadit-App-Key")).toBe(key());
   });
 
+  it("leaves the session as it is on any other answer about it: a second step under way, throttled, a server error, or none", async () => {
+    const { server } = await running();
+    const answers = [
+      () => json(401, { error: { code: "second_step", message: "finish signing in with your second step" } }),
+      () => json(403, { error: { code: "second_step_required", message: "set it up first" } }),
+      () => json(429, { error: { code: "rate_limited", message: "slow down" } }),
+      () => json(503, { error: { code: "unavailable", message: "try again later" } }),
+      () => new Response("not json", { status: 401 }),
+      () => {
+        throw new TypeError("fetch failed");
+      },
+    ];
+    for (const answer of answers) {
+      const session = windowSession((path) =>
+        path === "/api/v1/auth/me" ? answer() : new Response(null, { status: 204 }),
+      );
+      expect(await server.signInOwner(session.fetch)).toBe(false);
+      expect(session.asked.some((asked) => asked.method === "POST")).toBe(false);
+    }
+  });
+
   it("is not signed in by any other answer: set up with the form (409), no key (404), a wrong key (403), or no answer", async () => {
     const { server } = await running();
     for (const status of [409, 404, 403, 429, 500]) {
       const session = windowSession((path) =>
-        path === "/api/v1/auth/me" ? json(401, {}) : json(status, { error: { code: "x", message: "no" } }),
+        path === "/api/v1/auth/me"
+          ? json(401, { error: { code: "unauthorized" } })
+          : json(status, { error: { code: "x", message: "no" } }),
       );
       expect(await server.signInOwner(session.fetch), String(status)).toBe(false);
     }
-    const away = windowSession(() => {
+    const away = windowSession((path) => {
+      if (path === "/api/v1/auth/me") return json(401, { error: { code: "unauthorized" } });
       throw new TypeError("fetch failed");
     });
     expect(await server.signInOwner(away.fetch)).toBe(false);
