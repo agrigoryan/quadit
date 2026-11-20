@@ -80,6 +80,8 @@ export interface AuthConfig {
   require_2fa?: boolean;
   /** Whether the install can send mail (reset links, invitations, digests). */
   mail?: boolean;
+  /** The desktop app runs this install and sets it up itself: the set-up page has no form. */
+  setup_by_app?: boolean;
 }
 
 export const authConfig = () => api.get<AuthConfig>("/api/v1/auth/config");

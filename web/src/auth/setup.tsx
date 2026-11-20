@@ -1,14 +1,38 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { AuthLayout, FormError } from "@/auth/auth-layout";
-import { authConfig, setUp } from "@/auth/session";
+import { useAuthConfig } from "@/auth/config";
+import { setUp } from "@/auth/session";
 import { t } from "@/lib/i18n";
 import { FormField, useFieldErrors, useSubmit } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 
-/** The first visit to a new install: make the owner and the first workspace. */
+/**
+ * The first visit to a new install: make the owner and the first workspace.
+ * An install the desktop app runs is set up by that app, so the page only
+ * says so.
+ */
 export function SetupPage() {
+  const navigate = useNavigate();
+  const config = useAuthConfig();
+  const setUpAlready = config?.setup_needed === false;
+
+  // Set-up works once; after that this page is the sign-in page.
+  useEffect(() => {
+    if (setUpAlready) void navigate("/login", { replace: true });
+  }, [setUpAlready, navigate]);
+
+  if (config?.setup_by_app)
+    return (
+      <AuthLayout title={t("auth.setup.title")}>
+        <p className="text-sm text-ink-2">{t("auth.setup.byApp")}</p>
+      </AuthLayout>
+    );
+  return <SetupForm />;
+}
+
+function SetupForm() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", password: "", workspace_name: "" });
   // The server names the workspace's address "slug"; it comes from the workspace's name here.
@@ -23,13 +47,6 @@ export function SetupPage() {
     "workspace_name",
   ]);
   const { busy, run } = useSubmit(errors, { once: true });
-
-  // Set-up works once; after that this page is the sign-in page.
-  useEffect(() => {
-    authConfig()
-      .then((cfg) => !cfg.setup_needed && navigate("/login", { replace: true }))
-      .catch(() => {});
-  }, [navigate]);
 
   const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [field]: e.target.value }));

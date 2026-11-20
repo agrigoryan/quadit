@@ -8,13 +8,15 @@ import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 
 interface Props {
-  /** False for an account made through Google, GitHub or a passkey: it sets its first password here. */
+  /** False for an account made through Google, GitHub or a passkey, or by the desktop app: it sets its first password here. */
   hasPassword: boolean;
+  /** False for an install's owner the desktop app made, who signs in through the app until they add an email and a password. */
+  hasEmail: boolean;
   /** Called after the change: other browsers were signed out, so lists are stale. */
   onChanged: () => void;
 }
 
-export function PasswordSection({ hasPassword, onChanged }: Props) {
+export function PasswordSection({ hasPassword, hasEmail, onChanged }: Props) {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [again, setAgain] = useState("");
@@ -47,7 +49,10 @@ export function PasswordSection({ hasPassword, onChanged }: Props) {
   }
 
   return (
-    <Section title={t("me.password.title")} lead={hasPassword ? t("me.password.lead") : t("me.password.leadNone")}>
+    <Section
+      title={t("me.password.title")}
+      lead={hasPassword ? t("me.password.lead") : hasEmail ? t("me.password.leadNone") : t("me.signInFromBrowser")}
+    >
       <Card>
         <form onSubmit={submit} className="flex flex-col gap-4">
           {hasPassword && (

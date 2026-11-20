@@ -45,7 +45,10 @@ function EmailSection({ account }: { account: Account }) {
   const value = prefsOf(account).email;
   const noMail = useAuthConfig()?.mail === false;
   return (
-    <Section title={t("me.notify.email")} lead={t("me.notify.emailLead", { email: account.user.email ?? "" })}>
+    <Section
+      title={t("me.notify.email")}
+      lead={account.user.email ? t("me.notify.emailLead", { email: account.user.email }) : t("me.notify.emailNone")}
+    >
       <div className="flex flex-col gap-2.5">
         {noMail && <Note tone="wait">{t("me.notify.noMail")}</Note>}
         <Rows>

@@ -6,6 +6,7 @@ export const meSecurityStrings = {
   "me.password.title": "Password",
   "me.password.lead": "Changing it signs you out of every other browser.",
   "me.password.leadNone": "This account has no password yet. Set one to be able to sign in with your email.",
+  "me.signInFromBrowser": "Set an email and a password to sign in from a browser.",
   "me.password.current": "Current password",
   "me.password.new": "New password",
   "me.password.again": "New password, again",

@@ -44,6 +44,7 @@ export const meStrings = {
   "me.notify.lead": "Your inbox always gets everything. Choose what else should reach you when you are not looking.",
   "me.notify.email": "Email",
   "me.notify.emailLead": "Sent to {email}, only for inbox items you have not read.",
+  "me.notify.emailNone": "Your account has no email address, so none is sent. Add one under Profile.",
   "me.notify.noMail": "This install cannot send mail yet, so nothing is mailed. Your choice is kept for when it can.",
   "me.notify.email.all": "Everything",
   "me.notify.email.allHint": "Every inbox item: comments, replies and status changes too.",

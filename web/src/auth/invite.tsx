@@ -159,7 +159,9 @@ function JoinAsMe({ path, name, email, onJoined }: JoinProps & { name: string; e
 
   return (
     <div className="flex flex-col gap-3.5">
-      <p className="text-sm text-ink-2">{t("auth.invite.signedInAs", { name, email: email ?? "" })}</p>
+      <p className="text-sm text-ink-2">
+        {email ? t("auth.invite.signedInAs", { name, email }) : t("auth.invite.signedInAsName", { name })}
+      </p>
       <FormError>{error}</FormError>
       <Button variant="primary" size="lg" className="w-full" disabled={busy} onClick={() => void join()}>
         {busy ? t("auth.invite.joining") : t("auth.invite.joinAs", { name })}

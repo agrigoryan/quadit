@@ -102,7 +102,11 @@ function ProfileForm({ account }: { account: Account }) {
   );
 }
 
-/** The sign-in address, and the way to change it: the new address, confirmed with the current password. */
+/**
+ * The sign-in address, and the way to change it: the new address, confirmed
+ * with the current password when there is one. An account with no address
+ * (an install's owner the desktop app made) is told what one is for.
+ */
 function EmailSection({ account }: { account: Account }) {
   const saveAccount = useSaveAccount();
   const current = account.user.email ?? "";
@@ -134,7 +138,7 @@ function EmailSection({ account }: { account: Account }) {
   }
 
   return (
-    <Section title={t("me.email.title")} lead={t("me.email.lead")}>
+    <Section title={t("me.email.title")} lead={current ? t("me.email.lead") : t("me.signInFromBrowser")}>
       <Card>
         {open ? (
           <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
@@ -142,7 +146,7 @@ function EmailSection({ account }: { account: Account }) {
               <FormField
                 label={t("me.email.new")}
                 htmlFor="me-email"
-                hint={t("me.email.now", { email: current })}
+                hint={current ? t("me.email.now", { email: current }) : undefined}
                 error={errors.fields.email}
               >
                 <Input

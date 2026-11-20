@@ -116,6 +116,7 @@ export const common = {
   "auth.setup.workspaceHint": "Usually your team or company.",
   "auth.setup.submit": "Create workspace",
   "auth.setup.busy": "Creating…",
+  "auth.setup.byApp": "Set this install up in the Quadit app that runs it.",
 
   "nav.inbox": "Inbox",
   "nav.myWork": "My work",

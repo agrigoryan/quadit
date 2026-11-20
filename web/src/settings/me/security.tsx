@@ -18,7 +18,7 @@ export function SecurityPage() {
       <LoadGate of={account}>
         {(a) => (
           <>
-            <PasswordSection hasPassword={a.has_password} onChanged={accountChanged} />
+            <PasswordSection hasPassword={a.has_password} hasEmail={!!a.user.email} onChanged={accountChanged} />
             <TwoStepSection account={a} onChanged={accountChanged} />
             <PasskeysSection />
             <IdentitiesSection />

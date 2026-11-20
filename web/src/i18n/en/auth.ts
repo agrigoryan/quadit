@@ -59,6 +59,7 @@ export const authStrings = {
   "auth.invite.lead": "{who} invited you as {role}.",
   "auth.invite.leadNobody": "You are invited as {role}.",
   "auth.invite.signedInAs": "You are signed in as {name} ({email}).",
+  "auth.invite.signedInAsName": "You are signed in as {name}.",
   "auth.invite.joinAs": "Join as {name}",
   "auth.invite.joining": "Joining…",
   "auth.invite.otherAccount": "Sign out and use another account",
