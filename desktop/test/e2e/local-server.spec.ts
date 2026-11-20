@@ -133,10 +133,23 @@ test("the window of the server on this computer is signed in by the app whenever
     let page: Page;
     ({ origin, page } = await setUpFromTheList(desktop));
     // Signed out (the session ran out, or the person signed out): on the sign-in page, the app signs in again
-    // and goes on to the page the sign-in page was to lead to.
+    // and goes on to the page the newest sign-in page leads to. The web app sends its signed-out page to the
+    // sign-in page by itself too (next: My work), and may do so before the test's own: that older one must not
+    // win, nor cancel the newer one's load.
+    const visited: string[] = [];
+    page.on("framenavigated", (frame) => {
+      if (frame === page.mainFrame()) visited.push(frame.url());
+    });
     expect(await page.evaluate(async () => (await fetch("/api/v1/auth/logout", { method: "POST" })).ok)).toBe(true);
     await page.evaluate(() => setTimeout(() => location.assign("/login?next=%2Fpersonal%2Finbox"), 0));
-    await expect(page).toHaveURL(`${origin}/personal/inbox`, { timeout: 20_000 });
+    try {
+      await expect(page).toHaveURL(`${origin}/personal/inbox`, { timeout: 20_000 });
+    } catch (err) {
+      // What the window went through, for whoever reads the failure.
+      throw new Error(`${(err as Error).message}\nThe window's navigations since signing out:\n${visited.join("\n")}`, {
+        cause: err,
+      });
+    }
     expect(await page.evaluate(async () => (await fetch("/api/v1/auth/me")).status)).toBe(200);
   } finally {
     await desktop.close();

@@ -78,7 +78,8 @@ test("the first run sets Quadit up on this computer with a name alone, lands in 
     // What it changes, before anything is changed.
     const skill = join(computer.home, ".claude", "skills", "quadit", "SKILL.md");
     await welcome.getByRole("button", { name: "See what connecting Claude Code changes" }).click();
-    await expect(welcome.getByText(skill)).toBeVisible();
+    // The file's name, over its diff (which begins with it too).
+    await expect(welcome.getByText(skill, { exact: true })).toBeVisible();
     expect(existsSync(skill)).toBe(false);
 
     // Connected, with nothing asked: the command and its skill, as an agent of the tool's own name.
