@@ -206,6 +206,20 @@ export class ServerWindows {
   }
 
   /**
+   * Shows the server's window loading `path`, a page of the web app, anew,
+   * never by moving the page that is there: after the app changed the
+   * window's session, the page must start over to see it.
+   */
+  showAfresh(serverId: string, path: string) {
+    const server = this.store.get(serverId);
+    if (!server) return;
+    const target = appPage(server.origin, path) ?? server.origin + "/";
+    if (this.windows.has(serverId)) this.load(serverId, { url: target });
+    else this.ensure(server, target, true);
+    this.show(serverId);
+  }
+
+  /**
    * The network as a server's window has it: its own session, whose cookies
    * the requests carry and whose jar the answers' cookies land in.
    */

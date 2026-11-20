@@ -251,6 +251,8 @@ function start() {
       // Up: what it speaks is asked now, and a window that found it down tries again.
       void checks.check(entry.id);
       windows.serverStarted(entry.id);
+      // Its set-up unfinished (the app quit during the first run, or an older version started it): Welcome sets it up.
+      void local.setupNeeded().then((needed) => needed && welcome.show());
     }
   });
   refreshMenu();

@@ -36,7 +36,7 @@ type Local = Pick<
 >;
 
 /** What the list needs of the servers' windows. */
-type Windows = Pick<ServerWindows, "show" | "fetcher" | "forget" | "dismissBar" | "retryFrom">;
+type Windows = Pick<ServerWindows, "show" | "showAfresh" | "fetcher" | "forget" | "dismissBar" | "retryFrom">;
 
 export interface ServerListSetup {
   /** The network the probes of servers being added go through (Electron's net.fetch). */
@@ -136,11 +136,13 @@ export class ServerList {
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
-    // Its hand-off is asked once it runs (main.ts).
+    // Saved before its owner is made: quit before that, the next start finds its set-up unfinished and offers
+    // Welcome again (main.ts). Its hand-off is asked once it runs.
     const server = this.store.add(origin, LOCAL_NAME, 0);
     const owner = await local.setUpOwner(this.windows.fetcher(server.id), name.trim());
     if (!owner.ok) return owner;
-    this.windows.show(server.id, owner.path);
+    // Its window may be open already, on the web app's page saying the app sets it up: it starts over, signed in.
+    this.windows.showAfresh(server.id, owner.path);
     if (owner.first) this.setup.openConnect();
     return { ok: true };
   }

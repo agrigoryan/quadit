@@ -23,12 +23,14 @@ type Owner = { ok: true; path: string; first: boolean } | { ok: false; error: st
 function setUp(owner: Owner[], startError?: string) {
   const store = new ServerStore(join(mkdtempSync(join(tmpdir(), "quadit-desktop-list-")), "servers.json"));
   const windowFetches = new Map<string, Fetch>();
-  const shown: { serverId: string; path?: string }[] = [];
+  const shown: { serverId: string; path: string }[] = [];
   const ownerAsked: { fetch: Fetch; name: string }[] = [];
   let connectShown = 0;
   const fetcher: Fetch = async () => new Response(null, { status: 404 });
   const windows = {
-    show: (serverId: string, path?: string) => void shown.push({ serverId, path }),
+    show: () => {},
+    // The page starts over: the app changed the window's session under it.
+    showAfresh: (serverId: string, path: string) => void shown.push({ serverId, path }),
     fetcher: (serverId: string) => {
       const fetch: Fetch = async () => new Response(null, { status: 404 });
       windowFetches.set(serverId, fetch);
