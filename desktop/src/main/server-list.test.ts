@@ -20,7 +20,7 @@ type Owner = { ok: true; path: string; first: boolean } | { ok: false; error: st
  * A server list whose server on this computer starts at once (or fails to,
  * with `startError`) and answers set-up with `owner`, one answer per call.
  */
-function setUp(owner: Owner[], startError?: string) {
+function setUp(owner: Owner[], startError?: string, { toolFound = true } = {}) {
   const store = new ServerStore(join(mkdtempSync(join(tmpdir(), "quadit-desktop-list-")), "servers.json"));
   const windowFetches = new Map<string, Fetch>();
   const shown: { serverId: string; path: string }[] = [];
@@ -75,6 +75,7 @@ function setUp(owner: Owner[], startError?: string) {
       local,
       loginItem: null,
       openConnect: () => void connectShown++,
+      agentToolFound: async () => toolFound,
     },
   );
   return { list, store, shown, ownerAsked, windowFetches, connects: () => connectShown };
@@ -100,6 +101,15 @@ describe("ServerList.setUpHere", () => {
     expect(connects()).toBe(1);
     await list.setUpHere("Lou Local");
     expect(connects()).toBe(1);
+  });
+
+  it("does not show Connect agents by itself on a computer where no agent tool is found", async () => {
+    const { list, shown, connects } = setUp([{ ok: true, path: "/personal", first: true }], undefined, {
+      toolFound: false,
+    });
+    expect(await list.setUpHere("Lou Local")).toEqual({ ok: true });
+    expect(shown).toHaveLength(1);
+    expect(connects()).toBe(0);
   });
 
   it("says why when it could not, without opening a window or Connect", async () => {

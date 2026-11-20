@@ -122,6 +122,17 @@ export class Connections {
     return join(this.parts.dataDir, "backups");
   }
 
+  /**
+   * Whether an agent tool Connect can connect is on this computer, found
+   * as Connect's window finds it (installed); never on Windows, where
+   * Connect cannot connect one.
+   */
+  async anyToolFound(): Promise<boolean> {
+    if (this.parts.platform === "win32") return false;
+    const { path } = await this.parts.cli.look();
+    return HARNESSES.some((harness) => this.installed(harness, path));
+  }
+
   /** The harnesses, what each has connected, and where the quadit command stands. */
   async state(): Promise<ConnectView> {
     const { home, cli } = this.parts;
@@ -147,8 +158,7 @@ export class Connections {
         return {
           id: harness.id,
           name: harness.name,
-          installed:
-            existsSync(join(home, harness.folder)) || look.path.some((dir) => existsSync(join(dir, harness.command))),
+          installed: this.installed(harness, look.path),
           mcp: !!harness.mcp,
           cliIdentity: harness.env ? "own" : "default",
           connected: connection
@@ -170,6 +180,13 @@ export class Connections {
       defaultLogin,
       claudePlugin: claudePluginInstalled(home),
     };
+  }
+
+  /** Whether `harness` is on this computer: its config folder in the home folder, or its command in a folder of `path`. */
+  private installed(harness: Harness, path: string[]): boolean {
+    return (
+      existsSync(join(this.parts.home, harness.folder)) || path.some((dir) => existsSync(join(dir, harness.command)))
+    );
   }
 
   /** Plans connecting a harness as the person chose; nothing is written. */

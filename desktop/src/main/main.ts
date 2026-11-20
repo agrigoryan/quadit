@@ -155,22 +155,21 @@ function start() {
     local,
     loginItem,
     openConnect: () => connect.show(),
+    agentToolFound: () => connections.anyToolFound(),
   });
   const panel = new Panel(pages, requests);
   const capture = new Capture(pages, settings, requests);
-  const connect = new ConnectPage(
-    pages,
-    new Connections({
-      home: homedir(),
-      dataDir,
-      platform: process.platform,
-      hostName: hostname(),
-      cli: new QuaditCli(bundledCli(), loginShellPath),
-      summaries: () => requests.summaries(),
-      server: (id) => store.get(id),
-      ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
-    }),
-  );
+  const connections = new Connections({
+    home: homedir(),
+    dataDir,
+    platform: process.platform,
+    hostName: hostname(),
+    cli: new QuaditCli(bundledCli(), loginShellPath),
+    summaries: () => requests.summaries(),
+    server: (id) => store.get(id),
+    ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
+  });
+  const connect = new ConnectPage(pages, connections);
   const setup = new Setup({
     pages,
     settings,

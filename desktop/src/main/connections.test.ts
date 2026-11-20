@@ -448,3 +448,29 @@ describe("on Windows", () => {
     expect(existsSync(join(home, ".claude"))).toBe(false);
   });
 });
+
+posixOnly("Connect's agent tools on this computer", () => {
+  it("finds none on a computer without any, and one by its config folder or its command on the login shell's PATH", async () => {
+    const bare = setUp();
+    expect(await bare.connections.anyToolFound()).toBe(false);
+
+    const byFolder = setUp();
+    mkdirSync(join(byFolder.home, ".claude"));
+    expect(await byFolder.connections.anyToolFound()).toBe(true);
+
+    const byCommand = setUp();
+    writeFileSync(join(byCommand.bin, "codex"), "#!/bin/sh\n");
+    chmodSync(join(byCommand.bin, "codex"), 0o755);
+    expect(await byCommand.connections.anyToolFound()).toBe(true);
+    // As Connect itself shows them.
+    expect((await byCommand.connections.state()).harnesses.filter((h) => h.installed).map((h) => h.id)).toEqual([
+      "codex",
+    ]);
+  });
+
+  it("finds none on Windows, where Connect cannot connect any", async () => {
+    const { home, connections } = setUp({ platform: "win32" });
+    mkdirSync(join(home, ".claude"));
+    expect(await connections.anyToolFound()).toBe(false);
+  });
+});

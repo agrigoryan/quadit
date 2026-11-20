@@ -50,6 +50,8 @@ export interface ServerListSetup {
   loginItem: { get(): boolean; set(on: boolean): void } | null;
   /** Shows the Connect agents window. */
   openConnect(): void;
+  /** Whether an agent tool Connect can connect is found on this computer (connections.ts). */
+  agentToolFound(): Promise<boolean>;
 }
 
 export class ServerList {
@@ -126,7 +128,8 @@ export class ServerList {
    * through its window's own session, and opens that window on the
    * workspace, signed in. On an install set up already it signs in instead,
    * so trying again after a half-finished attempt works. Right after the
-   * owner is made, and only then, Connect agents opens over the window.
+   * owner is made, and only then, Connect agents opens over the window,
+   * where it has something to connect: an agent tool found on this computer.
    */
   async setUpHere(name: string): Promise<{ ok: true } | { ok: false; error: string }> {
     const { local } = this.setup;
@@ -143,7 +146,7 @@ export class ServerList {
     if (!owner.ok) return owner;
     // Its window may be open already, on the web app's page saying the app sets it up: it starts over, signed in.
     this.windows.showAfresh(server.id, owner.path);
-    if (owner.first) this.setup.openConnect();
+    if (owner.first && (await this.setup.agentToolFound())) this.setup.openConnect();
     return { ok: true };
   }
 
