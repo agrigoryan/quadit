@@ -17,9 +17,14 @@ name: desktop-release
 # key: APPLE_API_KEY_P8 (the .p8 file's text), APPLE_API_KEY_ID and
 # APPLE_API_ISSUER. MAC_PROVISIONING_PROFILE (base64) is used when set. Only
 # a pre-release tag (desktop-v1.2.3-beta.1) may go out unsigned, and only
-# with the repository variable DESKTOP_ALLOW_UNSIGNED=true. A signed app is
-# checked before it is published: its signature, its stapled notarization
-# and Gatekeeper's verdict. Windows is signed when WIN_CSC_LINK and
+# with the repository variable DESKTOP_ALLOW_UNSIGNED=true. The build waits
+# for Apple's verdict on the signed app for a limited time (15 minutes, or
+# the repository variable DESKTOP_NOTARIZE_WAIT; desktop/scripts/notarize.mjs).
+# A release fails without the verdict; a pre-release goes out signed and
+# unstapled, and macOS stops warning about that same app once Apple accepts
+# it (notarization-status.yml shows where a submission stands). A signed app
+# is checked before it is published: its signature, and for a notarized one
+# its stapled ticket and Gatekeeper's verdict. Windows is signed when WIN_CSC_LINK and
 # WIN_CSC_KEY_PASSWORD are set, and unsigned otherwise. The Homebrew cask is
 # not pushed from here: desktop/packaging/quadit-desktop.rb is its template.
 # The macOS and Linux apps carry the quadit command with the web app inside
@@ -103,6 +108,7 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           MAC_PROVISIONING_PROFILE: ${{ secrets.MAC_PROVISIONING_PROFILE }}
           ALLOW_UNSIGNED: ${{ vars.DESKTOP_ALLOW_UNSIGNED }}
+          QUADIT_NOTARIZE_WAIT: ${{ vars.DESKTOP_NOTARIZE_WAIT }}
           PRERELEASE: ${{ needs.tag.outputs.prerelease }}
         run: |
           # The App Store Connect API key and the provisioning profile come as
@@ -115,6 +121,8 @@ jobs:
             export QUADIT_MAC_PROVISIONING_PROFILE="$RUNNER_TEMP/quadit.provisionprofile"
             printf '%s' "$MAC_PROVISIONING_PROFILE" | base64 --decode > "$QUADIT_MAC_PROVISIONING_PROFILE"
           fi
+          # A pre-release does not wait for Apple longer than the limit; a release fails without its verdict.
+          if [ "$PRERELEASE" = true ]; then export QUADIT_NOTARIZE_UNANSWERED_OK=true; fi
           # A release is signed and notarized, or it does not go out.
           notarize=no
           if [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then notarize=yes; fi
@@ -134,6 +142,7 @@ jobs:
         shell: bash
         env:
           SIGNED: ${{ steps.mac.outputs.signed }}
+          PRERELEASE: ${{ needs.tag.outputs.prerelease }}
         run: |
           for app in dist/mac*/Quadit.app; do
             echo "$app"
@@ -141,8 +150,14 @@ jobs:
             test -x "$app/Contents/Resources/bin/quadit"
             if [ "$SIGNED" = true ]; then
               codesign --verify --deep --strict --verbose=2 "$app"
-              spctl --assess --type execute --verbose=4 "$app"
-              xcrun stapler validate "$app"
+              if xcrun stapler validate "$app"; then
+                spctl --assess --type execute --verbose=4 "$app"
+              elif [ "$PRERELEASE" = true ]; then
+                echo "$app carries no ticket: Apple had not answered when it was packaged."
+              else
+                echo "::error::$app is not notarized."
+                exit 1
+              fi
             fi
           done
       - name: Package (Windows)
@@ -171,6 +186,9 @@ jobs:
   release:
     needs: [tag, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # the GitHub Release
+      actions: write # starting the website's workflow
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -190,3 +208,9 @@ jobs:
           gh release create "$GITHUB_REF_NAME" packages/* --repo "$GITHUB_REPOSITORY" --latest=false "${kind[@]}" \
             --title "Quadit desktop ${GITHUB_REF_NAME#desktop-v}" \
             --notes "The Quadit desktop app. macOS: the .dmg for Apple silicon (arm64) or Intel (x64). Windows: the .exe installer. Linux: the AppImage or the .deb."
+      # The website's download links are this release's files from now on
+      # (pages.yml looks the newest desktop release up as it publishes).
+      - name: Publish the website again, with this release's download links
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main

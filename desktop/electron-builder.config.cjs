@@ -10,6 +10,9 @@
 //                                 or CSC_NAME for one already in the keychain
 //   APPLE_ID + APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID, or
 //   APPLE_API_KEY + APPLE_API_KEY_ID + APPLE_API_ISSUER   notarization through notarytool
+// The signed app is notarized by scripts/notarize.mjs, not by
+// electron-builder: its wait for Apple has a limit, and it says what happens
+// to an app Apple has not answered for.
 // With APPLE_TEAM_ID and a certificate, the build also gets the keychain group
 // that Touch ID passkeys need (src/main/main.ts, enablePasskeys).
 //
@@ -82,6 +85,8 @@ module.exports = {
   },
   // Releases are attached by the desktop-release workflow, never by electron-builder.
   publish: null,
+  // Notarizing, between the signing of the macOS app and the packages made of it.
+  ...(notarizing ? { afterSign: "./scripts/notarize.mjs" } : {}),
 
   mac: {
     category: "public.app-category.productivity",
@@ -96,7 +101,8 @@ module.exports = {
     entitlementsInherit: path.join(__dirname, "build", "entitlements.mac.inherit.plist"),
     // Without a certificate: no signing at all, rather than whatever identity the keychain happens to hold.
     identity: signing ? undefined : null,
-    notarize: notarizing,
+    // Never electron-builder's own notarizing: afterSign does it.
+    notarize: false,
     ...(env.QUADIT_MAC_PROVISIONING_PROFILE ? { provisioningProfile: env.QUADIT_MAC_PROVISIONING_PROFILE } : {}),
     extendInfo: { NSUserNotificationAlertStyle: "alert" },
     extraResources: [{ from: "cli/darwin-${arch}/quadit", to: "bin/quadit" }],
