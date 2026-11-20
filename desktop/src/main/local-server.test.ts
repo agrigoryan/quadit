@@ -97,6 +97,7 @@ function setUp(
     },
     ports,
     env: { PATH: "/usr/bin", HOME: "/home/ann", QUADIT_DB: "postgres://elsewhere", QUADIT_SECRET: "x".repeat(20) },
+    shellPath: async () => "/opt/homebrew/bin:/usr/bin:/bin",
   };
   const server = new LocalServer(parts);
   const states: string[] = [];
@@ -160,8 +161,9 @@ describe("LocalServer", () => {
     expect(run?.stdio[0]).toBe("pipe");
     expect(typeof run?.stdio[1]).toBe("number");
     expect(run?.stdio[2]).toBe(run?.stdio[1]);
-    // Nothing of the person's own Quadit settings reaches it.
-    expect(run?.env).toEqual({ PATH: "/usr/bin", HOME: "/home/ann" });
+    // Nothing of the person's own Quadit settings reaches it; the PATH is the login shell's, where
+    // git, ffmpeg and Chrome are found even when the app was opened from the Dock.
+    expect(run?.env).toEqual({ PATH: "/opt/homebrew/bin:/usr/bin:/bin", HOME: "/home/ann" });
     expect(server.state()).toEqual({ kind: "running" });
     expect(states).toEqual(["starting", "running"]);
     expect(statSync(server.logFile).isFile()).toBe(true);

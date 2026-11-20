@@ -11,6 +11,8 @@
 //     move, once the server before has had a few seconds to let go of it.
 //   - Its data is the folder `server` in the app's data folder, which the
 //     app never deletes; a folder with a database is simply used again.
+//   - It gets the login shell's PATH, as Connect does (quadit-cli.ts): an app
+//     opened from the Dock has a short one, without git, ffmpeg or Chrome.
 //   - Its output goes to server.log in that folder. The log is started anew
 //     at a start when it has grown past a few megabytes, keeping the one
 //     before it beside as server.log.1.
@@ -71,6 +73,8 @@ export interface LocalServerParts {
   ports: Ports;
   /** The app's environment, which the server gets without the QUADIT_ settings of the person's own servers. */
   env: NodeJS.ProcessEnv;
+  /** The PATH of the person's login shell (quadit-cli.ts, loginShellPath), which the server gets. */
+  shellPath(): Promise<string>;
 }
 
 /** Quadit's own port, taken when it is free at set-up. */
@@ -209,6 +213,7 @@ export class LocalServer {
       }
       return;
     }
+    const path = await this.parts.shellPath();
     if (generation !== this.generation) return;
 
     const log = this.openLog();
@@ -216,7 +221,7 @@ export class LocalServer {
     const child = spawn(
       binary,
       ["serve", "--data", this.dataDir, "--listen", `127.0.0.1:${port}`, "--url", origin, "--stop-on-stdin-close"],
-      { env: withoutQuaditSettings(this.parts.env), stdio: ["pipe", log, log] },
+      { env: { ...withoutQuaditSettings(this.parts.env), PATH: path }, stdio: ["pipe", log, log] },
     );
     closeSync(log); // the server has its own copy
     this.child = child;

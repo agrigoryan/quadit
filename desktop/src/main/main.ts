@@ -91,6 +91,7 @@ function start() {
     fetch: fetcher,
     ports: loopbackPorts,
     env: process.env,
+    shellPath: loginShellPath,
   });
   // Offered on macOS, for the installed app only: from source it would start the bare Electron.
   const loginItem =
