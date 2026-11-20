@@ -140,7 +140,9 @@ pre code { font-size: inherit; }
 .copy[data-done] { color: var(--move); }
 .after { margin-top: 10px; font-size: 0.9375rem; color: var(--ink-3); }
 .install .after { padding: 0 4px; }
-.facts { list-style: none; padding: 0; margin: 26px 0 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 0; font-size: 0.9375rem; color: var(--ink-3); }
+/* Under the film: what the app is, and the server's facts in one line. */
+.hero-foot { margin-top: 44px; padding-bottom: 72px; display: grid; justify-items: center; gap: 20px; }
+.facts { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 0; font-size: 0.9375rem; color: var(--ink-3); }
 .facts li { padding: 0 16px; }
 .facts li + li { border-left: 1px solid var(--line-2); }
 @media (max-width: 559px) { .facts li { padding: 0 10px; } .facts li + li { border-left: 0; } }
@@ -148,11 +150,10 @@ pre code { font-size: inherit; }
 .hero-fig { margin-top: 72px; width: 100%; }
 .hero-stage { position: relative; animation: rise 0.9s 0.24s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 .hero-stage::before { content: ""; position: absolute; inset: -7% -5% 6%; background: radial-gradient(50% 60% at 40% 30%, rgb(75 93 255 / 0.55), transparent 70%), radial-gradient(40% 50% at 78% 60%, rgb(255 214 10 / 0.22), transparent 70%); filter: blur(70px); z-index: -1; }
-.hero-in > h1, .hero-in > .sub, .hero-in > .get, .hero-in > .or, .hero-in > .install, .hero-in > .facts { animation: rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.hero-in > h1, .hero-in > .sub, .hero-in > .get, .hero-in > .or, .hero-in > .install { animation: rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 .hero-in > .sub { animation-delay: 0.06s; }
 .hero-in > .get { animation-delay: 0.1s; }
 .hero-in > .or, .hero-in > .install { animation-delay: 0.16s; }
-.hero-in > .facts { animation-delay: 0.22s; }
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .lamp, .hero-stage, .hero-in > * { animation: none; }
