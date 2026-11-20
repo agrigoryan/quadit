@@ -47,3 +47,29 @@ func TestReadFolder(t *testing.T) {
 		t.Errorf("a missing folder: %+v %v", f, err)
 	}
 }
+
+// TestGitWorksOnTheWorkingCopyWhateverTheEnvironmentSays: git run for a
+// sync works in the sync's own working copy even when the server was started
+// from an environment that points git at another repository (GIT_DIR,
+// GIT_WORK_TREE and the like), which a reset or a clean would otherwise
+// change.
+func TestGitWorksOnTheWorkingCopyWhateverTheEnvironmentSays(t *testing.T) {
+	ctx := t.Context()
+	own, other := t.TempDir(), t.TempDir()
+	for _, dir := range []string{own, other} {
+		if _, err := git(ctx, dir, "init", "--quiet"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("GIT_DIR", filepath.Join(other, ".git"))
+	t.Setenv("GIT_WORK_TREE", other)
+	t.Setenv("GIT_INDEX_FILE", filepath.Join(other, ".git", "index"))
+	got, err := git(ctx, own, "rev-parse", "--absolute-git-dir")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := filepath.EvalSymlinks(filepath.Join(own, ".git"))
+	if resolved, _ := filepath.EvalSymlinks(got); resolved != want {
+		t.Fatalf("git worked in %s, not in the working copy's %s", got, want)
+	}
+}

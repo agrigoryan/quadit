@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -290,13 +291,32 @@ func git(ctx context.Context, dir string, args ...string) (string, error) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_AUTHOR_NAME=Quadit", "GIT_AUTHOR_EMAIL=quadit@localhost",
+	cmd.Env = append(withoutRepositoryChoice(os.Environ()), "GIT_TERMINAL_PROMPT=0", "GIT_AUTHOR_NAME=Quadit", "GIT_AUTHOR_EMAIL=quadit@localhost",
 		"GIT_COMMITTER_NAME=Quadit", "GIT_COMMITTER_EMAIL=quadit@localhost")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", &gitFailure{command: args[0], said: oneLine(strings.TrimSpace(string(out)), 300)}
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// repositoryChoice are the variables by which an environment tells git
+// which repository, index or objects to use (git's own list: git rev-parse
+// --local-env-vars). Inherited by the server, they would point a sync's
+// reset or clean at another checkout.
+var repositoryChoice = map[string]bool{
+	"GIT_ALTERNATE_OBJECT_DIRECTORIES": true, "GIT_CONFIG": true, "GIT_CONFIG_PARAMETERS": true, "GIT_CONFIG_COUNT": true,
+	"GIT_OBJECT_DIRECTORY": true, "GIT_DIR": true, "GIT_WORK_TREE": true, "GIT_IMPLICIT_WORK_TREE": true, "GIT_GRAFT_FILE": true,
+	"GIT_INDEX_FILE": true, "GIT_NO_REPLACE_OBJECTS": true, "GIT_REPLACE_REF_BASE": true, "GIT_PREFIX": true,
+	"GIT_SHALLOW_FILE": true, "GIT_COMMON_DIR": true,
+}
+
+// withoutRepositoryChoice is env (NAME=value items) without repositoryChoice.
+func withoutRepositoryChoice(env []string) []string {
+	return slices.DeleteFunc(env, func(item string) bool {
+		name, _, _ := strings.Cut(item, "=")
+		return repositoryChoice[name]
+	})
 }
 
 // gitFailure is a git command that failed, and what git said. Its message
