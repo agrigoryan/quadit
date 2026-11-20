@@ -18,8 +18,12 @@ export interface Harness {
   name: string;
   /** Its command, looked for on the login shell's PATH. */
   command: string;
-  /** Its config folder under the home folder: there when it is installed. */
-  folder: string;
+  /**
+   * A folder or file of its own under the home folder, there when it is
+   * installed. Never one another harness makes: Antigravity CLI lives in
+   * ~/.gemini too, so Gemini CLI is known by its settings file.
+   */
+  trace: string;
   /** The skills folder it reads, under the home folder. */
   skills: string;
   /**
@@ -44,7 +48,7 @@ export const HARNESSES: readonly Harness[] = [
     id: "claude",
     name: "Claude Code",
     command: "claude",
-    folder: ".claude",
+    trace: ".claude",
     skills: ".claude/skills",
     env: (home, config) => [
       { kind: "json", path: join(home, ".claude", "settings.json"), keyPath: ["env", "QUADIT_CONFIG"], value: config },
@@ -85,7 +89,7 @@ export const HARNESSES: readonly Harness[] = [
     id: "codex",
     name: "Codex",
     command: "codex",
-    folder: ".codex",
+    trace: ".codex",
     skills: ".agents/skills",
     env: (home, config) => [
       {
@@ -119,7 +123,7 @@ export const HARNESSES: readonly Harness[] = [
     id: "gemini",
     name: "Gemini CLI",
     command: "gemini",
-    folder: ".gemini",
+    trace: ".gemini/settings.json",
     skills: ".agents/skills",
     mcp: {
       changes: (home, url, unattended) => [
@@ -134,10 +138,30 @@ export const HARNESSES: readonly Harness[] = [
     },
   },
   {
+    // Google's successor to Gemini CLI: its own command (agy), and its own
+    // files under ~/.gemini, which Gemini CLI's settings.json does not reach.
+    id: "antigravity",
+    name: "Antigravity CLI",
+    command: "agy",
+    trace: ".gemini/antigravity-cli",
+    skills: ".gemini/config/skills",
+    mcp: {
+      changes: (home, url) => [
+        {
+          kind: "json",
+          path: join(home, ".gemini", "config", "mcp_config.json"),
+          keyPath: ["mcpServers", "quadit"],
+          value: { url },
+        },
+      ],
+      signIn: "In Antigravity CLI, type /mcp and sign in to quadit",
+    },
+  },
+  {
     id: "cursor",
     name: "Cursor",
     command: "cursor-agent",
-    folder: ".cursor",
+    trace: ".cursor",
     skills: ".agents/skills",
     mcp: {
       changes: (home, url) => [
@@ -150,7 +174,7 @@ export const HARNESSES: readonly Harness[] = [
     id: "opencode",
     name: "opencode",
     command: "opencode",
-    folder: ".config/opencode",
+    trace: ".config/opencode",
     skills: ".agents/skills",
     mcp: {
       changes: (home, url) => [
@@ -159,8 +183,8 @@ export const HARNESSES: readonly Harness[] = [
       signIn: "In a terminal, run: opencode mcp auth quadit",
     },
   },
-  { id: "pi", name: "pi", command: "pi", folder: ".pi", skills: ".agents/skills" },
-  { id: "copilot", name: "GitHub Copilot CLI", command: "copilot", folder: ".copilot", skills: ".agents/skills" },
+  { id: "pi", name: "pi", command: "pi", trace: ".pi", skills: ".agents/skills" },
+  { id: "copilot", name: "GitHub Copilot CLI", command: "copilot", trace: ".copilot", skills: ".agents/skills" },
 ];
 
 /** opencode reads opencode.jsonc when there is one, and opencode.json otherwise. */

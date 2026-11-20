@@ -46,6 +46,22 @@ func TestTheSkillIsInstalledWhereAgentsLook(t *testing.T) {
 		}
 	}
 
+	// Antigravity CLI's folder is written only on a computer that has it.
+	antigravity := filepath.Join(home, ".gemini", "config", "skills", "quadit", "SKILL.md")
+	if _, err := os.Stat(antigravity); err == nil {
+		t.Errorf("%s was written on a computer without Antigravity CLI", antigravity)
+	}
+	if err := os.MkdirAll(filepath.Join(home, ".gemini", "config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if code := Run([]string{"skill", "install"}, &out, &errs); code != 0 {
+		t.Fatalf("exit %d: %s", code, errs.String())
+	}
+	if raw, _ := os.ReadFile(antigravity); string(raw) != integrations.Skill {
+		t.Errorf("%s is not the skill on a computer that has Antigravity CLI", antigravity)
+	}
+
 	// Named folders instead, and an older copy is replaced.
 	mine := filepath.Join(t.TempDir(), "skills")
 	old := filepath.Join(mine, "quadit", "SKILL.md")

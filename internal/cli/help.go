@@ -52,7 +52,7 @@ and --for=@WHO (it runs with that member's access).
 Connect with QUADIT_URL and QUADIT_TOKEN (both, or neither is used), or: quadit login URL
 TOKEN (TOKEN "-" reads it from stdin); quadit login --path says where the login is kept (QUADIT_CONFIG sets it)
 Teach an agent to use this: quadit skill install (puts the skill where Claude Code,
-Codex, Cursor, Gemini CLI, Copilot, opencode and pi look; quadit skill prints it)
+Codex, Cursor, Gemini CLI, Antigravity CLI, Copilot, opencode and pi look; quadit skill prints it)
 `
 
 // helpTopics are the texts of "quadit help TOPIC".

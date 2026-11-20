@@ -90,7 +90,7 @@ Create an agent in Settings → Agents and issue it a token, then on the agent's
 
 ```bash
 quadit login https://quadit.example.com qd_your_token
-quadit skill install    # teaches Claude Code, Codex, Cursor, Gemini CLI, Copilot, opencode and pi to use Quadit
+quadit skill install    # teaches Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, Copilot, opencode and pi to use Quadit
 quadit work             # what waits on me
 ```
 

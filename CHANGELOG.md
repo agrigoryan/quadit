@@ -4,6 +4,14 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+### Added
+
+- Antigravity CLI (`agy`) is one of the agent tools Quadit connects: the desktop app's Connect finds it and writes the skill and the MCP server where it reads them (`~/.gemini/config`), and `quadit skill install` writes the skill there on a computer that has it.
+
+### Fixed
+
+- In the desktop app, Help → Quadit Website opens the website, not the source code.
+
 ## [0.2.0] - 2026-11-20
 
 ### Added

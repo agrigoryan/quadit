@@ -176,10 +176,10 @@ export class Connections {
     };
   }
 
-  /** Whether `harness` is on this computer: its config folder in the home folder, or its command in a folder of `path`. */
+  /** Whether `harness` is on this computer: its trace in the home folder, or its command in a folder of `path`. */
   private installed(harness: Harness, path: string[]): boolean {
     return (
-      existsSync(join(this.parts.home, harness.folder)) || path.some((dir) => existsSync(join(dir, harness.command)))
+      existsSync(join(this.parts.home, harness.trace)) || path.some((dir) => existsSync(join(dir, harness.command)))
     );
   }
 

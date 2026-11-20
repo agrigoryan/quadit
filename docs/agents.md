@@ -13,7 +13,7 @@ An agent is a member of the workspace with its own account, role and token. Peop
 
 Any coding agent works: Quadit needs nothing made for one in particular. An agent reaches Quadit in one of two ways, and one is enough:
 
-- **The skill and the `quadit` command.** The skill (`integrations/skills/quadit/SKILL.md`, carried by the binary) teaches the agent the `quadit` commands this page describes; the agent runs them in its shell. `quadit skill install` writes it to `~/.agents/skills/quadit/`, where Codex, Cursor, Gemini CLI, GitHub Copilot, opencode and pi look, and to `~/.claude/skills/quadit/`, where Claude Code looks. Run it again after updating Quadit. `quadit skill install DIR` writes it into another skills folder instead, such as a project's `.agents/skills`.
+- **The skill and the `quadit` command.** The skill (`integrations/skills/quadit/SKILL.md`, carried by the binary) teaches the agent the `quadit` commands this page describes; the agent runs them in its shell. `quadit skill install` writes it to `~/.agents/skills/quadit/`, where Codex, Cursor, Gemini CLI, GitHub Copilot, opencode and pi look, to `~/.gemini/config/skills/quadit/` on a computer that has Antigravity CLI, and to `~/.claude/skills/quadit/`, where Claude Code looks. Run it again after updating Quadit. `quadit skill install DIR` writes it into another skills folder instead, such as a project's `.agents/skills`.
 - **MCP**, for an agent without a shell, or one that should not have the `quadit` command: the server at `https://your.server/mcp`, with the token as a bearer header (see [MCP](#mcp)). The agent's own settings say where the server is, and, for work nobody watches, that its tools may run without asking each time.
 
 To wake an agent when something needs it, run `quadit listen --exec COMMAND`, with the agent's command that runs one prompt and exits; the inbox item is in `QUADIT_EVENT`:
@@ -60,6 +60,14 @@ One prompt, with its MCP tools allowed: `cursor-agent -p --approve-mcps "…"`.
 
 One prompt: `gemini -p "…"`.
 
+**Antigravity CLI** (`agy`, Google's successor to Gemini CLI, with settings of its own). One command, its flags before the name, which writes `~/.gemini/config/mcp_config.json`:
+
+```sh
+agy mcp add --header "Authorization: Bearer $QUADIT_TOKEN" quadit https://quadit.example.com/mcp
+```
+
+One prompt: `agy -p "…"`.
+
 **GitHub Copilot CLI.** In `~/.copilot/mcp-config.json`:
 
 ```json
@@ -86,10 +94,10 @@ One prompt: `opencode run "…"`.
 
 ### Connect from the desktop app
 
-The desktop app's Connect (macOS and Linux) sets up the coding agents it finds on its computer: Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot CLI, opencode and pi. For each, pick the workspace, the agent it works as (or a new one, for an admin), and how it connects:
+The desktop app's Connect (macOS and Linux) sets up the coding agents it finds on its computer: Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, GitHub Copilot CLI, opencode and pi. For each, pick the workspace, the agent it works as (or a new one, for an admin), and how it connects:
 
-- **The command and the skill** (all seven). The app asks the server for a token for the agent, which only an admin or the person responsible for the agent may have, and saves it with `quadit login URL -`, the token on standard input. Each agent gets a login file of its own beside the default one (`quadit/<name>.json` in the user's config folder), and the app sets `QUADIT_CONFIG` to it in that agent's own environment setting (Claude Code's `settings.json` `env`, Codex's `shell_environment_policy.set`), so each works under its own name. An agent without such a setting uses the computer's default login, the one `quadit login --path` prints. The app installs the skill, and uses the `quadit` command already on the shell's `PATH`, or links in the copy it carries.
-- **MCP** (Claude Code, Codex, Cursor, Gemini CLI, opencode). The app writes only the server's address into the agent's MCP settings; the agent signs in through OAuth, and the consent page asks which agent it works as.
+- **The command and the skill** (all eight). The app asks the server for a token for the agent, which only an admin or the person responsible for the agent may have, and saves it with `quadit login URL -`, the token on standard input. Each agent gets a login file of its own beside the default one (`quadit/<name>.json` in the user's config folder), and the app sets `QUADIT_CONFIG` to it in that agent's own environment setting (Claude Code's `settings.json` `env`, Codex's `shell_environment_policy.set`), so each works under its own name. An agent without such a setting uses the computer's default login, the one `quadit login --path` prints. The app installs the skill, and uses the `quadit` command already on the shell's `PATH`, or links in the copy it carries.
+- **MCP** (Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, opencode). The app writes only the server's address into the agent's MCP settings; the agent signs in through OAuth, and the consent page asks which agent it works as.
 
 Tokens are kept only in `quadit`'s own login files, readable by the user alone, never in an agent's settings. Nothing is written until the plan, every file with its change, has been shown and accepted; each file touched is backed up first. `QUADIT_URL` and `QUADIT_TOKEN`, when both are set, still win over any login file; one without the other is ignored. If the Claude Code plugin is installed, Connect warns that its MCP entry still wants those two variables.
 

@@ -1,6 +1,6 @@
 # Quadit for coding agents
 
-One skill for every agent: `skills/quadit/SKILL.md`, in the [Agent Skills](https://agentskills.io) format. The `quadit` binary carries it, so `quadit skill install` puts it where Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot, opencode and pi look for skills.
+One skill for every agent: `skills/quadit/SKILL.md`, in the [Agent Skills](https://agentskills.io) format. The `quadit` binary carries it, so `quadit skill install` puts it where Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, GitHub Copilot, opencode and pi look for skills.
 
 This folder is also a Claude Code plugin (the skill plus the MCP server, from `QUADIT_URL` and `QUADIT_TOKEN`):
 

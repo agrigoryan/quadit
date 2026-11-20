@@ -182,6 +182,15 @@ posixOnly("Connect plans", () => {
       [".agents/skills/quadit/SKILL.md", "Library/Application Support/quadit/config.json", ".gemini/settings.json"],
     ],
     [
+      "antigravity",
+      ["cli", "mcp"],
+      [
+        ".gemini/config/skills/quadit/SKILL.md",
+        "Library/Application Support/quadit/config.json",
+        ".gemini/config/mcp_config.json",
+      ],
+    ],
+    [
       "cursor",
       ["cli", "mcp"],
       [".agents/skills/quadit/SKILL.md", "Library/Application Support/quadit/config.json", ".cursor/mcp.json"],
@@ -217,6 +226,7 @@ posixOnly("Connect plans", () => {
       ["claude", "own", true],
       ["codex", "own", true],
       ["gemini", "default", true],
+      ["antigravity", "default", true],
       ["cursor", "default", true],
       ["opencode", "default", true],
       ["pi", "default", false],
@@ -572,5 +582,23 @@ posixOnly("Connect's agent tools on this computer", () => {
     writeFileSync(join(byCommand.bin, "codex"), "#!/bin/sh\n");
     chmodSync(join(byCommand.bin, "codex"), 0o755);
     expect(await installed(byCommand.connections)).toEqual(["codex"]);
+  });
+
+  it("tells Antigravity CLI from Gemini CLI, though both keep their files in ~/.gemini", async () => {
+    const installed = async (connections: ReturnType<typeof setUp>["connections"]) =>
+      (await connections.state()).harnesses.filter((h) => h.installed).map((h) => h.id);
+    const antigravity = setUp();
+    mkdirSync(join(antigravity.home, ".gemini", "antigravity-cli"), { recursive: true });
+    expect(await installed(antigravity.connections)).toEqual(["antigravity"]);
+
+    const gemini = setUp();
+    mkdirSync(join(gemini.home, ".gemini"));
+    writeFileSync(join(gemini.home, ".gemini", "settings.json"), "{}");
+    expect(await installed(gemini.connections)).toEqual(["gemini"]);
+
+    const byCommand = setUp();
+    writeFileSync(join(byCommand.bin, "agy"), "#!/bin/sh\n");
+    chmodSync(join(byCommand.bin, "agy"), 0o755);
+    expect(await installed(byCommand.connections)).toEqual(["antigravity"]);
   });
 });
