@@ -65,6 +65,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        # The whole history and its tags: scripts/cli.mjs stamps the bundled quadit with the last server tag (git describe).
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
