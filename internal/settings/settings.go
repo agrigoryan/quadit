@@ -1,6 +1,7 @@
 // Package settings keeps the install's settings: named JSON values set from
 // the admin area, read on many requests. Get and Checked read one, Set
-// stores one, List gives them all for the admin area.
+// stores one (SetIn inside the caller's transaction), List gives them all
+// for the admin area.
 //
 // It hides where a value comes from (an environment variable, which wins,
 // or the settings table), the few seconds a read is kept, the sealing of
@@ -50,9 +51,13 @@ type Kind struct {
 	// Check, when set, is asked about a new value before it is stored, with
 	// its secrets readable; an error refuses the value.
 	Check func(ctx context.Context, value json.RawMessage) error
-	// Changed, when set, runs after a value is stored or reset, or failed
-	// to be.
+	// Changed, when set, runs after a value is stored or reset with Set,
+	// or failed to be.
 	Changed func(ctx context.Context)
+	// Internal marks a setting the server keeps for itself: it is not
+	// listed, not read from the environment, and not written with Set (the
+	// admin area's way), only with SetIn.
+	Internal bool
 }
 
 // Table is every setting, by name.
@@ -212,7 +217,7 @@ func misspelledIn(given, want any, at string) string {
 // read reads a setting from the environment or the database, past the
 // cache. A setting that is not set is nil, without an error.
 func (s *Settings) read(ctx context.Context, name string) (json.RawMessage, bool, error) {
-	if v := os.Getenv(EnvName(name)); v != "" {
+	if v := os.Getenv(EnvName(name)); v != "" && !s.table[name].Internal {
 		raw := json.RawMessage(v)
 		if !json.Valid(raw) { // a bare word is taken as a string
 			quoted, err := json.Marshal(v)
@@ -290,6 +295,9 @@ func (s *Settings) unseal(name string, raw json.RawMessage) json.RawMessage {
 func (s *Settings) List(ctx context.Context) (map[string]any, error) {
 	out := map[string]any{}
 	for name, kind := range s.table {
+		if kind.Internal {
+			continue
+		}
 		raw, fromEnv, err := s.load(ctx, name)
 		if err != nil {
 			return nil, err
@@ -318,44 +326,68 @@ func (s *Settings) List(ctx context.Context) (map[string]any, error) {
 // Set stores a setting, sealing its secret fields; null takes it back to
 // its default. A secret sent back as the mask, or left out, keeps its
 // stored value. The setting's Check is asked first, and its Changed runs
-// after, whether the write succeeded or not.
+// after, whether the write succeeded or not. A setting the server keeps
+// for itself (Internal) is refused.
 func (s *Settings) Set(ctx context.Context, name string, value json.RawMessage, by string) error {
 	kind, known := s.table[name]
+	if known && kind.Internal {
+		return invalid(name, "the setting %s is kept by the server itself and cannot be set", name)
+	}
+	raw, wrote, err := s.write(ctx, s.st, name, value, by)
+	if !wrote {
+		return err
+	}
+	s.saved(ctx, name, kind, s.unseal(name, raw), err)
+	return err
+}
+
+// SetIn stores a setting as Set does, Internal ones too, inside the
+// caller's transaction db, so that it is there only if the rest is. It is
+// read again on next use; Changed does not run, as nothing is committed yet.
+func (s *Settings) SetIn(ctx context.Context, db store.DB, name string, value json.RawMessage, by string) error {
+	_, _, err := s.write(ctx, db, name, value, by)
+	s.forget(name)
+	return err
+}
+
+// write checks a setting's new value, seals its secrets and stores it in
+// db, giving what it stored (nil for null, which deletes it). wrote reports
+// whether the store was written to, or tried: an error without it is a
+// refusal that changed nothing.
+func (s *Settings) write(ctx context.Context, db store.DB, name string, value json.RawMessage, by string) (raw json.RawMessage, wrote bool, err error) {
+	kind, known := s.table[name]
 	if !known {
-		return invalid("", "unknown setting %q; settings are: %s", name, strings.Join(slices.Sorted(maps.Keys(s.table)), ", "))
+		return nil, false, invalid("", "unknown setting %q; settings are: %s", name, strings.Join(slices.Sorted(maps.Keys(s.table)), ", "))
 	}
 	if !json.Valid(value) {
-		return invalid("", "a setting's value must be JSON")
+		return nil, false, invalid("", "a setting's value must be JSON")
 	}
 	if strings.TrimSpace(string(value)) == "null" {
-		_, err := s.st.Delete(ctx, "settings", store.Eq("name", name))
-		s.saved(ctx, name, kind, nil, err)
-		return err
+		_, err := db.Delete(ctx, "settings", store.Eq("name", name))
+		return nil, true, err
 	}
 	dec := json.NewDecoder(bytes.NewReader(value))
 	dec.DisallowUnknownFields()
 	shaped := kind.Shape()
 	if err := dec.Decode(shaped); err != nil {
-		return invalid(name, "this is not what the setting %s holds: %s", name, engine.PlainJSON(err))
+		return nil, false, invalid(name, "this is not what the setting %s holds: %s", name, engine.PlainJSON(err))
 	}
 	if field := misspelled(value, shaped); field != "" {
-		return invalid(name, "the setting %s has no field %q; field names are spelled as documented, in lower case", name, field)
+		return nil, false, invalid(name, "the setting %s has no field %q; field names are spelled as documented, in lower case", name, field)
 	}
 	if len(kind.Secrets) > 0 {
-		sealed, err := s.seal(ctx, name, kind.Secrets, value)
+		sealed, err := s.seal(ctx, db, name, kind.Secrets, value)
 		if err != nil {
-			return err
+			return nil, false, err
 		}
 		value = sealed
 	}
 	if kind.Check != nil {
 		if err := kind.Check(ctx, s.unseal(name, value)); err != nil {
-			return err
+			return nil, false, err
 		}
 	}
-	err := s.st.Upsert(ctx, core.Setting{Name: name, Value: value, UpdatedAt: time.Now().UnixMilli(), UpdatedBy: by}, "name")
-	s.saved(ctx, name, kind, s.unseal(name, value), err)
-	return err
+	return value, true, db.Upsert(ctx, core.Setting{Name: name, Value: value, UpdatedAt: time.Now().UnixMilli(), UpdatedBy: by}, "name")
 }
 
 // saved notes a setting just written, as raw: it is read again on next use,
@@ -376,12 +408,12 @@ func (s *Settings) saved(ctx context.Context, name string, kind Kind, raw json.R
 // as the mask, or left out, keeps the stored value, so the stored value
 // must be read: when it cannot be, the save fails rather than lose the
 // secrets.
-func (s *Settings) seal(ctx context.Context, name string, secrets []string, value json.RawMessage) (json.RawMessage, error) {
+func (s *Settings) seal(ctx context.Context, db store.DB, name string, secrets []string, value json.RawMessage) (json.RawMessage, error) {
 	var obj map[string]any
 	if err := json.Unmarshal(value, &obj); err != nil {
 		return nil, invalid("", "setting %s must be a JSON object", name)
 	}
-	old, err := s.stored(ctx, name)
+	old, err := s.stored(ctx, db, name)
 	if err != nil {
 		return nil, err
 	}
@@ -419,11 +451,11 @@ func field(obj map[string]any, path string) (map[string]any, string) {
 	return obj, parts[len(parts)-1]
 }
 
-// stored reads a setting's stored object as it is in the database, secrets
+// stored reads a setting's stored object as db has it, secrets
 // sealed; nil when it is not set.
-func (s *Settings) stored(ctx context.Context, name string) (map[string]any, error) {
+func (s *Settings) stored(ctx context.Context, db store.DB, name string) (map[string]any, error) {
 	var row core.Setting
-	there, err := store.Find(ctx, s.st, &row, store.Eq("name", name))
+	there, err := store.Find(ctx, db, &row, store.Eq("name", name))
 	switch {
 	case err != nil:
 		return nil, fmt.Errorf("reading the setting %s before saving it: %w", name, err)

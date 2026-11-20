@@ -114,3 +114,56 @@ func TestASecretSpelledInAnotherCaseIsNeverInTheClear(t *testing.T) {
 		})
 	}
 }
+
+// TestAnInternalSettingIsTheServersOwn: a setting the server keeps for
+// itself is not listed, not set through Set (the admin area's way), and
+// not taken from the environment; SetIn writes it, inside the caller's
+// transaction, so it is there only if that commits.
+func TestAnInternalSettingIsTheServersOwn(t *testing.T) {
+	ctx := context.Background()
+	sealer, _ := auth.NewSealer([]byte("a test secret, long enough"))
+	st := testdb.SQLite(t)
+	table := settings.Table{
+		"install.local_owner": {Shape: func() any { return new(string) }, Internal: true},
+		"install.name":        {Shape: func() any { return new(string) }},
+	}
+	set := settings.New(st, sealer, slog.Default(), table)
+
+	if err := set.Set(ctx, "install.local_owner", json.RawMessage(`"someone"`), ""); err == nil {
+		t.Fatal("Set wrote a setting the server keeps for itself")
+	}
+	t.Setenv(settings.EnvName("install.local_owner"), "from-the-environment")
+	var got string
+	if err := set.Checked(ctx, "install.local_owner", &got); err != nil || got != "" {
+		t.Fatalf("the environment set it: %q (%v)", got, err)
+	}
+
+	failed := st.Atomic(ctx, func(db store.DB) error {
+		if err := set.SetIn(ctx, db, "install.local_owner", json.RawMessage(`"lost"`), ""); err != nil {
+			return err
+		}
+		return context.Canceled // the rest of the transaction fails
+	})
+	if failed == nil {
+		t.Fatal("the transaction did not fail")
+	}
+	if err := set.Checked(ctx, "install.local_owner", &got); err != nil || got != "" {
+		t.Fatalf("a write in a transaction that failed is there: %q (%v)", got, err)
+	}
+
+	if err := st.Atomic(ctx, func(db store.DB) error {
+		return set.SetIn(ctx, db, "install.local_owner", json.RawMessage(`"owner-id"`), "")
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := set.Checked(ctx, "install.local_owner", &got); err != nil || got != "owner-id" {
+		t.Fatalf("after the transaction: %q (%v)", got, err)
+	}
+	all, err := set.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, listed := all["install.local_owner"]; listed || len(all) != 1 {
+		t.Fatalf("List gives %v, want only install.name", all)
+	}
+}
