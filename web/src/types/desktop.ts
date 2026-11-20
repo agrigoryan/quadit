@@ -90,6 +90,8 @@ export interface QuaditDesktop {
   publish?(summary: DesktopSummary | null): void;
   /** The one handler for requests the person made in the app; returns a function that stops it. */
   onRequest?(handler: (r: DesktopRequest) => Promise<DesktopOutcome>): () => void;
+  /** Opens the app's Connect agents window for this server. Present only where the app can connect tools (not on Windows). */
+  openConnect?(): void;
 }
 
 declare global {

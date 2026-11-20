@@ -9,6 +9,9 @@ export const agentsStrings = {
     "An agent is a member with its own account and token. Add one in Settings, then assign it tasks like anyone else.",
   "agents.emptyHintMember": "An agent is a member with its own account and token. An admin adds them in Settings.",
   "agents.emptyAction": "Add an agent in Settings",
+  "agents.connect": "Connect a tool on this computer",
+  "agents.emptyHintConnect":
+    "Connect Claude Code, Codex or another tool on this computer, and it becomes a member here.",
 
   "agents.doing.idle": "Nothing in hand. {n} open task assigned. | Nothing in hand. {n} open tasks assigned.",
   "agents.doing.waiting": "All of its open work waits on {who}.",

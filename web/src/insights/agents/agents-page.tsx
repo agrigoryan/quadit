@@ -21,11 +21,31 @@ import { NO_WORK, useAgentWork, useClaims, useResources } from "@/insights/agent
 import { Resources } from "@/insights/agents/resources";
 import { useSessions } from "@/insights/agents/session-data";
 import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helper-agents";
+import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/form";
 import { EmptyState } from "@/ui/empty";
 
 const NO_SESSIONS: AgentSession[] = [];
 const everySession = () => true;
+
+/**
+ * Whether the desktop app this page is in can connect agent tools on its
+ * computer (openConnect): not a browser, an older app, or Windows.
+ */
+const canConnectTools = () => !!window.quaditDesktop?.openConnect;
+
+/** Opens the desktop app's Connect window, which sets agent tools on this computer up to work here. */
+function ConnectToolButton({ main }: { main?: boolean }) {
+  return (
+    <Button
+      variant={main ? "primary" : "secondary"}
+      size={main ? "md" : "sm"}
+      onClick={() => window.quaditDesktop?.openConnect?.()}
+    >
+      {t("agents.connect")}
+    </Button>
+  );
+}
 
 /** Working first, then those with work queued, then waiting, then idle. */
 const ORDER = { working: 0, has_work: 1, waiting: 2, idle: 3 } as const;
@@ -41,6 +61,7 @@ export function AgentsPage() {
   const claims = useClaims();
   const resources = useResources();
   const work = useAgentWork(claims);
+  const connects = canConnectTools();
 
   const states = useMemo(() => {
     const out: Dict<AgentState> = {};
@@ -118,6 +139,7 @@ export function AgentsPage() {
             </Checkbox>
           </span>
         )}
+        {connects && <ConnectToolButton />}
       </PageBar>
       <div className="min-h-0 flex-1 overflow-y-auto bg-canvas pb-10">
         {agents.length === 0 ? (
@@ -125,15 +147,24 @@ export function AgentsPage() {
             <EmptyState
               icon={<Bot />}
               title={t("agents.empty")}
-              hint={t(can.administer ? "agents.emptyHint" : "agents.emptyHintMember")}
+              hint={
+                connects
+                  ? t("agents.emptyHintConnect")
+                  : t(can.administer ? "agents.emptyHint" : "agents.emptyHintMember")
+              }
               action={
-                can.administer && (
-                  <Link
-                    to={`/${slug}/settings/agents`}
-                    className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
-                  >
-                    {t("agents.emptyAction")}
-                  </Link>
+                (connects || can.administer) && (
+                  <div className="flex flex-col items-center gap-3">
+                    {connects && <ConnectToolButton main />}
+                    {can.administer && (
+                      <Link
+                        to={`/${slug}/settings/agents`}
+                        className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
+                      >
+                        {t("agents.emptyAction")}
+                      </Link>
+                    )}
+                  </div>
                 )
               }
             />
