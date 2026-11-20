@@ -56,11 +56,11 @@ quadit ask SVA-12 "Which explosion?" \
   recommended=2 why="clearest at 1x"
 ```
 
-- Show each option: a `file=PATH` belongs to the `option=` before it (several allowed); one before the first option goes with the question. The files go up first and the question goes out with them, once even if you resend it with the same `--id`.
+**Put each option's picture on the option.** When the options are things that can be seen (three icons, two layouts, a before and an after, the variants you just generated), every option carries its own file: a `file=PATH` belongs to the `option=` before it (several allowed), and one before the first option goes with the question. Do this even when the same files are already on the task or in a comment: the person decides in the question, where the options sit side by side at full size, and should not have to read "A, B, C" there and then scroll through the task to find which picture is which. An option with nothing to look at needs no file; a question whose options all point at files attached somewhere else is asked wrongly. The same holds for an approval: attach the thing you ask them to approve. The files go up first and the question goes out with them, once even if you resend it with the same `--id`.
 
 - One question per decision. Several questions are several decisions, or sub-tasks.
 - Always give a recommendation and the reason when you have one.
-- For a plain yes or no: `quadit approval SVA-12 "Merge this into main?"` (`file=PATH` works here too).
+- For a plain yes or no: `quadit approval SVA-12 "Use this icon?" file=icon.png`. What they are approving goes on the approval, as a file when it can be seen.
 - The task now waits on them. Wait with `quadit events cursor=main mine=1 others=1 wait=50` (it returns as soon as something happens), or stop and pick it up next session from `quadit work`.
 - The answer arrives as `decision.picked … -> 2) B: burst (with_changes): Make it 20% larger.` Follow the note exactly.
 - If the answer does not settle it, say what is unclear in one line: `quadit unclear DECISION_ID "Larger in radius, or in duration?"`. Do not guess.

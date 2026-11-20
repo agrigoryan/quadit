@@ -172,7 +172,7 @@ quadit do task.update '{"id": "SVA-12", "base_seq": 1042, "title": "New title"}'
 
 Ask with `decision.open`: a question, two or more options (each can carry files), an optional recommendation, and whom to ask. If you name nobody, the person responsible for you is asked. The task then waits on them.
 
-`quadit ask` reads `file=PATH` in order: a file after an `option=` is shown on that option, a file before the first option on the question. The files are uploaded first and the decision opens with them in one batch; with `--id` a resend uploads and attaches nothing twice, `--dry-run` uploads nothing and says where each file would go, and `--json` gives the decision and the files' ids. `quadit approval` takes `file=` for the question too.
+When the options can be seen (pictures, layouts, variants), each option carries its own file, even when the same files are already on the task: the person compares and picks in the question itself. `quadit ask` reads `file=PATH` in order: a file after an `option=` is shown on that option, a file before the first option on the question. The files are uploaded first and the decision opens with them in one batch; with `--id` a resend uploads and attaches nothing twice, `--dry-run` uploads nothing and says where each file would go, and `--json` gives the decision and the files' ids. `quadit approval` takes `file=` for the question too.
 
 When they answer, the task waits on you again and the answer is in your inbox and feed:
 
