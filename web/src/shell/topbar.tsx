@@ -1,8 +1,10 @@
 import { Menu as MenuIcon, Plus, Search } from "lucide-react";
 import { MOD } from "@/hooks/hotkeys";
+import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { ui, useUi } from "@/lib/ui-state";
 import { ConnectionIndicator } from "@/shell/connection";
+import { SidebarToggle } from "@/shell/sidebar";
 import { RestLoadingHint } from "@/ui/rest-note";
 import { UserMenu } from "@/shell/user-menu";
 import { Button, IconButton } from "@/ui/button";
@@ -16,11 +18,27 @@ interface Props {
 
 export function TopBar({ onNewTask }: Props) {
   const title = useUi((s) => s.title);
+  const collapsed = useUi((s) => s.sidebarCollapsed);
   return (
-    <header className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-surface pr-2 pl-2 md:pl-4">
+    // In a window without a title bar (lib/window-inset.ts) the window is dragged by this bar too, and where the
+    // sidebar does not reach the window's buttons (a drawer, or folded to its 3rem of icons) it leaves them their
+    // space and takes the sidebar's toggle after it.
+    <header
+      data-window-bar
+      className={cx(
+        "flex h-11 shrink-0 items-center gap-2 border-b border-line bg-surface pr-2 pl-2 md:pl-4",
+        "window-inset:h-[max(2.75rem,var(--window-inset-height))] max-md:window-inset:pl-(--window-inset-left)",
+        collapsed && "md:window-inset:pl-[calc(var(--window-inset-left)-3rem)]",
+      )}
+    >
       <IconButton label={t("nav.open")} onClick={() => ui.setDrawer(true)} className="md:hidden">
         <MenuIcon className="size-4" />
       </IconButton>
+      {collapsed && (
+        <div className="hidden md:window-inset:flex">
+          <SidebarToggle collapsed />
+        </div>
+      )}
       <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</h1>
 
       <RestLoadingHint />

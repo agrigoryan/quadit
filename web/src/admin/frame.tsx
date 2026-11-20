@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Link, Navigate } from "react-router";
 import { useSession } from "@/auth/session";
+import { cx } from "@/lib/cx";
 import { ApiError } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { usePageTitle } from "@/lib/ui-state";
@@ -65,7 +66,14 @@ function useGroups(): NavGroup[] {
 function TopBar({ installName }: { installName?: string }) {
   const user = useSession((s) => s.user);
   return (
-    <header className="flex h-11 shrink-0 items-center gap-2.5 border-b border-line bg-surface px-3 md:px-4">
+    // In a window without a title bar (lib/window-inset.ts) the window is dragged by this bar, past its buttons.
+    <header
+      data-window-bar
+      className={cx(
+        "flex h-11 shrink-0 items-center gap-2.5 border-b border-line bg-surface px-3 md:px-4",
+        "window-inset:h-[max(2.75rem,var(--window-inset-height))] window-inset:pl-(--window-inset-left)",
+      )}
+    >
       <Link to="/admin" className="flex items-center gap-2 rounded-md" aria-label={t("admin.title")}>
         <QuadMark size={20} />
         <span className="text-sm font-semibold">{t("admin.title")}</span>

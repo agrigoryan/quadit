@@ -80,6 +80,20 @@ function Places({ group, slug, collapsed }: { group: DestinationGroup; slug: str
   );
 }
 
+/** Folds the sidebar to icons, or opens it out again. */
+export function SidebarToggle({ collapsed, className }: { collapsed: boolean; className?: string }) {
+  return (
+    <IconButton
+      label={collapsed ? t("nav.expand") : t("nav.collapse")}
+      hint="["
+      onClick={ui.toggleSidebar}
+      className={className}
+    >
+      <PanelLeft className="size-4" />
+    </IconButton>
+  );
+}
+
 function SidebarBody({ collapsed }: { collapsed: boolean }) {
   const slug = useSlug();
   const projects = useProjects();
@@ -87,16 +101,25 @@ function SidebarBody({ collapsed }: { collapsed: boolean }) {
 
   return (
     <nav aria-label={t("nav.main")} className="flex h-full flex-col">
-      <div className={cx("flex h-11 shrink-0 items-center gap-1", collapsed ? "justify-center" : "pr-1.5 pl-2")}>
+      {/* In a window without a title bar (lib/window-inset.ts): the strip the window is dragged by, the window's
+          buttons on its left and the toggle after them. Folded, the toggle moves to the top bar, past the buttons. */}
+      <div
+        data-window-bar
+        className={cx(
+          "hidden h-(--window-inset-height) shrink-0 items-center window-inset:flex",
+          !collapsed && "pl-(--window-inset-left)",
+        )}
+      >
+        {!collapsed && <SidebarToggle collapsed={false} className="max-md:hidden" />}
+      </div>
+      <div
+        className={cx(
+          "flex h-11 shrink-0 items-center gap-1",
+          collapsed ? "justify-center window-inset:hidden" : "pr-1.5 pl-2",
+        )}
+      >
         {!collapsed && <WorkspaceSwitcher />}
-        <IconButton
-          label={collapsed ? t("nav.expand") : t("nav.collapse")}
-          hint="["
-          onClick={ui.toggleSidebar}
-          className="max-md:hidden"
-        >
-          <PanelLeft className="size-4" />
-        </IconButton>
+        <SidebarToggle collapsed={collapsed} className="max-md:hidden window-inset:hidden" />
       </div>
 
       <div className={"min-h-0 flex-1 overflow-y-auto px-2 pb-3"}>

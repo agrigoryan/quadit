@@ -3,6 +3,8 @@
 @import "./prose.css";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* In a window of the Quadit app without a title bar (lib/window-inset.ts): window-inset:pl-(--window-inset-left). */
+@custom-variant window-inset (&:where([data-window-inset] *));
 
 /* Tokens as Tailwind colours: bg-surface, text-ink-2, border-line ... */
 @theme inline {
@@ -160,6 +162,42 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+
+  /* A window without a title bar (lib/window-inset.ts) is dragged by the bars
+     marked data-window-bar: the workspace's top bar and its sidebar's strip,
+     the admin area's top bar, and elsewhere the strip over the page
+     (ui/window-strip.tsx), which gives way to a page's own bars. A dragged
+     area takes every click over it, so nothing that is clicked drags: not a
+     control in a bar, and not a dialog or a menu laid over one. */
+  [data-window-inset] [data-window-bar] {
+    app-region: drag;
+  }
+
+  [data-window-inset]
+    :is(
+      a[href],
+      button,
+      input,
+      select,
+      textarea,
+      [tabindex],
+      [role="button"],
+      [role="dialog"],
+      [role="alertdialog"],
+      [role="menu"],
+      [role="listbox"]
+    ) {
+    app-region: no-drag;
+  }
+}
+
+/* The strip over a page without bars of its own gives way where the page has
+   some (ui/window-strip.tsx). In the utilities layer: it overrides the strip's
+   own window-inset:block. */
+@layer utilities {
+  [data-window-inset] body:has([data-window-bar]:not([data-window-strip])) [data-window-strip] {
+    display: none;
   }
 }
 

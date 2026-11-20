@@ -18,7 +18,8 @@ export function AccountSecurityPage() {
   // Said only where it is true: an install that does not ask for a second step has nothing to warn about.
   const required = useAuthConfig()?.require_2fa !== false;
   return (
-    <main className="h-dvh overflow-y-auto bg-surface">
+    // Below the strip a window without a title bar is dragged by (ui/window-strip.tsx), clear of its buttons.
+    <main className="h-dvh overflow-y-auto bg-surface window-inset:pt-(--window-inset-height)">
       <Page title={t("auth.account.title")} lead={t("auth.account.lead")} back="/" backLabel={t("auth.account.back")}>
         <LoadGate of={account}>
           {(a) => (
