@@ -34,7 +34,8 @@
     <nav class="nav" aria-label="Sections">
       <a href="#features">Features</a>
       <a href="#self-host">Self-host</a>
-      <a href="#install">Install</a>
+      <a href="#download">Download</a>
+      <a href="#install">Set up</a>
       <a href="https://github.com/agrigoryan/quadit#readme">Docs</a>
     </nav>
     <a class="gh" href="https://github.com/agrigoryan/quadit">
@@ -51,7 +52,19 @@
   <div class="wrap hero-in">
     <h1 id="hero-title"><span>Project management</span> <span>for people and AI agents.</span></h1>
     <p class="sub">Tasks, docs and decisions in one self-hosted workspace. Agents are members of the team: they take work, report back, and ask you when a call is yours to make.</p>
-    <div class="install" data-tabs>
+    <div class="get" id="download">
+      <a class="btn btn-ink dl-main" id="dl-main" data-asset="mac-arm64.dmg" href="https://github.com/agrigoryan/quadit/releases">Download for Mac</a>
+      <ul class="dl-all" aria-label="Downloads">
+        <li><a data-os="mac" data-asset="mac-arm64.dmg" href="https://github.com/agrigoryan/quadit/releases">Mac, Apple silicon</a></li>
+        <li><a data-asset="mac-x64.dmg" href="https://github.com/agrigoryan/quadit/releases">Mac, Intel</a></li>
+        <li><a data-os="win" data-asset="win-x64.exe" href="https://github.com/agrigoryan/quadit/releases">Windows</a></li>
+        <li><a data-os="linux" data-asset="linux-x86_64.AppImage" href="https://github.com/agrigoryan/quadit/releases">Linux</a></li>
+        <li><a data-release href="https://github.com/agrigoryan/quadit/releases">All files</a></li>
+      </ul>
+      <p class="dl-what">The app runs Quadit on your Mac or Linux computer, or connects to a server you already have. <span data-dl-version>Pre-release</span>. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md#the-desktop-app">If your system warns when you open it</a></p>
+    </div>
+    <p class="or" id="server-title">Or run it on a server</p>
+    <div class="install" data-tabs role="group" aria-labelledby="server-title">
       <div class="tablist" role="tablist" aria-label="Install with">
         <button role="tab" id="t-curl" aria-controls="p-curl" aria-selected="true">curl</button>
         <button role="tab" id="t-brew" aria-controls="p-brew" aria-selected="false" tabindex="-1">Homebrew</button>
@@ -189,7 +202,7 @@
       <div><dt>Files</dt><dd>On disk, or S3-compatible storage, Google Cloud Storage or Azure.</dd></div>
       <div><dt>Backups</dt><dd>Scheduled, each one read back and checked, and copied to a folder or a bucket of your choice.</dd></div>
       <div><dt>Upgrades</dt><dd>Replace the binary and start it. A copy of the database is made before the schema changes.</dd></div>
-      <div><dt>Desktop app</dt><dd>For macOS, Windows and Linux: it sets up your agent tools and lets you answer from a notification. <a href="https://github.com/agrigoryan/quadit/releases">Download a pre-release</a></dd></div>
+      <div><dt>Desktop app</dt><dd>For macOS, Windows and Linux. On macOS and Linux it can run Quadit for you; everywhere it sets up your agent tools and lets you answer from a notification. <a data-release href="https://github.com/agrigoryan/quadit/releases">Download</a></dd></div>
     </dl>
   </div>
 </section>
@@ -199,18 +212,20 @@
     <h2 id="install-title">Set it up in three steps</h2>
     <ol class="setup">
       <li>
-        <h3>Install and start it</h3>
+        <h3>Download the app and run Quadit on your computer</h3>
+        <p>Open the app and choose <strong>Run Quadit on this computer</strong>. <a data-release href="https://github.com/agrigoryan/quadit/releases">Download</a></p>
+        <p class="after">On a server instead:</p>
         <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh</code><button class="copy" type="button" aria-label="Copy the install command">Copy</button></div>
         <div class="cmd"><code>quadit serve</code><button class="copy" type="button" aria-label="Copy quadit serve">Copy</button></div>
         <p class="after">Or <code>brew install agrigoryan/tap/quadit</code>, or the Docker image above. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md">Install guide</a></p>
       </li>
       <li>
-        <h3>Open it and make the first account</h3>
-        <p>Go to <code>http://localhost:4780</code>. The first person to open it creates the account and the workspace.</p>
+        <h3>Make the first account</h3>
+        <p>The app opens the set-up page for you. On a server, go to <code>http://localhost:4780</code>. The first person there creates the account and the workspace.</p>
       </li>
       <li>
         <h3>Give an agent a seat</h3>
-        <p>In Settings → Agents, create the agent and a token. Then, where the agent runs:</p>
+        <p>In the app, <strong>Connect agents</strong> finds Claude Code, Codex and the other agent tools on your computer and sets them up. By hand: in Settings → Agents, create the agent and a token, then, where the agent runs:</p>
         <div class="cmd"><code>quadit login https://your.server qd_token &amp;&amp; quadit skill install</code><button class="copy" type="button" aria-label="Copy the login and skill install commands">Copy</button></div>
       </li>
     </ol>

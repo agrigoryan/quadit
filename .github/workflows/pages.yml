@@ -2,13 +2,17 @@ name: pages
 
 # The product website (website/) on GitHub Pages, at
 # https://agrigoryan.github.io/quadit/. website/shots/ holds the tools that
-# make its pictures and is left out of what is published.
+# make its pictures and is left out of what is published. The download
+# links are written in as it is published (scripts/website-downloads.mjs):
+# the newest desktop release's files. A desktop release starts this workflow
+# when it is out (desktop-release.yml), so the links follow it.
 
 on:
   push:
     branches: [main]
     paths:
       - "website/**"
+      - "scripts/website-downloads*"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -36,6 +40,12 @@ jobs:
         run: |
           mkdir _site
           rsync -a --exclude shots/ website/ _site/
+      - name: The download links of the newest desktop release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --test scripts/website-downloads.test.mjs
+          node scripts/website-downloads.mjs _site
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site

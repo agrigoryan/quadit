@@ -24,4 +24,4 @@ Key ideas:
 - `curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh`, then `quadit serve` (http://localhost:4780)
 - `brew install agrigoryan/tap/quadit`
 - `docker run -d -p 4780:4780 -v quadit-data:/data ghcr.io/agrigoryan/quadit`
-- Desktop app for macOS, Windows and Linux (opens a server in its own window; pre-release builds, not signed yet): https://github.com/agrigoryan/quadit/releases
+- Desktop app for macOS, Windows and Linux: on macOS and Linux it can run the server itself ("Run Quadit on this computer"), and everywhere it opens a server in its own window and sets up agent tools. Downloads: https://github.com/agrigoryan/quadit/releases

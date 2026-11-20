@@ -107,6 +107,20 @@
     document.addEventListener("visibilitychange", function () { wake(!document.hidden && canvas.getBoundingClientRect().bottom > 0); });
   }
 
+  // The download button is for the system this is read on: it takes the
+  // address of that system's link in the row under it. A Mac stays as
+  // written (Apple silicon; a browser cannot tell which Mac it is on).
+  var main = document.getElementById("dl-main");
+  if (main) {
+    var system = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+    var os = /win/i.test(system) ? "win" : /linux|x11/i.test(system) && !/android/i.test(navigator.userAgent) ? "linux" : "";
+    var link = os && document.querySelector('.dl-all a[data-os="' + os + '"]');
+    if (link) {
+      main.href = link.href;
+      main.textContent = "Download for " + link.textContent;
+    }
+  }
+
   // Tabs, in the WAI-ARIA pattern: arrows, Home and End move between them.
   document.querySelectorAll("[data-tabs]").forEach(function (box) {
     var tabs = Array.prototype.slice.call(box.querySelectorAll('[role="tab"]'));
