@@ -21,16 +21,19 @@ export QUADIT_URL=$B QUADIT_CONFIG=$TMP/cli.json
 day() { python3 -c "import datetime,sys;print((datetime.date.today()+datetime.timedelta(days=int(sys.argv[1]))).isoformat())" "$1"; }
 json() { python3 -c "import json,sys;d=json.load(sys.stdin);print(eval(sys.argv[1],{'d':d}))" "$1"; }
 
+# A request as the server's own pages make it: a write made with the sign-in
+# cookie has to name its origin and send its body as JSON.
+web() { curl -sf -H "Origin: $B" -H "Content-Type: application/json" "$@"; }
 # One signed-in person: a cookie jar, then an API token of their own for the CLI.
 jar() { echo "$TMP/$1.jar"; }
-token_of() { curl -sf -b "$(jar "$1")" -X POST "$B/api/v1/w/$WS/tokens" -d "{\"name\":\"seed\"${2:+,\"user\":\"$2\"}}" | json 'd["token"]'; }
+token_of() { web -b "$(jar "$1")" -X POST "$B/api/v1/w/$WS/tokens" -d "{\"name\":\"seed\"${2:+,\"user\":\"$2\"}}" | json 'd["token"]'; }
 settok() { eval "TOK_$1=\$2"; }
 tok() { eval "echo \"\$TOK_$1\""; }
 as() { local who=$1; shift; QUADIT_TOKEN=$(tok "$who") "$Q" "$@" >/dev/null; }
 asj() { local who=$1; shift; QUADIT_TOKEN=$(tok "$who") "$Q" --json "$@"; }
 do_() { local who=$1 type=$2 args=$3; as "$who" do "$type" "$args"; }
 
-curl -sf -c "$(jar maya)" -X POST "$B/api/v1/auth/setup" \
+web -c "$(jar maya)" -X POST "$B/api/v1/auth/setup" \
   -d "{\"name\":\"Maya Okafor\",\"email\":\"maya@harbor.example\",\"password\":\"$PASS\",\"workspace_name\":\"Harbor Studio\"}" >/dev/null \
   || { echo "setup failed: is the server fresh and running at $B?" >&2; exit 1; }
 WS=harbor-studio
@@ -39,8 +42,8 @@ settok maya "$(token_of maya)"
 # Two more people, by invitation.
 for p in "jonas:Jonas Lindqvist" "priya:Priya Raman"; do
   h=${p%%:*} name=${p#*:}
-  link=$(curl -sf -b "$(jar maya)" -X POST "$B/api/v1/w/$WS/invites" -d '{"role":"member"}' | json 'd["link"]')
-  curl -sf -c "$(jar "$h")" -X POST "$B/api/v1/auth/invite/${link##*/}" \
+  link=$(web -b "$(jar maya)" -X POST "$B/api/v1/w/$WS/invites" -d '{"role":"member"}' | json 'd["link"]')
+  web -c "$(jar "$h")" -X POST "$B/api/v1/auth/invite/${link##*/}" \
     -d "{\"name\":\"$name\",\"email\":\"$h@harbor.example\",\"password\":\"$PASS\"}" >/dev/null
   settok "$h" "$(token_of "$h")"
 done
