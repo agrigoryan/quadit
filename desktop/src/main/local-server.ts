@@ -228,7 +228,7 @@ export class LocalServer {
       if (clock.now() - started >= READY_LIMIT_MS) {
         this.generation++;
         child.kill("SIGTERM");
-        this.fail("The server did not start within two minutes.", false);
+        this.fail("The server did not start within two minutes.", true);
         return;
       }
       await clock.sleep(READY_POLL_MS);
