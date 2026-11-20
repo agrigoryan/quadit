@@ -6,6 +6,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Desktop, expect, test } from "./desktop";
 
+/** What the settings file in `data` says of setup; undefined while the app has not written it yet. */
+function savedSetupDone(data: string): boolean | undefined {
+  try {
+    return (JSON.parse(readFileSync(join(data, "settings.json"), "utf8")) as { setupDone?: boolean }).setupDone;
+  } catch {
+    return undefined;
+  }
+}
+
 test("setup opens at the first start with its steps in order, and not at the next", async ({ run }) => {
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   let desktop = await Desktop.launch(data, run, [], { firstStart: true });
@@ -20,7 +29,7 @@ test("setup opens at the first start with its steps in order, and not at the nex
     ]);
     await expect(setup.getByRole("checkbox", { name: /quick capture/ })).toBeChecked();
     await setup.getByRole("button", { name: "Done" }).click();
-    await expect.poll(() => JSON.parse(readFileSync(join(data, "settings.json"), "utf8")).setupDone).toBe(true);
+    await expect.poll(() => savedSetupDone(data)).toBe(true);
   } finally {
     await desktop.close();
   }
