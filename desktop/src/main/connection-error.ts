@@ -86,7 +86,8 @@ export class ConnectionErrors {
     failure.timer = setTimeout(() => this.retry(win), wait);
   }
 
-  private retry(win: BrowserWindow) {
+  /** Tries the window again now, when its page could not be loaded. */
+  retry(win: BrowserWindow) {
     const failure = this.failures.get(win);
     if (!failure || win.isDestroyed()) return;
     failure.tries++;

@@ -11,6 +11,33 @@ export interface ServerView {
   origin: string;
   /** How its address carries what is said: see src/main/origins.ts, transportOf. */
   transport: "secure" | "local" | "insecure";
+  /** Whether it is the server the app runs on this computer (LocalServerView). */
+  local: boolean;
+}
+
+/** Where the server the app runs on this computer stands (src/main/local-server.ts). */
+export type LocalState =
+  | { kind: "stopped" }
+  | { kind: "starting" }
+  | { kind: "running" }
+  /** `log` is the last lines of the server's log. */
+  | { kind: "failed"; reason: string; log: string[] };
+
+export type LocalControl = "start" | "stop" | "restart";
+
+/** The server the app can run on this computer. */
+export interface LocalServerView {
+  /** Whether this build can run one: macOS and Linux, with the server inside the app. */
+  available: boolean;
+  /** Its id in the server list; null when it is not in the list (never set up, or removed). */
+  serverId: string | null;
+  state: LocalState;
+  /** Its data folder, kept when it is removed from the list. */
+  dataDir: string;
+  /** It was set up before and removed from the list: running it again uses the data it left. */
+  dataKept: boolean;
+  /** Whether the app starts when the person logs in; null where the app does not offer it (it does on macOS only). */
+  openAtLogin: boolean | null;
 }
 
 /** How a server answered just now; see src/main/probe.ts for what each fit means. */
@@ -134,6 +161,14 @@ export interface PagesApi {
   dismissSignInBar(): void;
   /** Loads again the server's page that the connection error it sits over is about. */
   retryServer(): void;
+
+  localServer(): Promise<LocalServerView>;
+  /** Sets up the server on this computer (or uses the one set up before), starts it and opens its window. */
+  runLocalServer(): Promise<{ ok: true } | { ok: false; error: string }>;
+  controlLocalServer(control: LocalControl): Promise<void>;
+  /** Shows the local server's data folder, or its log, in the system's file manager. */
+  showLocalServerFiles(what: "data" | "log"): Promise<void>;
+  setOpenAtLogin(on: boolean): Promise<void>;
 
   /** The workspaces the server windows show now. */
   summaries(): Promise<SummaryView[]>;

@@ -10,6 +10,7 @@
 
 import type { MenuItemConstructorOptions } from "electron";
 import type { Release } from "@/main/updates";
+import type { LocalControl, LocalState } from "@/shared/pages-api";
 
 export interface MenuState {
   appName: string;
@@ -20,6 +21,14 @@ export interface MenuState {
   /** Whether the window in front is a server's (Sign In with Browser acts on it). */
   serverInFront: boolean;
   update: Release | null;
+  /** The server the app can run on this computer; null where this build cannot run one. */
+  local: {
+    /** Whether it is in the server list. */
+    setUp: boolean;
+    state: LocalState["kind"];
+    /** Whether the app starts at login; null where the app does not offer it. */
+    openAtLogin: boolean | null;
+  } | null;
 }
 
 export interface MenuActions {
@@ -33,10 +42,63 @@ export interface MenuActions {
   openUpdate(release: Release): void;
   openWebsite(): void;
   reportIssue(): void;
+  runLocalServer(): void;
+  controlLocalServer(control: LocalControl): void;
+  showLocalServerFiles(what: "data" | "log"): void;
+  setOpenAtLogin(on: boolean): void;
 }
 
 /** What the menu-bar panel is called where it is a menu item. */
 export const PANEL_LABEL = "Decisions and Agents";
+
+/** What the menu says each state of the server on this computer is. */
+const LOCAL_STATE_LABEL: Record<LocalState["kind"], string> = {
+  stopped: "Stopped",
+  starting: "Starting…",
+  running: "Running",
+  failed: "Failed",
+};
+
+/** Running Quadit on this computer, or the controls of the server that runs here. */
+function localItems(local: MenuState["local"], actions: MenuActions): MenuItemConstructorOptions[] {
+  if (!local) return [];
+  if (!local.setUp)
+    return [{ id: "run-local", label: "Run Quadit on This Computer…", click: () => actions.runLocalServer() }];
+  const up = local.state === "starting" || local.state === "running";
+  return [
+    {
+      id: "local",
+      label: "Server on This Computer",
+      submenu: [
+        { label: LOCAL_STATE_LABEL[local.state], enabled: false },
+        { type: "separator" },
+        { id: "local-start", label: "Start", enabled: !up, click: () => actions.controlLocalServer("start") },
+        { id: "local-stop", label: "Stop", enabled: up, click: () => actions.controlLocalServer("stop") },
+        {
+          id: "local-restart",
+          label: "Restart",
+          enabled: local.state === "running",
+          click: () => actions.controlLocalServer("restart"),
+        },
+        { type: "separator" },
+        { id: "local-data", label: "Show Data Folder", click: () => actions.showLocalServerFiles("data") },
+        { id: "local-log", label: "Show Log", click: () => actions.showLocalServerFiles("log") },
+        ...(local.openAtLogin === null
+          ? []
+          : [
+              { type: "separator" as const },
+              {
+                id: "login-item",
+                label: "Start Quadit When I Log In",
+                type: "checkbox" as const,
+                checked: local.openAtLogin,
+                click: () => actions.setOpenAtLogin(!local.openAtLogin),
+              },
+            ]),
+      ],
+    },
+  ];
+}
 
 export function menuTemplate(state: MenuState, actions: MenuActions): MenuItemConstructorOptions[] {
   const mac = state.platform === "darwin";
@@ -75,8 +137,9 @@ export function menuTemplate(state: MenuState, actions: MenuActions): MenuItemCo
   const fileMenu: MenuItemConstructorOptions = {
     label: "File",
     submenu: [
-      { label: "Servers…", click: () => actions.showServerList() },
+      { id: "servers", label: "Servers…", click: () => actions.showServerList() },
       { label: "Add Server…", click: () => actions.showServerList() },
+      ...localItems(state.local, actions),
       { type: "separator" },
       // The key is the global one quick capture takes itself (capture.ts), so it is not given here.
       { id: "quick-capture", label: "Quick Capture…", click: () => actions.quickCapture() },

@@ -3,7 +3,8 @@
 // through window.quaditPages.
 
 import { element, make } from "@/pages/dom";
-import type { PagesApi, ServerStatus, ServerView } from "@/shared/pages-api";
+import { localDetails, runLocalChoice } from "@/pages/local";
+import type { LocalServerView, PagesApi, ServerStatus, ServerView } from "@/shared/pages-api";
 
 const api = window.quaditPages as PagesApi;
 const list = element<HTMLUListElement>("list");
@@ -12,6 +13,8 @@ const form = element<HTMLFormElement>("add");
 const addError = element<HTMLParagraphElement>("add-error");
 const addInsecure = element<HTMLButtonElement>("add-insecure");
 const invitation = element<HTMLParagraphElement>("invitation");
+const runLocal = element<HTMLElement>("run-local");
+const runLocalBox = element<HTMLDivElement>("run-local-choice");
 
 /** What a person should know about a server's answer, in a line. */
 function describe(status: ServerStatus): { text: string; signIn: boolean; warn: boolean } {
@@ -43,14 +46,15 @@ function transportNote(server: ServerView): string {
   return "";
 }
 
-function row(server: ServerView): HTMLLIElement {
+function row(server: ServerView, local: LocalServerView): HTMLLIElement {
   const item = make("li", "", "server");
   const about = make("div", "", "about");
   about.append(make("strong", server.name), make("span", server.origin, "origin"));
-  const note = transportNote(server);
+  const note = server.local ? "" : transportNote(server);
   if (note) about.append(make("span", note, server.transport === "insecure" ? "status warn" : "status"));
   const status = make("span", "Checking…", "status");
-  about.append(status);
+  // The server on this computer says how it runs instead, and has its controls.
+  about.append(...(server.local ? localDetails(local) : [status]));
 
   const actions = make("div", "", "actions");
   const open = make("button", "Open", "primary");
@@ -70,7 +74,15 @@ function row(server: ServerView): HTMLLIElement {
   // Removing asks once more in the row itself: the app forgets the sign-in.
   const confirming = make("div", "", "actions confirm");
   confirming.hidden = true;
-  confirming.append(make("span", `Remove ${server.name}? Its window closes and the app forgets its sign-in.`));
+  confirming.append(
+    make(
+      "span",
+      server.local
+        ? `Remove ${server.name}? The server on this computer stops, its window closes and the app forgets its sign-in. ` +
+            `Its data stays in ${local.dataDir}: run Quadit on this computer again to use it.`
+        : `Remove ${server.name}? Its window closes and the app forgets its sign-in.`,
+    ),
+  );
   const yes = make("button", "Remove", "danger");
   yes.type = "button";
   yes.setAttribute("aria-label", `Yes, remove ${server.name}`);
@@ -90,6 +102,11 @@ function row(server: ServerView): HTMLLIElement {
   });
   item.append(about, actions, confirming);
 
+  // Signing in to the server on this computer happens in its own window.
+  if (server.local) {
+    signIn.remove();
+    return item;
+  }
   void api.checkServer(server.id).then((answer) => {
     const said = describe(answer);
     status.textContent = said.text;
@@ -100,9 +117,12 @@ function row(server: ServerView): HTMLLIElement {
 }
 
 async function render() {
-  const servers = await api.listServers();
-  list.replaceChildren(...servers.map(row));
+  const [servers, local] = await Promise.all([api.listServers(), api.localServer()]);
+  list.replaceChildren(...servers.map((server) => row(server, local)));
   empty.hidden = servers.length > 0;
+  const choice = runLocalChoice(local);
+  runLocalBox.replaceChildren(...choice);
+  runLocal.hidden = choice.length === 0;
   const invited = await api.takeInvitation();
   if (invited) {
     invitation.textContent = `A link asked to open ${invited.origin}, which is not in your list. Add it below to open the link's server.`;

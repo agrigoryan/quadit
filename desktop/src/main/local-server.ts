@@ -23,13 +23,7 @@ import { createConnection, createServer } from "node:net";
 import { join } from "node:path";
 import type { Fetch } from "@/main/probe";
 import type { Settings } from "@/main/settings";
-
-export type LocalState =
-  | { kind: "stopped" }
-  | { kind: "starting" }
-  | { kind: "running" }
-  /** `log` is the last lines of the server's log. */
-  | { kind: "failed"; reason: string; log: string[] };
+import type { LocalState } from "@/shared/pages-api";
 
 /** What the app needs of a started quadit serve (Node's ChildProcess has it). */
 export interface ServerProcess {

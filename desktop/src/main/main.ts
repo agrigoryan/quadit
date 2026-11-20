@@ -4,9 +4,11 @@
 // (server-windows.ts), what the windows' pages publish and are asked
 // (requests.ts), the app's own pages (app-pages.ts: the server list,
 // setup, Connect, the menu-bar panel, quick capture), the browser sign-in
-// (handoff.ts), the unread badge (unread.ts), the menu (menu.ts) and the
-// update notice (updates.ts).
+// (handoff.ts), the unread badge (unread.ts), the menu (menu.ts), the
+// update notice (updates.ts) and the server on this computer
+// (local-server.ts), which runs while the app does.
 
+import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { join } from "node:path";
@@ -16,6 +18,7 @@ import { AppPages } from "@/main/app-pages";
 import { Capture } from "@/main/capture";
 import { ConnectPage } from "@/main/connect-page";
 import { Connections } from "@/main/connections";
+import { LocalServer, loopbackPorts } from "@/main/local-server";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
 import { SignInFlows } from "@/main/handoff";
 import { menuTemplate } from "@/main/menu";
@@ -79,6 +82,29 @@ function start() {
 
   const fetcher = (url: string, init?: RequestInit) => net.fetch(url, init);
   const checks = new ServerChecks(store, fetcher, (words) => void warn(words));
+  const local = new LocalServer({
+    binary: localServerBinary(),
+    dataDir: join(dataDir, "server"),
+    settings,
+    spawn: (binary, args, options) => spawn(binary, args, options),
+    clock: { now: () => Date.now(), sleep: (ms) => new Promise((done) => setTimeout(done, ms)) },
+    fetch: fetcher,
+    ports: loopbackPorts,
+    env: process.env,
+  });
+  /** The server on this computer's entry in the list, when it is there. */
+  const localEntry = () => {
+    const origin = local.origin();
+    return origin ? store.byOrigin(origin) : undefined;
+  };
+  // Offered on macOS, for the installed app only: from source it would start the bare Electron.
+  const loginItem =
+    process.platform === "darwin" && app.isPackaged
+      ? {
+          get: () => app.getLoginItemSettings().openAtLogin,
+          set: (on: boolean) => app.setLoginItemSettings({ openAtLogin: on }),
+        }
+      : null;
   // Every way to start the browser sign-in (the bar, the server list, the
   // menu, a provider's address on the sign-in page) comes here, and only a
   // server that speaks this app's hand-off gets it.
@@ -116,8 +142,9 @@ function start() {
     forgetUnread: (reporter) => unread.forget(reporter),
     requests,
     changed: () => refreshMenu(),
+    whenReachable: (serverId) => (serverId === localEntry()?.id ? local.settled() : Promise.resolve()),
   });
-  const list = new ServerList(store, windows, pages, requests, { fetcher, checks, signIn });
+  const list = new ServerList(store, windows, pages, requests, { fetcher, checks, signIn, local, loginItem });
   const panel = new Panel(pages, requests);
   const capture = new Capture(pages, settings, requests);
   const connect = new ConnectPage(
@@ -164,6 +191,9 @@ function start() {
               .map((server) => ({ id: server.id, name: server.name, focused: server.id === front?.id })),
             serverInFront: !!front,
             update: updates.available,
+            local: local.available
+              ? { setUp: !!localEntry(), state: local.state().kind, openAtLogin: loginItem?.get() ?? null }
+              : null,
           },
           {
             showServerList: () => list.show(),
@@ -176,6 +206,18 @@ function start() {
             openUpdate: (release) => void tellAboutUpdate(release),
             openWebsite: () => void shell.openExternal(WEBSITE),
             reportIssue: () => void shell.openExternal(`${WEBSITE}/issues`),
+            runLocalServer: () =>
+              void list.runLocal().then((ran) => {
+                if (!ran.ok) void warn({ title: "Quadit could not be run on this computer", detail: ran.error });
+              }),
+            controlLocalServer: (control) => void list.control(control),
+            showLocalServerFiles: (what) =>
+              what === "log" ? shell.showItemInFolder(local.logFile) : void shell.openPath(local.dataDir),
+            setOpenAtLogin: (on) => {
+              loginItem?.set(on);
+              refreshMenu();
+              pages.changed();
+            },
           },
         ),
       ),
@@ -183,6 +225,16 @@ function start() {
   };
   store.onChange(refreshMenu);
   app.on("browser-window-focus", refreshMenu);
+  local.onChange(() => {
+    refreshMenu();
+    pages.changed();
+    const entry = localEntry();
+    if (entry && local.state().kind === "running") {
+      // Up: what it speaks is asked now, and a window that found it down tries again.
+      void checks.check(entry.id);
+      windows.retry(entry.id);
+    }
+  });
   refreshMenu();
 
   const handleReadyLink = (raw: string) => {
@@ -207,22 +259,39 @@ function start() {
   app.on("activate", () => {
     if (!BrowserWindow.getAllWindows().some((win) => win.isVisible())) list.show();
   });
-  app.on("before-quit", () => {
+  // Quitting waits for the server on this computer to stop: it is told to,
+  // and killed if it has not in a few seconds (local-server.ts).
+  let localStopped = false;
+  app.on("before-quit", (event) => {
     windows.quit();
     updates.stop();
+    if (localStopped) return;
+    event.preventDefault();
+    void local.stop().then(() => {
+      localStopped = true;
+      app.quit();
+    });
   });
   // Server windows hide rather than close, so this only runs when quitting
-  // or when the server list was the last window on Windows and Linux.
+  // or when the server list was the last window on Windows and Linux. With
+  // a server on this computer the app stays, in the menu bar or the tray,
+  // since the server runs only while the app does.
   app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") app.quit();
+    if (process.platform !== "darwin" && !localEntry()) app.quit();
   });
 
   // Asleep, a page's connections died quietly; awake, they are checked at once.
   powerMonitor.on("resume", () => windows.wake());
   unread.start();
   capture.applyShortcut();
-  const shown = windows.restore();
-  if (!settings.get().setupDone) setup.show();
+  // Started before the windows are made, so its own waits for it (whenReachable).
+  if (localEntry()) local.start();
+  // Started at login (macOS), the app opens no window: it is there for its server and its notifications.
+  const atLogin = process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin;
+  const shown = windows.restore({ show: !atLogin });
+  if (atLogin) {
+    // Nothing to show.
+  } else if (!settings.get().setupDone) setup.show();
   else if (!shown) list.show();
   // Servers upgrade and downgrade while the app is away: ask each again.
   void checks.checkAll();
@@ -259,6 +328,18 @@ async function offerToAdd(origin: string): Promise<boolean> {
 function bundledCli(): string | null {
   const path = join(process.resourcesPath, "bin", "quadit");
   return app.isPackaged && !process.env.APPIMAGE && existsSync(path) ? path : null;
+}
+
+/**
+ * The quadit the app runs as the server on this computer: the one packaged
+ * in its resources (macOS and Linux, built with the web app), or null
+ * without one (Windows). Run from source, QUADIT_DESKTOP_QUADIT names one
+ * (a binary `make build` made), for tests and for trying it out.
+ */
+function localServerBinary(): string | null {
+  if (!app.isPackaged) return process.env.QUADIT_DESKTOP_QUADIT || null;
+  const path = join(process.resourcesPath, "bin", "quadit");
+  return existsSync(path) ? path : null;
 }
 
 /** Tells the person something that went wrong or needs them, in a dialog of its own. */

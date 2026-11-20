@@ -2,12 +2,15 @@
 // where it stands and each skippable.
 
 import { button, element, make } from "@/pages/dom";
+import { describeLocal, runLocalChoice } from "@/pages/local";
 import type { PagesApi, SetupState } from "@/shared/pages-api";
 
 const api = window.quaditPages as PagesApi;
 const servers = element<HTMLUListElement>("servers");
 const signIn = element<HTMLUListElement>("sign-in");
 const form = element<HTMLFormElement>("add");
+const runLocal = element<HTMLElement>("run-local");
+const runLocalBox = element<HTMLDivElement>("run-local-choice");
 const addError = element<HTMLParagraphElement>("add-error");
 const shortcut = element<HTMLInputElement>("shortcut");
 const shortcutLabel = element<HTMLSpanElement>("shortcut-label");
@@ -32,20 +35,27 @@ function showState(state: SetupState) {
 }
 
 async function render() {
-  const [list, state] = await Promise.all([api.listServers(), api.setupState()]);
+  const [list, state, local] = await Promise.all([api.listServers(), api.setupState(), api.localServer()]);
   servers.replaceChildren(
     ...list.map((server) => {
       const row = make("li", "", "item");
-      row.append(make("strong", server.name), make("span", `${server.origin} · added`, "status"));
+      const status = server.local ? describeLocal(local.state).text : "added";
+      row.append(make("strong", server.name), make("span", `${server.origin} · ${status}`, "status"));
       return row;
     }),
   );
+  const choice = runLocalChoice(local);
+  runLocalBox.replaceChildren(...choice);
+  runLocal.hidden = choice.length === 0;
   signIn.replaceChildren(
     ...list.map((server) => {
       const row = make("li", "", "item");
       const done = state.signedIn.includes(server.id);
       row.append(make("strong", server.name));
       if (done) row.append(make("span", "Signed in", "status"));
+      // The server on this computer is set up, and signed in to, in its own window.
+      else if (server.local)
+        row.append(button("Open its window", () => void api.openServer(server.id), "", `Open ${server.name}`));
       else
         row.append(button("Sign in with browser", () => void api.signIn(server.id), "", `Sign in to ${server.name}`));
       return row;

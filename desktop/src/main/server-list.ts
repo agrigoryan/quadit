@@ -1,16 +1,32 @@
 // The server list: the app's own bundled page where servers are added,
 // checked, opened, signed in to and removed; and what the app's pages ask
 // about servers and the workspaces their windows show (the summaries).
+//
+// The server the app runs on this computer (local-server.ts) is one of the
+// list's servers, named "This computer", with its state and controls beside
+// it. There is one at most. Removing it stops it and keeps its data folder.
 
-import type { BrowserWindow } from "electron";
+import { type BrowserWindow, shell } from "electron";
 import type { AppPages } from "@/main/app-pages";
+import type { LocalServer } from "@/main/local-server";
 import { serverOrigin, transportOf } from "@/main/origins";
 import { type Fetch, probe } from "@/main/probe";
 import type { Requests } from "@/main/requests";
 import type { ServerChecks } from "@/main/server-checks";
 import type { ServerWindows } from "@/main/server-windows";
 import type { Server, ServerStore } from "@/main/servers";
-import type { AddResult, Invitation, ServerStatus, ServerView, SummaryView } from "@/shared/pages-api";
+import type {
+  AddResult,
+  Invitation,
+  LocalControl,
+  LocalServerView,
+  ServerStatus,
+  ServerView,
+  SummaryView,
+} from "@/shared/pages-api";
+
+/** What the server on this computer is called in the list. */
+export const LOCAL_NAME = "This computer";
 
 export interface ServerListSetup {
   /** The network the probes of servers being added go through (Electron's net.fetch). */
@@ -18,6 +34,10 @@ export interface ServerListSetup {
   /** What asks added servers what they are and keeps the answer. */
   checks: ServerChecks;
   signIn(serverId: string): void;
+  /** The server the app runs on this computer. */
+  local: LocalServer;
+  /** Whether the app starts at login, and the switch; null where the app does not offer it. */
+  loginItem: { get(): boolean; set(on: boolean): void } | null;
 }
 
 export class ServerList {
@@ -34,13 +54,18 @@ export class ServerList {
     private setup: ServerListSetup,
   ) {
     pages.answer({
-      listServers: () => store.list().map(view),
+      listServers: () => store.list().map((server) => this.view(server)),
       checkServer: (_sender, id) => this.check(String(id)),
       addServer: (_sender, address, name, allowInsecure) =>
         this.add(String(address), String(name ?? ""), allowInsecure === true),
       removeServer: async (_sender, id) => {
         const server = store.get(String(id));
         if (!server) return;
+        if (this.isLocal(server)) {
+          // Its data stays; the person can run it again and have it back.
+          await setup.local.stop();
+          setup.loginItem?.set(false);
+        }
         await windows.forget(server);
         store.remove(server.id);
       },
@@ -61,8 +86,52 @@ export class ServerList {
           return server ? [{ serverId, serverName: server.name, summary, listening }] : [];
         }),
       openPath: (_sender, serverId, path) => windows.show(String(serverId), String(path)),
+      localServer: () => this.localView(),
+      runLocalServer: () => this.runLocal(),
+      controlLocalServer: (_sender, control) => this.control(control),
+      showLocalServerFiles: (_sender, what) => {
+        if (what === "log") shell.showItemInFolder(setup.local.logFile);
+        else void shell.openPath(setup.local.dataDir);
+      },
+      setOpenAtLogin: (_sender, on) => {
+        setup.loginItem?.set(on === true);
+        pages.changed();
+      },
     });
     store.onChange(() => pages.changed());
+  }
+
+  /** The server on this computer, when it is in the list. */
+  localServer(): Server | undefined {
+    const origin = this.setup.local.origin();
+    return origin ? this.store.byOrigin(origin) : undefined;
+  }
+
+  /**
+   * Sets up the server on this computer, or uses the one set up before (its
+   * data folder and port), adds it to the list and opens its window on the
+   * web app's first-run page, which goes on to sign-in when it is set up already.
+   */
+  async runLocal(): Promise<{ ok: true } | { ok: false; error: string }> {
+    let origin: string;
+    try {
+      origin = await this.setup.local.setUp();
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+    // Its hand-off is asked once it runs (main.ts).
+    const server = this.store.add(origin, LOCAL_NAME, 0);
+    this.windows.showSetUp(server.id);
+    return { ok: true };
+  }
+
+  /** Starts, stops or restarts the server on this computer. */
+  async control(control: LocalControl) {
+    const { local } = this.setup;
+    if (!this.localServer()) return;
+    if (control === "start") local.start();
+    else if (control === "stop") await local.stop();
+    else if (control === "restart") await local.restart();
   }
 
   /** Shows the list, making its window when there is none. */
@@ -116,7 +185,7 @@ export class ServerList {
     const path = this.destination?.origin === origin ? this.destination.path : undefined;
     if (path) this.destination = null;
     this.windows.show(server.id, path);
-    return { ok: true, server: view(server) };
+    return { ok: true, server: this.view(server) };
   }
 
   private async check(id: string): Promise<ServerStatus> {
@@ -125,8 +194,31 @@ export class ServerList {
     if (!answer.reachable) return answer;
     return { reachable: true, version: answer.version, fit: answer.fit };
   }
-}
 
-function view(server: Server): ServerView {
-  return { id: server.id, name: server.name, origin: server.origin, transport: transportOf(server.origin) };
+  private isLocal(server: Server): boolean {
+    return server.origin === this.setup.local.origin();
+  }
+
+  private view(server: Server): ServerView {
+    return {
+      id: server.id,
+      name: server.name,
+      origin: server.origin,
+      transport: transportOf(server.origin),
+      local: this.isLocal(server),
+    };
+  }
+
+  private localView(): LocalServerView {
+    const { local, loginItem } = this.setup;
+    const serverId = this.localServer()?.id ?? null;
+    return {
+      available: local.available,
+      serverId,
+      state: local.state(),
+      dataDir: local.dataDir,
+      dataKept: serverId === null && local.origin() !== null,
+      openAtLogin: loginItem ? loginItem.get() : null,
+    };
+  }
 }

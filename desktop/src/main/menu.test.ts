@@ -1,5 +1,5 @@
 import type { MenuItemConstructorOptions } from "electron";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { menuTemplate, type MenuState } from "@/main/menu";
 
 /**
@@ -33,6 +33,7 @@ const state = (platform: NodeJS.Platform, extra: Partial<MenuState> = {}): MenuS
   ],
   serverInFront: true,
   update: null,
+  local: null,
   ...extra,
 });
 
@@ -48,6 +49,10 @@ const actions = {
   openUpdate: noop,
   openWebsite: noop,
   reportIssue: noop,
+  runLocalServer: noop,
+  controlLocalServer: noop,
+  showLocalServerFiles: noop,
+  setOpenAtLogin: noop,
 };
 
 function items(template: MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
@@ -127,5 +132,46 @@ describe("menuTemplate", () => {
       menuTemplate(state("darwin", { update: { version: "0.2.0", url: "https://x" } }), actions),
     ).map((item) => item.label);
     expect(labels).toContain("Quadit 0.2.0 Is Available…");
+  });
+
+  it("offers to run Quadit on this computer only where the app can", () => {
+    const labels = (local: MenuState["local"]) =>
+      items(menuTemplate(state("linux", { local }), actions)).map((item) => item.label);
+    expect(labels(null)).not.toContain("Run Quadit on This Computer…");
+    expect(labels({ setUp: false, state: "stopped", openAtLogin: null })).toContain("Run Quadit on This Computer…");
+    expect(labels({ setUp: true, state: "running", openAtLogin: null })).not.toContain("Run Quadit on This Computer…");
+  });
+
+  it("has the server on this computer's state and controls, each where it makes sense", () => {
+    const control = vi.fn();
+    const local = (kind: "stopped" | "starting" | "running" | "failed", openAtLogin: boolean | null = null) => {
+      const all = items(
+        menuTemplate(state("darwin", { local: { setUp: true, state: kind, openAtLogin } }), {
+          ...actions,
+          controlLocalServer: control,
+        }),
+      );
+      const submenu = all.find((item) => item.id === "local")?.submenu;
+      return Array.isArray(submenu) ? submenu : [];
+    };
+    const enabled = (menu: MenuItemConstructorOptions[]) =>
+      menu.filter((item) => item.id?.startsWith("local-") && item.enabled !== false).map((item) => item.label);
+
+    expect(local("running")[0]).toMatchObject({ label: "Running", enabled: false });
+    expect(enabled(local("running"))).toEqual(["Stop", "Restart", "Show Data Folder", "Show Log"]);
+    expect(enabled(local("starting"))).toEqual(["Stop", "Show Data Folder", "Show Log"]);
+    expect(enabled(local("stopped"))).toEqual(["Start", "Show Data Folder", "Show Log"]);
+    expect(enabled(local("failed"))).toEqual(["Start", "Show Data Folder", "Show Log"]);
+
+    local("running")
+      .find((item) => item.label === "Restart")
+      ?.click?.({} as never, undefined, {});
+    expect(control).toHaveBeenCalledWith("restart");
+
+    expect(local("running").find((item) => item.type === "checkbox")).toBeUndefined();
+    expect(local("running", true).find((item) => item.type === "checkbox")).toMatchObject({
+      label: "Start Quadit When I Log In",
+      checked: true,
+    });
   });
 });

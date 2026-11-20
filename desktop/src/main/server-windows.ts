@@ -60,6 +60,8 @@ import {
 
 /** The path of the web app's sign-in page: where the bar offering the browser sign-in shows. */
 const SIGN_IN_PATH = "/login";
+/** The web app's first-run page, where a new server's owner and first workspace are made. */
+const SET_UP_PATH = "/setup";
 const BAR_HEIGHT = 52;
 
 /** What a server's windows need from the rest of the app. */
@@ -82,6 +84,12 @@ export interface WindowsSetup {
   requests: Requests;
   /** A window was shown, hidden or focused: the menus that list them change. */
   changed(): void;
+  /**
+   * Resolves when a server's page is worth loading: at once for a server
+   * elsewhere; for the one the app runs on this computer, once it has
+   * started or failed to. Until then its window shows the dark background.
+   */
+  whenReachable(serverId: string): Promise<void>;
 }
 
 export class ServerWindows {
@@ -133,10 +141,14 @@ export class ServerWindows {
     });
   }
 
-  /** Makes a window for every server, shown for those that were open when the app last stopped; gives whether any is shown. */
-  restore(): boolean {
-    for (const server of this.store.list()) this.ensure(server, server.origin + "/", server.open);
-    return this.store.list().some((server) => server.open);
+  /**
+   * Makes a window for every server, shown for those that were open when the
+   * app last stopped unless `show` is false (they stay marked open for the
+   * next start); gives whether any is shown.
+   */
+  restore({ show }: { show: boolean }): boolean {
+    for (const server of this.store.list()) this.ensure(server, server.origin + "/", show && server.open);
+    return show && this.store.list().some((server) => server.open);
   }
 
   /** Shows and focuses a server's window, at `path` when given and a page of the web app. */
@@ -150,6 +162,22 @@ export class ServerWindows {
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
+  }
+
+  /**
+   * Shows a new server's window on the web app's first-run page, where the
+   * person makes its owner and first workspace and is signed in, in the
+   * window. Only the app opens that page: a link or a notification may not
+   * (appPage). The page itself goes on to sign-in on a server set up already.
+   */
+  showSetUp(serverId: string) {
+    const server = this.store.get(serverId);
+    if (!server) return;
+    const target = server.origin + SET_UP_PATH;
+    const known = this.windows.get(serverId);
+    if (known) void this.setup.whenReachable(serverId).then(() => known.webContents.loadURL(target));
+    else this.ensure(server, target, true);
+    this.show(serverId);
   }
 
   /**
@@ -237,6 +265,12 @@ export class ServerWindows {
     }
   }
 
+  /** Tries a server's window again now, when its page could not be loaded: the server has just started. */
+  retry(serverId: string) {
+    const win = this.windows.get(serverId);
+    if (win) this.errors.retry(win);
+  }
+
   /** Tries again the window a connection error page sits over (its Try again). */
   retryFrom(contents: WebContents) {
     this.errors.retryFrom(contents);
@@ -292,7 +326,9 @@ export class ServerWindows {
     win.on("closed", () => {
       if (this.windows.get(server.id) === win) this.windows.delete(server.id);
     });
-    void win.webContents.loadURL(firstUrl);
+    void this.setup.whenReachable(server.id).then(() => {
+      if (!win.isDestroyed()) void win.webContents.loadURL(firstUrl);
+    });
     return win;
   }
 
