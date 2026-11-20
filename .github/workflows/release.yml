@@ -101,6 +101,13 @@ jobs:
           if [ -z "$HOMEBREW_TAP_GITHUB_TOKEN" ]; then
             echo "::warning::HOMEBREW_TAP_GITHUB_TOKEN is not set: the Homebrew cask is not pushed to agrigoryan/homebrew-tap, which keeps the earlier version. The release notes say so."
           fi
+      # The desktop app's tags (desktop-v*) are in this repository too, and
+      # GoReleaser would take the nearest tag of any kind as the release
+      # before this one: the notes of 0.2.0 began at a desktop tag. The
+      # release before a server release is the last server tag.
+      - name: The server release before this one
+        id: before
+        run: echo "tag=$(git describe --tags --abbrev=0 --match 'v*' "$GITHUB_REF_NAME^" 2>/dev/null || true)" >> "$GITHUB_OUTPUT"
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -109,3 +116,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
+          GORELEASER_PREVIOUS_TAG: ${{ steps.before.outputs.tag }}
