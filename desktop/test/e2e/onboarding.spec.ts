@@ -75,18 +75,27 @@ test("the first run sets Quadit up on this computer with a name alone, lands in 
     ).toBeVisible();
     await screen(welcome, "04-connect-agents.png");
 
-    // What it changes, before anything is changed.
+    // What it changes, before anything is changed; shown again, it folds away.
     const skill = join(computer.home, ".claude", "skills", "quadit", "SKILL.md");
-    await welcome.getByRole("button", { name: "See what connecting Claude Code changes" }).click();
+    const seeChanges = welcome.getByRole("button", { name: "See what connecting Claude Code changes" });
     // The file's name, over its diff (which begins with it too).
-    await expect(welcome.getByText(skill, { exact: true })).toBeVisible();
+    const skillShown = welcome.getByText(skill, { exact: true });
+    await seeChanges.click();
+    await expect(skillShown).toBeVisible();
     expect(existsSync(skill)).toBe(false);
+    await seeChanges.click();
+    await expect(skillShown).toBeHidden();
 
     // Connected, with nothing asked: the command and its skill, as an agent of the tool's own name.
     await welcome.getByRole("button", { name: "Connect Claude Code" }).click();
     await expect(welcome.getByText("Connected", { exact: true })).toBeVisible({ timeout: 20_000 });
     await expect(welcome.getByRole("button", { name: "Done" })).toBeVisible();
     await screen(welcome, "04b-connected.png");
+    // What it changed, in the window's width: a long path wraps, a diff scrolls in its own box.
+    await seeChanges.click();
+    await expect(skillShown).toBeVisible();
+    expect(await welcome.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await screen(welcome, "04c-changes.png");
     expect(existsSync(skill)).toBe(true);
     const settings = JSON.parse(readFileSync(join(computer.home, ".claude", "settings.json"), "utf8")) as {
       env?: { QUADIT_CONFIG?: string };
