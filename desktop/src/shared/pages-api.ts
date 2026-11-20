@@ -72,6 +72,12 @@ export interface SetupState {
   signedIn: string[];
 }
 
+/** An agent tool found on this computer, as Welcome offers it: its name only. */
+export interface FoundToolView {
+  id: string;
+  name: string;
+}
+
 export type CaptureWhat = "task" | "page";
 
 /** Where quick capture puts what it makes; the last one is offered again. */
@@ -168,9 +174,15 @@ export interface PagesApi {
   /**
    * Sets Quadit up on this computer: starts the server here (or the one set
    * up before), makes its owner, named `name`, and opens its window on their
-   * workspace, signed in; on one set up already, signs in instead.
+   * workspace, signed in; on one set up already, signs in instead. `tools`:
+   * the agent tools found here that Welcome offers to connect next (none:
+   * Welcome is done).
    */
-  setUpHere(name: string): Promise<{ ok: true } | { ok: false; error: string }>;
+  setUpHere(name: string): Promise<{ ok: true; tools: FoundToolView[] } | { ok: false; error: string }>;
+  /** Connects one of the tools setUpHere offered, with the first run's choices and nothing asked. */
+  connectFoundTool(id: string): Promise<{ ok: true } | { ok: false; error: string }>;
+  /** What connecting one of those tools changes: the plan as it would be, or as it was carried out. */
+  foundToolChanges(id: string): Promise<Planned>;
   controlLocalServer(control: LocalControl): Promise<void>;
   /** Shows the local server's data folder, or its log, in the system's file manager. */
   showLocalServerFiles(what: "data" | "log"): Promise<void>;

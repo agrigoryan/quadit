@@ -14,18 +14,17 @@ const { LOCAL_NAME, ServerList } = await import("@/main/server-list");
 
 const ORIGIN = "http://127.0.0.1:4780";
 
-type Owner = { ok: true; path: string; first: boolean } | { ok: false; error: string };
+type Owner = { ok: true; workspace: string | null } | { ok: false; error: string };
 
 /**
  * A server list whose server on this computer starts at once (or fails to,
  * with `startError`) and answers set-up with `owner`, one answer per call.
  */
-function setUp(owner: Owner[], startError?: string, { toolFound = true } = {}) {
+function setUp(owner: Owner[], startError?: string) {
   const store = new ServerStore(join(mkdtempSync(join(tmpdir(), "quadit-desktop-list-")), "servers.json"));
   const windowFetches = new Map<string, Fetch>();
   const shown: { serverId: string; path: string }[] = [];
   const ownerAsked: { fetch: Fetch; name: string }[] = [];
-  let connectShown = 0;
   const fetcher: Fetch = async () => new Response(null, { status: 404 });
   const windows = {
     show: () => {},
@@ -74,52 +73,40 @@ function setUp(owner: Owner[], startError?: string, { toolFound = true } = {}) {
       signIn: () => {},
       local,
       loginItem: null,
-      openConnect: () => void connectShown++,
-      agentToolFound: async () => toolFound,
     },
   );
-  return { list, store, shown, ownerAsked, windowFetches, connects: () => connectShown };
+  return { list, store, shown, ownerAsked, windowFetches };
 }
 
 describe("ServerList.setUpHere", () => {
   it("adds the server on this computer, makes its owner through its window's own session, and opens that window on the workspace", async () => {
-    const { list, store, shown, ownerAsked, windowFetches } = setUp([{ ok: true, path: "/personal", first: true }]);
-    expect(await list.setUpHere("Lou Local")).toEqual({ ok: true });
+    const { list, store, shown, ownerAsked, windowFetches } = setUp([{ ok: true, workspace: "personal" }]);
+    const done = await list.setUpHere("Lou Local");
     const server = store.byOrigin(ORIGIN);
+    expect(done).toEqual({ ok: true, serverId: server?.id, workspace: "personal" });
     expect(server?.name).toBe(LOCAL_NAME);
     expect(list.localServer()?.id).toBe(server?.id);
     expect(ownerAsked).toEqual([{ fetch: windowFetches.get(server?.id ?? ""), name: "Lou Local" }]);
     expect(shown).toEqual([{ serverId: server?.id, path: "/personal" }]);
   });
 
-  it("shows Connect agents once, right after the owner is made, and not when it signs in to an install set up before", async () => {
-    const { list, connects } = setUp([
-      { ok: true, path: "/personal", first: true },
-      { ok: true, path: "/", first: false },
+  it("says which workspace it made with the owner, and none when it signed in to an install set up before, which opens on its own first page", async () => {
+    const { list, shown } = setUp([
+      { ok: true, workspace: "personal" },
+      { ok: true, workspace: null },
     ]);
-    await list.setUpHere("Lou Local");
-    expect(connects()).toBe(1);
-    await list.setUpHere("Lou Local");
-    expect(connects()).toBe(1);
+    expect(await list.setUpHere("Lou Local")).toMatchObject({ workspace: "personal" });
+    expect(await list.setUpHere("Lou Local")).toMatchObject({ workspace: null });
+    expect(shown.map((open) => open.path)).toEqual(["/personal", "/"]);
   });
 
-  it("does not show Connect agents by itself on a computer where no agent tool is found", async () => {
-    const { list, shown, connects } = setUp([{ ok: true, path: "/personal", first: true }], undefined, {
-      toolFound: false,
-    });
-    expect(await list.setUpHere("Lou Local")).toEqual({ ok: true });
-    expect(shown).toHaveLength(1);
-    expect(connects()).toBe(0);
-  });
-
-  it("says why when it could not, without opening a window or Connect", async () => {
+  it("says why when it could not, without opening a window", async () => {
     const refused = setUp([{ ok: false, error: "The server on this computer answered: name is required." }]);
     expect(await refused.list.setUpHere("")).toEqual({
       ok: false,
       error: "The server on this computer answered: name is required.",
     });
     expect(refused.shown).toEqual([]);
-    expect(refused.connects()).toBe(0);
 
     const unstartable = setUp([], "This build of the app has no Quadit server to run.");
     expect(await unstartable.list.setUpHere("Lou")).toEqual({

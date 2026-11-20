@@ -48,10 +48,6 @@ export interface ServerListSetup {
   local: Local;
   /** Whether the app starts at login, and the switch; null where the app does not offer it. */
   loginItem: { get(): boolean; set(on: boolean): void } | null;
-  /** Shows the Connect agents window. */
-  openConnect(): void;
-  /** Whether an agent tool Connect can connect is found on this computer (connections.ts). */
-  agentToolFound(): Promise<boolean>;
 }
 
 export class ServerList {
@@ -101,7 +97,6 @@ export class ServerList {
         }),
       openPath: (_sender, serverId, path) => windows.show(String(serverId), String(path)),
       localServer: () => this.localView(),
-      setUpHere: (_sender, name) => this.setUpHere(typeof name === "string" ? name : ""),
       controlLocalServer: (_sender, control) => this.control(control),
       showLocalServerFiles: (_sender, what) => {
         if (what === "log") shell.showItemInFolder(setup.local.logFile);
@@ -127,11 +122,13 @@ export class ServerList {
    * one), adds it to the list, makes its owner `name` and their workspace
    * through its window's own session, and opens that window on the
    * workspace, signed in. On an install set up already it signs in instead,
-   * so trying again after a half-finished attempt works. Right after the
-   * owner is made, and only then, Connect agents opens over the window,
-   * where it has something to connect: an agent tool found on this computer.
+   * so trying again after a half-finished attempt works. Gives the server's
+   * id and the workspace made with the owner (its slug; null when the
+   * install was set up already).
    */
-  async setUpHere(name: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  async setUpHere(
+    name: string,
+  ): Promise<{ ok: true; serverId: string; workspace: string | null } | { ok: false; error: string }> {
     const { local } = this.setup;
     let origin: string;
     try {
@@ -145,9 +142,8 @@ export class ServerList {
     const owner = await local.setUpOwner(this.windows.fetcher(server.id), name.trim());
     if (!owner.ok) return owner;
     // Its window may be open already, on the web app's page saying the app sets it up: it starts over, signed in.
-    this.windows.showAfresh(server.id, owner.path);
-    if (owner.first && (await this.setup.agentToolFound())) this.setup.openConnect();
-    return { ok: true };
+    this.windows.showAfresh(server.id, owner.workspace ? `/${encodeURIComponent(owner.workspace)}` : "/");
+    return { ok: true, serverId: server.id, workspace: owner.workspace };
   }
 
   /** Starts, stops or restarts the server on this computer. */

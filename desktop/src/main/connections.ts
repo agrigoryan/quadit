@@ -125,17 +125,6 @@ export class Connections {
     return join(this.parts.dataDir, "backups");
   }
 
-  /**
-   * Whether an agent tool Connect can connect is on this computer, found
-   * as Connect's window finds it (installed); never on Windows, where
-   * Connect cannot connect one.
-   */
-  async anyToolFound(): Promise<boolean> {
-    if (this.parts.platform === "win32") return false;
-    const { path } = await this.parts.cli.look();
-    return HARNESSES.some((harness) => this.installed(harness, path));
-  }
-
   /** The harnesses, what each has connected, and where the quadit command stands. */
   async state(): Promise<ConnectView> {
     const { home, cli } = this.parts;

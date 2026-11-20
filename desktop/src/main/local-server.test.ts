@@ -642,7 +642,7 @@ describe("LocalServer.setUpOwner", () => {
         return json(201, { user: { name: "Lou Local" }, workspace: { slug: "personal", name: "Personal" } });
       return json(404, {});
     });
-    expect(await server.setUpOwner(session.fetch, "Lou Local")).toEqual({ ok: true, path: "/personal", first: true });
+    expect(await server.setUpOwner(session.fetch, "Lou Local")).toEqual({ ok: true, workspace: "personal" });
     const made = session.asked.find((asked) => asked.url.endsWith("/api/v1/auth/setup"));
     expect(made).toMatchObject({
       url: "http://127.0.0.1:4780/api/v1/auth/setup",
@@ -663,7 +663,7 @@ describe("LocalServer.setUpOwner", () => {
       if (path === "/api/v1/auth/app-session") return new Response(null, { status: 204 });
       return json(404, {});
     });
-    expect(await server.setUpOwner(session.fetch, "Lou Local")).toEqual({ ok: true, path: "/", first: false });
+    expect(await server.setUpOwner(session.fetch, "Lou Local")).toEqual({ ok: true, workspace: null });
     expect(session.asked.some((asked) => asked.url.endsWith("/api/v1/auth/setup"))).toBe(false);
     const signedIn = session.asked.find((asked) => asked.url.endsWith("/api/v1/auth/app-session"));
     expect(signedIn).toMatchObject({ method: "POST", credentials: "include" });
@@ -677,7 +677,7 @@ describe("LocalServer.setUpOwner", () => {
         ? json(200, { setup_needed: false })
         : json(409, { error: { code: "conflict", message: "this install has no local owner" } }),
     );
-    expect(await server.setUpOwner(session.fetch, "Lou Local")).toEqual({ ok: true, path: "/", first: false });
+    expect(await server.setUpOwner(session.fetch, "Lou Local")).toEqual({ ok: true, workspace: null });
   });
 
   it("says plainly why it could not, in the server's words when it gave some", async () => {

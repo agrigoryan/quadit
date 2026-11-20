@@ -235,13 +235,14 @@ export class LocalServer {
    * reads it. An install that is set up already is signed in to instead,
    * which makes trying again after a half-finished set-up work; one set up
    * with the web form has no owner the app may sign in, and its window opens
-   * on the sign-in page. Gives the path to open the window on and whether
-   * the owner was made just now, or what went wrong, in a sentence. Never throws.
+   * on the sign-in page. Gives the workspace made with the owner (its slug),
+   * null when the install was set up already, or what went wrong, in a
+   * sentence. Never throws.
    */
   async setUpOwner(
     fetch: Fetch,
     name: string,
-  ): Promise<{ ok: true; path: string; first: boolean } | { ok: false; error: string }> {
+  ): Promise<{ ok: true; workspace: string | null } | { ok: false; error: string }> {
     const reach = await this.whenRunning();
     if (!reach.ok) return { ok: false, error: reach.reason };
     try {
@@ -253,11 +254,11 @@ export class LocalServer {
         if (made.status !== 201) return { ok: false, error: await refusal(made) };
         const { workspace } = (await made.json()) as { workspace?: { slug?: unknown } };
         const slug = typeof workspace?.slug === "string" ? workspace.slug : "";
-        return { ok: true, path: `/${encodeURIComponent(slug)}`, first: true };
+        return { ok: true, workspace: slug };
       }
       const signedIn = await this.ask(fetch, "POST", "/api/v1/auth/app-session", {});
       if (signedIn.status !== 204 && signedIn.status !== 409) return { ok: false, error: await refusal(signedIn) };
-      return { ok: true, path: "/", first: false };
+      return { ok: true, workspace: null };
     } catch (err) {
       return {
         ok: false,

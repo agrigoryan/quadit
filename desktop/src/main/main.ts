@@ -19,6 +19,7 @@ import { accountName } from "@/main/account-name";
 import { AppPages } from "@/main/app-pages";
 import { Capture } from "@/main/capture";
 import { ConnectPage } from "@/main/connect-page";
+import { FirstConnect } from "@/main/first-connect";
 import { Connections } from "@/main/connections";
 import { LocalServer, loopbackPorts } from "@/main/local-server";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
@@ -154,8 +155,6 @@ function start() {
     signIn,
     local,
     loginItem,
-    openConnect: () => connect.show(),
-    agentToolFound: () => connections.anyToolFound(),
   });
   const panel = new Panel(pages, requests);
   const capture = new Capture(pages, settings, requests);
@@ -182,6 +181,12 @@ function start() {
   const welcome = new Welcome({
     pages,
     settings,
+    list,
+    firstConnect: new FirstConnect({
+      connections,
+      summaries: () => requests.summaries(),
+      sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
+    }),
     accountName: () =>
       accountName(process.platform, userInfo().username, async (command, args) => {
         const { stdout } = await run(command, args, { timeout: 5_000 });

@@ -22,6 +22,8 @@ const api: PagesApi = {
   takeInvitation: call("takeInvitation"),
   localServer: call("localServer"),
   setUpHere: call("setUpHere"),
+  connectFoundTool: call("connectFoundTool"),
+  foundToolChanges: call("foundToolChanges"),
   controlLocalServer: call("controlLocalServer"),
   showLocalServerFiles: call("showLocalServerFiles"),
   setOpenAtLogin: call("setOpenAtLogin"),
