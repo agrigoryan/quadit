@@ -70,9 +70,9 @@ function OpenButton({ label, onClick }: { label: string; onClick: () => void }) 
         type="button"
         aria-label={label}
         onClick={onClick}
-        className="absolute top-1.5 right-1.5 z-[2] flex size-8 items-center justify-center rounded-md bg-black/60 text-white ring-1 ring-white/30 hover:bg-black/80 max-sm:size-9"
+        className="absolute top-1.5 right-1.5 z-[2] flex size-7 items-center justify-center rounded-md bg-black/60 text-white ring-1 ring-white/30 hover:bg-black/80 max-sm:size-9"
       >
-        <Maximize2 className="size-4" aria-hidden />
+        <Maximize2 className="size-3.5" aria-hidden />
       </button>
     </Tooltip>
   );
