@@ -13,8 +13,11 @@
 // The signed app is notarized by scripts/notarize.mjs, not by
 // electron-builder: its wait for Apple has a limit, and it says what happens
 // to an app Apple has not answered for.
-// With APPLE_TEAM_ID and a certificate, the build also gets the keychain group
-// that Touch ID passkeys need (src/main/main.ts, enablePasskeys).
+// With APPLE_TEAM_ID, a certificate and a provisioning profile
+// (QUADIT_MAC_PROVISIONING_PROFILE, a Developer ID profile of the app's id),
+// the build also gets the keychain group that Touch ID passkeys need
+// (src/main/main.ts, enablePasskeys). Never without the profile: macOS kills
+// an app at its start when it claims that group and no profile grants it.
 //
 // The quadit command goes into the app's resources as bin/quadit, built for
 // each architecture by scripts/cli.mjs into cli/ (pnpm dist runs it first);
@@ -36,9 +39,10 @@ const notarizing =
     (env.APPLE_ID && env.APPLE_APP_SPECIFIC_PASSWORD && env.APPLE_TEAM_ID) ||
     (env.APPLE_API_KEY && env.APPLE_API_KEY_ID && env.APPLE_API_ISSUER),
   );
-const keychainGroup = signing && env.APPLE_TEAM_ID ? `${env.APPLE_TEAM_ID}.${APP_ID}.webauthn` : "";
+const keychainGroup =
+  signing && env.APPLE_TEAM_ID && env.QUADIT_MAC_PROVISIONING_PROFILE ? `${env.APPLE_TEAM_ID}.${APP_ID}.webauthn` : "";
 
-/** The main process's entitlements: the JIT always, the keychain group when the build is signed for a team. */
+/** The main process's entitlements: the JIT always, the keychain group when the build's signing carries it. */
 function entitlements() {
   const base = path.join(__dirname, "build", "entitlements.mac.plist");
   if (!keychainGroup) return base;

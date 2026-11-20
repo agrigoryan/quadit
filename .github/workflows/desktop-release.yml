@@ -15,7 +15,9 @@ name: desktop-release
 # CSC_KEY_PASSWORD, and for notarization either APPLE_ID,
 # APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID, or an App Store Connect API
 # key: APPLE_API_KEY_P8 (the .p8 file's text), APPLE_API_KEY_ID and
-# APPLE_API_ISSUER. MAC_PROVISIONING_PROFILE (base64) is used when set. Only
+# APPLE_API_ISSUER. MAC_PROVISIONING_PROFILE (base64, a Developer ID profile
+# of the app's id) is used when set, and only with it does the app get the
+# keychain group of Touch ID passkeys. Only
 # a pre-release tag (desktop-v1.2.3-beta.1) may go out unsigned, and only
 # with the repository variable DESKTOP_ALLOW_UNSIGNED=true. The build waits
 # for Apple's verdict on the signed app for a limited time (15 minutes, or
@@ -23,8 +25,8 @@ name: desktop-release
 # A release fails without the verdict; a pre-release goes out signed and
 # unstapled, and macOS stops warning about that same app once Apple accepts
 # it (notarization-status.yml shows where a submission stands). A signed app
-# is checked before it is published: its signature, and for a notarized one
-# its stapled ticket and Gatekeeper's verdict. Windows is signed when WIN_CSC_LINK and
+# is checked before it is published: its signature, that it starts, and for
+# a notarized one its stapled ticket and Gatekeeper's verdict. Windows is signed when WIN_CSC_LINK and
 # WIN_CSC_KEY_PASSWORD are set, and unsigned otherwise. The Homebrew cask is
 # not pushed from here: desktop/packaging/quadit-desktop.rb is its template.
 # The macOS and Linux apps carry the quadit command with the web app inside
@@ -137,7 +139,7 @@ jobs:
             exit 1
           fi
           pnpm build && node scripts/cli.mjs && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
-      - name: Check the macOS app (link scheme, the quadit command, signature, notarization, Gatekeeper)
+      - name: Check the macOS app (link scheme, the quadit command, signature, notarization, Gatekeeper, that it starts)
         if: runner.os == 'macOS'
         shell: bash
         env:
@@ -160,6 +162,8 @@ jobs:
               fi
             fi
           done
+          # The app of this machine's own kind; the Intel one would need Rosetta.
+          if [ "$SIGNED" = true ]; then sh scripts/mac-app-starts.sh dist/mac-arm64/Quadit.app; fi
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: bash
