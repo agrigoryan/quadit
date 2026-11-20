@@ -92,11 +92,6 @@ function start() {
     ports: loopbackPorts,
     env: process.env,
   });
-  /** The server on this computer's entry in the list, when it is there. */
-  const localEntry = () => {
-    const origin = local.origin();
-    return origin ? store.byOrigin(origin) : undefined;
-  };
   // Offered on macOS, for the installed app only: from source it would start the bare Electron.
   const loginItem =
     process.platform === "darwin" && app.isPackaged
@@ -142,7 +137,7 @@ function start() {
     forgetUnread: (reporter) => unread.forget(reporter),
     requests,
     changed: () => refreshMenu(),
-    whenReachable: (serverId) => (serverId === localEntry()?.id ? local.settled() : Promise.resolve()),
+    whenReachable: (serverId) => (serverId === list.localServer()?.id ? local.settled() : Promise.resolve()),
   });
   const list = new ServerList(store, windows, pages, requests, { fetcher, checks, signIn, local, loginItem });
   const panel = new Panel(pages, requests);
@@ -192,7 +187,7 @@ function start() {
             serverInFront: !!front,
             update: updates.available,
             local: local.available
-              ? { setUp: !!localEntry(), state: local.state().kind, openAtLogin: loginItem?.get() ?? null }
+              ? { setUp: !!list.localServer(), state: local.state().kind, openAtLogin: loginItem?.get() ?? null }
               : null,
           },
           {
@@ -228,7 +223,7 @@ function start() {
   local.onChange(() => {
     refreshMenu();
     pages.changed();
-    const entry = localEntry();
+    const entry = list.localServer();
     if (entry && local.state().kind === "running") {
       // Up: what it speaks is asked now, and a window that found it down tries again.
       void checks.check(entry.id);
@@ -277,15 +272,15 @@ function start() {
   // a server on this computer the app stays, in the menu bar or the tray,
   // since the server runs only while the app does.
   app.on("window-all-closed", () => {
-    if (process.platform !== "darwin" && !localEntry()) app.quit();
+    if (process.platform !== "darwin" && !list.localServer()) app.quit();
   });
 
   // Asleep, a page's connections died quietly; awake, they are checked at once.
   powerMonitor.on("resume", () => windows.wake());
   unread.start();
   capture.applyShortcut();
-  // Started before the windows are made, so its own waits for it (whenReachable).
-  if (localEntry()) local.start();
+  // Started before the windows are made, so that its window waits for it (whenReachable).
+  if (list.localServer()) local.start();
   // Started at login (macOS), the app opens no window: it is there for its server and its notifications.
   const atLogin = process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin;
   const shown = windows.restore({ show: !atLogin });
