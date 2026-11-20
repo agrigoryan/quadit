@@ -27,13 +27,15 @@ export class ConnectPage {
     });
   }
 
-  show() {
+  /** Shows the Connect window, made with `serverId`'s workspace chosen first when given (a page of that server asked). */
+  show(serverId?: string) {
     if (this.win && !this.win.isDestroyed()) {
       this.win.show();
       this.win.focus();
       return;
     }
-    this.win = this.pages.window("connect.html", {
+    const query = serverId ? `?${new URLSearchParams({ server: serverId })}` : "";
+    this.win = this.pages.window(`connect.html${query}`, {
       name: "connect",
       width: 760,
       height: 780,

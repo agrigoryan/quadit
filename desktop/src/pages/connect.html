@@ -13,9 +13,9 @@
     <main class="page connect">
       <h1>Connect agents</h1>
       <p class="hint">
-        Let the agent tools on this computer work in a Quadit workspace: through the quadit command and its skill,
-        through Quadit's MCP server, or both. You see every file that changes before anything is written, and Disconnect
-        takes it back.
+        Connecting an AI tool lets it take tasks in your workspace, ask you questions and report back there. It works
+        through the quadit command and its skill, through Quadit's MCP server, or both; you see every file that changes
+        before anything is written, and Disconnect takes it back.
       </p>
       <p id="unsupported" class="notice" hidden>
         Connecting agent tools is not available on Windows yet: it needs the quadit command, which has no Windows build.
@@ -26,7 +26,15 @@
 
       <section id="tools" aria-labelledby="harnesses-title">
         <h2 id="harnesses-title">Agent tools</h2>
+        <p id="none-found" class="notice" hidden>
+          No agent tools found on this computer. Quadit works with Claude Code, Codex, Gemini CLI and others: install
+          one, then come back here.
+        </p>
         <ul id="harnesses" class="list"></ul>
+        <details id="all-tools" hidden>
+          <summary>Show all tools</summary>
+          <ul id="all-harnesses" class="list"></ul>
+        </details>
         <button id="backups" type="button" class="quiet">Show backups</button>
       </section>
 

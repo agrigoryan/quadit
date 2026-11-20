@@ -33,7 +33,8 @@
 //   - only the server's own pages get the bridge, and each message on it is
 //     checked again here against the frame that sent it; what a page
 //     publishes and answers goes to Requests (requests.ts), and goes with
-//     the page.
+//     the page; its ask to open Connect agents opens the app's own window,
+//     at most once a second (open-connect.ts).
 
 import {
   BrowserWindow,
@@ -52,6 +53,7 @@ import { AppSignIn } from "@/main/app-sign-in";
 import { ConnectionErrors } from "@/main/connection-error";
 import { giveContextMenu } from "@/main/context-menu";
 import { NoticeGate } from "@/main/notices";
+import { OpenConnect } from "@/main/open-connect";
 import { PendingLoads } from "@/main/pending-loads";
 import { HANDOFF_HEADER } from "@/main/handoff";
 import { appPage, browserAddress, isHandoffPage, isOwnPage } from "@/main/origins";
@@ -62,6 +64,7 @@ import {
   BRIDGE_BADGE,
   BRIDGE_LISTENING,
   BRIDGE_NOTIFY,
+  BRIDGE_OPEN_CONNECT,
   BRIDGE_OUTCOME,
   BRIDGE_PUBLISH,
   badgeOf,
@@ -116,6 +119,8 @@ export interface WindowsSetup {
   signInWithoutForm(serverId: string, fetch: Fetch): Promise<boolean>;
   /** Whether a server's window, its session reached through `fetch`, is signed in, where the app can ask (as for signInWithoutForm). */
   isSignedIn(serverId: string, fetch: Fetch): Promise<boolean>;
+  /** Opens (or focuses) the Connect agents window for a server: its page asked (open-connect.ts). */
+  openConnect(serverId: string): void;
 }
 
 export class ServerWindows {
@@ -154,6 +159,8 @@ export class ServerWindows {
     ipcMain.on(BRIDGE_OUTCOME, (event, raw: unknown) => {
       if (this.bridgeSender(event)) setup.requests.answer(event.sender.id, raw);
     });
+    const connectAsks = new OpenConnect((serverId) => setup.openConnect(serverId));
+    ipcMain.on(BRIDGE_OPEN_CONNECT, (event) => connectAsks.asked(this.bridgeSender(event)?.id ?? null));
     this.appSignIn = new AppSignIn({
       signIn: (serverId) => setup.signInWithoutForm(serverId, this.fetcher(serverId)),
       isSignedIn: (serverId) => setup.isSignedIn(serverId, this.fetcher(serverId)),

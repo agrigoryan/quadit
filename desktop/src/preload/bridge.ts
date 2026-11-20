@@ -15,6 +15,7 @@ import {
   BRIDGE_BADGE,
   BRIDGE_LISTENING,
   BRIDGE_NOTIFY,
+  BRIDGE_OPEN_CONNECT,
   BRIDGE_OUTCOME,
   BRIDGE_PUBLISH,
   BRIDGE_REQUEST,
@@ -89,6 +90,14 @@ if (origin && window.location.origin === origin) {
         ipcRenderer.send(BRIDGE_LISTENING, false);
       };
     },
+    // Connect needs the quadit command, which has no Windows build: there the page offers nothing.
+    ...(process.platform === "win32"
+      ? {}
+      : {
+          openConnect() {
+            ipcRenderer.send(BRIDGE_OPEN_CONNECT);
+          },
+        }),
   };
   contextBridge.exposeInMainWorld("quaditDesktop", Object.freeze(bridge));
 }

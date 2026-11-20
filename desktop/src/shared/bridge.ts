@@ -86,6 +86,8 @@ export interface QuaditDesktop {
   publish(summary: DesktopSummary | null): void;
   /** The one handler for requests the person made in the app; gives the function that stops it. */
   onRequest(handler: (request: DesktopRequest) => Promise<DesktopOutcome>): () => void;
+  /** Opens the app's Connect agents window for this server. Present only where the app can connect tools (not on Windows). */
+  openConnect?(): void;
 }
 
 export const BRIDGE_NOTIFY = "bridge:notify";
@@ -98,6 +100,8 @@ export const BRIDGE_REQUEST = "bridge:request";
 export const BRIDGE_OUTCOME = "bridge:outcome";
 /** Page to app: whether the page has a request handler now. */
 export const BRIDGE_LISTENING = "bridge:listening";
+/** Page to app: open the Connect agents window (no payload). */
+export const BRIDGE_OPEN_CONNECT = "bridge:open-connect";
 
 const TITLE_MAX = 200;
 const BODY_MAX = 1000;

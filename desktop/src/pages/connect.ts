@@ -20,6 +20,8 @@ const planSection = element<HTMLElement>("plan");
 const planError = element<HTMLParagraphElement>("plan-error");
 const result = element<HTMLParagraphElement>("result");
 const NEW_AGENT = "";
+/** The server whose page opened this window (its "Connect a tool on this computer"): its workspace is chosen first. */
+const askedFor = new URLSearchParams(window.location.search).get("server");
 
 let views: SummaryView[] = [];
 /** The computer's default login, as the last look at the harnesses found it. */
@@ -90,7 +92,12 @@ async function render() {
         ]
       : []),
   );
-  harnessList.replaceChildren(...(view.supported ? view.harnesses.map(harnessRow) : []));
+  // With none found here, the list of tools that are not would only say "Not found" again and again: it waits, folded.
+  const noneFound = view.supported && !view.harnesses.some((h) => h.installed || h.connected);
+  element("none-found").hidden = !noneFound;
+  element("all-tools").hidden = !noneFound;
+  harnessList.replaceChildren(...(view.supported && !noneFound ? view.harnesses.map(harnessRow) : []));
+  element("all-harnesses").replaceChildren(...(noneFound ? view.harnesses.map(harnessRow) : []));
   if (harness) harness = view.harnesses.find((h) => h.id === harness?.id) ?? null;
   await fillWorkspaces();
 }
@@ -106,7 +113,9 @@ async function fillWorkspaces() {
       return option;
     }),
   );
+  const first = views.find((v) => v.serverId === askedFor);
   if (views.some((v) => keyOf(v) === previous)) workspaces.value = previous;
+  else if (first) workspaces.value = keyOf(first);
   fillAgents();
 }
 
