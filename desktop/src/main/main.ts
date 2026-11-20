@@ -256,14 +256,16 @@ function start() {
   app.on("activate", () => {
     if (!BrowserWindow.getAllWindows().some((win) => win.isVisible())) list.show();
   });
-  // Quitting is never held up: macOS sends this for a logout too, which
-  // stopping it would cancel. The server on this computer is told to stop
-  // and finishes on its own (local-server.ts).
   app.on("before-quit", () => {
     windows.quit();
     updates.stop();
-    local.stopWithoutWaiting();
   });
+  // Quitting is never held up: macOS quits this way for a logout too,
+  // which waiting would cancel. The server on this computer is told to stop
+  // and finishes on its own (local-server.ts). Only now that the windows
+  // have closed: one may still keep the app (a page's beforeunload, during
+  // an upload) after before-quit, and the server must not go under it.
+  app.on("will-quit", () => local.stopWithoutWaiting());
   // Server windows hide rather than close, so this only runs when quitting
   // or when the server list was the last window on Windows and Linux. With
   // a server on this computer the app stays, in the menu bar or the tray,
