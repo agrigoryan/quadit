@@ -132,17 +132,25 @@ test("the window of the server on this computer is signed in by the app whenever
   try {
     let page: Page;
     ({ origin, page } = await setUpFromTheList(desktop));
-    // Signed out (the session ran out, or the person signed out): on the sign-in page, the app signs in again
-    // and goes on to the page the newest sign-in page leads to. The web app sends its signed-out page to the
-    // sign-in page by itself too (next: My work), and may do so before the test's own: that older one must not
-    // win, nor cancel the newer one's load.
+    // Signed out: the web app shows its sign-in page, with the page the person was on as where to go next, and
+    // the app signs in again and goes on to that page. The person signs out with the web app's own control, so
+    // that the window is moved by the web app and the app alone: a navigation the test started beside theirs
+    // would be dropped by the browser whenever the app's own load was already on its way.
     const visited: string[] = [];
     page.on("framenavigated", (frame) => {
       if (frame === page.mainFrame()) visited.push(frame.url());
     });
-    expect(await page.evaluate(async () => (await fetch("/api/v1/auth/logout", { method: "POST" })).ok)).toBe(true);
-    await page.evaluate(() => setTimeout(() => location.assign("/login?next=%2Fpersonal%2Finbox"), 0));
+    await page
+      .getByRole("link", { name: /^Inbox/ })
+      .first()
+      .click();
+    await expect(page).toHaveURL(`${origin}/personal/inbox`);
+    await page.getByRole("button", { name: "Account" }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
     try {
+      await expect
+        .poll(() => visited.some((url) => new URL(url).pathname === "/login"), { timeout: 20_000 })
+        .toBe(true);
       await expect(page).toHaveURL(`${origin}/personal/inbox`, { timeout: 20_000 });
     } catch (err) {
       // What the window went through, for whoever reads the failure.
