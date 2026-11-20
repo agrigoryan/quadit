@@ -72,7 +72,7 @@ func TestServeTakesTheAppKeyFromItsInput(t *testing.T) {
 			t.Fatal(err)
 		}
 		app := func(key string) int {
-			req, _ := http.NewRequest("POST", url+"/api/v1/auth/app-session", nil)
+			req, _ := http.NewRequest(http.MethodPost, url+"/api/v1/auth/app-session", nil)
 			req.Header.Set("X-Quadit-App-Key", key)
 			res, err := http.DefaultClient.Do(req)
 			if err != nil {

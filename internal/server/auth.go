@@ -337,7 +337,8 @@ func (s *Server) finishSignIn(x *c, u core.User, method string) error {
 }
 
 // signIn signs a person in on this browser once they have passed the first
-// step by method (password, passkey, a provider's id, or desktop), and
+// step by method (password, passkey, a provider's id, desktop, or app: the
+// key of the app that runs this server), and
 // records the sign-in. twoStep says that step was both (startSession). It
 // reports whether the session still waits for the second step.
 func (s *Server) signIn(x *c, u core.User, method string, twoStep bool) (secondStep bool, err error) {

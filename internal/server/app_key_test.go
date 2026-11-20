@@ -225,3 +225,19 @@ func TestAnOwnerWithNoEmail(t *testing.T) {
 		s.call(t, browser(), "", "POST", "/api/v1/auth/login", M{"email": "", "password": ""}, 401, nil)
 	})
 }
+
+// TestTheFormStillSetsUpWithAnEmail: on a server no app runs, the set-up
+// form makes an owner who signs in with an email and a password, and one
+// without an email is refused rather than made unable to sign in.
+func TestTheFormStillSetsUpWithAnEmail(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := startSite(t, st, nil, nil)
+		form := M{"name": "Aram", "email": " ", "password": "correct-horse-battery", "workspace_name": "Games"}
+		if out := s.call(t, browser(), "", "POST", "/api/v1/auth/setup", form, 400, nil); !strings.Contains(out, `"field":"email"`) {
+			t.Errorf("a set-up with no email: %s", out)
+		}
+		form["email"] = "aram@example.com"
+		s.call(t, browser(), "", "POST", "/api/v1/auth/setup", form, 201, nil)
+		s.call(t, browser(), "", "POST", "/api/v1/auth/login", M{"email": "aram@example.com", "password": "correct-horse-battery"}, 200, nil)
+	})
+}
