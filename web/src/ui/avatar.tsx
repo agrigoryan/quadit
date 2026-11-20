@@ -58,7 +58,8 @@ export function Avatar({ member, size = "sm", className }: Props) {
   // An emoji is drawn larger than letters and on a quiet ground: it has colour of its own.
   const letters = !member.avatar || /^[\p{L}\p{N}]{1,2}$/u.test(member.avatar);
   return (
-    <span className={cx("relative inline-flex shrink-0", className)} title={member.name}>
+    // The box's own size, so a row that stretches its children cannot pull the badge away from the picture.
+    <span className={cx("relative inline-flex shrink-0", boxes[size], className)} title={member.name}>
       {picture ? (
         <img
           src={member.avatar}
