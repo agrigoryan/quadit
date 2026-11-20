@@ -86,6 +86,9 @@ export interface AuthConfig {
 
 export const authConfig = () => api.get<AuthConfig>("/api/v1/auth/config");
 
+/** The key the sign-in options are read under where a page waits for them (the set-up page). */
+export const authConfigKey = ["auth", "config"] as const;
+
 /** Signs in. Answers "second_step" when the account has a second step turned on. */
 export async function signIn(email: string, password: string): Promise<"ok" | "second_step"> {
   const out = await api.post<{ second_step?: boolean }>("/api/v1/auth/login", { email, password }, { quiet401: true });
