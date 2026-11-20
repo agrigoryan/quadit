@@ -112,10 +112,11 @@ pre code { font-size: inherit; }
 /* The download: one button for this computer's system, the others in a row under it. */
 .get { margin-top: 34px; display: grid; justify-items: center; gap: 14px; scroll-margin-top: 96px; }
 .get-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
-.get-row .btn-line { min-height: 54px; padding: 0 26px; border-radius: 13px; font-size: 1.0625rem; }
+/* Both buttons one size, set here: .btn's own size comes later in this file and would win over a single class. */
+.get-row .btn { min-height: 54px; padding: 0 28px; border-radius: 13px; font-size: 1.0625rem; }
+@media (max-width: 559px) { .get-row { flex-direction: column; align-items: stretch; width: min(100%, 300px); } }
 .team .install { width: 100%; margin-top: 0; }
 .team .install .cmd code { font-size: 0.8125rem; }
-.dl-main { min-height: 54px; padding: 0 30px; border-radius: 13px; font-size: 1.0625rem; }
 .dl-all { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 0; font-size: 0.9375rem; }
 .dl-all li { padding: 0 13px; }
 .dl-all li + li { border-left: 1px solid var(--line-2); }
