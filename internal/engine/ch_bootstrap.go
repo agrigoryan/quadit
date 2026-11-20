@@ -14,8 +14,11 @@ import (
 
 // BootstrapArgs describe a new workspace and the person who owns it.
 type BootstrapArgs struct {
-	OwnerID       string // an existing user; or the fields below make one
-	OwnerName     string
+	OwnerID   string // an existing user; or the fields below make one
+	OwnerName string
+	// OwnerEmail finds the account that has it, or is the new person's.
+	// Empty makes a person with no email address, as an agent has none: the
+	// owner of an install the desktop app sets up, who signs in through it.
 	OwnerEmail    string
 	OwnerHandle   string
 	WorkspaceSlug string
@@ -64,19 +67,22 @@ func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace
 }
 
 // ownerFor finds the person who will own a new workspace: by id, or by
-// email address, making their account when there is none yet.
+// email address, making their account when there is none yet (or no
+// address is given).
 func ownerFor(ctx context.Context, db store.DB, a BootstrapArgs, at int64) (core.User, error) {
 	var owner core.User
 	if a.OwnerID != "" {
 		return owner, db.Get(ctx, &owner, store.Eq("id", a.OwnerID), store.Live)
 	}
 	email := strings.ToLower(strings.TrimSpace(a.OwnerEmail))
-	if email == "" || !strings.Contains(email, "@") {
-		return owner, invalid("owner_email", "an owner needs an email address")
-	}
-	there, err := store.Find(ctx, db, &owner, store.Eq("email", email), store.Live)
-	if err != nil || there {
-		return owner, err
+	if email != "" {
+		if !strings.Contains(email, "@") {
+			return owner, invalid("owner_email", "that is not an email address")
+		}
+		there, err := store.Find(ctx, db, &owner, store.Eq("email", email), store.Live)
+		if err != nil || there {
+			return owner, err
+		}
 	}
 	owner = core.User{ID: id.New(), Kind: core.KindPerson, Name: strings.TrimSpace(a.OwnerName), Email: email, CreatedAt: at, UpdatedAt: at}
 	if owner.Name == "" {
