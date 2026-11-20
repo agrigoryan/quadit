@@ -110,7 +110,7 @@ func (s *Server) coreRoutes() []route {
 		{"DELETE /api/v1/auth/sessions/{id}", s.signedIn(s.handleRevokeSession), "Sign one device out.", "", "account"},
 		{"POST /api/v1/workspaces", s.signedIn(s.handleCreateWorkspace), "Make a workspace. Body: {name, slug}.", "", "account"},
 		{"GET /api/v1/changes", s.public(s.handleDescribeChangeTypes), "Every change type with its arguments and the least role it needs, and the surface version.", "format: text", "describe"},
-		{"GET /api/v1/version", s.public(s.handleDescribeVersion), "What this server is, without signing in: {name: \"quadit\", version, surface, desktop: {handoff}}. The desktop app asks it before adding a server.", "", "describe"},
+		{"GET /api/v1/version", s.public(s.handleDescribeVersion), "What this server is, without signing in: {name: \"quadit\", version, surface, desktop: {handoff, inset}}. The desktop app asks it before adding a server.", "", "describe"},
 
 		// Inside a workspace: every write is a change; the rest are reads.
 		{"POST " + w + "/changes", s.workspaceMember(s.handleApplyChanges), "Apply one change, or a batch that succeeds or fails together. Body: {id, type, args} or {changes: […], dry_run}. The id is made by the caller; sending the same id again applies nothing twice. Alone or in a batch, an admin may mark a change quiet: true (history being imported): it notifies nobody, and its events say quiet.", "events: true to get the events back; dry_run: true to check without writing", "write"},
@@ -224,12 +224,19 @@ func (s *Server) handleDescribeChangeTypes(x *c) error {
 	return x.ok(map[string]any{"changes": cat, "surface": engine.Surface})
 }
 
+// desktopInset is the version of the window without a title bar that this
+// server's web app lays itself out for (web/src/lib/window-inset.ts): on
+// macOS the desktop app gives a server window no title bar only when its
+// pages say they keep clear of the window buttons and can be dragged by.
+const desktopInset = 1
+
 // handleDescribeVersion says that this is a Quadit server, which version of
-// it, the agent surface it keeps, and the version of the desktop app's
-// sign-in hand-off (desktop.go) it speaks.
+// it, the agent surface it keeps, the version of the desktop app's sign-in
+// hand-off (desktop.go) it speaks, and the version of the window without a
+// title bar its web app lays itself out for.
 func (s *Server) handleDescribeVersion(x *c) error {
 	return x.ok(map[string]any{"name": "quadit", "version": s.cfg.Version, "surface": engine.Surface,
-		"desktop": map[string]any{"handoff": desktopHandoff}})
+		"desktop": map[string]any{"handoff": desktopHandoff, "inset": desktopInset}})
 }
 
 // narrowingParams are the URL parameters a list is narrowed by, and the

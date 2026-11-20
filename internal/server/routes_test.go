@@ -11,19 +11,20 @@ import (
 )
 
 // TestTheVersionSaysWhatTheServerIs: anyone may ask, without signing in,
-// whether an address is a Quadit server, which version, which agent surface
-// and which desktop sign-in hand-off it speaks; the desktop app asks before
-// it adds a server.
+// whether an address is a Quadit server, which version, which agent surface,
+// which desktop sign-in hand-off it speaks and which version of the window
+// without a title bar its web app lays itself out for; the desktop app asks
+// before it adds a server.
 func TestTheVersionSaysWhatTheServerIs(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
 	var v struct {
 		Name    string
 		Version string
 		Surface string
-		Desktop struct{ Handoff int }
+		Desktop struct{ Handoff, Inset int }
 	}
 	s.call(t, nil, "", "GET", "/api/v1/version", nil, 200, &v)
-	if v.Name != "quadit" || v.Version != "test" || v.Surface != engine.Surface || v.Desktop.Handoff != 1 {
+	if v.Name != "quadit" || v.Version != "test" || v.Surface != engine.Surface || v.Desktop.Handoff != 1 || v.Desktop.Inset != 1 {
 		t.Fatalf("version = %+v", v)
 	}
 }
