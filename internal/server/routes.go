@@ -224,12 +224,6 @@ func (s *Server) handleDescribeChangeTypes(x *c) error {
 	return x.ok(map[string]any{"changes": cat, "surface": engine.Surface})
 }
 
-// desktopInset is the version of the window without a title bar that this
-// server's web app lays itself out for (web/src/lib/window-inset.ts): on
-// macOS the desktop app gives a server window no title bar only when its
-// pages say they keep clear of the window buttons and can be dragged by.
-const desktopInset = 1
-
 // handleDescribeVersion says that this is a Quadit server, which version of
 // it, the agent surface it keeps, the version of the desktop app's sign-in
 // hand-off (desktop.go) it speaks, and the version of the window without a

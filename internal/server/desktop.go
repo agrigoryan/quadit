@@ -38,6 +38,12 @@ import (
 // server too old or too new for it.
 const desktopHandoff = 1
 
+// desktopInset is the version of the window without a title bar that this
+// server's web app lays itself out for (web/src/lib/window-inset.ts);
+// GET /api/v1/version says it too. On macOS the app makes a server's window
+// without one only for pages that keep clear of its buttons and can drag it.
+const desktopInset = 1
+
 // desktopCodeLife is how long the app has to trade a code for a session.
 const desktopCodeLife = 2 * time.Minute
 
