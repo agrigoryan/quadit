@@ -311,7 +311,7 @@ func (s *Server) handleAcceptInvite(x *c) error {
 		}
 	}
 	if inv.Email != "" && !strings.EqualFold(inv.Email, u.Email) {
-		return errForbidden("this invitation is for %s; you are signed in as %s", inv.Email, u.Email)
+		return errForbidden("this invitation is for %s; you are signed in as %s", inv.Email, accountName(u))
 	}
 	if n, err := s.st.Count(ctx, "members", store.Eq("workspace_id", ws.ID), store.Eq("user_id", u.ID), store.Null("removed_at")); err != nil {
 		return err

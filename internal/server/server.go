@@ -31,6 +31,8 @@
 //	  auth_passkeys.go, auth_oauth.go, signin_provider.go,
 //	  signin_github.go, signin_oidc.go, tokens.go
 //	  desktop.go     the desktop app signing in through the system browser
+//	  app_key.go     the desktop app that runs this server: setting the
+//	                 install up and signing its owner in with its key
 //	Reads
 //	  viewer.go      the viewer: who a read is made for, and what they may
 //	                 see. Every read below is a method of it that takes a
@@ -122,6 +124,11 @@ type Config struct {
 	// the page's whole height. nil means picture.Take, with the Chrome or
 	// Chromium of this machine.
 	TakePicture func(context.Context, picture.Request) (png []byte, whole int, err error)
+	// AppKey is the key of the desktop app that runs this server
+	// (quadit serve --app-key-stdin), empty when no app does. A request
+	// that carries it is that app: it alone sets the install up, and it
+	// signs the install's local owner in (app_key.go).
+	AppKey string
 }
 
 // Server holds everything a request needs. New sets every field except

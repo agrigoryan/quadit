@@ -180,7 +180,7 @@ func (s *Server) handleStartTwoStepSetup(x *c) error {
 		return err
 	}
 	issuer := s.installName(x.ctx())
-	return x.ok(map[string]any{"secret": secret, "url": auth.TOTPURL(issuer, x.user.Email, secret)})
+	return x.ok(map[string]any{"secret": secret, "url": auth.TOTPURL(issuer, accountName(x.user), secret)})
 }
 
 func (s *Server) newRecoveryCodes(ctx context.Context, userID string) ([]string, error) {

@@ -26,6 +26,7 @@ func (s *Server) settingKinds() settings.Table {
 	no, yes := json.RawMessage(`false`), json.RawMessage(`true`)
 	return settings.Table{
 		"install.name":                 {Shape: func() any { return new(string) }},
+		localOwnerSetting:              {Shape: func() any { return new(string) }}, // app_key.go
 		"auth.password":                {Shape: func() any { return new(bool) }, WhenUnreadable: no},
 		"auth.passkeys":                {Shape: func() any { return new(bool) }, WhenUnreadable: no},
 		"auth.registration":            {Shape: func() any { return new(bool) }, WhenUnreadable: no},

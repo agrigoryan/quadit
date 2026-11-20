@@ -185,6 +185,8 @@ func (s *Server) handleShowSignInOptions(x *c) error {
 		"mail":                         s.mailReady(ctx),
 		"version":                      s.cfg.Version,
 		"name":                         s.installName(ctx),
+		// The desktop app runs this server and sets it up itself.
+		"setup_by_app": s.cfg.AppKey != "",
 	}
 	out["providers"] = s.providerList(ctx)
 	return x.ok(out)
@@ -198,9 +200,15 @@ type setupBody struct {
 	WorkspaceSlug string `json:"workspace_slug"`
 }
 
-// handleSetUpInstall makes the first person and the first workspace on a new install.
-// It works once.
+// handleSetUpInstall makes the first person and the first workspace on a new
+// install, and signs them in. It works once. On a server the desktop app
+// runs, only that app may, with its key and the person's name alone
+// (setUpByApp), so nothing else on the computer can make the first account.
 func (s *Server) handleSetUpInstall(x *c) error {
+	byApp := s.cfg.AppKey != ""
+	if byApp && !s.isTheApp(x.r) {
+		return errForbidden("this install is set up by the app that runs it")
+	}
 	var b setupBody
 	if err := x.body(&b); err != nil {
 		return err
@@ -209,21 +217,15 @@ func (s *Server) handleSetUpInstall(x *c) error {
 	if n, err := s.st.Count(ctx, "users", store.Eq("kind", core.KindPerson)); err != nil || n > 0 {
 		return &engine.Error{Code: engine.CodeConflict, Message: "this install is already set up; sign in instead"}
 	}
-	if err := auth.CheckPasswordRules(b.Password); err != nil {
-		return &engine.Error{Code: engine.CodeInvalid, Field: "password", Message: err.Error()}
-	}
 	if b.WorkspaceSlug == "" {
 		b.WorkspaceSlug = slugFrom(b.WorkspaceName)
 	}
-	ws, owner, err := s.eng.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: b.Name, OwnerEmail: b.Email, WorkspaceSlug: b.WorkspaceSlug, WorkspaceName: b.WorkspaceName})
-	if err != nil {
-		return err
+	setUp := s.setUpWithPassword
+	if byApp {
+		setUp = s.setUpByApp
 	}
-	hash, err := auth.HashPassword(b.Password)
+	ws, owner, err := setUp(ctx, b)
 	if err != nil {
-		return err
-	}
-	if _, err := s.st.Update(ctx, "users", map[string]any{"password_hash": hash}, store.Eq("id", owner.ID)); err != nil {
 		return err
 	}
 	s.audit(x.r, ws.ID, owner, "install.setup", "workspace", ws.ID, nil)
@@ -231,6 +233,31 @@ func (s *Server) handleSetUpInstall(x *c) error {
 		return err
 	}
 	return x.json(201, map[string]any{"user": owner, "workspace": ws})
+}
+
+// setUpWithPassword makes the install's owner and first workspace from the
+// set-up form: the owner signs in with their email and password.
+func (s *Server) setUpWithPassword(ctx context.Context, b setupBody) (core.Workspace, core.User, error) {
+	var ws core.Workspace
+	var owner core.User
+	if strings.TrimSpace(b.Email) == "" {
+		return ws, owner, &engine.Error{Code: engine.CodeInvalid, Field: "email", Message: "an email address is required: you sign in with it"}
+	}
+	if err := auth.CheckPasswordRules(b.Password); err != nil {
+		return ws, owner, &engine.Error{Code: engine.CodeInvalid, Field: "password", Message: err.Error()}
+	}
+	ws, owner, err := s.eng.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: b.Name, OwnerEmail: b.Email, WorkspaceSlug: b.WorkspaceSlug, WorkspaceName: b.WorkspaceName})
+	if err != nil {
+		return ws, owner, err
+	}
+	hash, err := auth.HashPassword(b.Password)
+	if err != nil {
+		return ws, owner, err
+	}
+	if _, err := s.st.Update(ctx, "users", map[string]any{"password_hash": hash}, store.Eq("id", owner.ID)); err != nil {
+		return ws, owner, err
+	}
+	return ws, owner, nil
 }
 
 func slugFrom(name string) string {
@@ -339,6 +366,16 @@ func (s *Server) handleSignOut(x *c) error {
 	}
 	s.clearCookie(x)
 	return x.ok(map[string]any{"ok": true})
+}
+
+// accountName is what an authenticator app or a passkey lists an account
+// as: its email address, or its name when it has none (an install's owner
+// the desktop app made).
+func accountName(u core.User) string {
+	if u.Email == "" {
+		return u.Name
+	}
+	return u.Email
 }
 
 type membership struct {

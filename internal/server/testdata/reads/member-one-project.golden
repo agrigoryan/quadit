@@ -22,6 +22,7 @@ ready
  "providers": [],
  "registration": false,
  "require_2fa": false,
+ "setup_by_app": false,
  "setup_needed": false,
  "version": "test"
 }

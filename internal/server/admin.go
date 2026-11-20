@@ -90,6 +90,9 @@ func (s *Server) handleSendTestMail(x *c) error {
 	if b.To == "" {
 		b.To = x.user.Email
 	}
+	if b.To == "" {
+		return &engine.Error{Code: engine.CodeInvalid, Field: "to", Message: "say where to send it: your account has no email address"}
+	}
 	if err := s.sendMail(x.ctx(), b.To, "Test message", "This is a test message from your install. Mail works."); err != nil {
 		return &engine.Error{Code: engine.CodeInvalid, Message: err.Error()}
 	}

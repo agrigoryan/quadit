@@ -80,6 +80,7 @@ api POST /api/v1/admin/backups/{id}/restore-item
 api POST /api/v1/admin/mail/test
 api POST /api/v1/admin/workspaces/{id}/join
 api POST /api/v1/admin/workspaces/{id}/restore
+api POST /api/v1/auth/app-session
 api POST /api/v1/auth/invite/{token}
 api POST /api/v1/auth/login
 api POST /api/v1/auth/logout

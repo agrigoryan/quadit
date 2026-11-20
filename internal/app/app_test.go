@@ -1,6 +1,7 @@
 package app
 
 import (
+	"io"
 	"net"
 	"net/http"
 	"net/netip"
@@ -53,6 +54,95 @@ func TestServeStopsWhenItsInputCloses(t *testing.T) {
 	})
 }
 
+// TestServeTakesTheAppKeyFromItsInput: with --app-key-stdin the server
+// reads the key of the app that runs it from the first line of its input
+// before it listens, and takes requests that carry it as that app's; the
+// rest of the input is still only waited through, and its end still stops
+// the server. A key that is missing or too short stops the start, and is
+// never written to the log.
+func TestServeTakesTheAppKeyFromItsInput(t *testing.T) {
+	const key = "a2V5LW9mLXRoZS1hcHAtdGhhdC1ydW5zLXRoaXMtc2VydmVyLTEyMzQ"
+	t.Run("a key", func(t *testing.T) {
+		input := pipeAsStdin(t)
+		if _, err := input.WriteString(key + "\n"); err != nil {
+			t.Fatal(err)
+		}
+		url, done := startServe(t, "--stop-on-stdin-close", "--app-key-stdin")
+		if _, err := input.WriteString("anything else the app sends\n"); err != nil {
+			t.Fatal(err)
+		}
+		app := func(key string) int {
+			req, _ := http.NewRequest("POST", url+"/api/v1/auth/app-session", nil)
+			req.Header.Set("X-Quadit-App-Key", key)
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			res.Body.Close()
+			return res.StatusCode
+		}
+		// Not set up yet: the app is known, and there is no owner to sign in.
+		if got := app(key); got != http.StatusConflict {
+			t.Errorf("an app session with the key: %d, want 409", got)
+		}
+		if got := app(key[1:]); got != http.StatusForbidden {
+			t.Errorf("an app session with another key: %d, want 403", got)
+		}
+		input.Close()
+		if code := waitForExit(t, done); code != 0 {
+			t.Fatalf("quadit serve exited %d, want 0", code)
+		}
+	})
+
+	for name, line := range map[string]string{"a short key": "c2hvcnQta2V5LXNob3J0LWtleQ\n", "no key": ""} {
+		t.Run(name, func(t *testing.T) {
+			withoutQuaditEnv(t)
+			input := pipeAsStdin(t)
+			if _, err := input.WriteString(line); err != nil {
+				t.Fatal(err)
+			}
+			input.Close()
+			log := pipeAsStderr(t)
+			done := make(chan int, 1)
+			go func() {
+				done <- Serve([]string{"--data", t.TempDir(), "--listen", "127.0.0.1:0", "--stop-on-stdin-close", "--app-key-stdin"}, "test")
+			}()
+			if code := waitForExit(t, done); code != 1 {
+				t.Fatalf("quadit serve exited %d, want 1", code)
+			}
+			said := log()
+			if !strings.Contains(said, "--app-key-stdin") {
+				t.Errorf("the log does not say why it stopped: %q", said)
+			}
+			if key := strings.TrimSpace(line); key != "" && strings.Contains(said, key) {
+				t.Errorf("the log shows the key: %q", said)
+			}
+		})
+	}
+}
+
+// pipeAsStderr makes a pipe the process's standard error for the test, and
+// gives what was written to it once called.
+func pipeAsStderr(t *testing.T) func() string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := os.Stderr
+	os.Stderr = w
+	t.Cleanup(func() {
+		os.Stderr = old
+		r.Close()
+	})
+	return func() string {
+		os.Stderr = old
+		w.Close()
+		said, _ := io.ReadAll(r) // a pipe of this process: the read ends at its close
+		return string(said)
+	}
+}
+
 // pipeAsStdin makes a pipe the process's standard input for the test and
 // gives its writing end.
 func pipeAsStdin(t *testing.T) *os.File {
@@ -77,12 +167,7 @@ func pipeAsStdin(t *testing.T) *os.File {
 // run in reach it: QUADIT_DB would open, and upgrade, a real database.
 func startServe(t *testing.T, flags ...string) (string, <-chan int) {
 	t.Helper()
-	for _, item := range os.Environ() {
-		if name, _, _ := strings.Cut(item, "="); strings.HasPrefix(name, "QUADIT_") {
-			t.Setenv(name, "")
-			_ = os.Unsetenv(name) // cannot fail for a name os.Environ gave; t.Setenv puts it back after the test
-		}
-	}
+	withoutQuaditEnv(t)
 	probe, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -112,6 +197,18 @@ func startServe(t *testing.T, flags ...string) (string, <-chan int) {
 			t.Fatalf("quadit serve was not ready on %s within 20 s", url)
 		}
 		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// withoutQuaditEnv takes the QUADIT_ settings of the environment the tests
+// run in away for the test.
+func withoutQuaditEnv(t *testing.T) {
+	t.Helper()
+	for _, item := range os.Environ() {
+		if name, _, _ := strings.Cut(item, "="); strings.HasPrefix(name, "QUADIT_") {
+			t.Setenv(name, "")
+			_ = os.Unsetenv(name) // cannot fail for a name os.Environ gave; t.Setenv puts it back after the test
+		}
 	}
 }
 

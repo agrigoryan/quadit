@@ -26,11 +26,13 @@ import (
 //
 // A request with an Authorization header is not held to this: a browser
 // never adds one by itself, and another site's page cannot set it without
-// asking first (CORS), which the server never allows. Nor is a write made
-// with no cookie by a program that is not a browser (a sign-in from a
+// asking first (CORS), which the server never allows. Nor are the two
+// requests the desktop app that runs this server makes with its key
+// (appKeyed), which another site's page cannot set either. Nor is a write
+// made with no cookie by a program that is not a browser (a sign-in from a
 // script, GitHub's webhook, an MCP client getting its token).
 func (s *Server) refuseOtherPages(r *http.Request) error {
-	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || r.Header.Get("Authorization") != "" {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions || r.Header.Get("Authorization") != "" || s.appKeyed(r) {
 		return nil
 	}
 	switch s.sentFrom(r) {

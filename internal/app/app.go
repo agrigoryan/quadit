@@ -11,9 +11,11 @@
 package app
 
 import (
+	"bufio"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -158,11 +160,23 @@ func Serve(args []string, version string) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// Standard input has one reader: the app key is its first line, and
+	// what comes after it is only waited through for its end.
+	input := bufio.NewReader(os.Stdin)
+	var appKey string
+	if run.flags.appKeyStdin {
+		key, err := readAppKey(input)
+		if err != nil {
+			log.Error("cannot start", "err", err)
+			return 1
+		}
+		appKey = key
+	}
 	if run.flags.stopOnStdinClose {
 		// Detached: a read of standard input cannot be called off, so this
 		// ends when the input closes or the process does.
 		go func() {
-			_, _ = io.Copy(io.Discard, os.Stdin) // what is sent is not read; only its end counts
+			_, _ = io.Copy(io.Discard, input) // what is sent is not read; only its end counts
 			stop()
 		}()
 	}
@@ -201,7 +215,7 @@ func Serve(args []string, version string) int {
 		return 1
 	}
 	srv := server.New(ctx, server.Config{DataDir: o.Data, BaseURL: o.BaseURL, LocalURL: "http://" + run.localAddress(), Version: version, Log: log,
-		PrivateNetworks: privateNets, TrustedProxies: proxies}, st, files, sealer)
+		PrivateNetworks: privateNets, TrustedProxies: proxies, AppKey: appKey}, st, files, sealer)
 	if web := WebHandler(); web != nil {
 		srv.SetWeb(web)
 	}
@@ -270,6 +284,10 @@ type serveFlags struct {
 	// server (the desktop app) holds it open while it wants the server, so
 	// the server ends with that program however it ends.
 	stopOnStdinClose bool
+	// Read the key of the app that runs the server from the first line of
+	// standard input (readAppKey): a request that carries it is that app,
+	// which sets the install up and signs its owner in (server.Config.AppKey).
+	appKeyStdin bool
 }
 
 // serveRun is what one quadit serve was told: the Options and its own flags.
@@ -294,8 +312,8 @@ const (
 )
 
 // parse reads quadit serve's flags, each of which but --stop-on-stdin-close
-// can also come from the environment. That one is for the program that
-// starts the server, never inherited.
+// and --app-key-stdin can also come from the environment. Those are for the
+// program that starts the server, never inherited.
 func (run *serveRun) parse(args []string) {
 	o, f := &run.o, &run.flags
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
@@ -313,7 +331,29 @@ func (run *serveRun) parse(args []string) {
 	fs.StringVar(&f.privateNets, "allow-private-networks", envOr("QUADIT_ALLOW_PRIVATE_NETWORKS", ""), "networks off the public internet that webhooks, push, the vault, imports and GitHub integrations may reach, e.g. 192.168.1.0/24,10.0.0.5; default none (QUADIT_ALLOW_PRIVATE_NETWORKS)")
 	fs.StringVar(&f.trustedProxies, "trusted-proxies", envOr("QUADIT_TRUSTED_PROXIES", "127.0.0.1,::1"), "the reverse proxies in front of the server, whose X-Forwarded-For says who the caller is: addresses or networks; empty trusts none (QUADIT_TRUSTED_PROXIES)")
 	fs.BoolVar(&f.stopOnStdinClose, "stop-on-stdin-close", false, "shut down when standard input closes: for a program that starts the server and holds its input open while it wants it running")
+	fs.BoolVar(&f.appKeyStdin, "app-key-stdin", false, "read a key from the first line of standard input before listening: a request that carries it in X-Quadit-App-Key is the desktop app that runs this server, which sets the install up and signs its owner in")
 	fs.Parse(args)
+}
+
+// appKeyBytes is the least randomness an app key carries, in bytes.
+const appKeyBytes = 32
+
+// readAppKey reads the app key, the first line of standard input: base64url
+// of at least appKeyBytes bytes. A key that is missing or shorter is an
+// error, which never shows the key.
+func readAppKey(input *bufio.Reader) (string, error) {
+	line, err := input.ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", fmt.Errorf("--app-key-stdin: reading standard input: %w", err)
+	}
+	key := strings.TrimRight(line, "\r\n")
+	if key == "" {
+		return "", errors.New("--app-key-stdin: standard input gave no key")
+	}
+	if raw, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(key, "=")); err != nil || len(raw) < appKeyBytes {
+		return "", fmt.Errorf("--app-key-stdin: the key on standard input is not base64url of at least %d bytes", appKeyBytes)
+	}
+	return key, nil
 }
 
 // networks reads a list of networks (10.0.0.0/8) and single addresses
@@ -547,6 +587,9 @@ func (run *adminRun) person(addr string) (core.User, error) {
 // setup makes the first person and workspace.
 func (run *adminRun) setup() error {
 	ctx, st := run.ctx, run.st
+	if strings.TrimSpace(run.email) == "" {
+		return errors.New("--email is required: the person signs in with it")
+	}
 	if err := auth.CheckPasswordRules(run.password); err != nil {
 		return err
 	}

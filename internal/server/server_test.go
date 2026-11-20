@@ -58,6 +58,16 @@ func newSiteWith(t *testing.T, st store.Store, configure func(*server.Config)) *
 // site's folder when that is nil, with what configure sets on its Config.
 func newSiteOf(t *testing.T, st store.Store, files blob.Store, configure func(*server.Config)) *site {
 	t.Helper()
+	s := startSite(t, st, files, configure)
+	s.call(t, s.owner, "", "POST", "/api/v1/auth/setup", map[string]any{"name": "Aram", "email": "owner@example.com",
+		"password": "correct-horse-battery", "workspace_name": "Games"}, 201, nil)
+	return s
+}
+
+// startSite is newSiteOf before the install is set up: s.owner is a
+// browser signed in as nobody yet.
+func startSite(t *testing.T, st store.Store, files blob.Store, configure func(*server.Config)) *site {
+	t.Helper()
 	dir := t.TempDir()
 	if files == nil {
 		disk, err := blob.NewDisk(dir + "/files")
@@ -83,10 +93,7 @@ func newSiteOf(t *testing.T, st store.Store, files blob.Store, configure func(*s
 	}()
 	stopRun := func() { stop(); <-ran }
 	t.Cleanup(func() { stopRun(); hs.Close() })
-	s := &site{url: base, dir: dir, owner: browser(), srv: srv, stopRun: stopRun}
-	s.call(t, s.owner, "", "POST", "/api/v1/auth/setup", map[string]any{"name": "Aram", "email": "owner@example.com",
-		"password": "correct-horse-battery", "workspace_name": "Games"}, 201, nil)
-	return s
+	return &site{url: base, dir: dir, owner: browser(), srv: srv, stopRun: stopRun}
 }
 
 // call sends a request and decodes the answer, checking the status.

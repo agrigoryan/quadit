@@ -46,7 +46,7 @@ type webAuthnUser struct {
 }
 
 func (w webAuthnUser) WebAuthnID() []byte                         { return []byte(w.u.ID) }
-func (w webAuthnUser) WebAuthnName() string                       { return w.u.Email }
+func (w webAuthnUser) WebAuthnName() string                       { return accountName(w.u) }
 func (w webAuthnUser) WebAuthnDisplayName() string                { return w.u.Name }
 func (w webAuthnUser) WebAuthnCredentials() []webauthn.Credential { return w.creds }
 

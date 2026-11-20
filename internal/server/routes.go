@@ -63,6 +63,7 @@ func (s *Server) allRoutes() []route {
 		s.mcpRoutes(),            // mcp.go
 		s.oauthServerRoutes(),    // oauth_server.go
 		s.desktopRoutes(),        // desktop.go
+		s.appKeyRoutes(),         // app_key.go
 		s.openAPIRoutes(),        // openapi.go
 	)
 }
@@ -99,7 +100,7 @@ func (s *Server) coreRoutes() []route {
 
 		// Signing in and the account, outside any workspace.
 		{"GET /api/v1/auth/config", s.public(s.handleShowSignInOptions), "What this install offers for signing in, and whether it has been set up.", "", "account"},
-		{"POST /api/v1/auth/setup", s.public(s.handleSetUpInstall), "First run: make the first person and workspace. Body: {name, email, password, workspace_name}.", "", "account"},
+		{"POST /api/v1/auth/setup", s.public(s.handleSetUpInstall), "First run: make the first person and workspace, signed in. Body: {name, email, password, workspace_name}. On a server the desktop app runs (setup_by_app in the sign-in options) only that app may, with its key in X-Quadit-App-Key and the body {name, workspace_name}: the owner has no email and no password.", "", "account"},
 		{"POST /api/v1/auth/login", s.public(s.handleSignIn), "Sign in with email and password. Body: {email, password}. Answers with a session cookie; with two-step on, the second step follows.", "", "account"},
 		{"POST /api/v1/auth/logout", s.public(s.handleSignOut), "Sign out of this session.", "", "account"},
 		{"GET /api/v1/auth/me", s.settingUpSecondStep(s.handleShowAccount), "The signed-in account and the workspaces it is in.", "", "account"},
