@@ -40,6 +40,7 @@ on:
       - "web/src/auth/desktop-*"
       - "web/src/shell/system-notices.ts"
       - "web/src/types/desktop.ts"
+      - "web/src/insights/agents/agents-page.tsx"
       - "web/public/sw.js"
   pull_request:
     paths: *paths
