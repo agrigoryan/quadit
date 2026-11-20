@@ -191,8 +191,11 @@ test("S on My work opens the status picker for the row", async ({ page, project,
   await page.goto("/e2e/my-work");
   const open = page.getByRole("link", { name: `Open ${key}` });
   await expect(open).toBeVisible();
-  await page.keyboard.press("ArrowDown");
-  await expect(open).toHaveAttribute("aria-current", "true");
+  // Tasks of other tests that wait on the owner (a question asked of them) come first: go down to this one.
+  await expect(async () => {
+    await page.keyboard.press("ArrowDown");
+    await expect(open).toHaveAttribute("aria-current", "true", { timeout: 500 });
+  }).toPass();
   await page.keyboard.press("s");
   await expect(page.getByRole("dialog", { name: "Change status…" })).toBeVisible();
 });
