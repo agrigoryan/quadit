@@ -7,6 +7,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { FileRow } from "@/types/core";
 import { Lightbox } from "@/ui/media";
+import { TooltipProvider } from "@/ui/tooltip";
 
 afterEach(cleanup);
 
@@ -26,7 +27,11 @@ function picture(name: string, content_type = "image/png"): FileRow {
 /** A lightbox open on the first of `files`, moving as its arrows ask. */
 function Open({ files }: { files: FileRow[] }) {
   const [file, setFile] = useState<FileRow | null>(files[0] ?? null);
-  return <Lightbox file={file} files={files} onShow={setFile} onClose={() => setFile(null)} />;
+  return (
+    <TooltipProvider>
+      <Lightbox file={file} files={files} onShow={setFile} onClose={() => setFile(null)} />
+    </TooltipProvider>
+  );
 }
 
 const shown = () => screen.getByRole("dialog").querySelector("img, video")?.getAttribute("src");

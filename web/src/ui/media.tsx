@@ -1,9 +1,11 @@
-import { ChevronLeft, ChevronRight, FileText, Play, X } from "lucide-react";
+import { useRef } from "react";
+import { FileText, Play, X } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { cx } from "@/lib/cx";
 import { fileSize, isImage, isVideo } from "@/data/files";
 import { t } from "@/lib/i18n";
 import type { FileRow } from "@/types/core";
+import { CarouselArrows, CarouselCount, onCarouselKey, type Steps } from "@/ui/carousel";
 
 interface ThumbProps {
   file: FileRow;
@@ -91,7 +93,9 @@ interface LightboxProps {
   onClose: () => void;
 }
 
-const round = "flex size-9 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20";
+/** The close button, in the look of the carousel's arrows. */
+const round =
+  "flex size-10 items-center justify-center rounded-full bg-black/55 text-white ring-1 ring-white/25 hover:bg-black/75";
 
 /**
  * One file over the whole screen. Escape or a click outside closes it. When
@@ -99,11 +103,16 @@ const round = "flex size-9 items-center justify-center rounded-full bg-white/10 
  * ones beside it, and round from the last to the first.
  */
 export function Lightbox({ file, files, onShow, onClose }: LightboxProps) {
+  const box = useRef<HTMLDivElement | null>(null);
   const at = file ? files.findIndex((f) => f.id === file.id) : -1;
-  const several = at >= 0 && files.length > 1;
-  const step = (by: number) => {
-    const next = files[(at + by + files.length) % files.length];
-    if (several && next) onShow(next);
+  const steps: Steps = {
+    index: Math.max(at, 0),
+    total: at >= 0 ? files.length : 0,
+    wrap: true,
+    onShow: (index) => {
+      const next = files[index];
+      if (next) onShow(next);
+    },
   };
 
   return (
@@ -111,45 +120,25 @@ export function Lightbox({ file, files, onShow, onClose }: LightboxProps) {
       <RDialog.Portal>
         <RDialog.Overlay className="fixed inset-0 z-[70] bg-black/85 animate-fade" />
         <RDialog.Content
+          ref={box}
+          tabIndex={-1}
           aria-describedby={undefined}
+          onOpenAutoFocus={(e) => {
+            // Start on the box, not on an arrow, whose tooltip would come up with it.
+            e.preventDefault();
+            box.current?.focus();
+          }}
           className="fixed inset-0 z-[70] flex items-center justify-center p-4 outline-none sm:p-10"
           onClick={(e) => e.target === e.currentTarget && onClose()}
-          onKeyDown={(e) => {
-            // A video's own controls seek with the same keys.
-            if (!several || e.target instanceof HTMLVideoElement) return;
-            if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-            e.preventDefault();
-            step(e.key === "ArrowLeft" ? -1 : 1);
-          }}
+          onKeyDown={(e) => onCarouselKey(e, steps)}
         >
           <VisuallyHidden.Root>
             <RDialog.Title>{file?.name}</RDialog.Title>
           </VisuallyHidden.Root>
           {/* Keyed, so the picture before does not stay up while the next one loads. */}
           {file && (isImage(file) || isVideo(file)) && <MediaFull key={file.id} file={file} className="rounded-md" />}
-          {several && (
-            <>
-              <button
-                type="button"
-                aria-label={t("common.previous")}
-                onClick={() => step(-1)}
-                className={cx("absolute top-1/2 left-3 -translate-y-1/2", round)}
-              >
-                <ChevronLeft className="size-5" />
-              </button>
-              <button
-                type="button"
-                aria-label={t("common.next")}
-                onClick={() => step(1)}
-                className={cx("absolute top-1/2 right-3 -translate-y-1/2", round)}
-              >
-                <ChevronRight className="size-5" />
-              </button>
-              <span className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-2.5 py-1 text-xs text-white tnum">
-                {t("common.position", { n: at + 1, total: files.length })}
-              </span>
-            </>
-          )}
+          <CarouselArrows {...steps} size="large" keys={{ previous: "←", next: "→" }} />
+          <CarouselCount index={steps.index} total={steps.total} size="large" />
           <RDialog.Close aria-label={t("common.close")} className={cx("absolute top-3 right-3", round)}>
             <X className="size-5" />
           </RDialog.Close>
