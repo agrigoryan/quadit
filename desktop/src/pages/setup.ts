@@ -1,4 +1,4 @@
-// The setup page (src/main/setup-settings.ts): five steps, each showing
+// The setup page (src/main/setup-page.ts): five steps, each showing
 // where it stands and each skippable.
 
 import { button, element, make } from "@/pages/dom";

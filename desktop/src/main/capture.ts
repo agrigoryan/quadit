@@ -6,7 +6,7 @@
 import { type BrowserWindow, globalShortcut } from "electron";
 import type { AppPages } from "@/main/app-pages";
 import type { Requests } from "@/main/requests";
-import type { Settings } from "@/main/setup-settings";
+import type { Settings } from "@/main/settings";
 import type { DesktopOutcome } from "@/shared/bridge";
 
 /** The quick-capture key: fixed, on or off in setup. */
