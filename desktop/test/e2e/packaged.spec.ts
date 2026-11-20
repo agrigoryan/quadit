@@ -131,6 +131,39 @@ test("the packaged app carries the quadit command for its architecture, which Co
   expect(execFileSync("file", [cli], { encoding: "utf8" })).toContain(process.arch === "arm64" ? "arm64" : "x86_64");
 });
 
+test("the quadit it carries serves the web app, and stops when its input closes, as Run Quadit on this computer runs it", async () => {
+  const cli = join(APP, "Contents/Resources/bin/quadit");
+  const free = createServer();
+  await new Promise<void>((done) => free.listen(0, "127.0.0.1", done));
+  const address = free.address();
+  const port = typeof address === "object" && address ? address.port : 0;
+  await new Promise((done) => free.close(done));
+  const origin = `http://127.0.0.1:${port}`;
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-packaged-server-"));
+  const server = spawn(
+    cli,
+    ["serve", "--data", data, "--listen", `127.0.0.1:${port}`, "--url", origin, "--stop-on-stdin-close"],
+    { stdio: ["pipe", "ignore", "ignore"], env: { PATH: process.env.PATH ?? "", HOME: data } },
+  );
+  try {
+    await expect
+      .poll(
+        () =>
+          fetch(`${origin}/readyz`).then(
+            (r) => r.status,
+            () => 0,
+          ),
+        { timeout: 20_000 },
+      )
+      .toBe(200);
+    expect(await (await fetch(`${origin}/setup`)).text()).toContain('<div id="root">');
+    server.stdin?.end();
+    expect(await exitOf(server)).toBe(0);
+  } finally {
+    await stop(server);
+  }
+});
+
 test("the packaged app starts and opens the server that was open, as the app", async () => {
   const server = await ownServer();
   const { app } = start([], {}, [{ id: "a1b2c3d4e5f6", name: "Own", origin: server.origin, open: true, handoff: 1 }]);

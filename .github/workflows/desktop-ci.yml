@@ -10,8 +10,10 @@ name: desktop-ci
 # desktop/ first for the packaged checks.
 #
 # Besides the app, it runs for the server's and the web app's side of the
-# desktop contract, and for the command-line client the app carries
-# (desktop/scripts/cli.mjs) and Connect runs. The desktop release runs it on the tagged commit before
+# desktop contract, for the command-line client the app carries
+# (desktop/scripts/cli.mjs) and Connect runs, and for what "Run Quadit on
+# this computer" runs of the server: quadit serve's flags and the web app's
+# first-run page. The desktop release runs it on the tagged commit before
 # it publishes anything.
 on:
   push:
@@ -23,6 +25,8 @@ on:
       - "internal/server/desktop*.go"
       - "internal/app/web.go"
       - "internal/cli/**"
+      - "internal/app/app.go"
+      - "web/src/auth/setup.tsx"
       - "web/src/auth/desktop-*"
       - "web/src/shell/system-notices.ts"
       - "web/src/types/desktop.ts"
@@ -76,6 +80,8 @@ jobs:
             desktop/pnpm-lock.yaml
       - name: The server, with the web app inside
         run: make build
+      # cli.mjs builds the web app into the quadit it packages; make build's is the suite's server, which
+      # test/e2e/local-server.spec.ts also runs as the app's own (QUADIT_DESKTOP_QUADIT).
       - name: The app, and the app packaged for this Mac, unsigned
         working-directory: desktop
         run: |

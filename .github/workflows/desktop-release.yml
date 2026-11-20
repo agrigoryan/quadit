@@ -22,8 +22,9 @@ name: desktop-release
 # and Gatekeeper's verdict. Windows is signed when WIN_CSC_LINK and
 # WIN_CSC_KEY_PASSWORD are set, and unsigned otherwise. The Homebrew cask is
 # not pushed from here: desktop/packaging/quadit-desktop.rb is its template.
-# The macOS and Linux apps carry the quadit command, built here with Go
-# (desktop/scripts/cli.mjs) and signed with the app on macOS.
+# The macOS and Linux apps carry the quadit command with the web app inside
+# (the server "Run Quadit on this computer" runs), built here with pnpm and
+# Go (desktop/scripts/cli.mjs) and signed with the app on macOS.
 on:
   push:
     tags: ["desktop-v*"]
@@ -76,7 +77,10 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          cache-dependency-path: desktop/pnpm-lock.yaml
+          # web/: cli.mjs builds the web app into the quadit the macOS and Linux apps carry.
+          cache-dependency-path: |
+            web/pnpm-lock.yaml
+            desktop/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       # Each system gets its own signing secrets and no other's: given the
