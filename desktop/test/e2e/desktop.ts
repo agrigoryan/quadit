@@ -150,11 +150,20 @@ export class Desktop {
   async signedIn(origin: string): Promise<Page> {
     const partition = `persist:server-${this.serverId(origin)}`;
     const { name, value } = this.run.session;
+    // Kept for a day and written out at once, as the server's own cookie is kept: a start of the
+    // app again in the same data folder is still signed in.
     await this.app.evaluate(
-      ({ session }, cookie) =>
-        session
-          .fromPartition(cookie.partition)
-          .cookies.set({ url: cookie.url, name: cookie.name, value: cookie.value, httpOnly: true }),
+      async ({ session }, cookie) => {
+        const { cookies } = session.fromPartition(cookie.partition);
+        await cookies.set({
+          url: cookie.url,
+          name: cookie.name,
+          value: cookie.value,
+          httpOnly: true,
+          expirationDate: Date.now() / 1000 + 24 * 60 * 60,
+        });
+        await cookies.flushStore();
+      },
       { partition, url: origin, name, value },
     );
     const page = await this.pageOf(origin);
