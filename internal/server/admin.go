@@ -378,12 +378,22 @@ func (s *Server) handleShowInstallHealth(x *c) error {
 
 // keepsADoor refuses a change to the sign-in settings that would leave the
 // one making it with no way to sign in: turning passwords off needs a
-// passkey or a provider account of theirs that still works.
+// passkey or a provider account of theirs that still works. The local
+// owner of a server the desktop app runs always has the app.
 func (s *Server) keepsADoor(x *c, name string, value json.RawMessage) error {
 	if name != "auth.password" && name != "auth.passkeys" && !signInSetting(name) {
 		return nil
 	}
 	ctx := x.ctx()
+	if s.cfg.AppKey != "" {
+		var localOwner string
+		if err := s.settings.Checked(ctx, localOwnerSetting, &localOwner); err != nil {
+			return err
+		}
+		if localOwner == x.user.ID {
+			return nil
+		}
+	}
 	change := settingChange{name: name, value: value}
 	if on, err := s.doorOn(ctx, change, "auth.password", true); err != nil {
 		return err
