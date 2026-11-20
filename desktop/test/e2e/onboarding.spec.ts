@@ -1,12 +1,12 @@
 // The first run, as a person meets it (desktop contract §7): Welcome, a
 // name, "Set up on this computer", and the workspace, signed in, with
-// Connect agents over it once; or "Connect to a server", as far as it goes
-// without a browser. Each step's window is saved as a picture in
+// Connect agents over it once where an agent tool is found; or "Connect to
+// a server", as far as it goes without a browser. Each step's window is saved as a picture in
 // onboarding-screens/ (outside test-results, which Playwright empties at
 // every run), in the order a person sees them; desktop-ci keeps the folder
 // on every run as the artifact desktop-onboarding-screens.
 
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
@@ -18,6 +18,23 @@ const SCREENS = join(__dirname, "../../onboarding-screens");
 async function screen(page: Page, name: string) {
   mkdirSync(SCREENS, { recursive: true });
   await page.screenshot({ path: join(SCREENS, name) });
+}
+
+/**
+ * A home folder of the test's own and a login shell whose PATH holds no
+ * agent tool (as connect.spec.ts fakes a computer), with Claude Code's
+ * config folder in that home when `claudeCode`: what the app sees of the
+ * agent tools on this computer. Given to the app as HOME and SHELL.
+ */
+function computer({ claudeCode }: { claudeCode: boolean }): { HOME: string; SHELL: string } {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-onboarding-")));
+  const home = join(root, "home");
+  mkdirSync(home);
+  if (claudeCode) mkdirSync(join(home, ".claude"));
+  const shell = join(root, "shell");
+  writeFileSync(shell, '#!/bin/sh\necho "PATH=/usr/bin:/bin"\n');
+  chmodSync(shell, 0o755);
+  return { HOME: home, SHELL: shell };
 }
 
 /** Whether one of the app's own pages, `file`, is open. */
@@ -37,13 +54,13 @@ async function closePage(desktop: Desktop, file: string) {
   await expect.poll(() => isOpen(desktop, file)).toBe(false);
 }
 
-test("the first run sets Quadit up on this computer with a name alone, lands in the workspace signed in, and offers Connect agents once", async ({
+test("the first run sets Quadit up on this computer with a name alone, lands in the workspace signed in, and offers Connect agents once where a tool is found", async ({
   run,
 }) => {
   // Two starts of the app, each waiting for its server.
   test.slow();
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
-  const env = { QUADIT_DESKTOP_QUADIT: slowToStart(run.binary, 3) };
+  const env = { QUADIT_DESKTOP_QUADIT: slowToStart(run.binary, 3), ...computer({ claudeCode: true }) };
   let desktop = await Desktop.launch(data, run, [], { env, firstStart: true });
   let origin = "";
   try {
@@ -72,9 +89,10 @@ test("the first run sets Quadit up on this computer with a name alone, lands in 
     expect((await desktop.recorded()).opened).toEqual([]);
     await expect.poll(() => isOpen(desktop, "welcome.html")).toBe(false);
 
-    // Connect agents, over the workspace, once.
+    // Connect agents, over the workspace, once: Claude Code is found here.
     const connect = await desktop.appPage("connect.html");
     await expect(connect.getByRole("heading", { level: 1, name: "Connect agents" })).toBeVisible();
+    await expect(connect.getByRole("button", { name: "Connect Claude Code" })).toBeVisible();
     await screen(connect, "04-connect-agents.png");
     await closePage(desktop, "connect.html");
     await screen(page, "05-workspace.png");
@@ -89,6 +107,26 @@ test("the first run sets Quadit up on this computer with a name alone, lands in 
     await expect(page.getByRole("heading", { level: 1, name: "My work" })).toBeVisible({ timeout: 30_000 });
     expect(isOpen(desktop, "connect.html")).toBe(false);
     expect(isOpen(desktop, "welcome.html")).toBe(false);
+  } finally {
+    await desktop.close();
+  }
+});
+
+test("after a first set-up on a computer where no agent tool is found, Connect agents does not open by itself", async ({
+  run,
+}) => {
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  const env = { QUADIT_DESKTOP_QUADIT: run.binary, ...computer({ claudeCode: false }) };
+  const desktop = await Desktop.launch(data, run, [], { env, firstStart: true });
+  try {
+    const welcome = await desktop.appPage("welcome.html");
+    await welcome.getByLabel("Your name").fill("Lou Local");
+    await welcome.getByRole("button", { name: "Set up on this computer" }).click();
+    const page = await desktop.pageOf(await desktop.localOrigin());
+    await expect(page.getByRole("heading", { level: 1, name: "My work" })).toBeVisible({ timeout: 30_000 });
+    // Welcome closes once the set-up, and the choice about Connect agents, are done.
+    await expect.poll(() => isOpen(desktop, "welcome.html")).toBe(false);
+    expect(isOpen(desktop, "connect.html")).toBe(false);
   } finally {
     await desktop.close();
   }
