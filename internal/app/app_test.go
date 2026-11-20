@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"os"
 	"slices"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -72,9 +73,16 @@ func pipeAsStdin(t *testing.T) *os.File {
 
 // startServe runs quadit serve with extra flags on a new data directory and
 // a free port, waits until it is ready, and gives its address and what it
-// will exit with.
+// will exit with. None of the QUADIT_ settings of the environment the tests
+// run in reach it: QUADIT_DB would open, and upgrade, a real database.
 func startServe(t *testing.T, flags ...string) (string, <-chan int) {
 	t.Helper()
+	for _, item := range os.Environ() {
+		if name, _, _ := strings.Cut(item, "="); strings.HasPrefix(name, "QUADIT_") {
+			t.Setenv(name, "")
+			_ = os.Unsetenv(name) // cannot fail for a name os.Environ gave; t.Setenv puts it back after the test
+		}
+	}
 	probe, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
