@@ -190,10 +190,10 @@ A webhook to an agent on the same machine or network, or a secret for a service 
 
 The Quadit desktop app opens a server's own web address in a window of its own; the server needs nothing turned on for it.
 
-Download it from [Releases](https://github.com/agrigoryan/quadit/releases), under the newest `desktop-v…` release: the `.dmg` for macOS (`arm64` for Apple silicon, `x64` for Intel; drag Quadit to Applications), the `.exe` installer for Windows, or the AppImage or `.deb` for Linux. Builds so far are pre-releases and are not signed, so the system warns the first time one is opened:
+Download it from [Releases](https://github.com/agrigoryan/quadit/releases), under the newest `desktop-v…` release: the `.dmg` for macOS (`arm64` for Apple silicon, `x64` for Intel; drag Quadit to Applications), the `.exe` installer for Windows, or the AppImage or `.deb` for Linux. Builds so far are pre-releases, and the system may warn the first time one is opened:
 
-- macOS refuses to open it. Allow it under System Settings → Privacy & Security, "Open Anyway", or run `xattr -dr com.apple.quarantine /Applications/Quadit.app` once.
-- Windows SmartScreen says it protected the PC: choose "More info", then "Run anyway".
+- macOS: the app is signed, and Apple checks each build (notarization). A pre-release can be out before Apple has answered, and until then macOS says it could not verify the app. Allow it under System Settings → Privacy & Security, "Open Anyway", or run `xattr -dr com.apple.quarantine /Applications/Quadit.app` once. The warning stops by itself once Apple has accepted that build.
+- Windows: the app is not signed, and SmartScreen says it protected the PC. Choose "More info", then "Run anyway".
 
 The app does not update itself: it tells you when a newer version is out, and you download it the same way.
 
