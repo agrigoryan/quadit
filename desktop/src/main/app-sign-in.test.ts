@@ -1,25 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { AppSignIn } from "@/main/app-sign-in";
 
-/** An AppSignIn whose sign-in answers `signs` and counts how often it was asked. */
-function made(signs = true) {
+/** An AppSignIn whose sign-in gives the answers in `answers`, one per ask (then true), and notes each ask. */
+function made(answers: boolean[] = []) {
   const asked: string[] = [];
   const signIn = new AppSignIn(async (serverId) => {
     asked.push(serverId);
-    return signs;
+    return answers.shift() ?? true;
   });
   return { signIn, asked };
 }
 
 describe("AppSignIn", () => {
   it("signs a window in, and says whether it did just now", async () => {
-    expect(await made(true).signIn.attempt("a")).toBe(true);
-    expect(await made(false).signIn.attempt("a")).toBe(false);
+    expect(await made([true]).signIn.attempt("a")).toBe(true);
+    expect(await made([false]).signIn.attempt("a")).toBe(false);
   });
 
-  it("tries once, however often the window lands on the sign-in page, until it has shown a workspace", async () => {
+  it("after a sign-in that worked, does not sign in again until the window has shown a workspace", async () => {
     const { signIn, asked } = made();
-    await signIn.attempt("a");
+    expect(await signIn.attempt("a")).toBe(true);
+    // Sent back to the sign-in page again and again: no loop.
     expect(await signIn.attempt("a")).toBe(false);
     expect(await signIn.attempt("a")).toBe(false);
     expect(asked).toEqual(["a"]);
@@ -30,7 +31,14 @@ describe("AppSignIn", () => {
     expect(asked).toEqual(["a", "a"]);
   });
 
-  it("keeps each server's tries apart", async () => {
+  it("asks again at the next load after one that did not sign in, which sends the window nowhere", async () => {
+    const { signIn, asked } = made([false, false]);
+    expect(await signIn.attempt("a")).toBe(false);
+    expect(await signIn.attempt("a")).toBe(false);
+    expect(asked).toEqual(["a", "a"]);
+  });
+
+  it("keeps each server's sign-ins apart", async () => {
     const { signIn, asked } = made();
     await signIn.attempt("a");
     await signIn.attempt("b");
