@@ -1,4 +1,4 @@
-// The Quadit server the app runs on this computer ("Run Quadit on this
+// The Quadit server the app runs on this computer ("Set up on this
 // computer"): the bundled quadit, built with the web app, started as a child
 // of the app and stopped when the app quits, the way Docker Desktop runs its
 // engine. No service is installed: the server runs while the app does.
@@ -19,6 +19,11 @@
 //   - The app holds its standard input, and it runs with
 //     --stop-on-stdin-close: if the app dies without stopping it, the input
 //     closes and the server shuts down, so it never outlives the app.
+//   - Its first line of input is the app key (--app-key-stdin), made anew at
+//     every start and kept only here, in memory: it is never logged, put in
+//     settings or given to a page. A request carrying it is the app that runs
+//     the server, which may make the install's owner and sign a window in as
+//     them without a form (setUpOwner, signInOwner; desktop contract §7).
 //   - It is reached directly, never through a proxy (--trusted-proxies=),
 //     and has passkeys off: no passkey can be made for an address that is
 //     a number, and the sign-in page would offer them.
@@ -30,6 +35,7 @@
 //   - One that exits on its own is started again a few times, a little
 //     later each time, then shown as failed with the last lines of its log.
 
+import { randomBytes } from "node:crypto";
 import { closeSync, mkdirSync, openSync, readSync, renameSync, statSync, writeSync } from "node:fs";
 import { createConnection, createServer } from "node:net";
 import { join } from "node:path";
@@ -39,6 +45,8 @@ import type { LocalState } from "@/shared/pages-api";
 
 /** What the app needs of a started quadit serve (Node's ChildProcess has it). */
 export interface ServerProcess {
+  /** Its standard input; null only when it was not started with a pipe there. */
+  stdin: { write(data: string): boolean; on(event: "error", listener: (err: Error) => void): unknown } | null;
   kill(signal: NodeJS.Signals): boolean;
   /** "exit" when it ended; "error" when it could not be run at all. */
   once(event: "exit", listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
@@ -98,6 +106,13 @@ const RESTART_DELAYS_MS = [1_000, 3_000, 10_000];
 const STEADY_MS = 60_000;
 const LOG_LIMIT_BYTES = 5 * 1024 * 1024;
 const LOG_LINES = 20;
+/** The header that says a request is the app that runs the server: the app key. */
+const APP_KEY_HEADER = "X-Quadit-App-Key";
+/** The bytes of randomness in an app key; the server refuses fewer than 32. */
+const APP_KEY_BYTES = 32;
+/** The workspace the app makes with the owner. */
+const FIRST_WORKSPACE = "Personal";
+const ASK_LIMIT_MS = 15_000;
 
 export class LocalServer {
   readonly available: boolean;
@@ -107,6 +122,8 @@ export class LocalServer {
   private listeners = new Set<() => void>();
   private settledWaiters: (() => void)[] = [];
   private child: ServerProcess | undefined;
+  /** The app key of the server started last, while it runs. */
+  private key: string | null = null;
   private exited: Promise<void> = Promise.resolve();
   /** Counts each start and stop: a step of an older one finds it changed and does nothing more. */
   private generation = 0;
@@ -206,6 +223,82 @@ export class LocalServer {
     if (generation === this.generation) this.start();
   }
 
+  /**
+   * Makes the install's owner, named `name`, and their first workspace
+   * ("Personal"), through the session behind `fetch`: the server window's
+   * own, so that the session cookie it answers with lands where that window
+   * reads it. An install that is set up already is signed in to instead,
+   * which makes trying again after a half-finished set-up work; one set up
+   * with the web form has no owner the app may sign in, and its window opens
+   * on the sign-in page. Gives the path to open the window on and whether
+   * the owner was made just now, or what went wrong, in a sentence. Never throws.
+   */
+  async setUpOwner(
+    fetch: Fetch,
+    name: string,
+  ): Promise<{ ok: true; path: string; first: boolean } | { ok: false; error: string }> {
+    const reach = await this.whenRunning();
+    if (!reach.ok) return { ok: false, error: reach.reason };
+    try {
+      const config = await this.ask(fetch, "GET", "/api/v1/auth/config");
+      if (!config.ok) return { ok: false, error: await refusal(config) };
+      const { setup_needed } = (await config.json()) as { setup_needed?: unknown };
+      if (setup_needed === true) {
+        const made = await this.ask(fetch, "POST", "/api/v1/auth/setup", { name, workspace_name: FIRST_WORKSPACE });
+        if (made.status !== 201) return { ok: false, error: await refusal(made) };
+        const { workspace } = (await made.json()) as { workspace?: { slug?: unknown } };
+        const slug = typeof workspace?.slug === "string" ? workspace.slug : "";
+        return { ok: true, path: `/${encodeURIComponent(slug)}`, first: true };
+      }
+      const signedIn = await this.ask(fetch, "POST", "/api/v1/auth/app-session", {});
+      if (signedIn.status !== 204 && signedIn.status !== 409) return { ok: false, error: await refusal(signedIn) };
+      return { ok: true, path: "/", first: false };
+    } catch (err) {
+      return {
+        ok: false,
+        error: `The server on this computer could not be reached: ${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
+  }
+
+  /**
+   * Signs the session behind `fetch` (a server window's) in as the
+   * install's owner when it has no session there. True when it did just
+   * now; false when it was signed in already, and when it cannot: the server
+   * is not running, it was set up with the web form (409), it runs without
+   * an app key (404), or it could not be asked. Never throws.
+   */
+  async signInOwner(fetch: Fetch): Promise<boolean> {
+    if (this.current.kind !== "running") return false;
+    try {
+      const me = await this.ask(fetch, "GET", "/api/v1/auth/me");
+      if (me.ok) return false;
+      return (await this.ask(fetch, "POST", "/api/v1/auth/app-session", {})).status === 204;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * One request of the running server through `fetch`, with the session's
+   * cookies, both ways. A request with a body is a write of the app's own
+   * and carries the app key; a read never does.
+   */
+  private ask(fetch: Fetch, method: "GET" | "POST", path: string, body?: object): Promise<Response> {
+    const origin = this.origin();
+    if (!origin || !this.key) return Promise.reject(new Error("the server is not running"));
+    return fetch(origin + path, {
+      method,
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        ...(body ? { "Content-Type": "application/json", [APP_KEY_HEADER]: this.key } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(ASK_LIMIT_MS),
+    });
+  }
+
   private async chooseAndStart(): Promise<string> {
     let port = this.parts.settings.get().localPort;
     if (port === null) {
@@ -279,6 +372,7 @@ export class LocalServer {
           origin,
           "--trusted-proxies=",
           "--stop-on-stdin-close",
+          "--app-key-stdin",
         ],
         {
           // Set after the person's own QUADIT_ settings are taken out, on purpose.
@@ -289,7 +383,12 @@ export class LocalServer {
     } finally {
       closeSync(log); // the server has its own copy
     }
+    const key = randomBytes(APP_KEY_BYTES).toString("base64url");
+    // A server that is gone before it reads its key closes its input: the write fails, and its exit says why.
+    child.stdin?.on("error", () => {});
+    child.stdin?.write(`${key}\n`);
     this.child = child;
+    this.key = key;
     let ended = false;
     let exitedNow = () => {};
     const exited = new Promise<void>((done) => (exitedNow = done));
@@ -297,7 +396,10 @@ export class LocalServer {
     const end = (why: string, again: boolean) => {
       if (ended) return;
       ended = true;
-      if (this.child === child) this.child = undefined;
+      if (this.child === child) {
+        this.child = undefined;
+        this.key = null;
+      }
       exitedNow();
       if (generation === this.generation) void this.exitedOnItsOwn(why, again);
     };
@@ -392,6 +494,15 @@ export class LocalServer {
 
 function originOf(port: number): string {
   return `http://127.0.0.1:${port}`;
+}
+
+/** Why the server refused a request, in a sentence: in its own words when its answer has some. */
+async function refusal(response: Response): Promise<string> {
+  const body = (await response.json().catch(() => null)) as { error?: { message?: unknown } } | null;
+  const message = body?.error?.message;
+  return typeof message === "string" && message
+    ? `The server on this computer answered: ${message}.`
+    : `The server on this computer answered with status ${response.status}.`;
 }
 
 function sizeOf(file: string): number | null {

@@ -12,11 +12,20 @@ import {
   type Ports,
   type ServerProcess,
 } from "@/main/local-server";
+import type { Fetch } from "@/main/probe";
 import type { AppSettings } from "@/main/settings";
 
-/** A quadit serve as the app sees it: told signals, and made to exit by the test. */
+/** A quadit serve as the app sees it: told signals, given its input, and made to exit by the test. */
 class FakeProcess extends EventEmitter implements ServerProcess {
   signals: string[] = [];
+  /** What the app wrote to its standard input. */
+  input: string[] = [];
+  stdin = Object.assign(new EventEmitter(), {
+    write: (data: string) => {
+      this.input.push(data);
+      return true;
+    },
+  });
   /** Whether it exits when told SIGTERM, as a quadit serve does. */
   constructor(private obeys = true) {
     super();
@@ -57,6 +66,15 @@ class FakeClock implements Clock {
 /** Lets promises and I/O callbacks run. */
 async function settle() {
   for (let i = 0; i < 10; i++) await new Promise((done) => setImmediate(done));
+}
+
+/** A request the app made of the server, as the server saw it. */
+interface Asked {
+  url: string;
+  method: string;
+  headers: Headers;
+  body: unknown;
+  credentials: RequestCredentials | undefined;
 }
 
 function setUp(
@@ -163,6 +181,7 @@ describe("LocalServer", () => {
       // Reached only directly: no caller is a proxy whose X-Forwarded-For is believed.
       "--trusted-proxies=",
       "--stop-on-stdin-close",
+      "--app-key-stdin",
     ]);
     // The app holds the server's input: when the app goes, however it goes, so does the server.
     expect(run?.stdio[0]).toBe("pipe");
@@ -432,6 +451,204 @@ describe("LocalServer", () => {
     expect(second).toBe(first);
     expect(settings().localPort).toBe(51234);
     expect(spawned).toHaveLength(1);
+  });
+});
+
+/**
+ * The server on this computer as a window's session reaches it: each answer
+ * is given by `answer` from the path and the request, and every request is
+ * kept as the server saw it.
+ */
+function windowSession(answer: (path: string, asked: Asked) => Response) {
+  const asked: Asked[] = [];
+  const fetch: Fetch = async (url, init = {}) => {
+    const request: Asked = {
+      url,
+      method: init.method ?? "GET",
+      headers: new Headers(init.headers),
+      body: typeof init.body === "string" ? JSON.parse(init.body) : undefined,
+      credentials: init.credentials,
+    };
+    asked.push(request);
+    return answer(new URL(url).pathname, request);
+  };
+  return { fetch, asked };
+}
+
+function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+}
+
+/** A server that runs, as setUp makes it, and the key it was given on its input. */
+async function running() {
+  const made = setUp();
+  await made.server.setUp();
+  await made.clock.advance(0);
+  const key = () => (made.spawned.at(-1)?.process.input.join("") ?? "").replace(/\n$/, "");
+  return { ...made, key };
+}
+
+describe("LocalServer's app key", () => {
+  it("is new at every start, given as the first line of the server's input, and written nowhere else", async () => {
+    const { server, spawned, clock, settings, key } = await running();
+    const first = key();
+    expect(first).toMatch(/^[A-Za-z0-9_-]{43}$/); // 32 random bytes, base64url
+    expect(spawned[0]?.process.input).toEqual([`${first}\n`]);
+
+    await server.restart();
+    await clock.advance(0);
+    expect(spawned).toHaveLength(2);
+    expect(key()).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(key()).not.toBe(first);
+
+    for (const run of spawned) {
+      expect(JSON.stringify(run.args)).not.toContain(first);
+      expect(JSON.stringify(run.env)).not.toContain(first);
+    }
+    expect(JSON.stringify(settings())).not.toContain(first);
+    expect(readFileSync(server.logFile, "utf8")).not.toContain(first);
+  });
+
+  it("does not bring the app down when the server's input is already closed: its exit says what happened", async () => {
+    const { server, spawned, clock } = await running();
+    spawned[0]?.process.stdin.emit("error", Object.assign(new Error("write EPIPE"), { code: "EPIPE" }));
+    spawned[0]?.process.emit("exit", 1, null);
+    await clock.advance(0);
+    expect(server.state().kind).toBe("starting");
+  });
+});
+
+describe("LocalServer.setUpOwner", () => {
+  it("makes the owner and the workspace Personal with the app key, through the session it is given", async () => {
+    const { server, key } = await running();
+    const session = windowSession((path) => {
+      if (path === "/api/v1/auth/config") return json(200, { setup_needed: true, setup_by_app: true });
+      if (path === "/api/v1/auth/setup")
+        return json(201, { user: { name: "Lou Local" }, workspace: { slug: "personal", name: "Personal" } });
+      return json(404, {});
+    });
+    expect(await server.setUpOwner(session.fetch, "Lou Local")).toEqual({ ok: true, path: "/personal", first: true });
+    const made = session.asked.find((asked) => asked.url.endsWith("/api/v1/auth/setup"));
+    expect(made).toMatchObject({
+      url: "http://127.0.0.1:4780/api/v1/auth/setup",
+      method: "POST",
+      body: { name: "Lou Local", workspace_name: "Personal" },
+      // The cookie it answers with lands in the window's own session.
+      credentials: "include",
+    });
+    expect(made?.headers.get("X-Quadit-App-Key")).toBe(key());
+    // Nothing else is sent the key.
+    expect(session.asked.filter((asked) => asked.headers.has("X-Quadit-App-Key"))).toHaveLength(1);
+  });
+
+  it("signs in instead on an install set up already, so trying again after a half-finished set-up works", async () => {
+    const { server, key } = await running();
+    const session = windowSession((path) => {
+      if (path === "/api/v1/auth/config") return json(200, { setup_needed: false });
+      if (path === "/api/v1/auth/app-session") return new Response(null, { status: 204 });
+      return json(404, {});
+    });
+    expect(await server.setUpOwner(session.fetch, "Lou Local")).toEqual({ ok: true, path: "/", first: false });
+    expect(session.asked.some((asked) => asked.url.endsWith("/api/v1/auth/setup"))).toBe(false);
+    const signedIn = session.asked.find((asked) => asked.url.endsWith("/api/v1/auth/app-session"));
+    expect(signedIn).toMatchObject({ method: "POST", credentials: "include" });
+    expect(signedIn?.headers.get("X-Quadit-App-Key")).toBe(key());
+  });
+
+  it("opens the sign-in page of an install that was set up with the form, which has no owner the app may sign in", async () => {
+    const { server } = await running();
+    const session = windowSession((path) =>
+      path === "/api/v1/auth/config"
+        ? json(200, { setup_needed: false })
+        : json(409, { error: { code: "conflict", message: "this install has no local owner" } }),
+    );
+    expect(await server.setUpOwner(session.fetch, "Lou Local")).toEqual({ ok: true, path: "/", first: false });
+  });
+
+  it("says plainly why it could not, in the server's words when it gave some", async () => {
+    const { server } = await running();
+    const refusing = windowSession((path) =>
+      path === "/api/v1/auth/config"
+        ? json(200, { setup_needed: true })
+        : json(400, { error: { code: "invalid", field: "name", message: "name is required" } }),
+    );
+    expect(await server.setUpOwner(refusing.fetch, "")).toEqual({
+      ok: false,
+      error: "The server on this computer answered: name is required.",
+    });
+
+    const silent = windowSession(() => new Response("", { status: 502 }));
+    expect(await server.setUpOwner(silent.fetch, "Lou")).toEqual({
+      ok: false,
+      error: "The server on this computer answered with status 502.",
+    });
+
+    const away = windowSession(() => {
+      throw new TypeError("fetch failed");
+    });
+    expect(await server.setUpOwner(away.fetch, "Lou")).toEqual({
+      ok: false,
+      error: "The server on this computer could not be reached: fetch failed",
+    });
+  });
+
+  it("asks nothing of a server that is not running", async () => {
+    const { server } = setUp({ port: 4780 });
+    const session = windowSession(() => json(200, {}));
+    expect(await server.setUpOwner(session.fetch, "Lou")).toEqual({
+      ok: false,
+      error: expect.stringMatching(/is stopped/),
+    });
+    expect(session.asked).toEqual([]);
+  });
+});
+
+describe("LocalServer.signInOwner", () => {
+  it("leaves a session that is signed in alone", async () => {
+    const { server } = await running();
+    const session = windowSession((path) => (path === "/api/v1/auth/me" ? json(200, { user: {} }) : json(500, {})));
+    expect(await server.signInOwner(session.fetch)).toBe(false);
+    expect(session.asked.map((asked) => `${asked.method} ${new URL(asked.url).pathname}`)).toEqual([
+      "GET /api/v1/auth/me",
+    ]);
+    expect(session.asked[0]?.credentials).toBe("include");
+    expect(session.asked[0]?.headers.has("X-Quadit-App-Key")).toBe(false);
+  });
+
+  it("asks for the owner's session with the app key when there is none", async () => {
+    const { server, key } = await running();
+    const session = windowSession((path) =>
+      path === "/api/v1/auth/me" ? json(401, { error: { code: "unauthorized" } }) : new Response(null, { status: 204 }),
+    );
+    expect(await server.signInOwner(session.fetch)).toBe(true);
+    const asked = session.asked.at(-1);
+    expect(asked).toMatchObject({
+      url: "http://127.0.0.1:4780/api/v1/auth/app-session",
+      method: "POST",
+      credentials: "include",
+    });
+    expect(asked?.headers.get("X-Quadit-App-Key")).toBe(key());
+  });
+
+  it("is not signed in by any other answer: set up with the form (409), no key (404), a wrong key (403), or no answer", async () => {
+    const { server } = await running();
+    for (const status of [409, 404, 403, 429, 500]) {
+      const session = windowSession((path) =>
+        path === "/api/v1/auth/me" ? json(401, {}) : json(status, { error: { code: "x", message: "no" } }),
+      );
+      expect(await server.signInOwner(session.fetch), String(status)).toBe(false);
+    }
+    const away = windowSession(() => {
+      throw new TypeError("fetch failed");
+    });
+    expect(await server.signInOwner(away.fetch)).toBe(false);
+  });
+
+  it("asks nothing of a server that is not running", async () => {
+    const { server } = setUp({ port: 4780 });
+    const session = windowSession(() => json(401, {}));
+    expect(await server.signInOwner(session.fetch)).toBe(false);
+    expect(session.asked).toEqual([]);
   });
 });
 
