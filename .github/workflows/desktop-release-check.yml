@@ -1,0 +1,57 @@
+name: desktop-release-check
+
+# Run by hand: a published desktop release's macOS app (Apple silicon), as
+# someone who downloads it gets it. It checks the signature, says what
+# Gatekeeper makes of the app now (a pre-release may be out before Apple's
+# notarization verdict, and passes from the moment Apple accepts it), and
+# starts the app: macOS kills a signed app at once when it claims a right its
+# signing does not carry.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release's tag (desktop-v0.1.0-beta.5)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download the app
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern '*-mac-arm64.zip' --pattern SHA256SUMS.txt
+          grep -- '-mac-arm64.zip$' SHA256SUMS.txt | shasum -a 256 -c -
+          ditto -x -k ./*-mac-arm64.zip .
+      - name: Signature
+        run: |
+          codesign --verify --deep --strict --verbose=2 Quadit.app
+          codesign -dv --verbose=2 Quadit.app 2>&1 | grep -E "Authority|TeamIdentifier"
+      - name: Gatekeeper
+        run: |
+          if spctl --assess --type execute -vv Quadit.app; then
+            echo "Gatekeeper accepts the app."
+          else
+            echo "::warning::Gatekeeper does not accept the app yet: macOS warns on opening it."
+          fi
+      - name: The app starts
+        run: |
+          Quadit.app/Contents/MacOS/Quadit &
+          pid=$!
+          sleep 20
+          if kill -0 "$pid" 2>/dev/null; then
+            echo "The app is running."
+            kill "$pid"
+          else
+            wait "$pid" && code=0 || code=$?
+            echo "::error::The app stopped by itself, with status $code."
+            log show --last 2m --style compact --predicate 'process == "amfid" OR (process == "kernel" AND eventMessage CONTAINS "Quadit")' | tail -30
+            exit 1
+          fi
