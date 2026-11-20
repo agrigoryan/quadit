@@ -78,6 +78,11 @@ interface Asked {
   credentials: RequestCredentials | undefined;
 }
 
+/** The nonce a proof was asked for with. */
+function nonceOf(asked: Asked | undefined): string {
+  return (asked?.body as { nonce?: string } | undefined)?.nonce ?? "";
+}
+
 function setUp(
   options: {
     taken?: number[];
@@ -138,7 +143,7 @@ function setUp(
       if (proof === "missing") return json(404, { error: { code: "not_found", message: "not found" } });
       // The key as the server read it: the first line of its input.
       const key = proof === "right" ? (spawned.at(-1)?.process.input.join("").split("\n")[0] ?? "") : "another key";
-      const { nonce } = JSON.parse(String(init.body)) as { nonce: string };
+      const nonce = nonceOf(addressed.at(-1));
       return json(200, { proof: createHmac("sha256", key).update(nonce).digest("hex") });
     },
     ports,
@@ -530,13 +535,13 @@ describe("LocalServer's proof", () => {
     });
     // The key itself never goes there: only what the server makes of the nonce with it comes back.
     expect(asked?.headers.has("X-Quadit-App-Key")).toBe(false);
-    const { nonce } = asked?.body as { nonce: string };
+    const nonce = nonceOf(asked);
     expect(nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);
 
     await server.restart();
     await clock.advance(0);
     expect(proofs()).toHaveLength(2);
-    expect((proofs()[1]?.body as { nonce: string }).nonce).not.toBe(nonce);
+    expect(nonceOf(proofs()[1])).not.toBe(nonce);
   });
 
   for (const [proof, what] of [
