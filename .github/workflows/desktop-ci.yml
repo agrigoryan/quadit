@@ -12,10 +12,13 @@ name: desktop-ci
 # Besides the app, it runs for the server's and the web app's side of the
 # desktop contract, for the command-line client the app carries
 # (desktop/scripts/cli.mjs) and Connect runs, and for what "Set up on this
-# computer" runs of the server: quadit serve's flags, the set-up and the
-# sign-in the app makes with its key (an owner with no email), and the web
-# app's first-run page. The desktop release runs it on the tagged commit
-# before it publishes anything.
+# computer" runs of the server: quadit serve's flags (the app key among
+# them), the set-up and the sign-in the app makes with that key (an owner
+# with no email), and the web app's first-run and sign-in pages. The desktop
+# release runs it on the tagged commit before it publishes anything.
+#
+# Every run of the end-to-end suite keeps the pictures of the first run it
+# took (test/e2e/onboarding.spec.ts) as the artifact desktop-onboarding-screens.
 on:
   push:
     branches: [main]
@@ -32,6 +35,7 @@ on:
       - "internal/cli/**"
       - "internal/app/app.go"
       - "web/src/auth/setup.tsx"
+      - "web/src/auth/login.tsx"
       - "web/src/auth/desktop-*"
       - "web/src/shell/system-notices.ts"
       - "web/src/types/desktop.ts"
@@ -104,6 +108,12 @@ jobs:
       - name: End-to-end
         working-directory: desktop
         run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-onboarding-screens
+          path: desktop/onboarding-screens
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

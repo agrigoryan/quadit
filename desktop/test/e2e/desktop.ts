@@ -1,6 +1,6 @@
 // The `test` every desktop spec imports: Playwright's, with the app started
-// fresh for each test (its own empty data folder, setup marked done unless
-// a test asks for the first start) and some things of the main process
+// fresh for each test (its own empty data folder, the first run marked over
+// unless a test asks for the first start, which shows Welcome) and some things of the main process
 // stood in for from its start (stand-ins.cjs), so nothing leaves the test
 // and what the app did can be read back.
 
@@ -36,7 +36,7 @@ export class Desktop {
    * in place. `args` are given to it as a system gives a link that starts
    * the app (Windows and Linux; macOS reads the same argument at start);
    * `env` is added to its environment. A data folder without settings gets
-   * setup marked done, unless `firstStart`.
+   * the first run marked over (no Welcome), unless `firstStart`.
    */
   static async launch(
     data: string,
@@ -210,6 +210,21 @@ export class Desktop {
     await list.getByLabel("Name").fill(name);
     await list.getByRole("button", { name: "Add server" }).click();
     return this.pageOf(new URL(address).origin);
+  }
+
+  /** The address of the server the app runs on this computer, once it has chosen its port (its settings file). */
+  async localOrigin(): Promise<string> {
+    const port = () => {
+      try {
+        return (
+          (JSON.parse(readFileSync(join(this.data, "settings.json"), "utf8")) as { localPort?: number }).localPort ?? 0
+        );
+      } catch {
+        return 0;
+      }
+    };
+    await expect.poll(port, { message: "the port of the server on this computer" }).toBeGreaterThan(0);
+    return `http://127.0.0.1:${port()}`;
   }
 
   /** The id the app gave the server at `origin`, from its servers file. */
