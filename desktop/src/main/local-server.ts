@@ -19,9 +19,16 @@
 //   - The app holds its standard input, and it runs with
 //     --stop-on-stdin-close: if the app dies without stopping it, the input
 //     closes and the server shuts down, so it never outlives the app.
-//   - It is running once /readyz answers 200. One that exits on its own is
-//     started again a few times, a little later each time, then shown as
-//     failed with the last lines of its log.
+//   - It is reached directly, never through a proxy (--trusted-proxies=),
+//     and has passkeys off: no passkey can be made for an address that is
+//     a number, and the sign-in page would offer them.
+//   - It is running once /healthz answers 200: its listener opens only
+//     after the database is open and upgraded (internal/app, Serve), while
+//     /readyz also asks a cloud file store, which may be away while the
+//     server is usable. A window loads its address only while it runs
+//     (whenRunning): what else answers there must not get its sign-in.
+//   - One that exits on its own is started again a few times, a little
+//     later each time, then shown as failed with the last lines of its log.
 
 import { closeSync, mkdirSync, openSync, readSync, renameSync, statSync, writeSync } from "node:fs";
 import { createConnection, createServer } from "node:net";
@@ -105,6 +112,8 @@ export class LocalServer {
   private generation = 0;
   private restarts = 0;
   private runningSince: number | null = null;
+  /** The set-up under way, which a second ask while it is gets too. */
+  private settingUp: Promise<string> | null = null;
 
   constructor(private parts: LocalServerParts) {
     this.available = parts.binary !== null;
@@ -135,19 +144,33 @@ export class LocalServer {
   }
 
   /**
-   * Chooses the server's port the first time (4780 when free, otherwise
-   * one the system has free) and starts it; gives its address. Throws
-   * where the app has no server to run.
+   * Once it is no longer starting: whether it runs, so that a window may
+   * load its address, or why not. A window that loaded the address while
+   * another program held the port would hand that program this server's
+   * sign-in.
    */
-  async setUp(): Promise<string> {
-    if (!this.available) throw new Error("This build of the app has no Quadit server to run.");
-    let port = this.parts.settings.get().localPort;
-    if (port === null) {
-      port = (await this.parts.ports.free(PREFERRED_PORT)) ? PREFERRED_PORT : await this.parts.ports.any();
-      this.parts.settings.change({ localPort: port });
-    }
-    this.start();
-    return originOf(port);
+  async whenRunning(): Promise<{ ok: true } | { ok: false; reason: string }> {
+    await this.settled();
+    const state = this.current;
+    if (state.kind === "running") return { ok: true };
+    if (state.kind === "failed") return { ok: false, reason: state.reason };
+    return {
+      ok: false,
+      reason:
+        "The server on this computer is stopped. Start it from the server list, or File → Server on This Computer.",
+    };
+  }
+
+  /**
+   * Chooses the server's port the first time (4780 when free, otherwise
+   * one the system has free) and starts it; gives its address. Asked again
+   * while it is at it, gives the same. Throws where the app has no server
+   * to run.
+   */
+  setUp(): Promise<string> {
+    if (!this.available) return Promise.reject(new Error("This build of the app has no Quadit server to run."));
+    this.settingUp ??= this.chooseAndStart().finally(() => (this.settingUp = null));
+    return this.settingUp;
   }
 
   /** Starts the server, unless it is starting or running already. Its state says how it goes. */
@@ -159,21 +182,10 @@ export class LocalServer {
 
   /** Stops the server and waits for it: SIGTERM, then SIGKILL if it has not exited in time. Never starts it again. */
   async stop(): Promise<void> {
-    this.generation++;
-    const child = this.child;
-    if (child) {
-      const exited = this.exited;
-      child.kill("SIGTERM");
-      const inTime = await Promise.race([
-        exited.then(() => true),
-        this.parts.clock.sleep(STOP_LIMIT_MS).then(() => false),
-      ]);
-      if (!inTime) {
-        child.kill("SIGKILL");
-        await exited;
-      }
-    }
-    this.set({ kind: "stopped" });
+    const generation = ++this.generation;
+    if (this.child) await this.terminate(this.child, this.exited);
+    // Something asked after this stop says what the state is.
+    if (generation === this.generation) this.set({ kind: "stopped" });
   }
 
   /**
@@ -186,13 +198,48 @@ export class LocalServer {
     this.child?.kill("SIGTERM");
   }
 
+  /** Stops the server and starts it again, unless something else was asked of it meanwhile. */
   async restart(): Promise<void> {
-    await this.stop();
-    this.start();
+    const stopping = this.stop();
+    const generation = this.generation;
+    await stopping;
+    if (generation === this.generation) this.start();
   }
 
-  /** One start of the server, as the start numbered `generation`. */
+  private async chooseAndStart(): Promise<string> {
+    let port = this.parts.settings.get().localPort;
+    if (port === null) {
+      port = (await this.parts.ports.free(PREFERRED_PORT)) ? PREFERRED_PORT : await this.parts.ports.any();
+      this.parts.settings.change({ localPort: port });
+    }
+    this.start();
+    return originOf(port);
+  }
+
+  /** SIGTERM, then SIGKILL when the server has not exited in time; resolves once it has. */
+  private async terminate(child: ServerProcess, exited: Promise<void>) {
+    child.kill("SIGTERM");
+    const inTime = await Promise.race([
+      exited.then(() => true),
+      this.parts.clock.sleep(STOP_LIMIT_MS).then(() => false),
+    ]);
+    if (!inTime) {
+      child.kill("SIGKILL");
+      await exited;
+    }
+  }
+
+  /** One start of the server, as the start numbered `generation`: whatever goes wrong ends as failed. */
   private async launch(generation: number) {
+    try {
+      await this.run(generation);
+    } catch (err) {
+      if (generation === this.generation)
+        this.fail(`The server could not be started: ${err instanceof Error ? err.message : String(err)}`, false);
+    }
+  }
+
+  private async run(generation: number) {
     const { binary, settings, spawn, ports, clock, fetch } = this.parts;
     const port = settings.get().localPort;
     if (!binary || port === null) return;
@@ -218,16 +265,35 @@ export class LocalServer {
 
     const log = this.openLog();
     const origin = originOf(port);
-    const child = spawn(
-      binary,
-      ["serve", "--data", this.dataDir, "--listen", `127.0.0.1:${port}`, "--url", origin, "--stop-on-stdin-close"],
-      { env: { ...withoutQuaditSettings(this.parts.env), PATH: path }, stdio: ["pipe", log, log] },
-    );
-    closeSync(log); // the server has its own copy
+    let child: ServerProcess;
+    try {
+      child = spawn(
+        binary,
+        [
+          "serve",
+          "--data",
+          this.dataDir,
+          "--listen",
+          `127.0.0.1:${port}`,
+          "--url",
+          origin,
+          "--trusted-proxies=",
+          "--stop-on-stdin-close",
+        ],
+        {
+          // Set after the person's own QUADIT_ settings are taken out, on purpose.
+          env: { ...withoutQuaditSettings(this.parts.env), PATH: path, QUADIT_SETTING_AUTH_PASSKEYS: "false" },
+          stdio: ["pipe", log, log],
+        },
+      );
+    } finally {
+      closeSync(log); // the server has its own copy
+    }
     this.child = child;
     let ended = false;
     let exitedNow = () => {};
-    this.exited = new Promise((done) => (exitedNow = done));
+    const exited = new Promise<void>((done) => (exitedNow = done));
+    this.exited = exited;
     const end = (why: string, again: boolean) => {
       if (ended) return;
       ended = true;
@@ -242,7 +308,7 @@ export class LocalServer {
 
     const started = clock.now();
     while (generation === this.generation && !ended) {
-      const ready = await fetch(`${origin}/readyz`, { signal: AbortSignal.timeout(2_000) })
+      const ready = await fetch(`${origin}/healthz`, { signal: AbortSignal.timeout(2_000) })
         .then((response) => response.status === 200)
         .catch(() => false);
       if (generation !== this.generation || ended) return;
@@ -252,9 +318,10 @@ export class LocalServer {
         return;
       }
       if (clock.now() - started >= READY_LIMIT_MS) {
-        this.generation++;
-        child.kill("SIGTERM");
-        this.fail("The server did not start within two minutes.", true);
+        // Stopped as Stop stops it, and only then failed: no live server is left behind controls that say it is not.
+        const stopping = ++this.generation;
+        await this.terminate(child, exited);
+        if (stopping === this.generation) this.fail("The server did not start within two minutes.", true);
         return;
       }
       await clock.sleep(READY_POLL_MS);
@@ -299,16 +366,21 @@ export class LocalServer {
     return fd;
   }
 
+  /** The log's last lines; none when it cannot be read. */
   private lastLogLines(): string[] {
     const size = sizeOf(this.logFile);
     if (!size) return [];
     const length = Math.min(size, 16 * 1024);
     const buffer = Buffer.alloc(length);
-    const fd = openSync(this.logFile, "r");
     try {
-      readSync(fd, buffer, 0, length, size - length);
-    } finally {
-      closeSync(fd);
+      const fd = openSync(this.logFile, "r");
+      try {
+        readSync(fd, buffer, 0, length, size - length);
+      } finally {
+        closeSync(fd);
+      }
+    } catch {
+      return [];
     }
     return buffer
       .toString("utf8")

@@ -66,6 +66,7 @@ function setUp(
     binary?: string | null;
     port?: number | null;
     obeys?: boolean;
+    spawn?: () => never;
   } = {},
 ) {
   const userData = mkdtempSync(join(tmpdir(), "quadit-desktop-local-"));
@@ -80,19 +81,22 @@ function setUp(
   const clock = new FakeClock();
   const taken = new Set(options.taken ?? []);
   let ready = options.ready ?? true;
-  const ports: Ports = { free: async (port) => !taken.has(port), any: async () => 51_234 };
+  // Each port the system hands out is another, as a real one's would be.
+  let nextFree = 51_234;
+  const ports: Ports = { free: async (port) => !taken.has(port), any: async () => nextFree++ };
   const parts: LocalServerParts = {
     binary: options.binary === undefined ? "/app/bin/quadit" : options.binary,
     dataDir: join(userData, "server"),
     settings: { get: () => settings, change: (change) => (settings = { ...settings, ...change }) },
     spawn: (binary, args, spawnOptions) => {
+      if (options.spawn) options.spawn();
       const process = new FakeProcess(options.obeys);
       spawned.push({ binary, args, env: spawnOptions.env, stdio: spawnOptions.stdio, process });
       return process;
     },
     clock,
     fetch: async (url) => {
-      if (!ready || !url.endsWith("/readyz")) throw new TypeError("fetch failed");
+      if (!ready || !url.endsWith("/healthz")) throw new TypeError("fetch failed");
       return new Response("ok");
     },
     ports,
@@ -132,10 +136,11 @@ describe("LocalServer", () => {
   });
 
   it("takes another free port when 4780 is taken, and keeps it even once 4780 is free", async () => {
-    const { server, settings, clock } = setUp({ taken: [4780] });
+    const { server, settings, clock, release } = setUp({ taken: [4780] });
     expect(await server.setUp()).toBe("http://127.0.0.1:51234");
     await clock.advance(0);
     await server.stop();
+    release(4780);
     expect(await server.setUp()).toBe("http://127.0.0.1:51234");
     expect(settings().localPort).toBe(51234);
   });
@@ -155,6 +160,8 @@ describe("LocalServer", () => {
       "127.0.0.1:4780",
       "--url",
       "http://127.0.0.1:4780",
+      // Reached only directly: no caller is a proxy whose X-Forwarded-For is believed.
+      "--trusted-proxies=",
       "--stop-on-stdin-close",
     ]);
     // The app holds the server's input: when the app goes, however it goes, so does the server.
@@ -163,13 +170,18 @@ describe("LocalServer", () => {
     expect(run?.stdio[2]).toBe(run?.stdio[1]);
     // Nothing of the person's own Quadit settings reaches it; the PATH is the login shell's, where
     // git, ffmpeg and Chrome are found even when the app was opened from the Dock.
-    expect(run?.env).toEqual({ PATH: "/opt/homebrew/bin:/usr/bin:/bin", HOME: "/home/ann" });
+    // Passkeys are off: no passkey can be made for an address that is a number (127.0.0.1).
+    expect(run?.env).toEqual({
+      PATH: "/opt/homebrew/bin:/usr/bin:/bin",
+      HOME: "/home/ann",
+      QUADIT_SETTING_AUTH_PASSKEYS: "false",
+    });
     expect(server.state()).toEqual({ kind: "running" });
     expect(states).toEqual(["starting", "running"]);
     expect(statSync(server.logFile).isFile()).toBe(true);
   });
 
-  it("is starting until /readyz answers, and settles once it does", async () => {
+  it("is starting until /healthz answers, and settles once it does", async () => {
     const { server, clock, setReady } = setUp({ ready: false });
     await server.setUp();
     let settled = false;
@@ -344,6 +356,82 @@ describe("LocalServer", () => {
     await clock.advance(0);
     expect(statSync(`${server.logFile}.1`).size).toBe(5 * 1024 * 1024 + 1);
     expect(readFileSync(server.logFile, "utf8")).toMatch(/^Started by the Quadit app at /);
+  });
+
+  it("is reachable for a window only while it runs, and says why not otherwise", async () => {
+    const { server, clock, take } = setUp({ port: 4780 });
+    expect(await server.whenRunning()).toEqual({ ok: false, reason: expect.stringMatching(/is stopped/) });
+    server.start();
+    let answer: unknown;
+    void server.whenRunning().then((said) => (answer = said));
+    await clock.advance(0);
+    expect(answer).toEqual({ ok: true });
+
+    // Another program on its port: the window must not go there, with this server's sign-in.
+    await server.stop();
+    take(4780);
+    server.start();
+    void server.whenRunning().then((said) => (answer = said));
+    await clock.advance(10_000);
+    expect(answer).toEqual({ ok: false, reason: expect.stringMatching(/^Port 4780 on this computer is in use/) });
+  });
+
+  it("does not start again after a restart when a stop was asked while the old server was still going", async () => {
+    const { server, clock, spawned } = setUp({ obeys: false });
+    await server.setUp();
+    await clock.advance(0);
+    const restarted = server.restart();
+    const stopped = server.stop();
+    spawned[0]?.process.emit("exit", 0, null);
+    await Promise.all([restarted, stopped]);
+    await clock.advance(60_000);
+    expect(spawned).toHaveLength(1);
+    expect(server.state().kind).toBe("stopped");
+  });
+
+  it("fails with a plain reason when it cannot be started at all", async () => {
+    const { server, parts, clock } = setUp();
+    // A file where its data folder should be: its log cannot be opened.
+    writeFileSync(parts.dataDir, "");
+    await server.setUp();
+    await clock.advance(0);
+    expect(server.state()).toMatchObject({
+      kind: "failed",
+      reason: expect.stringMatching(/^The server could not be started: /),
+    });
+
+    const throwing = setUp({
+      spawn: () => {
+        throw new Error("spawn EBADF");
+      },
+    });
+    await throwing.server.setUp();
+    await throwing.clock.advance(0);
+    expect(throwing.server.state()).toMatchObject({
+      kind: "failed",
+      reason: "The server could not be started: spawn EBADF",
+    });
+  });
+
+  it("stops a server that was never ready the way Stop does, killing it if it must, before showing it failed", async () => {
+    const { server, clock, spawned } = setUp({ ready: false, obeys: false });
+    await server.setUp();
+    await clock.advance(120_000);
+    expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
+    expect(server.state().kind).toBe("starting");
+    await clock.advance(10_000);
+    expect(spawned[0]?.process.signals).toEqual(["SIGTERM", "SIGKILL"]);
+    expect(server.state()).toMatchObject({ kind: "failed", reason: "The server did not start within two minutes." });
+  });
+
+  it("is set up once when asked twice at the same time, on one port", async () => {
+    const { server, clock, spawned, settings } = setUp({ taken: [4780] });
+    const [first, second] = await Promise.all([server.setUp(), server.setUp()]);
+    await clock.advance(0);
+    expect(first).toBe("http://127.0.0.1:51234");
+    expect(second).toBe(first);
+    expect(settings().localPort).toBe(51234);
+    expect(spawned).toHaveLength(1);
   });
 });
 
