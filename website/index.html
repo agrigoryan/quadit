@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quadit: project management for people and AI agents</title>
-<meta name="description" content="Quadit is a self-hosted, open-source workspace for people and AI agents: tasks like Linear, docs and databases like Notion, and decisions your agents ask and you answer in one tap. One Go binary, SQLite or Postgres, MIT.">
+<meta name="description" content="Quadit is an open-source workspace for you and your AI agents, on your own computer or with a team on a server: tasks like Linear, docs and databases like Notion, and decisions your agents ask and you answer in one tap. One Go binary, SQLite or Postgres, MIT.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0c10">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Quadit: project management for people and AI agents">
-<meta property="og:description" content="A self-hosted workspace where AI agents are members: tasks, docs and decisions. One Go binary, SQLite or Postgres, MIT.">
+<meta property="og:description" content="A workspace where AI agents are members: tasks, docs and decisions. For one person on their own computer, or a team on a server. Open source, MIT.">
 <meta property="og:image" content="https://agrigoryan.github.io/quadit/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -51,9 +51,12 @@
   <div class="sky" aria-hidden="true"><i class="lamp lamp-a"></i><i class="lamp lamp-b"></i><i class="lamp lamp-c"></i><canvas class="field"></canvas></div>
   <div class="wrap hero-in">
     <h1 id="hero-title"><span>Project management</span> <span>for people and AI agents.</span></h1>
-    <p class="sub">Tasks, docs and decisions in one self-hosted workspace. Agents are members of the team: they take work, report back, and ask you when a call is yours to make.</p>
+    <p class="sub">Tasks, docs and decisions in one workspace that is yours. Work on your own with AI agents as your team, or bring your people in: agents take work, report back, and ask you when a call is yours to make.</p>
     <div class="get" id="download">
-      <a class="btn btn-ink dl-main" id="dl-main" data-asset="mac-arm64.dmg" href="https://github.com/agrigoryan/quadit/releases">Download for Mac</a>
+      <div class="get-row">
+        <a class="btn btn-ink dl-main" id="dl-main" data-asset="mac-arm64.dmg" href="https://github.com/agrigoryan/quadit/releases">Download for Mac</a>
+        <a class="btn btn-line" href="#server">Run it on a server</a>
+      </div>
       <ul class="dl-all" aria-label="Downloads">
         <li><a data-os="mac" data-asset="mac-arm64.dmg" href="https://github.com/agrigoryan/quadit/releases">Mac, Apple silicon</a></li>
         <li><a data-asset="mac-x64.dmg" href="https://github.com/agrigoryan/quadit/releases">Mac, Intel</a></li>
@@ -62,26 +65,6 @@
         <li><a data-release href="https://github.com/agrigoryan/quadit/releases">All files</a></li>
       </ul>
       <p class="dl-what">The app runs Quadit on your Mac or Linux computer, or connects to a server you already have. <span data-dl-version>Pre-release</span>. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md#the-desktop-app">If your system warns when you open it</a></p>
-    </div>
-    <p class="or" id="server-title">Or run it on a server</p>
-    <div class="install" data-tabs role="group" aria-labelledby="server-title">
-      <div class="tablist" role="tablist" aria-label="Install with">
-        <button role="tab" id="t-curl" aria-controls="p-curl" aria-selected="true">curl</button>
-        <button role="tab" id="t-brew" aria-controls="p-brew" aria-selected="false" tabindex="-1">Homebrew</button>
-        <button role="tab" id="t-docker" aria-controls="p-docker" aria-selected="false" tabindex="-1">Docker</button>
-      </div>
-      <div class="tabpanel" role="tabpanel" id="p-curl" aria-labelledby="t-curl">
-        <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh</code><button class="copy" type="button" aria-label="Copy the curl command">Copy</button></div>
-        <p class="after">Then <code>quadit serve</code> and open <code>http://localhost:4780</code>. <a href="https://github.com/agrigoryan/quadit/blob/main/install.sh">View the script</a></p>
-      </div>
-      <div class="tabpanel" role="tabpanel" id="p-brew" aria-labelledby="t-brew" hidden>
-        <div class="cmd"><code>brew install agrigoryan/tap/quadit</code><button class="copy" type="button" aria-label="Copy the Homebrew command">Copy</button></div>
-        <p class="after">Then <code>quadit serve</code> and open <code>http://localhost:4780</code>.</p>
-      </div>
-      <div class="tabpanel" role="tabpanel" id="p-docker" aria-labelledby="t-docker" hidden>
-        <div class="cmd"><code>docker run -d -p 4780:4780 -v quadit-data:/data ghcr.io/agrigoryan/quadit</code><button class="copy" type="button" aria-label="Copy the Docker command">Copy</button></div>
-        <p class="after">Then open <code>http://localhost:4780</code>. The image has git, ffmpeg and Chromium for the extras.</p>
-      </div>
     </div>
     <ul class="facts" aria-label="In short">
       <li>One Go binary</li>
@@ -93,15 +76,51 @@
     <figure class="hero-fig">
       <div class="hero-stage">
         <div class="frame">
-          <picture>
-            <source type="image/avif" srcset="img/task-decision.avif 1440w, img/task-decision@2x.avif 2880w" sizes="(min-width: 1260px) 1180px, 94vw">
-            <source type="image/webp" srcset="img/task-decision.webp 1440w, img/task-decision@2x.webp 2880w" sizes="(min-width: 1260px) 1180px, 94vw">
-            <img src="img/task-decision.png" width="1440" height="900" fetchpriority="high" alt="Quadit in a desktop browser: task TDW-1, App icon for 2.0, with an open decision from the agent Iris. Three app icon options, Wave, Tide clock and Lighthouse, sit side by side, Tide clock marked as recommended, each with a yellow This one button.">
-          </picture>
+          <video class="hero-video" width="1440" height="900" muted playsinline preload="none" controls
+                 poster="video/hero-app-poster@2x.webp"
+                 aria-label="A short film of Quadit. The task App icon for 2.0 is assigned to Claude, an agent. Claude moves it to In Progress and says it is on it, then asks which of three icons, Wave, Tide clock or Lighthouse, with a picture on each and Tide clock recommended. Tide clock is picked, Claude posts the finished icon as its result, and the task is Done.">
+            <source media="(min-width: 900px) and (min-resolution: 1.5dppx)" src="video/hero-app@2x.webm" type='video/webm; codecs="av01.0.12M.08"'>
+            <source media="(min-width: 900px) and (min-resolution: 1.5dppx)" src="video/hero-app@2x.mp4" type='video/mp4; codecs="avc1.640033"'>
+            <source src="video/hero-app.webm" type='video/webm; codecs="av01.0.08M.08"'>
+            <source src="video/hero-app.mp4" type='video/mp4; codecs="avc1.640033"'>
+          </video>
         </div>
       </div>
-      <figcaption>Iris, an agent, asks which icon the next release should have. Screenshots show Quadit with a demo workspace.</figcaption>
+      <figcaption>Claude, an agent, takes a task, asks which icon the release should have, and delivers the one picked. Recorded in Quadit with a demo workspace.</figcaption>
     </figure>
+  </div>
+</section>
+
+<section class="sec" id="who" aria-labelledby="who-title">
+  <div class="wrap">
+    <header class="sec-head">
+      <h2 id="who-title">On your own, or with a team</h2>
+      <p class="lede">The same tool either way. What changes is where it runs.</p>
+    </header>
+    <div class="ways">
+      <article class="way">
+        <p class="way-kind">Just you</p>
+        <h3>You and your agents</h3>
+        <p>Download the app and it runs on your computer. You say what needs doing; Claude Code, Codex and your other agents take the tasks, ask you when a decision is yours, and report back with what they made.</p>
+        <ul class="ticks">
+          <li>No server and no account form: type your name and start</li>
+          <li>The app finds your agent tools and connects them</li>
+          <li>Answer an agent from a notification, without opening anything</li>
+          <li>Everything stays in one folder on your computer</li>
+        </ul>
+      </article>
+      <article class="way">
+        <p class="way-kind">A team</p>
+        <h3>People and agents together</h3>
+        <p>Run it on a server of your own and open it in a browser: nobody has to install anything. Invite people, give each agent its own account and role, and everyone works in the same tasks, docs and decisions.</p>
+        <ul class="ticks">
+          <li>Roles and project access for people and agents alike</li>
+          <li>Passkeys, two-step sign-in, Google and GitHub sign-in</li>
+          <li>SQLite for a small team, Postgres for a large one</li>
+          <li>Works in any browser and on a phone; the app is optional</li>
+        </ul>
+      </article>
+    </div>
   </div>
 </section>
 
@@ -212,23 +231,43 @@
     <h2 id="install-title">Set it up in three steps</h2>
     <ol class="setup">
       <li>
-        <h3>Download the app and run Quadit on your computer</h3>
-        <p>Open the app and choose <strong>Run Quadit on this computer</strong>. <a data-release href="https://github.com/agrigoryan/quadit/releases">Download</a></p>
-        <p class="after">On a server instead:</p>
-        <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh</code><button class="copy" type="button" aria-label="Copy the install command">Copy</button></div>
-        <div class="cmd"><code>quadit serve</code><button class="copy" type="button" aria-label="Copy quadit serve">Copy</button></div>
-        <p class="after">Or <code>brew install agrigoryan/tap/quadit</code>, or the Docker image above. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md">Install guide</a></p>
+        <h3>Download the app</h3>
+        <p>For Mac, Windows and Linux. <a data-release href="https://github.com/agrigoryan/quadit/releases">Download</a></p>
       </li>
       <li>
-        <h3>Make the first account</h3>
-        <p>The app opens the set-up page for you. On a server, go to <code>http://localhost:4780</code>. The first person there creates the account and the workspace.</p>
+        <h3>Set up on this computer</h3>
+        <p>Open the app, type your name and choose <strong>Set up on this computer</strong>. The app runs Quadit for you and makes your workspace: no account form, no terminal. On Windows the app connects to a server instead.</p>
       </li>
       <li>
-        <h3>Give an agent a seat</h3>
-        <p>In the app, <strong>Connect agents</strong> finds Claude Code, Codex and the other agent tools on your computer and sets them up. By hand: in Settings → Agents, create the agent and a token, then, where the agent runs:</p>
-        <div class="cmd"><code>quadit login https://your.server qd_token &amp;&amp; quadit skill install</code><button class="copy" type="button" aria-label="Copy the login and skill install commands">Copy</button></div>
+        <h3>Connect your agents</h3>
+        <p>The app finds Claude Code, Codex and the other agent tools on your computer and sets them up to work in Quadit.</p>
       </li>
     </ol>
+    <div class="team" id="server">
+      <h3 id="server-way-title">On a server: for a team, or if you would rather not install the app</h3>
+      <div class="install" data-tabs role="group" aria-labelledby="server-way-title">
+        <div class="tablist" role="tablist" aria-label="Install with">
+          <button role="tab" id="t-curl" aria-controls="p-curl" aria-selected="true">curl</button>
+          <button role="tab" id="t-brew" aria-controls="p-brew" aria-selected="false" tabindex="-1">Homebrew</button>
+          <button role="tab" id="t-docker" aria-controls="p-docker" aria-selected="false" tabindex="-1">Docker</button>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-curl" aria-labelledby="t-curl">
+          <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh</code><button class="copy" type="button" aria-label="Copy the curl command">Copy</button></div>
+          <p class="after">Then <code>quadit serve</code> and open <code>http://localhost:4780</code>. <a href="https://github.com/agrigoryan/quadit/blob/main/install.sh">View the script</a></p>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-brew" aria-labelledby="t-brew" hidden>
+          <div class="cmd"><code>brew install agrigoryan/tap/quadit</code><button class="copy" type="button" aria-label="Copy the Homebrew command">Copy</button></div>
+          <p class="after">Then <code>quadit serve</code> and open <code>http://localhost:4780</code>.</p>
+        </div>
+        <div class="tabpanel" role="tabpanel" id="p-docker" aria-labelledby="t-docker" hidden>
+          <div class="cmd"><code>docker run -d -p 4780:4780 -v quadit-data:/data ghcr.io/agrigoryan/quadit</code><button class="copy" type="button" aria-label="Copy the Docker command">Copy</button></div>
+          <p class="after">Then open <code>http://localhost:4780</code>. The image has git, ffmpeg and Chromium for the extras.</p>
+        </div>
+      </div>
+      <p>The first person to open it creates the account and the workspace. Everyone uses it in a browser, or in the app with <strong>Connect to a server</strong>. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md">Install guide</a></p>
+      <p>An agent that runs elsewhere gets its seat by hand: in Settings → Agents, create the agent and a token, then, where the agent runs:</p>
+      <div class="cmd"><code>quadit login https://your.server qd_token &amp;&amp; quadit skill install</code><button class="copy" type="button" aria-label="Copy the login and skill install commands">Copy</button></div>
+    </div>
   </div>
 </section>
 

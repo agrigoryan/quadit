@@ -109,13 +109,20 @@
 
   // The download button is for the system this is read on: it takes the
   // address of that system's link in the row under it. A Mac stays as
-  // written (Apple silicon; a browser cannot tell which Mac it is on).
+  // written (Apple silicon; a browser cannot tell which Mac it is on), and a
+  // phone or tablet, which cannot run the app, gets the list of all files.
   var main = document.getElementById("dl-main");
   if (main) {
     var system = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
-    var os = /win/i.test(system) ? "win" : /linux|x11/i.test(system) && !/android/i.test(navigator.userAgent) ? "linux" : "";
+    var phone = /android|iphone|ipad|ipod/i.test(navigator.userAgent) || (/mac/i.test(system) && navigator.maxTouchPoints > 1);
+    var os = /win/i.test(system) ? "win" : /linux|x11/i.test(system) && !phone ? "linux" : "";
     var link = os && document.querySelector('.dl-all a[data-os="' + os + '"]');
-    if (link) {
+    var all = document.querySelector(".dl-all a[data-release]");
+    if (phone && all) {
+      // The app is for a computer: on a phone the button leads to all its files.
+      main.href = all.href;
+      main.textContent = "Get the desktop app";
+    } else if (link) {
       main.href = link.href;
       main.textContent = "Download for " + link.textContent;
     }
@@ -182,4 +189,38 @@
       }
     });
   });
+  // The hero film: plays when most of it is in view, waits while it is off
+  // screen, and goes round: its last frame stays a moment, then it starts
+  // again. Visitors who ask for less motion or less data keep the poster and
+  // the browser's controls, as the markup gives them.
+  var film = document.querySelector(".hero-video");
+  var calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+    (navigator.connection && navigator.connection.saveData);
+  if (film && !calm && "IntersectionObserver" in window) {
+    var inView = false;
+    var again = 0;
+    function play() {
+      var started = film.play();
+      // A browser that refuses to play on its own (low power mode) shows the controls instead.
+      if (started && started.catch) started.catch(function () { film.controls = true; });
+    }
+    film.muted = true;
+    film.controls = false;
+    film.preload = "auto";
+    // 60% rather than all of it: the frame is taller than many laptop screens.
+    new IntersectionObserver(function (entries) {
+      inView = entries[0].isIntersecting;
+      if (!inView) film.pause();
+      else if (!film.ended) play();
+      else if (!again) restart();
+    }, { threshold: 0.6 }).observe(film);
+    function restart() {
+      again = 0;
+      if (!inView) return;
+      film.currentTime = 0;
+      play();
+    }
+    // The finished task is worth a look before the film starts over.
+    film.addEventListener("ended", function () { again = setTimeout(restart, 2500); });
+  }
 })();
