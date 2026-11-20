@@ -5,7 +5,7 @@
 // and what the app did can be read back.
 
 import { createHash, randomBytes } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { _electron as electron, type ElectronApplication, expect, type Page, test as base } from "@playwright/test";
@@ -261,6 +261,18 @@ export class Desktop {
     await this.app.close();
     expect(errors, "exceptions the app's main process did not catch").toEqual([]);
   }
+}
+
+/**
+ * The quadit `binary`, started `seconds` late: a start a person waits
+ * through, long enough to be seen, or to quit the app during. Its input
+ * reaches the server untouched (exec), app key and all.
+ */
+export function slowToStart(binary: string, seconds: number): string {
+  const script = join(mkdtempSync(join(tmpdir(), "quadit-desktop-slow-")), "quadit");
+  writeFileSync(script, `#!/bin/sh\nsleep ${seconds}\nexec '${binary}' "$@"\n`);
+  chmodSync(script, 0o755);
+  return script;
 }
 
 /**

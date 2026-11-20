@@ -5,7 +5,7 @@
 // is started as a person starts it, and watched from outside.
 
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { connect } from "node:net";
@@ -132,7 +132,7 @@ test("the packaged app carries the quadit command for its architecture, which Co
   expect(execFileSync("file", [cli], { encoding: "utf8" })).toContain(process.arch === "arm64" ? "arm64" : "x86_64");
 });
 
-test("the quadit it carries serves the web app, takes the app key on its input, and stops when its input closes, as the app runs it", async () => {
+test("the quadit it carries serves the web app, takes the app key on its input and proves it holds it, and stops when its input closes, as the app runs it", async () => {
   const cli = join(APP, "Contents/Resources/bin/quadit");
   const free = createServer();
   await new Promise<void>((done) => free.listen(0, "127.0.0.1", done));
@@ -156,7 +156,8 @@ test("the quadit it carries serves the web app, takes the app key on its input, 
     ],
     { stdio: ["pipe", "ignore", "ignore"], env: { PATH: process.env.PATH ?? "", HOME: data } },
   );
-  server.stdin?.write(`${randomBytes(32).toString("base64url")}\n`);
+  const key = randomBytes(32).toString("base64url");
+  server.stdin?.write(`${key}\n`);
   try {
     await expect
       .poll(
@@ -172,6 +173,17 @@ test("the quadit it carries serves the web app, takes the app key on its input, 
     // Set up by the app that runs it, not by the web form.
     const signIn = (await (await fetch(`${origin}/api/v1/auth/config`)).json()) as { setup_by_app?: boolean };
     expect(signIn.setup_by_app).toBe(true);
+    // It proves it holds the key, without being given it: the HMAC of a nonce of the app's.
+    const nonce = randomBytes(32).toString("base64url");
+    const proved = await fetch(`${origin}/api/v1/auth/app-proof`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ nonce }),
+    });
+    expect(proved.status).toBe(200);
+    expect(((await proved.json()) as { proof?: string }).proof).toBe(
+      createHmac("sha256", key).update(nonce).digest("hex"),
+    );
     server.stdin?.end();
     expect(await exitOf(server)).toBe(0);
   } finally {

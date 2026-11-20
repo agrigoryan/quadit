@@ -6,11 +6,11 @@
 // every run), in the order a person sees them; desktop-ci keeps the folder
 // on every run as the artifact desktop-onboarding-screens.
 
-import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { Desktop, expect, test } from "./desktop";
+import { Desktop, expect, slowToStart, test } from "./desktop";
 
 const SCREENS = join(__dirname, "../../onboarding-screens");
 
@@ -18,18 +18,6 @@ const SCREENS = join(__dirname, "../../onboarding-screens");
 async function screen(page: Page, name: string) {
   mkdirSync(SCREENS, { recursive: true });
   await page.screenshot({ path: join(SCREENS, name) });
-}
-
-/**
- * The quadit `binary`, started a few seconds late: the start a person
- * waits through, long enough to be seen and pictured. Its input reaches
- * the server untouched (exec), app key and all.
- */
-function slowToStart(binary: string): string {
-  const script = join(mkdtempSync(join(tmpdir(), "quadit-desktop-slow-")), "quadit");
-  writeFileSync(script, `#!/bin/sh\nsleep 3\nexec '${binary}' "$@"\n`);
-  chmodSync(script, 0o755);
-  return script;
 }
 
 /** Whether one of the app's own pages, `file`, is open. */
@@ -55,7 +43,7 @@ test("the first run sets Quadit up on this computer with a name alone, lands in 
   // Two starts of the app, each waiting for its server.
   test.slow();
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
-  const env = { QUADIT_DESKTOP_QUADIT: slowToStart(run.binary) };
+  const env = { QUADIT_DESKTOP_QUADIT: slowToStart(run.binary, 3) };
   let desktop = await Desktop.launch(data, run, [], { env, firstStart: true });
   let origin = "";
   try {

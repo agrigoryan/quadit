@@ -5,11 +5,11 @@
 // the server stop when it quits. The first run's own way there is
 // onboarding.spec.ts.
 
-import { existsSync, mkdtempSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { Desktop, expect, test } from "./desktop";
+import { Desktop, expect, slowToStart, test } from "./desktop";
 
 /** Whether a Quadit server answers at `origin`. */
 async function answers(origin: string): Promise<boolean> {
@@ -18,6 +18,46 @@ async function answers(origin: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * A program in the server's place that answers 200 to everything on the
+ * address the app gives it, as the server would, but holds no app key:
+ * what answers on the port when another program took it. It notes each
+ * request it gets: its method, its path, and whether it carried the app
+ * key and a cookie.
+ */
+function impostor(): { binary: string; requests: () => string[] } {
+  const dir = mkdtempSync(join(tmpdir(), "quadit-desktop-impostor-"));
+  const log = join(dir, "requests.log");
+  const program = join(dir, "impostor.cjs");
+  writeFileSync(
+    program,
+    `const http = require("node:http");
+const fs = require("node:fs");
+const listen = process.argv[process.argv.indexOf("--listen") + 1];
+const at = listen.lastIndexOf(":");
+// Held, like the server's input: its end ends this program.
+process.stdin.resume();
+process.stdin.on("end", () => process.exit(0));
+process.on("SIGTERM", () => process.exit(0));
+http
+  .createServer((req, res) => {
+    const said = [req.method, req.url.split("?")[0], req.headers["x-quadit-app-key"] ? "key" : "-", req.headers.cookie ? "cookie" : "-"];
+    fs.appendFileSync(${JSON.stringify(log)}, said.join(" ") + "\\n");
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ proof: "0".repeat(64), setup_needed: true }));
+  })
+  .listen(Number(listen.slice(at + 1)), listen.slice(0, at));
+`,
+  );
+  const binary = join(dir, "quadit");
+  writeFileSync(binary, `#!/bin/sh\nexec '${process.execPath}' '${program}' "$@"\n`);
+  chmodSync(binary, 0o755);
+  return {
+    binary,
+    requests: () => (existsSync(log) ? readFileSync(log, "utf8").trim().split("\n") : []),
+  };
 }
 
 /** Sets Quadit up on this computer from the server list, through Welcome, and gives the server's address and its window on the workspace. */
@@ -134,6 +174,72 @@ test("without a server to run, Welcome offers only connecting to one, and setup 
     const setup = await desktop.appPage("setup.html");
     await expect(setup.getByText("Not available in this copy of the app")).toBeVisible();
     await expect(setup.getByRole("button", { name: "Set up on this computer…" })).toHaveCount(0);
+  } finally {
+    await desktop.close();
+  }
+});
+
+test("a program that answers on the server's port without the app key is never taken for the server: no set-up, no sign-in, no window", async ({
+  run,
+}) => {
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  const fake = impostor();
+  const desktop = await Desktop.launch(data, run, [], { env: { QUADIT_DESKTOP_QUADIT: fake.binary } });
+  try {
+    const list = await desktop.serverList();
+    await list.getByRole("button", { name: "Set up on this computer…" }).click();
+    const welcome = await desktop.appPage("welcome.html");
+    await welcome.getByLabel("Your name").fill("Lou Local");
+    await welcome.getByRole("button", { name: "Set up on this computer" }).click();
+    await expect(welcome.getByText(/^Another program answers on port \d+ of this computer/)).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(welcome.getByRole("button", { name: "Try again" })).toBeVisible();
+    const origin = await desktop.localOrigin();
+    // Asked whether it is up, and for the proof it could not give: nothing else, never the key, never a cookie.
+    expect(fake.requests()).toEqual(["GET /healthz - -", "POST /api/v1/auth/app-proof - -"]);
+    expect(desktop.app.windows().some((page) => page.url().startsWith(origin))).toBe(false);
+    await desktop.chooseMenuItem("servers");
+    await expect(list.getByText(/^Another program answers on port \d+ of this computer/)).toBeVisible();
+  } finally {
+    await desktop.close();
+  }
+});
+
+test("quit before its set-up was finished, the server on this computer offers Welcome again at the next start, which finishes it", async ({
+  run,
+}) => {
+  // Two starts of the app, the second waiting for its server.
+  test.slow();
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  let desktop = await Desktop.launch(data, run, [], {
+    env: { QUADIT_DESKTOP_QUADIT: slowToStart(run.binary, 60) },
+    firstStart: true,
+  });
+  let origin = "";
+  try {
+    const welcome = await desktop.appPage("welcome.html");
+    await welcome.getByLabel("Your name").fill("Lou Local");
+    await welcome.getByRole("button", { name: "Set up on this computer" }).click();
+    await expect(welcome.getByText("Starting Quadit…")).toBeVisible();
+    origin = await desktop.localOrigin();
+    // Saved in the list already: the next start has a server, and no first run.
+    await expect.poll(() => desktop.serverId(origin)).not.toBe("");
+  } finally {
+    await desktop.close();
+  }
+
+  desktop = await Desktop.launch(data, run, [], { env: { QUADIT_DESKTOP_QUADIT: run.binary } });
+  try {
+    const welcome = await desktop.appPage("welcome.html");
+    await welcome.getByLabel("Your name").fill("Lou Later");
+    await welcome.getByRole("button", { name: "Set up on this computer" }).click();
+    const page = await desktop.pageOf(origin);
+    await expect(page.getByRole("heading", { level: 1, name: "My work" })).toBeVisible({ timeout: 30_000 });
+    await expect(page).toHaveURL(`${origin}/personal/my-work`);
+    const me = (await page.evaluate(async () => (await fetch("/api/v1/auth/me")).json())) as { user: { name: string } };
+    expect(me.user.name).toBe("Lou Later");
+    await expect.poll(() => desktop.app.windows().some((p) => p.url().endsWith("/welcome.html"))).toBe(false);
   } finally {
     await desktop.close();
   }
