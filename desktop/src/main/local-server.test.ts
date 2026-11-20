@@ -110,6 +110,7 @@ function setUp(
     settings: () => settings,
     setReady: (now: boolean) => (ready = now),
     take: (port: number) => taken.add(port),
+    release: (port: number) => taken.delete(port),
   };
 }
 
@@ -192,10 +193,26 @@ describe("LocalServer", () => {
     expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
   });
 
-  it("refuses to start when its port is taken, with a clear reason, and does not move", async () => {
-    const { server, spawned, take } = setUp({ port: 4780 });
+  it("waits a few seconds for its port, as the server before it lets go of it, and then starts", async () => {
+    const { server, spawned, take, release, clock } = setUp({ port: 4780 });
     take(4780);
     server.start();
+    await clock.advance(3_000);
+    expect(spawned).toEqual([]);
+    expect(server.state().kind).toBe("starting");
+    release(4780);
+    await clock.advance(500);
+    expect(spawned).toHaveLength(1);
+    expect(server.state().kind).toBe("running");
+  });
+
+  it("refuses to start when its port stays taken, with a clear reason, and does not move", async () => {
+    const { server, spawned, take, clock } = setUp({ port: 4780 });
+    take(4780);
+    server.start();
+    await clock.advance(7_999);
+    expect(server.state().kind).toBe("starting");
+    await clock.advance(1);
     await server.settled();
     expect(spawned).toEqual([]);
     expect(server.state()).toMatchObject({
@@ -254,6 +271,18 @@ describe("LocalServer", () => {
     expect(states.at(-1)).toBe("stopped");
   });
 
+  it("is told to stop without being waited for when the app quits, and is not started again", async () => {
+    const { server, clock, spawned } = setUp({ obeys: false });
+    await server.setUp();
+    await clock.advance(0);
+    server.stopWithoutWaiting();
+    expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
+    spawned[0]?.process.emit("exit", 0, null);
+    await clock.advance(60_000);
+    expect(spawned).toHaveLength(1);
+    expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
+  });
+
   it("kills a server that does not stop in time", async () => {
     const { server, clock, spawned } = setUp({ obeys: false });
     await server.setUp();
@@ -293,8 +322,9 @@ describe("LocalServer", () => {
   });
 
   it("says why a server could not be run at all", async () => {
-    const { server, clock, spawned } = setUp();
+    const { server, clock, spawned } = setUp({ ready: false });
     await server.setUp();
+    await clock.advance(0);
     spawned[0]?.process.emit("error", Object.assign(new Error("spawn /app/bin/quadit EACCES"), { code: "EACCES" }));
     await clock.advance(60_000);
     expect(server.state()).toMatchObject({

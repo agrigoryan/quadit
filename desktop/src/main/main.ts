@@ -254,18 +254,13 @@ function start() {
   app.on("activate", () => {
     if (!BrowserWindow.getAllWindows().some((win) => win.isVisible())) list.show();
   });
-  // Quitting waits for the server on this computer to stop: it is told to,
-  // and killed if it has not in a few seconds (local-server.ts).
-  let localStopped = false;
-  app.on("before-quit", (event) => {
+  // Quitting is never held up: macOS sends this for a logout too, which
+  // stopping it would cancel. The server on this computer is told to stop
+  // and finishes on its own (local-server.ts).
+  app.on("before-quit", () => {
     windows.quit();
     updates.stop();
-    if (localStopped) return;
-    event.preventDefault();
-    void local.stop().then(() => {
-      localStopped = true;
-      app.quit();
-    });
+    local.stopWithoutWaiting();
   });
   // Server windows hide rather than close, so this only runs when quitting
   // or when the server list was the last window on Windows and Linux. With

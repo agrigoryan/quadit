@@ -2,7 +2,7 @@
 // (QUADIT_DESKTOP_QUADIT, standing in for the one the packaged app
 // carries), on a data folder in its own, opens the server's first-run page
 // in a window, where the owner is made and signed in without the browser,
-// and stops the server when it quits.
+// and has the server stop when it quits.
 
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -64,9 +64,9 @@ test("running Quadit on this computer starts a server whose first-run page signs
   } finally {
     await desktop.close();
   }
-  // Quitting the app stopped its server.
+  // Quitting the app told its server to stop, which it does on its own, a moment later.
   expect(origin).not.toBe("");
-  expect(await answers(origin)).toBe(false);
+  await expect.poll(() => answers(origin), { timeout: 15_000 }).toBe(false);
 });
 
 test("without a server to run, the choice says so in a sentence", async ({ run }) => {

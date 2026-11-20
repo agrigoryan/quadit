@@ -2,10 +2,13 @@
 // computer"): the bundled quadit, built with the web app, started as a child
 // of the app and stopped when the app quits, the way Docker Desktop runs its
 // engine. No service is installed: the server runs while the app does.
+// Quitting never waits for it (a logout would be held up): the server is
+// told to stop and finishes on its own.
 //
 //   - It listens on 127.0.0.1 only, at a port chosen once (4780 when free)
 //     and never changed: the address is the server's identity for its
-//     cookies, sign-ins and agents. A port taken later is an error, not a move.
+//     cookies, sign-ins and agents. A port taken later is an error, not a
+//     move, once the server before has had a few seconds to let go of it.
 //   - Its data is the folder `server` in the app's data folder, which the
 //     app never deletes; a folder with a database is simply used again.
 //   - Its output goes to server.log in that folder. The log is started anew
@@ -76,6 +79,8 @@ const READY_POLL_MS = 250;
 const READY_LIMIT_MS = 120_000;
 /** The server takes up to 5 s to finish what it is doing when told to stop (internal/app, shutdownTimeout). */
 const STOP_LIMIT_MS = 10_000;
+/** How long a start waits for its port, which the server before it (the app quit and opened again) may still hold. */
+const PORT_WAIT_MS = 8_000;
 /** The waits before each start again after the server exited on its own; then it is shown as failed. */
 const RESTART_DELAYS_MS = [1_000, 3_000, 10_000];
 /** A server that ran this long before it exited gets its starts again back. */
@@ -167,6 +172,16 @@ export class LocalServer {
     this.set({ kind: "stopped" });
   }
 
+  /**
+   * Tells the server to stop (SIGTERM) and does not wait: for the app's
+   * quitting, which must not be held up. The server finishes on its own, and
+   * would anyway once the app is gone and its input closes.
+   */
+  stopWithoutWaiting() {
+    this.generation++;
+    this.child?.kill("SIGTERM");
+  }
+
   async restart(): Promise<void> {
     await this.stop();
     this.start();
@@ -178,7 +193,13 @@ export class LocalServer {
     const port = settings.get().localPort;
     if (!binary || port === null) return;
     this.set({ kind: "starting" });
-    if (!(await ports.free(port))) {
+    const waitedFrom = clock.now();
+    let free = await ports.free(port);
+    while (!free && generation === this.generation && clock.now() - waitedFrom < PORT_WAIT_MS) {
+      await clock.sleep(READY_POLL_MS);
+      free = await ports.free(port);
+    }
+    if (!free) {
       if (generation === this.generation) {
         this.fail(
           `Port ${port} on this computer is in use by another program. The server here always uses it, ` +
