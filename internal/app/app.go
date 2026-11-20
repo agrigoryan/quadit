@@ -17,6 +17,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -157,6 +158,14 @@ func Serve(args []string, version string) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if run.flags.stopOnStdinClose {
+		// Detached: a read of standard input cannot be called off, so this
+		// ends when the input closes or the process does.
+		go func() {
+			_, _ = io.Copy(io.Discard, os.Stdin) // what is sent is not read; only its end counts
+			stop()
+		}()
+	}
 	// One server per data directory: a second one, or an upgrade being
 	// undone, must not run beside it. Several servers may share a Postgres
 	// database; each has its own directory or none to guard.
@@ -257,6 +266,10 @@ type serveFlags struct {
 	localListen     string // with HTTPS on: the server's own plain address
 	privateNets     string // the private networks users' addresses may reach, as written
 	trustedProxies  string // the proxies whose X-Forwarded-For is believed, as written
+	// Shut down when standard input closes: the program that started the
+	// server (the desktop app) holds it open while it wants the server, so
+	// the server ends with that program however it ends.
+	stopOnStdinClose bool
 }
 
 // serveRun is what one quadit serve was told: the Options and its own flags.
@@ -280,8 +293,9 @@ const (
 	acmeTimeout       = 30 * time.Second
 )
 
-// parse reads quadit serve's flags, each of which can also come from the
-// environment.
+// parse reads quadit serve's flags, each of which but --stop-on-stdin-close
+// can also come from the environment. That one is for the program that
+// starts the server, never inherited.
 func (run *serveRun) parse(args []string) {
 	o, f := &run.o, &run.flags
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
@@ -298,6 +312,7 @@ func (run *serveRun) parse(args []string) {
 	fs.StringVar(&f.localListen, "local-listen", envOr("QUADIT_LOCAL_LISTEN", "127.0.0.1:4781"), "with HTTPS on: a plain address on this machine only, for the server's own use (QUADIT_LOCAL_LISTEN)")
 	fs.StringVar(&f.privateNets, "allow-private-networks", envOr("QUADIT_ALLOW_PRIVATE_NETWORKS", ""), "networks off the public internet that webhooks, push, the vault, imports and GitHub integrations may reach, e.g. 192.168.1.0/24,10.0.0.5; default none (QUADIT_ALLOW_PRIVATE_NETWORKS)")
 	fs.StringVar(&f.trustedProxies, "trusted-proxies", envOr("QUADIT_TRUSTED_PROXIES", "127.0.0.1,::1"), "the reverse proxies in front of the server, whose X-Forwarded-For says who the caller is: addresses or networks; empty trusts none (QUADIT_TRUSTED_PROXIES)")
+	fs.BoolVar(&f.stopOnStdinClose, "stop-on-stdin-close", false, "shut down when standard input closes: for a program that starts the server and holds its input open while it wants it running")
 	fs.Parse(args)
 }
 

@@ -18,6 +18,7 @@ quadit serve --data /var/lib/quadit --url https://quadit.example.com
 | `--log-json` | `QUADIT_LOG=json` | text | Structured logs |
 | `--trusted-proxies` | `QUADIT_TRUSTED_PROXIES` | `127.0.0.1,::1` | The reverse proxies in front of the server, addresses or networks: only their `X-Forwarded-For` is believed ([below](#behind-a-proxy)). `--trusted-proxies=` (empty) trusts none |
 | `--allow-private-networks` | `QUADIT_ALLOW_PRIVATE_NETWORKS` | none | Networks off the public internet the server may call for its users, e.g. `192.168.1.0/24,10.0.0.5` ([below](#addresses-users-give)) |
+| `--stop-on-stdin-close` | | off | Shut down cleanly when standard input closes: for a program that starts the server and holds its input open while it wants it running (the desktop app's [own server](#a-server-on-this-computer)) |
 
 Put it behind a reverse proxy for HTTPS. The proxy must not buffer responses (the live stream and held requests need that): for nginx, `proxy_buffering off`.
 
