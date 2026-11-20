@@ -232,6 +232,8 @@ h2 {
 .error {
   margin: 0;
   color: var(--danger);
+  /* A path in it has no spaces to break at. */
+  overflow-wrap: anywhere;
 }
 
 .error:empty {
@@ -243,6 +245,8 @@ h2 {
 body.welcome-page {
   min-height: 100vh;
   display: grid;
+  /* One column no wider than the window, whatever its content: the window never scrolls sideways. */
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
 }
 
@@ -276,6 +280,14 @@ body.welcome-page {
   width: 100%;
   padding: 18px;
   text-align: left;
+}
+
+/* Every box in the column may be narrower than what it holds: a long path wraps, a diff scrolls in its own box. */
+.welcome > *,
+.welcome .add > *,
+.welcome .tool > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .welcome .add + .add {
@@ -336,6 +348,12 @@ body.welcome-page {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.welcome .tool-top .about {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .welcome .tool button.primary {
@@ -497,10 +515,17 @@ label.check {
   margin: 12px 0;
   display: grid;
   gap: 4px;
+  min-width: 0;
+}
+
+/* A file's path has no spaces to break at. */
+.file strong {
+  overflow-wrap: anywhere;
 }
 
 pre.diff {
   margin: 0;
+  max-width: 100%;
   padding: 10px;
   background: var(--panel);
   border: 1px solid var(--line);
