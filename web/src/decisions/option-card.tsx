@@ -22,7 +22,8 @@ interface Props {
   /** Whether any option of this decision has media: cards then keep the same shape. */
   aspect: number | null;
   viewer: Viewer;
-  onCompare: (fileIndex: number) => void;
+  /** Opens the option alone over the whole screen, on this file. */
+  onOpen: (fileIndex: number) => void;
   onPick: () => void;
   onPickWithChanges: () => void;
   threadOpen: boolean;
@@ -36,7 +37,7 @@ export function OptionCard({
   docs,
   aspect,
   viewer,
-  onCompare,
+  onOpen,
   onPick,
   onPickWithChanges,
   threadOpen,
@@ -56,7 +57,7 @@ export function OptionCard({
       )}
     >
       {media.length > 0 ? (
-        <OptionMedia files={media} label={option.label} aspect={aspect ?? 4 / 3} onOpen={onCompare} />
+        <OptionMedia files={media} label={option.label} aspect={aspect ?? 4 / 3} onOpen={onOpen} />
       ) : (
         aspect !== null && (
           <>

@@ -3,7 +3,7 @@
 // it, or move it with the arrow keys.
 
 import { type CSSProperties, type KeyboardEvent, type PointerEvent, useState } from "react";
-import { ChevronsLeftRight, Maximize2 } from "lucide-react";
+import { ChevronsLeftRight } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import type { OptionFile } from "@/decisions/data";
@@ -111,18 +111,12 @@ interface PairProps {
   file: OptionFile;
   src: (file: OptionFile) => string;
   pixelated?: boolean;
-  /**
-   * Opens the compare view. Side by side, the pictures are the button; with
-   * the divider it is a button of its own in a corner, clear of the grip.
-   */
-  onOpen?: () => void;
-  openLabel?: string;
 }
 
 const layer = "absolute inset-0 size-full object-contain";
 
 /** The pair in a box of its own, with the divider: before under after. */
-export function SwipePair({ file, src, pixelated, onOpen, openLabel }: PairProps) {
+export function SwipePair({ file, src, pixelated }: PairProps) {
   const [pos, setPos] = useState(50);
   const before = file.before;
   if (!before) return null;
@@ -152,24 +146,16 @@ export function SwipePair({ file, src, pixelated, onOpen, openLabel }: PairProps
       {pictures}
       <PairLabels />
       <SwipeHandle pos={pos} onChange={setPos} />
-      {/* Not the whole picture: the grip sits in its middle. Over the divider when that is dragged under it. */}
-      {onOpen && (
-        <button
-          type="button"
-          aria-label={openLabel}
-          title={openLabel}
-          onClick={onOpen}
-          className="absolute top-1.5 right-1.5 z-[2] flex size-7 items-center justify-center rounded-md bg-black/55 text-white hover:bg-black/70 max-sm:size-9"
-        >
-          <Maximize2 className="size-3.5" aria-hidden />
-        </button>
-      )}
     </div>
   );
 }
 
-/** The pair side by side, each half with its name: for a box wide enough to show both. */
-export function SidePair({ file, src, pixelated, onOpen, openLabel }: PairProps) {
+/**
+ * The pair side by side, each half with its name: for a box wide enough to
+ * show both. A click on it opens it big; that is for a pointer only, as the
+ * card's own open button serves the keyboard and screen readers.
+ */
+export function SidePair({ file, src, pixelated, onOpen }: PairProps & { onOpen: () => void }) {
   const before = file.before;
   if (!before) return null;
   const rendering = pixelated ? ("pixelated" as const) : undefined;
@@ -189,9 +175,10 @@ export function SidePair({ file, src, pixelated, onOpen, openLabel }: PairProps)
   return (
     <button
       type="button"
-      aria-label={openLabel}
+      tabIndex={-1}
+      aria-hidden
       onClick={onOpen}
-      className="grid size-full cursor-zoom-in grid-cols-2 gap-px bg-line focus-visible:-outline-offset-2"
+      className="grid size-full cursor-zoom-in grid-cols-2 gap-px bg-line"
     >
       {half(before, "before")}
       {half(file, "after")}

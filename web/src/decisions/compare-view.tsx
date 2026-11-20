@@ -1,7 +1,7 @@
 // The compare view: a decision's options over the whole screen on a dark
-// stage, side by side on a desktop (zoom, pan and video playback shared by
-// every pane) and as a swipe-through on a phone. Arrow keys move the focus;
-// a number key picks, after Enter confirms it.
+// stage, on a desktop side by side or one at a time (zoom, pan and video
+// playback shared by every pane either way), and as a swipe-through on a
+// phone. Arrow keys move the focus; a number key picks, after Enter confirms it.
 
 import { type KeyboardEvent, useRef } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
@@ -16,7 +16,7 @@ import { Transport } from "@/decisions/compare-transport";
 import { useReturnFocus } from "@/decisions/data";
 import { usePhone } from "@/hooks/breakpoints";
 import { useMedia } from "@/hooks/use-media";
-import { PixelToggle, StageButton, ZoomControls } from "@/decisions/stage-ui";
+import { LayoutSwitch, OptionArrows, PixelToggle, StageButton, ZoomControls } from "@/decisions/stage-ui";
 
 /** "Pick B: burst?" — what a number key asks before it answers the question. */
 function ConfirmBar({ c, onConfirm }: { c: Compare; onConfirm: () => void }) {
@@ -51,11 +51,12 @@ export function CompareView(props: CompareProps) {
   useReturnFocus();
   const { options, viewer, zoom } = c;
 
-  // Two to four panes at a time; more options than that are paged through.
-  const perPage = wide ? 4 : mid ? 3 : 2;
+  // One option at a time, or two to four side by side; more options than that are paged through.
+  const one = !phone && c.layout === "one";
+  const perPage = one ? 1 : wide ? 4 : mid ? 3 : 2;
   const first = Math.floor(c.focus / perPage) * perPage;
   const visible = phone ? options : options.slice(first, first + perPage);
-  const paged = !phone && options.length > perPage;
+  const paged = !phone && !one && options.length > perPage;
   const transport = !phone && c.hasVideo(visible);
 
   const confirm = () => c.pending && c.onPick(c.pending.id);
@@ -88,6 +89,7 @@ export function CompareView(props: CompareProps) {
       "-": () => zoom.zoomBy(1 / 1.25),
       "0": zoom.fit,
       p: () => c.setPixelated(!c.pixelated),
+      l: phone ? undefined : () => c.setLayout(one ? "side-by-side" : "one"),
       " ": onButton || !c.hasVideo(visible) ? undefined : () => c.setPlaying(!c.playing),
     };
     const run = keys[e.key.length === 1 ? e.key.toLowerCase() : e.key];
@@ -121,6 +123,11 @@ export function CompareView(props: CompareProps) {
             <RDialog.Title className="mr-2 min-w-0 flex-1 truncate text-sm font-semibold max-sm:line-clamp-2 max-sm:whitespace-normal">
               {c.decision.question}
             </RDialog.Title>
+            {one && options.length > 1 && (
+              <span className="px-1 text-xs text-inverse-ink tnum" aria-live="polite">
+                {t("compare.position", { n: c.focus + 1, total: options.length })}
+              </span>
+            )}
             {paged && (
               // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a set of buttons, not form fields: <fieldset> is for those
               <div role="group" aria-label={t("compare.pages")} className="flex items-center">
@@ -145,6 +152,7 @@ export function CompareView(props: CompareProps) {
                 </StageButton>
               </div>
             )}
+            {!phone && <LayoutSwitch c={c} />}
             {!phone && <ZoomControls c={c} />}
             <PixelToggle c={c} compact={phone} />
             <RDialog.Close asChild>
@@ -161,6 +169,7 @@ export function CompareView(props: CompareProps) {
 
           <div className="relative flex min-h-0 flex-1 flex-col">
             {phone ? <ComparePhone c={c} /> : <CompareStage c={c} visible={visible} first={first} />}
+            {one && options.length > 1 && <OptionArrows c={c} />}
             {transport && <Transport c={c} />}
             <ConfirmBar c={c} onConfirm={confirm} />
           </div>

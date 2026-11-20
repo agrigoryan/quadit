@@ -1,7 +1,8 @@
 // The media at the top of an option card: one picture or video at a time in
 // a box whose shape is fixed before anything loads, so cards never jump. A
 // "before" and "after" picture are one entry: side by side when the card is
-// wide enough, wiped between with a divider when it is not.
+// wide enough, wiped between with a divider when it is not. A button in the
+// corner, always shown, opens what is shown over the whole screen.
 
 import { useCallback, useState } from "react";
 import { FileText, Maximize2 } from "lucide-react";
@@ -9,6 +10,7 @@ import { isVideo } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { useMember } from "@/data/selectors";
 import type { FileRow } from "@/types/core";
+import { Tooltip } from "@/ui/tooltip";
 import { RoleLabel, SidePair, SwipePair } from "@/decisions/before-after";
 import { isSmallArt, nameOf, type OptionFile } from "@/decisions/data";
 import { FileStepper } from "@/decisions/file-stepper";
@@ -56,8 +58,24 @@ interface Props {
   label: string;
   /** Width over height of the box. */
   aspect: number;
-  /** Opens the compare view at this option, on the file shown. */
+  /** Opens the option over the whole screen, on the file shown. */
   onOpen: (fileIndex: number) => void;
+}
+
+/** The corner button that opens the picture or video big; dark with a light edge, so it reads on any picture. */
+function OpenButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Tooltip label={t("decision.openTip")}>
+      <button
+        type="button"
+        aria-label={label}
+        onClick={onClick}
+        className="absolute top-1.5 right-1.5 z-[2] flex size-8 items-center justify-center rounded-md bg-black/60 text-white ring-1 ring-white/30 hover:bg-black/80 max-sm:size-9"
+      >
+        <Maximize2 className="size-4" aria-hidden />
+      </button>
+    </Tooltip>
+  );
 }
 
 export function OptionMedia({ files, label, aspect, onOpen }: Props) {
@@ -66,47 +84,32 @@ export function OptionMedia({ files, label, aspect, onOpen }: Props) {
   const index = Math.min(shown, files.length - 1);
   const file = files[index];
   if (!file) return null;
-  const open = t("decision.openCompare", { label });
-  const pair = { file, src: thumbOf, pixelated: isSprite(file), onOpen: () => onOpen(index), openLabel: open };
+  const open = () => onOpen(index);
+  const pair = { file, src: thumbOf, pixelated: isSprite(file) };
 
   return (
     <>
       <div ref={box} className="relative overflow-hidden rounded-t-[9px] bg-sunken" style={{ aspectRatio: aspect }}>
         {file.before ? (
           width >= SIDE_BY_SIDE ? (
-            <SidePair {...pair} />
+            <SidePair {...pair} onOpen={open} />
           ) : (
             <SwipePair {...pair} />
           )
         ) : isVideo(file) ? (
-          <>
-            <video
-              key={file.id}
-              src={file.url}
-              poster={file.preview_url}
-              controls
-              playsInline
-              preload="metadata"
-              aria-label={file.name}
-              className="size-full object-contain"
-            />
-            <button
-              type="button"
-              aria-label={open}
-              title={open}
-              onClick={() => onOpen(index)}
-              className="absolute top-1.5 right-1.5 flex size-7 items-center justify-center rounded-md bg-black/55 text-white hover:bg-black/70 max-sm:size-9"
-            >
-              <Maximize2 className="size-3.5" aria-hidden />
-            </button>
-          </>
+          <video
+            key={file.id}
+            src={file.url}
+            poster={file.preview_url}
+            controls
+            playsInline
+            preload="metadata"
+            aria-label={file.name}
+            className="size-full object-contain"
+          />
         ) : (
-          <button
-            type="button"
-            aria-label={open}
-            onClick={() => onOpen(index)}
-            className="block size-full cursor-zoom-in focus-visible:-outline-offset-2"
-          >
+          // A larger target for a pointer; the corner button is the one the keyboard and screen readers get.
+          <button type="button" tabIndex={-1} aria-hidden onClick={open} className="block size-full cursor-zoom-in">
             <img
               src={thumbOf(file)}
               alt={file.name}
@@ -120,6 +123,7 @@ export function OptionMedia({ files, label, aspect, onOpen }: Props) {
             {file.role && <RoleLabel role={file.role} />}
           </button>
         )}
+        <OpenButton label={t("decision.open", { label })} onClick={open} />
         <FileStepper
           index={index}
           total={files.length}

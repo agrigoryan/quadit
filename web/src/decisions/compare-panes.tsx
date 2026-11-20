@@ -1,5 +1,6 @@
 // The panes of the compare view: each shows one option's picture or video
-// under the shared zoom, with its label and its pick button below.
+// under the shared zoom, with its label and its pick button below. One pane
+// alone fills the stage.
 
 import { useCallback, useEffect, useState } from "react";
 import { ImageOff } from "lucide-react";
@@ -157,7 +158,16 @@ function NoMedia() {
   );
 }
 
-function Pane({ c, option, index, gauge }: { c: Compare; option: DecisionOption; index: number; gauge: boolean }) {
+interface PaneProps {
+  c: Compare;
+  option: DecisionOption;
+  index: number;
+  gauge: boolean;
+  /** The only pane on stage: no outline to say which has the focus. */
+  alone: boolean;
+}
+
+function Pane({ c, option, index, gauge, alone }: PaneProps) {
   const focused = c.focus === index;
   const files: OptionFile[] = c.filesOf(option);
   return (
@@ -191,7 +201,9 @@ function Pane({ c, option, index, gauge }: { c: Compare; option: DecisionOption;
           )}
         </div>
       </footer>
-      {focused && <span aria-hidden className="pointer-events-none absolute inset-0 ring-2 ring-white ring-inset" />}
+      {focused && !alone && (
+        <span aria-hidden className="pointer-events-none absolute inset-0 ring-2 ring-white ring-inset" />
+      )}
     </section>
   );
 }
@@ -206,7 +218,14 @@ export function CompareStage({ c, visible, first }: { c: Compare; visible: Decis
       style={{ gridTemplateColumns: `repeat(${visible.length}, minmax(0, 1fr))` }}
     >
       {visible.map((option, i) => (
-        <Pane key={option.id} c={c} option={option} index={first + i} gauge={gauge?.id === option.id} />
+        <Pane
+          key={option.id}
+          c={c}
+          option={option}
+          index={first + i}
+          gauge={gauge?.id === option.id}
+          alone={visible.length === 1}
+        />
       ))}
     </div>
   );

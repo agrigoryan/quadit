@@ -1,5 +1,5 @@
-// The state of an open compare view: which option has the focus, which file
-// of each option is showing, the shared zoom, whether pictures keep hard
+// The state of an open compare view: how the options are laid out, which
+// option has the focus, which file of each option is showing, the shared zoom, whether pictures keep hard
 // pixel edges, the videos on stage, and the pick waiting for its confirmation.
 
 import { useCallback, useRef, useState } from "react";
@@ -8,14 +8,20 @@ import type { Decision, DecisionOption } from "@/types/core";
 import { isSmallArt, type OptionFile, type OptionFiles, type Viewer } from "@/decisions/data";
 import { useSharedZoom, type Zoom } from "@/decisions/use-zoom";
 
+/**
+ * How a desktop shows the options: side by side, or the focused one alone
+ * as large as the stage allows. A phone always shows one per screen.
+ */
+export type Layout = "side-by-side" | "one";
+
 export interface CompareProps {
   decision: Decision;
   options: DecisionOption[];
   /** Pictures and videos of each option, by option id; a before/after pair is one entry. */
   media: OptionFiles;
   viewer: Viewer;
-  /** Where to open: the position of an option and of one of its files. */
-  start: { option: number; file: number };
+  /** Where to open: the position of an option and of one of its files, and the layout. */
+  start: { option: number; file: number; layout: Layout };
   onClose: () => void;
   onPick: (optionId: string) => void;
   onPickWithChanges: (option: DecisionOption) => void;
@@ -23,6 +29,9 @@ export interface CompareProps {
 }
 
 export interface Compare extends CompareProps {
+  /** Changes only when the person switches it. */
+  layout: Layout;
+  setLayout: (layout: Layout) => void;
   focus: number;
   focused: DecisionOption | undefined;
   /** Moves the focus, staying inside the options. Drops a pick that waits for confirmation. */
@@ -55,6 +64,7 @@ export interface Compare extends CompareProps {
 
 export function useCompare(props: CompareProps): Compare {
   const { options, media, viewer } = props;
+  const [layout, setLayout] = useState(props.start.layout);
   const [focus, setFocus] = useState(props.start.option);
   const [shown, setShown] = useState<Record<string, number>>(() => {
     const first = options[props.start.option];
@@ -86,6 +96,8 @@ export function useCompare(props: CompareProps): Compare {
 
   return {
     ...props,
+    layout,
+    setLayout,
     focus,
     focused: options[focus],
     focusOn: (index) => {

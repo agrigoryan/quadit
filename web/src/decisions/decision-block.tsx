@@ -13,6 +13,7 @@ import { DecisionMentions } from "@/detail/mentions";
 import { Button, IconButton } from "@/ui/button";
 import { Markdown } from "@/ui/markdown";
 import { deleteDecision, markUnclear, pick } from "@/decisions/actions";
+import type { CompareProps } from "@/decisions/compare-state";
 import { CompareView } from "@/decisions/compare-view";
 import { EditDecisionDialog } from "@/decisions/edit-decision-dialog";
 import {
@@ -66,7 +67,8 @@ export function DecisionBlock({ decision, answerKey = false }: Props) {
   const answererName = useMemberName(decision.decided_by, t("common.someone"));
 
   const [prompt, setPrompt] = useState<NotePrompt | null>(null);
-  const [compare, setCompare] = useState<{ option: number; file: number } | null>(null);
+  const [compare, setCompare] = useState<CompareProps["start"] | null>(null);
+  const sideBySide = () => setCompare({ option: 0, file: 0, layout: "side-by-side" });
   /** The option whose comments are open under the cards. */
   const [threadOf, setThreadOf] = useState<string | null>(null);
   const [talk, setTalk] = useState(false);
@@ -81,7 +83,7 @@ export function DecisionBlock({ decision, answerKey = false }: Props) {
     {
       d: (e) => {
         e.preventDefault();
-        if (allMedia.length > 0) setCompare({ option: 0, file: 0 });
+        if (allMedia.length > 0) sideBySide();
         else article.current?.querySelector<HTMLElement>("[data-answer]")?.focus();
       },
     },
@@ -188,7 +190,7 @@ export function DecisionBlock({ decision, answerKey = false }: Props) {
               docs={docs[option.id] ?? []}
               aspect={aspect}
               viewer={viewer}
-              onCompare={(file) => setCompare({ option: options.indexOf(option), file })}
+              onOpen={(file) => setCompare({ option: options.indexOf(option), file, layout: "one" })}
               onPick={() => answer(option.id)}
               onPickWithChanges={() => askChanges(option)}
               threadOpen={threadOf === option.id}
@@ -235,11 +237,7 @@ export function DecisionBlock({ decision, answerKey = false }: Props) {
             </Button>
           )}
           {allMedia.length > 0 && (
-            <Button
-              variant="ghost"
-              className={cx("max-sm:h-10", !viewer.canAnswer && "-ml-2")}
-              onClick={() => setCompare({ option: 0, file: 0 })}
-            >
+            <Button variant="ghost" className={cx("max-sm:h-10", !viewer.canAnswer && "-ml-2")} onClick={sideBySide}>
               <Columns3 className="size-4" aria-hidden />
               {t("decision.compare")}
             </Button>
