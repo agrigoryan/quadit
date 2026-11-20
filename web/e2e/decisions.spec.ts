@@ -24,48 +24,60 @@ test("an agent's question is answered in the app and the answer is recorded", as
     .toMatchObject({ state: "picked", picked_label: "Green", decided_by: `@${OWNER.handle}` });
 });
 
-test("an option's picture opens alone, steps to the next option, and switches to side by side", async ({
+test("an option's pictures go round on its card, and one at a time walks through every picture, option after option", async ({
   page,
   project,
   quadit,
 }, testInfo) => {
   const key = await project.newTask("Pick a logo");
-  // A one-pixel picture on each option.
+  // One-pixel pictures: one on each option, and a second on "Square".
   const pixel = testInfo.outputPath("pixel.png");
-  await writeFile(
-    pixel,
-    Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-      "base64",
-    ),
+  const other = testInfo.outputPath("other.png");
+  const png = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
   );
+  await writeFile(pixel, png);
+  await writeFile(other, png);
   await quadit.agent(
     "ask",
     key,
     "Which logo?",
-    ...["Round", "Square", "Star"].flatMap((label) => [`option=${label}`, `file=${pixel}`]),
+    "option=Round",
+    `file=${pixel}`,
+    "option=Square",
+    `file=${pixel}`,
+    `file=${other}`,
+    "option=Star",
+    `file=${pixel}`,
   );
 
   await page.goto(`/e2e/task/${key}`);
-  const question = page.getByRole("article", { name: "Which logo?" });
-  await question
-    .getByRole("article", { name: "Square" })
-    .getByRole("button", { name: "Open Square full screen" })
-    .click();
+  const square = page.getByRole("article", { name: "Which logo?" }).getByRole("article", { name: "Square" });
+  await expect(square.getByText("1 / 2")).toBeVisible();
+  await square.getByRole("button", { name: "Next file" }).click();
+  await expect(square.getByText("2 / 2")).toBeVisible();
+  await square.getByRole("button", { name: "Next file" }).click();
+  await expect(square.getByText("1 / 2")).toBeVisible();
+  await square.getByRole("button", { name: "Open Square full screen" }).click();
 
   const stage = page.getByRole("dialog", { name: "Which logo?" });
   const panes = stage.getByRole("region");
   await expect(panes).toHaveCount(1);
   await expect(stage.getByRole("region", { name: "Square" })).toBeVisible();
-  await expect(stage.getByText("2 of 3")).toBeVisible();
+  await expect(stage.getByText("Option 2 of 3 · picture 1 of 2")).toBeVisible();
 
-  await stage.getByRole("button", { name: "Next option" }).click();
+  // Next goes through Square's second picture before it reaches Star.
+  await stage.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(stage.getByText("Option 2 of 3 · picture 2 of 2")).toBeVisible();
+  await stage.getByRole("button", { name: "Next", exact: true }).click();
   await expect(stage.getByRole("region", { name: "Star" })).toBeVisible();
-  await expect(panes).toHaveCount(1);
+  await expect(stage.getByText("Option 3 of 3")).toBeVisible();
   await page.keyboard.press("ArrowLeft");
-  await expect(stage.getByRole("region", { name: "Square" })).toBeVisible();
+  await expect(stage.getByText("Option 2 of 3 · picture 2 of 2")).toBeVisible();
 
   await stage.getByRole("button", { name: "Side by side" }).click();
   await expect(panes).toHaveCount(3);
-  await expect(stage.getByRole("button", { name: "Next option" })).toBeHidden();
+  await expect(stage.getByRole("button", { name: "Next", exact: true })).toBeHidden();
+  await expect(stage.getByRole("region", { name: "Square" }).getByText("2 / 2")).toBeVisible();
 });

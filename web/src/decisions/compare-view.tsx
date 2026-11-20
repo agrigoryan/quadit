@@ -16,7 +16,8 @@ import { Transport } from "@/decisions/compare-transport";
 import { useReturnFocus } from "@/decisions/data";
 import { usePhone } from "@/hooks/breakpoints";
 import { useMedia } from "@/hooks/use-media";
-import { LayoutSwitch, OptionArrows, PixelToggle, StageButton, ZoomControls } from "@/decisions/stage-ui";
+import { LayoutSwitch, PixelToggle, StageButton, ZoomControls } from "@/decisions/stage-ui";
+import { CarouselArrows, step } from "@/ui/carousel";
 
 /** "Pick B: burst?" — what a number key asks before it answers the question. */
 function ConfirmBar({ c, onConfirm }: { c: Compare; onConfirm: () => void }) {
@@ -39,6 +40,19 @@ function ConfirmBar({ c, onConfirm }: { c: Compare; onConfirm: () => void }) {
         <Kbd onDark>Esc</Kbd>
       </StageButton>
     </div>
+  );
+}
+
+/** "Option 2 of 4 · picture 1 of 3": where the walk one at a time is. */
+function WalkPosition({ c }: { c: Compare }) {
+  const files = c.focused ? c.fileSteps(c.focused) : null;
+  const option = { n: c.focus + 1, total: c.options.length };
+  return (
+    <span className="px-1 text-xs text-inverse-ink tnum" aria-live="polite">
+      {files && files.total > 1
+        ? t("compare.optionPicture", { ...option, file: files.index + 1, files: files.total })
+        : t("compare.option", option)}
+    </span>
   );
 }
 
@@ -80,10 +94,11 @@ export function CompareView(props: CompareProps) {
     if (e.target instanceof HTMLInputElement) return;
     const onButton = e.target instanceof HTMLButtonElement;
     const keys: Record<string, (() => void) | undefined> = {
-      ArrowLeft: () => c.focusOn(c.focus - 1),
-      ArrowRight: () => c.focusOn(c.focus + 1),
-      ArrowUp: () => c.focused && c.stepFile(c.focused, -1),
-      ArrowDown: () => c.focused && c.stepFile(c.focused, 1),
+      // One at a time, through every picture; side by side, from option to option.
+      ArrowLeft: () => (one ? step(c.walk, -1) : c.focusOn(c.focus - 1)),
+      ArrowRight: () => (one ? step(c.walk, 1) : c.focusOn(c.focus + 1)),
+      ArrowUp: () => c.focused && step(c.fileSteps(c.focused), -1),
+      ArrowDown: () => c.focused && step(c.fileSteps(c.focused), 1),
       "+": () => zoom.zoomBy(1.25),
       "=": () => zoom.zoomBy(1.25),
       "-": () => zoom.zoomBy(1 / 1.25),
@@ -123,11 +138,7 @@ export function CompareView(props: CompareProps) {
             <RDialog.Title className="mr-2 min-w-0 flex-1 truncate text-sm font-semibold max-sm:line-clamp-2 max-sm:whitespace-normal">
               {c.decision.question}
             </RDialog.Title>
-            {one && options.length > 1 && (
-              <span className="px-1 text-xs text-inverse-ink tnum" aria-live="polite">
-                {t("compare.position", { n: c.focus + 1, total: options.length })}
-              </span>
-            )}
+            {one && c.walk.total > 1 && <WalkPosition c={c} />}
             {paged && (
               // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a set of buttons, not form fields: <fieldset> is for those
               <div role="group" aria-label={t("compare.pages")} className="flex items-center">
@@ -169,7 +180,7 @@ export function CompareView(props: CompareProps) {
 
           <div className="relative flex min-h-0 flex-1 flex-col">
             {phone ? <ComparePhone c={c} /> : <CompareStage c={c} visible={visible} first={first} />}
-            {one && options.length > 1 && <OptionArrows c={c} />}
+            {one && <CarouselArrows {...c.walk} size="large" keys={{ previous: "←", next: "→" }} />}
             {transport && <Transport c={c} />}
             <ConfirmBar c={c} onConfirm={confirm} />
           </div>

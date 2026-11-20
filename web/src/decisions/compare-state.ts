@@ -5,6 +5,7 @@
 import { useCallback, useRef, useState } from "react";
 import { isVideo } from "@/data/files";
 import type { Decision, DecisionOption } from "@/types/core";
+import type { Steps } from "@/ui/carousel";
 import { isSmallArt, type OptionFile, type OptionFiles, type Viewer } from "@/decisions/data";
 import { useSharedZoom, type Zoom } from "@/decisions/use-zoom";
 
@@ -39,7 +40,14 @@ export interface Compare extends CompareProps {
   filesOf: (option: DecisionOption) => OptionFile[];
   fileIndexOf: (option: DecisionOption) => number;
   fileOf: (option: DecisionOption) => OptionFile | undefined;
-  stepFile: (option: DecisionOption, delta: number) => void;
+  /** The carousel through one option's files: it goes round. */
+  fileSteps: (option: DecisionOption) => Steps;
+  /**
+   * The walk one at a time: every option's files in order, one option after
+   * the other (an option with none is one stop). Coming back into an option
+   * starts on its last file. It stops at the ends, as numbered choices do.
+   */
+  walk: Steps;
   zoom: Zoom;
   /** Screen pixels per picture pixel of the focused file when it fits its pane. */
   fit: number;
@@ -94,6 +102,26 @@ export function useCompare(props: CompareProps): Compare {
   }, []);
   const videos = useCallback(() => [...stage.current.values()], []);
 
+  function walkOf(): Steps {
+    const stops = options.map((o) => Math.max(1, filesOf(o).length));
+    const before = (at: number) => stops.slice(0, at).reduce((sum, n) => sum + n, 0);
+    const focused = options[focus];
+    return {
+      index: before(focus) + (focused ? fileIndexOf(focused) : 0),
+      total: before(options.length),
+      wrap: false,
+      onShow: (index) => {
+        let option = 0;
+        while (option < stops.length - 1 && index >= before(option + 1)) option++;
+        const to = options[option];
+        if (!to) return;
+        setFocus(option);
+        setShown((s) => ({ ...s, [to.id]: index - before(option) }));
+        setPending(null);
+      },
+    };
+  }
+
   return {
     ...props,
     layout,
@@ -107,10 +135,13 @@ export function useCompare(props: CompareProps): Compare {
     filesOf,
     fileIndexOf,
     fileOf,
-    stepFile: (option, delta) => {
-      const next = fileIndexOf(option) + delta;
-      if (next >= 0 && next < filesOf(option).length) setShown((s) => ({ ...s, [option.id]: next }));
-    },
+    fileSteps: (option) => ({
+      index: fileIndexOf(option),
+      total: filesOf(option).length,
+      wrap: true,
+      onShow: (index) => setShown((s) => ({ ...s, [option.id]: index })),
+    }),
+    walk: walkOf(),
     zoom,
     fit,
     setFit,

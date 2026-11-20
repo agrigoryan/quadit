@@ -12,9 +12,9 @@ import { Button } from "@/ui/button";
 import { Kbd } from "@/ui/kbd";
 import { afterClip, PairLabels, RoleLabel, SwipeHandle } from "@/decisions/before-after";
 import { type Compare, paneNote } from "@/decisions/compare-state";
-import { isSmallArt, type OptionFile } from "@/decisions/data";
-import { FileStepper } from "@/decisions/file-stepper";
+import { isSmallArt } from "@/decisions/data";
 import { PickedBadge, RecommendedBadge } from "@/decisions/option-marks";
+import { CarouselArrows, CarouselCount } from "@/ui/carousel";
 
 interface Size {
   w: number;
@@ -167,9 +167,24 @@ interface PaneProps {
   alone: boolean;
 }
 
+/** The way through one option's files, over its picture: up and down do the same for the focused option. */
+export function FileCarousel({ c, option }: { c: Compare; option: DecisionOption }) {
+  const steps = c.fileSteps(option);
+  return (
+    <>
+      <CarouselArrows
+        {...steps}
+        size="compact"
+        labels={{ previous: t("decision.file.prev"), next: t("decision.file.next") }}
+        keys={{ previous: "↑", next: "↓" }}
+      />
+      <CarouselCount index={steps.index} total={steps.total} size="compact" />
+    </>
+  );
+}
+
 function Pane({ c, option, index, gauge, alone }: PaneProps) {
   const focused = c.focus === index;
-  const files: OptionFile[] = c.filesOf(option);
   return (
     <section
       aria-label={option.label}
@@ -177,20 +192,17 @@ function Pane({ c, option, index, gauge, alone }: PaneProps) {
       onPointerDown={() => !focused && c.focusOn(index)}
       className="relative flex min-h-0 min-w-0 flex-col bg-black"
     >
-      <PaneMedia c={c} option={option} gauge={gauge} />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <PaneMedia c={c} option={option} gauge={gauge} />
+        {/* One at a time, the stage's own arrows walk through the files. */}
+        {c.layout === "side-by-side" && <FileCarousel c={c} option={option} />}
+      </div>
       <footer className="shrink-0 bg-inverse px-3 py-2">
         <div className="flex h-6 items-center gap-2">
           {index < 9 && <Kbd onDark>{String(index + 1)}</Kbd>}
           <h3 className="min-w-0 truncate text-sm font-semibold text-inverse-ink">{option.label}</h3>
           {c.decision.picked_option_id === option.id && <PickedBadge />}
           {c.decision.recommended_option_id === option.id && <RecommendedBadge />}
-          <span className="flex-1" />
-          <FileStepper
-            onDark
-            index={c.fileIndexOf(option)}
-            total={files.length}
-            onStep={(delta) => c.stepFile(option, delta)}
-          />
         </div>
         <div className="mt-1 flex h-7 items-center gap-2">
           <p className="min-w-0 flex-1 truncate text-xs text-inverse-ink/70">{paneNote(c, option)}</p>

@@ -1,8 +1,9 @@
 // The media at the top of an option card: one picture or video at a time in
 // a box whose shape is fixed before anything loads, so cards never jump. A
 // "before" and "after" picture are one entry: side by side when the card is
-// wide enough, wiped between with a divider when it is not. A button in the
-// corner, always shown, opens what is shown over the whole screen.
+// wide enough, wiped between with a divider when it is not. Several go round
+// in a carousel, and a button in the corner, always shown, opens the one
+// shown over the whole screen.
 
 import { useCallback, useState } from "react";
 import { FileText, Maximize2 } from "lucide-react";
@@ -10,10 +11,10 @@ import { isVideo } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { useMember } from "@/data/selectors";
 import type { FileRow } from "@/types/core";
+import { CarouselArrows, CarouselCount, onCarouselKey, type Steps } from "@/ui/carousel";
 import { Tooltip } from "@/ui/tooltip";
 import { RoleLabel, SidePair, SwipePair } from "@/decisions/before-after";
 import { isSmallArt, nameOf, type OptionFile } from "@/decisions/data";
-import { FileStepper } from "@/decisions/file-stepper";
 
 const isSprite = (file: FileRow) => isSmallArt(file.width, file.height);
 
@@ -86,10 +87,17 @@ export function OptionMedia({ files, label, aspect, onOpen }: Props) {
   if (!file) return null;
   const open = () => onOpen(index);
   const pair = { file, src: thumbOf, pixelated: isSprite(file) };
+  const steps: Steps = { index, total: files.length, wrap: true, onShow: setShown };
 
   return (
     <>
-      <div ref={box} className="relative overflow-hidden rounded-t-[9px] bg-sunken" style={{ aspectRatio: aspect }}>
+      {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- the arrow keys reach the box from the buttons inside it */}
+      <div
+        ref={box}
+        onKeyDown={(e) => onCarouselKey(e, steps)}
+        className="relative overflow-hidden rounded-t-[9px] bg-sunken"
+        style={{ aspectRatio: aspect }}
+      >
         {file.before ? (
           width >= SIDE_BY_SIDE ? (
             <SidePair {...pair} onOpen={open} />
@@ -124,12 +132,13 @@ export function OptionMedia({ files, label, aspect, onOpen }: Props) {
           </button>
         )}
         <OpenButton label={t("decision.open", { label })} onClick={open} />
-        <FileStepper
-          index={index}
-          total={files.length}
-          onStep={(delta) => setShown(index + delta)}
-          className="absolute top-1.5 left-1.5 z-[2] rounded-md bg-surface shadow-card"
+        <CarouselArrows
+          {...steps}
+          size="compact"
+          labels={{ previous: t("decision.file.prev"), next: t("decision.file.next") }}
+          keys={{ previous: "←", next: "→" }}
         />
+        <CarouselCount index={index} total={files.length} size="compact" />
       </div>
       <AttachedBy file={file} />
     </>

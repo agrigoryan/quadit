@@ -95,7 +95,6 @@ export const decisions = {
 
   "decision.file.prev": "Previous file",
   "decision.file.next": "Next file",
-  "decision.file.count": "{n} of {total}",
   "decision.file.by": "Attached by {name}",
 
   "decision.pair.before": "Before",
@@ -172,11 +171,11 @@ export const decisions = {
   "compare.prevPage": "Previous options",
   "compare.nextPage": "Next options",
   "compare.position": "{n} of {total}",
+  "compare.option": "Option {n} of {total}",
+  "compare.optionPicture": "Option {n} of {total} · picture {file} of {files}",
   "compare.layout": "Layout",
   "compare.sideBySide": "Side by side",
   "compare.oneAtATime": "One at a time",
-  "compare.prevOption": "Previous option",
-  "compare.nextOption": "Next option",
   "compare.noMedia": "No picture or video for this option",
   "compare.confirm": "Pick “{label}”?",
   "compare.confirmPick": "Pick",

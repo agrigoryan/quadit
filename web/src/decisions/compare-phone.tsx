@@ -5,11 +5,10 @@ import { useEffect, useEffectEvent, useLayoutEffect, useRef } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { Button } from "@/ui/button";
-import { PaneMedia } from "@/decisions/compare-panes";
+import { FileCarousel, PaneMedia } from "@/decisions/compare-panes";
 import { type Compare, paneNote } from "@/decisions/compare-state";
 import { Transport } from "@/decisions/compare-transport";
 import { useMemberName } from "@/decisions/data";
-import { FileStepper } from "@/decisions/file-stepper";
 import { PickedBadge, RecommendedBadge } from "@/decisions/option-marks";
 import { StageButton } from "@/decisions/stage-ui";
 
@@ -81,9 +80,10 @@ export function ComparePhone({ c }: { c: Compare }) {
           <section
             key={option.id}
             aria-label={option.label}
-            className="flex w-full shrink-0 snap-center snap-always flex-col"
+            className="relative flex w-full shrink-0 snap-center snap-always flex-col"
           >
             <PaneMedia c={c} option={option} gauge={option.id === focused.id} swipeThrough />
+            <FileCarousel c={c} option={option} />
           </section>
         ))}
       </div>
@@ -99,8 +99,8 @@ export function ComparePhone({ c }: { c: Compare }) {
           </span>
         </div>
         <p className="mt-0.5 line-clamp-2 min-h-9 text-xs text-inverse-ink/70">{note}</p>
-        <div className="flex h-8 items-center justify-between gap-2">
-          {options.length <= 8 ? (
+        <div className="flex h-8 items-center">
+          {options.length <= 8 && (
             <div className="-ml-2 flex">
               {options.map((option, i) => (
                 <button
@@ -115,15 +115,7 @@ export function ComparePhone({ c }: { c: Compare }) {
                 </button>
               ))}
             </div>
-          ) : (
-            <span />
           )}
-          <FileStepper
-            onDark
-            index={c.fileIndexOf(focused)}
-            total={c.filesOf(focused).length}
-            onStep={(delta) => c.stepFile(focused, delta)}
-          />
         </div>
       </div>
 

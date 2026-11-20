@@ -1,9 +1,8 @@
 // Controls drawn on the dark compare stage: a quiet button that reads on
-// black in both themes, the layout, pixel and zoom controls in the header,
-// and the arrows beside an option shown alone.
+// black in both themes, and the layout, pixel and zoom controls in the header.
 
 import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
-import { ChevronLeft, ChevronRight, Columns3, Grid2x2, Minus, Plus, Square } from "lucide-react";
+import { Columns3, Grid2x2, Minus, Plus, Square } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { Tooltip } from "@/ui/tooltip";
@@ -63,43 +62,6 @@ export function LayoutSwitch({ c }: { c: Compare }) {
         </StageButton>
       ))}
     </div>
-  );
-}
-
-const round =
-  "absolute top-1/2 z-[2] flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white ring-1 ring-white/25 hover:bg-black/80 focus-visible:outline-white aria-disabled:cursor-default aria-disabled:opacity-30";
-
-/**
- * The previous and the next option, at the sides of the stage. Place it in
- * the box the stage fills. At the ends they are marked, not disabled: a
- * disabled button drops the focus out of the view, and its keys with it.
- */
-export function OptionArrows({ c }: { c: Compare }) {
-  return (
-    <>
-      <Tooltip label={t("compare.prevOption")} hint="←">
-        <button
-          type="button"
-          aria-label={t("compare.prevOption")}
-          aria-disabled={c.focus === 0}
-          onClick={() => c.focusOn(c.focus - 1)}
-          className={cx(round, "left-3")}
-        >
-          <ChevronLeft className="size-5" aria-hidden />
-        </button>
-      </Tooltip>
-      <Tooltip label={t("compare.nextOption")} hint="→">
-        <button
-          type="button"
-          aria-label={t("compare.nextOption")}
-          aria-disabled={c.focus === c.options.length - 1}
-          onClick={() => c.focusOn(c.focus + 1)}
-          className={cx(round, "right-3")}
-        >
-          <ChevronRight className="size-5" aria-hidden />
-        </button>
-      </Tooltip>
-    </>
   );
 }
 

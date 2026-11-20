@@ -189,6 +189,7 @@ const sections: Section[] = [
     rows: [
       { what: "shortcuts.focusOption", keys: ["←", "→"], join: "or" },
       { what: "shortcuts.stepFile", keys: ["↑", "↓"], join: "or" },
+      { what: "shortcuts.compareLayout", keys: ["L"] },
       { what: "shortcuts.pick", keys: ["1", "9"], join: "to" },
       { what: "shortcuts.zoom", keys: ["+", "−"], join: "or" },
       { what: "shortcuts.fit", keys: ["0"] },
