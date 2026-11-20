@@ -9,7 +9,17 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { Desktop, expect, slowToStart, test } from "./desktop";
+import { Desktop, expect, fakeComputer, slowToStart, test } from "./desktop";
+
+/**
+ * The app's environment for running `binary` as its server, on a computer
+ * of the test's own where no agent tool is found: Welcome ends with the
+ * set-up, whatever the machine running the suite has installed.
+ */
+function serverEnv(binary: string): Record<string, string> {
+  const computer = fakeComputer({ claudeCode: false });
+  return { QUADIT_DESKTOP_QUADIT: binary, HOME: computer.home, SHELL: computer.shell };
+}
 
 /** Whether a Quadit server answers at `origin`. */
 async function answers(origin: string): Promise<boolean> {
@@ -77,7 +87,7 @@ test("set up on this computer, the app runs a server whose owner it made, shows 
   run,
 }) => {
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
-  const desktop = await Desktop.launch(data, run, [], { env: { QUADIT_DESKTOP_QUADIT: run.binary } });
+  const desktop = await Desktop.launch(data, run, [], { env: serverEnv(run.binary) });
   let origin = "";
   try {
     let page: Page;
@@ -116,7 +126,7 @@ test("the window of the server on this computer is signed in by the app whenever
   // Three starts of the app, two of them waiting for its server.
   test.slow();
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
-  const env = { QUADIT_DESKTOP_QUADIT: run.binary };
+  const env = serverEnv(run.binary);
   let desktop = await Desktop.launch(data, run, [], { env });
   let origin = "";
   try {
@@ -184,7 +194,7 @@ test("a program that answers on the server's port without the app key is never t
 }) => {
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   const fake = impostor();
-  const desktop = await Desktop.launch(data, run, [], { env: { QUADIT_DESKTOP_QUADIT: fake.binary } });
+  const desktop = await Desktop.launch(data, run, [], { env: serverEnv(fake.binary) });
   try {
     const list = await desktop.serverList();
     await list.getByRole("button", { name: "Set up on this computer…" }).click();
@@ -213,7 +223,7 @@ test("quit before its set-up was finished, the server on this computer offers We
   test.slow();
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   let desktop = await Desktop.launch(data, run, [], {
-    env: { QUADIT_DESKTOP_QUADIT: slowToStart(run.binary, 60) },
+    env: serverEnv(slowToStart(run.binary, 60)),
     firstStart: true,
   });
   let origin = "";
@@ -229,7 +239,7 @@ test("quit before its set-up was finished, the server on this computer offers We
     await desktop.close();
   }
 
-  desktop = await Desktop.launch(data, run, [], { env: { QUADIT_DESKTOP_QUADIT: run.binary } });
+  desktop = await Desktop.launch(data, run, [], { env: serverEnv(run.binary) });
   try {
     const welcome = await desktop.appPage("welcome.html");
     await welcome.getByLabel("Your name").fill("Lou Later");

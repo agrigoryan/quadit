@@ -4,44 +4,9 @@
 // server), and Disconnect takes it all back. Nothing outside the test's
 // folders is touched.
 
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { Desktop, expect, test } from "./desktop";
-
-/** A home folder, a login shell that says its PATH holds `bin`, and a quadit there that does what Connect runs. */
-function fakeComputer() {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
-  const home = join(root, "home");
-  const bin = join(root, "bin");
-  mkdirSync(join(home, ".claude"), { recursive: true });
-  mkdirSync(bin);
-  const configDir = join(home, "Library", "Application Support", "quadit");
-  const shell = join(root, "shell");
-  writeFileSync(shell, `#!/bin/sh\necho "PATH=${bin}:/usr/bin:/bin"\n`);
-  writeFileSync(
-    join(bin, "quadit"),
-    `#!/bin/sh
-default='${join(configDir, "config.json")}'
-case "$1" in
-  version) echo "quadit 9.9.9 (agent surface 2.0)" ;;
-  skill) printf '# Quadit skill\\n' ;;
-  login)
-    if [ "$2" = "--path" ]; then echo "\${QUADIT_CONFIG:-$default}"; exit 0; fi
-    [ "$3" = "-" ] || exit 2
-    read -r token
-    config="\${QUADIT_CONFIG:-$default}"
-    mkdir -p "$(dirname "$config")"
-    printf '{"url":"%s","token":"%s"}\\n' "$2" "$token" > "$config"
-    chmod 600 "$config" ;;
-esac
-`,
-  );
-  chmodSync(shell, 0o755);
-  chmodSync(join(bin, "quadit"), 0o755);
-  writeFileSync(join(home, ".claude", "settings.json"), JSON.stringify({ permissions: { allow: ["Read"] } }));
-  return { root, home, configDir, shell };
-}
+import { Desktop, expect, fakeComputer, test } from "./desktop";
 
 test("Connect sets Claude Code up with its own login and MCP, and Disconnect takes it back", async ({ run }) => {
   const computer = fakeComputer();
@@ -99,6 +64,28 @@ test("Connect sets Claude Code up with its own login and MCP, and Disconnect tak
     expect(existsSync(config)).toBe(false);
     expect(existsSync(join(computer.home, ".claude", "skills", "quadit", "SKILL.md"))).toBe(false);
     expect(JSON.parse(readFileSync(join(data, "connections.json"), "utf8"))).toEqual({ harnesses: {} });
+  } finally {
+    await desktop.close();
+  }
+});
+
+test("the Agents page's Connect a tool on this computer opens the Connect window on that server's workspace", async ({
+  run,
+}) => {
+  const computer = fakeComputer();
+  const data = join(computer.root, "data");
+  mkdirSync(data);
+  const desktop = await Desktop.launch(data, run, [], { env: { HOME: computer.home, SHELL: computer.shell } });
+  try {
+    await desktop.addServer(run.server);
+    const page = await desktop.signedIn(run.server);
+    await page.goto(`${run.server}/e2e/agents`);
+    // The page's header has it; an empty Agents page has it again as its main action.
+    await page.getByRole("button", { name: "Connect a tool on this computer" }).first().click();
+    const connect = await desktop.appPage("connect.html?server=" + desktop.serverId(run.server));
+    await connect.getByRole("button", { name: "Connect Claude Code" }).click();
+    await expect(connect.getByLabel("Workspace")).toHaveValue(new RegExp(desktop.serverId(run.server)));
+    expect(desktop.app.windows().filter((p) => p.url().includes("/connect.html"))).toHaveLength(1);
   } finally {
     await desktop.close();
   }

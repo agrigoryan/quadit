@@ -5,7 +5,7 @@
 // and what the app did can be read back.
 
 import { createHash, randomBytes } from "node:crypto";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { _electron as electron, type ElectronApplication, expect, type Page, test as base } from "@playwright/test";
@@ -273,6 +273,48 @@ export function slowToStart(binary: string, seconds: number): string {
   writeFileSync(script, `#!/bin/sh\nsleep ${seconds}\nexec '${binary}' "$@"\n`);
   chmodSync(script, 0o755);
   return script;
+}
+
+/**
+ * A computer of the test's own for Connect: a home folder, a login shell
+ * that says its PATH holds `bin`, and a quadit there that does what Connect
+ * runs; with Claude Code's config folder in that home unless `claudeCode`
+ * is false, when no agent tool is found there. Given to the app as HOME and
+ * SHELL; nothing outside the test's folders is touched.
+ */
+export function fakeComputer({ claudeCode = true }: { claudeCode?: boolean } = {}) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
+  const home = join(root, "home");
+  const bin = join(root, "bin");
+  mkdirSync(home, { recursive: true });
+  if (claudeCode) mkdirSync(join(home, ".claude"));
+  mkdirSync(bin);
+  const configDir = join(home, "Library", "Application Support", "quadit");
+  const shell = join(root, "shell");
+  writeFileSync(shell, `#!/bin/sh\necho "PATH=${bin}:/usr/bin:/bin"\n`);
+  writeFileSync(
+    join(bin, "quadit"),
+    `#!/bin/sh
+default='${join(configDir, "config.json")}'
+case "$1" in
+  version) echo "quadit 9.9.9 (agent surface 2.0)" ;;
+  skill) printf '# Quadit skill\\n' ;;
+  login)
+    if [ "$2" = "--path" ]; then echo "\${QUADIT_CONFIG:-$default}"; exit 0; fi
+    [ "$3" = "-" ] || exit 2
+    read -r token
+    config="\${QUADIT_CONFIG:-$default}"
+    mkdir -p "$(dirname "$config")"
+    printf '{"url":"%s","token":"%s"}\\n' "$2" "$token" > "$config"
+    chmod 600 "$config" ;;
+esac
+`,
+  );
+  chmodSync(shell, 0o755);
+  chmodSync(join(bin, "quadit"), 0o755);
+  if (claudeCode)
+    writeFileSync(join(home, ".claude", "settings.json"), JSON.stringify({ permissions: { allow: ["Read"] } }));
+  return { root, home, configDir, shell };
 }
 
 /**
