@@ -220,6 +220,10 @@ var (
 		"Nothing was changed. Start again from the Quadit app; if it keeps happening, the server's log has the details."}
 )
 
+// desktopPage is shown in the app's window. On macOS that window may have no
+// title bar (desktop contract §9): its window-strip, as tall as the title
+// area the window's controls overlay gives the page and of no height
+// anywhere else, is what the window is dragged by.
 var desktopPage = template.Must(template.New("desktop").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>{{.Title}}</title>
 <style>
@@ -227,7 +231,8 @@ body{font:16px/1.5 system-ui,sans-serif;background:#f6f6f7;color:#18181b;display
 @media(prefers-color-scheme:dark){body{background:#111113;color:#ededef}.card{background:#1b1b1f!important;border-color:#2e2e33!important}}
 .card{background:#fff;border:1px solid #e4e4e7;border-radius:12px;padding:28px;max-width:420px;width:calc(100% - 48px)}
 h1{font-size:19px;margin:0 0 8px}p{margin:8px 0;color:#71717a}
-</style></head><body><main class="card"><h1>{{.Title}}</h1><p>{{.Message}}</p></main></body></html>`))
+.window-strip{position:fixed;top:0;left:0;right:0;height:env(titlebar-area-height,0px);app-region:drag}
+</style></head><body><div class="window-strip"></div><main class="card"><h1>{{.Title}}</h1><p>{{.Message}}</p></main></body></html>`))
 
 // showDesktopPage answers with a plain page saying why the hand-off stops.
 func (s *Server) showDesktopPage(x *c, status int, words desktopWords) error {

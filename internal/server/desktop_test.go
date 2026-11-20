@@ -277,6 +277,17 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 			}
 		})
 
+		t.Run("the page saying why the app was not signed in can drag a window without a title bar by its top", func(t *testing.T) {
+			// The app's window on macOS may have none (desktop/src/main/window-frame.ts); the strip is as tall as
+			// the title area the window's controls overlay gives the page, and has no height anywhere else.
+			_, body := app().getWith(t, finishURL(s, "a-code", "a-verifier"), nil)
+			for _, want := range []string{`<div class="window-strip"></div>`, "height:env(titlebar-area-height,0px)", "app-region:drag"} {
+				if !strings.Contains(body, want) {
+					t.Fatalf("the page has no %q: %s", want, body)
+				}
+			}
+		})
+
 		t.Run("what is refused as not the app counts against no one's sign-ins", func(t *testing.T) {
 			// More than an address's sign-ins allowed: refusing them must not lock the app out.
 			f := newDesktopFlow()
