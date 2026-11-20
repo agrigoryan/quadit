@@ -5,6 +5,7 @@
 
 import { type RefObject, useEffect, useRef } from "react";
 import { useOnePane } from "@/hooks/breakpoints";
+import { cx } from "@/lib/cx";
 import { TaskView } from "@/detail/task-view";
 
 interface Props {
@@ -57,7 +58,12 @@ export function TaskPanel({ taskKey, onClose, onExpand }: Props) {
       ref={panel}
       data-task-panel
       aria-label={taskKey}
-      className="fixed inset-y-0 right-0 z-40 flex w-full flex-col bg-surface shadow-panel animate-panel md:w-[min(44rem,calc(100vw-3rem))]"
+      // In a window without a title bar (lib/window-inset.ts) it keeps clear of the window's buttons: on a narrow
+      // window it starts under the strip they are in, on a wide one its left edge stays past them.
+      className={cx(
+        "fixed inset-y-0 right-0 z-40 flex w-full flex-col bg-surface shadow-panel animate-panel md:w-[min(44rem,calc(100vw-3rem))]",
+        "max-md:window-inset:top-(--window-inset-height) md:window-inset:w-[min(44rem,calc(100vw-var(--window-inset-left)))]",
+      )}
     >
       <TaskView key={taskKey} taskKey={taskKey} layout="panel" onClose={onClose} onExpand={onExpand} />
     </aside>

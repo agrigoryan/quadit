@@ -82,7 +82,8 @@ function Palette() {
             e.preventDefault();
             toPage("root");
           }}
-          className="fixed inset-x-0 top-0 z-[70] overflow-hidden bg-surface text-ink shadow-pop outline-none animate-pop max-sm:rounded-b-xl sm:top-[12vh] sm:left-1/2 sm:w-[min(600px,calc(100vw-2rem))] sm:-translate-x-1/2 sm:rounded-xl"
+          // At the top of a narrow window without a title bar (lib/window-inset.ts) it starts under the window's buttons.
+          className="fixed inset-x-0 top-0 z-[70] overflow-hidden bg-surface text-ink shadow-pop outline-none animate-pop max-sm:rounded-b-xl max-sm:window-inset:top-(--window-inset-height) sm:top-[12vh] sm:left-1/2 sm:w-[min(600px,calc(100vw-2rem))] sm:-translate-x-1/2 sm:rounded-xl"
         >
           <VisuallyHidden.Root>
             <RDialog.Title>{t("palette.title")}</RDialog.Title>

@@ -134,7 +134,11 @@ export function CompareView(props: CompareProps) {
           }}
           className="fixed inset-0 z-50 flex flex-col bg-black text-inverse-ink outline-none animate-fade"
         >
-          <header className="flex h-12 shrink-0 items-center gap-1 bg-inverse pr-2 pl-4 max-sm:h-14 max-sm:pr-1">
+          {/* Covering the window, it is what a window without a title bar is dragged by, past the window's buttons (lib/window-inset.ts). */}
+          <header
+            data-window-bar
+            className="flex h-12 shrink-0 items-center gap-1 bg-inverse pr-2 pl-4 max-sm:h-14 max-sm:pr-1 window-inset:pl-(--window-inset-left)"
+          >
             <RDialog.Title className="mr-2 min-w-0 flex-1 truncate text-sm font-semibold max-sm:line-clamp-2 max-sm:whitespace-normal">
               {c.decision.question}
             </RDialog.Title>

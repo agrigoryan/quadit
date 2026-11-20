@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { ChevronsRight, Maximize2, Trash2 } from "lucide-react";
 import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
 import { Link } from "react-router";
+import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useRow, useSlug } from "@/data/selectors";
 import { trashDoc } from "@/docs/actions";
@@ -42,7 +43,11 @@ export function RowPeek({ rowId, onClose, readOnly }: { rowId: string; onClose: 
             const el = document.activeElement as HTMLElement | null;
             if (el?.isContentEditable) e.preventDefault();
           }}
-          className="fixed inset-y-0 right-0 z-40 flex w-[min(46rem,100vw)] flex-col bg-surface shadow-panel outline-none animate-panel max-md:inset-0 max-md:w-auto"
+          // In a window without a title bar (lib/window-inset.ts) it keeps clear of the window's buttons, as the task panel does.
+          className={cx(
+            "fixed inset-y-0 right-0 z-40 flex w-[min(46rem,100vw)] flex-col bg-surface shadow-panel outline-none animate-panel max-md:inset-0 max-md:w-auto",
+            "max-md:window-inset:top-(--window-inset-height) md:window-inset:w-[min(46rem,calc(100vw-var(--window-inset-left)))]",
+          )}
         >
           <VisuallyHidden.Root>
             <RDialog.Title>{docTitle(row)}</RDialog.Title>

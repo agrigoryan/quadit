@@ -128,7 +128,8 @@ export function Lightbox({ file, files, onShow, onClose }: LightboxProps) {
             e.preventDefault();
             box.current?.focus();
           }}
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 outline-none sm:p-10"
+          // On a narrow window without a title bar (lib/window-inset.ts) a video's controls stay clear of the window's buttons.
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 outline-none max-sm:window-inset:pt-(--window-inset-height) sm:p-10"
           onClick={(e) => e.target === e.currentTarget && onClose()}
           onKeyDown={(e) => onCarouselKey(e, steps)}
         >
