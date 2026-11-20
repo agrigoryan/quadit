@@ -44,15 +44,42 @@ describe("AppSignIn", () => {
 
   it("has one sign-in in flight per server: a second caller waits for the first's outcome", async () => {
     const { signIn, asked, release } = made([true], { held: true });
-    expect(signIn.inFlight("a")).toBe(false);
     const first = signIn.attempt("a");
     const second = signIn.attempt("a");
-    expect(signIn.inFlight("a")).toBe(true);
     await settle();
     expect(asked).toEqual(["a"]);
     release();
     expect(await Promise.all([first, second])).toEqual([true, true]);
-    expect(signIn.inFlight("a")).toBe(false);
+  });
+
+  it("from the sign-in page, lets the window go on when it signed it in and nothing has moved it since", async () => {
+    const { signIn, asked } = made([true, false]);
+    expect(await signIn.fromSignInPage("a")).toBe(true);
+    // Not signed in by the app (here: held back after the one that worked): nowhere to go.
+    expect(await signIn.fromSignInPage("a")).toBe(false);
+    expect(asked).toEqual(["a"]);
+  });
+
+  it("lets only the newest sign-in page go on: one that landed while a sign-in was under way joins it and takes over", async () => {
+    const { signIn, asked, release } = made([true], { held: true });
+    // The web app sent its signed-out page to the sign-in page; then another sign-in page came (a link).
+    const older = signIn.fromSignInPage("a");
+    signIn.navigationStarted("a");
+    const newer = signIn.fromSignInPage("a");
+    await settle();
+    release();
+    expect(await Promise.all([older, newer])).toEqual([false, true]);
+    expect(asked).toEqual(["a"]);
+  });
+
+  it("does not let a sign-in page go on once a navigation of the window has started since it landed", async () => {
+    const { signIn, release } = made([true], { held: true });
+    const landed = signIn.fromSignInPage("a");
+    // Started, and not shown yet: going on would cancel it.
+    signIn.navigationStarted("a");
+    await settle();
+    release();
+    expect(await landed).toBe(false);
   });
 
   it("after a sign-in that worked, signs in again only once a navigation outside the sign-in page has ended signed in", async () => {

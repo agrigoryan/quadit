@@ -5,6 +5,14 @@
 //
 //   - One sign-in at a time per server: a second caller waits for the
 //     first's outcome instead of asking again.
+//   - After a sign-in, only the newest sign-in page goes on to where it is
+//     headed, and only when no navigation of the window has started since
+//     it landed: the web app sends a page that finds itself signed out to
+//     the sign-in page by itself, and a link may come while that sign-in
+//     runs; going on from the older page would load over the newer one, or
+//     cancel a navigation started and not shown yet. A page that started
+//     loading after the sign-in finds the session there, and the web app's
+//     sign-in page goes on to its own next by itself.
 //   - After a sign-in that worked, none again until a navigation of the
 //     window outside the sign-in page has ended signed in (a workspace, the
 //     admin pages: asked of the server), or the server has started anew. A
@@ -28,6 +36,8 @@ export class AppSignIn {
   private inFlightFor = new Map<string, Promise<boolean>>();
   /** The servers whose session is being checked after a navigation. */
   private checking = new Set<string>();
+  /** For each server's window: how many times it landed on its sign-in page, and started a navigation. */
+  private counts = new Map<string, { landings: number; started: number }>();
 
   constructor(private parts: AppSignInParts) {}
 
@@ -47,9 +57,23 @@ export class AppSignIn {
     return signing;
   }
 
-  /** Whether a sign-in of the server's window is under way. */
-  inFlight(serverId: string): boolean {
-    return this.inFlightFor.has(serverId);
+  /**
+   * The server's window landed on its sign-in page: signs it in (or waits
+   * for the sign-in under way). True when the window is to go on from this
+   * page to where it is headed: it was signed in just now, and since this
+   * landing no other sign-in page landed and no navigation started.
+   */
+  async fromSignInPage(serverId: string): Promise<boolean> {
+    const counts = this.countsOf(serverId);
+    const landing = ++counts.landings;
+    const started = counts.started;
+    const signedIn = await this.attempt(serverId);
+    return signedIn && counts.landings === landing && counts.started === started;
+  }
+
+  /** A navigation of the server's window to another document started (not one within the page). */
+  navigationStarted(serverId: string) {
+    this.countsOf(serverId).started++;
   }
 
   /** The server's window navigated, to its sign-in page or not; outside it, a window found signed in lets go of the hold. */
@@ -62,6 +86,15 @@ export class AppSignIn {
         if (signedIn) this.held.delete(serverId);
       })
       .finally(() => this.checking.delete(serverId));
+  }
+
+  private countsOf(serverId: string) {
+    let counts = this.counts.get(serverId);
+    if (!counts) {
+      counts = { landings: 0, started: 0 };
+      this.counts.set(serverId, counts);
+    }
+    return counts;
   }
 
   /** The server started anew: what was held back for its window no longer holds. */

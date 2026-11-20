@@ -505,18 +505,20 @@ export class ServerWindows {
       this.placeBar(win, serverId);
       const signInPage = onSignInPage(contents, server);
       this.appSignIn.navigated(serverId, signInPage);
-      // Landed on the sign-in page: signed in without the form where the app can, unless a sign-in is under way
-      // already, whose asker goes on itself.
-      if (!signInPage || this.appSignIn.inFlight(serverId)) return;
-      void this.appSignIn.attempt(serverId).then((signedIn) => {
-        // On to where the sign-in page shown now is headed (a newer one may have replaced the one that asked: the web
-        // app sends a signed-out page to /login itself), only while the window still shows one and no newer load waits.
-        if (!signedIn || contents.isDestroyed() || !onSignInPage(contents, server) || this.loads.waiting(serverId))
-          return;
-        const target = appPage(server.origin, this.waitingFor(serverId) ?? "/");
-        if (target) this.load(serverId, { url: target });
+      // Landed on the sign-in page: signed in without the form where the app can, and on to where this page is
+      // headed, when it is still the page shown (app-sign-in.ts says when) and no load of the app's waits.
+      if (!signInPage) return;
+      const target = appPage(server.origin, this.waitingFor(serverId) ?? "/");
+      void this.appSignIn.fromSignInPage(serverId).then((goOn) => {
+        if (!goOn || !target || contents.isDestroyed() || !onSignInPage(contents, server)) return;
+        if (!this.loads.waiting(serverId)) this.load(serverId, { url: target });
       });
     };
+    contents.on("did-start-navigation", (details) => {
+      const win = this.windows.get(serverId);
+      if (win?.webContents === contents && details.isMainFrame && !details.isSameDocument)
+        this.appSignIn.navigationStarted(serverId);
+    });
     contents.on("did-navigate", () => {
       // A new page: what the last one reported and published goes with it, and this one reports anew.
       this.setup.forgetUnread(reporter);
