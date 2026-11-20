@@ -457,6 +457,19 @@ body.bar p {
   margin-top: 14px;
 }
 
+/*
+ * The connection error covers the whole window. In a window without a title
+ * bar (src/main/window-frame.ts) the window is dragged by the strip at its top,
+ * where the buttons are: Electron hands a view the overlay as it falls on the
+ * view, so this strip is as tall as that one; with a title bar it has none.
+ */
+.window-strip {
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(titlebar-area-height, 0px);
+  app-region: drag;
+}
+
 /* Forms with choices: setup, Connect and quick capture. */
 
 fieldset.choice {

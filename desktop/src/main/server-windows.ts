@@ -1,6 +1,8 @@
 // Each server's window: its own signed-in session, its pages kept to its
 // origin, the bridge its pages may use, and the bar that offers the browser
-// sign-in when its page is the sign-in page.
+// sign-in when its page is the sign-in page. On macOS it may have no title
+// bar (window-frame.ts): the bar then sits under the strip the window's
+// buttons are in, which the page underneath is dragged by.
 //
 // A window lives as long as its server is added: closing it only hides it,
 // so its page keeps receiving the live feed and its notifications and badge
@@ -60,6 +62,7 @@ import { appPage, browserAddress, isHandoffPage, isOwnPage } from "@/main/origin
 import { type Fetch, fitOf } from "@/main/probe";
 import type { Requests } from "@/main/requests";
 import type { Server, ServerStore } from "@/main/servers";
+import { frameFor } from "@/main/window-frame";
 import {
   BRIDGE_BADGE,
   BRIDGE_LISTENING,
@@ -128,6 +131,8 @@ export class ServerWindows {
   /** Which server each web contents belongs to: the windows and the windows their pages opened. */
   private owners = new Map<number, string>();
   private bars = new Map<string, WebContentsView>();
+  /** The height of the strip at the top of each window without a title bar (window-frame.ts); absent with one. */
+  private strips = new WeakMap<BrowserWindow, number>();
   /** Servers whose sign-in bar the person closed; it stays away until the app restarts. */
   private barDismissed = new Set<string>();
   /** Shown notifications, held so their click still arrives (macOS forgets the handlers of collected ones). */
@@ -349,6 +354,7 @@ export class ServerWindows {
     const known = this.windows.get(server.id);
     if (known) return known;
     this.prepareSession(server);
+    const frame = frameFor(process.platform, server);
     const win = new BrowserWindow({
       name: windowName(server.id),
       windowStatePersistence: true,
@@ -360,9 +366,11 @@ export class ServerWindows {
       // The web app's dark --bg (its default theme), so the window is not white until its page paints.
       backgroundColor: "#131419",
       show: shown,
+      ...frame.options,
       webPreferences: this.preferencesFor(server),
     });
     this.windows.set(server.id, win);
+    if (frame.strip) this.strips.set(win, frame.strip);
     this.guard(win.webContents, server.id);
     this.errors.watch(
       win,
@@ -609,7 +617,10 @@ export class ServerWindows {
     note.show();
   }
 
-  /** Shows the sign-in bar over the top of a server's window when its page is the sign-in page, and hides it otherwise. */
+  /**
+   * Shows the sign-in bar over the top of a server's window when its page is the sign-in page, and hides it otherwise.
+   * In a window without a title bar it sits under the strip, which stays the page's to drag the window by.
+   */
   private placeBar(win: BrowserWindow, serverId: string) {
     const server = this.store.get(serverId);
     const wanted =
@@ -635,7 +646,7 @@ export class ServerWindows {
       this.bars.set(serverId, bar);
     }
     const { width } = win.getContentBounds();
-    bar.setBounds({ x: 0, y: 0, width, height: BAR_HEIGHT });
+    bar.setBounds({ x: 0, y: this.strips.get(win) ?? 0, width, height: BAR_HEIGHT });
     bar.setVisible(true);
   }
 }
