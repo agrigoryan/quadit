@@ -23,6 +23,10 @@ type BootstrapArgs struct {
 	OwnerHandle   string
 	WorkspaceSlug string
 	WorkspaceName string
+	// Also, when set, writes more in the same transaction once the
+	// workspace and its owner are made: what must not be there without
+	// them, nor they without it. Its error undoes all of it.
+	Also func(ctx context.Context, db store.DB, owner core.User) error
 }
 
 // Bootstrap makes a workspace and its owner membership, and the owner too
@@ -60,8 +64,14 @@ func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace
 			}
 			return err
 		}
-		return db.Insert(ctx, core.Member{WorkspaceID: ws.ID, UserID: owner.ID, Role: core.RoleOwner, Handle: handle,
-			Kind: owner.Kind, Name: owner.Name, Avatar: owner.Avatar, CreatedAt: at})
+		if err := db.Insert(ctx, core.Member{WorkspaceID: ws.ID, UserID: owner.ID, Role: core.RoleOwner, Handle: handle,
+			Kind: owner.Kind, Name: owner.Name, Avatar: owner.Avatar, CreatedAt: at}); err != nil {
+			return err
+		}
+		if a.Also == nil {
+			return nil
+		}
+		return a.Also(ctx, db, owner)
 	})
 	return ws, owner, err
 }
