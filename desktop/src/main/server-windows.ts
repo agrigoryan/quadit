@@ -16,6 +16,12 @@
 //     but the app's own hand-off (finishSignIn): not a page's navigation,
 //     a redirect, a frame or window.open, and not a link or a notification,
 //     which may only open pages of the web app (origins.ts, appPage);
+//   - its window loads the server's address only once the server can be
+//     reached (whenReachable): the server on this computer only while it
+//     runs, since whatever else answers at its address would get its
+//     sign-in; until then the window waits, dark, and if the server is not
+//     running it shows why, over it; a later load asked meanwhile (a link)
+//     replaces an earlier one (pending-loads.ts);
 //   - a frame of a page stays on the server's own pages;
 //   - window.open of the same origin opens another window held to the same
 //     rules; anything else goes to the system browser;
@@ -40,6 +46,7 @@ import {
 import { ConnectionErrors } from "@/main/connection-error";
 import { giveContextMenu } from "@/main/context-menu";
 import { NoticeGate } from "@/main/notices";
+import { PendingLoads } from "@/main/pending-loads";
 import { HANDOFF_HEADER } from "@/main/handoff";
 import { appPage, browserAddress, isHandoffPage, isOwnPage } from "@/main/origins";
 import { fitOf } from "@/main/probe";
@@ -64,6 +71,13 @@ const SIGN_IN_PATH = "/login";
 const SET_UP_PATH = "/setup";
 const BAR_HEIGHT = 52;
 
+/** A load of a server's window: the address, the headers it carries, and what to do once it has loaded. */
+interface Load {
+  url: string;
+  extraHeaders?: string;
+  then?: () => void;
+}
+
 /** What a server's windows need from the rest of the app. */
 export interface WindowsSetup {
   version: string;
@@ -85,11 +99,11 @@ export interface WindowsSetup {
   /** A window was shown, hidden or focused: the menus that list them change. */
   changed(): void;
   /**
-   * Resolves when a server's page is worth loading: at once for a server
-   * elsewhere; for the one the app runs on this computer, once it has
-   * started or failed to. Until then its window shows the dark background.
+   * Whether a server's address may be loaded, once that is known: at once
+   * for a server elsewhere; for the one the app runs on this computer, once
+   * it has started (ok) or failed to (not, and why).
    */
-  whenReachable(serverId: string): Promise<void>;
+  whenReachable(serverId: string): Promise<{ ok: true } | { ok: false; reason: string }>;
 }
 
 export class ServerWindows {
@@ -104,6 +118,7 @@ export class ServerWindows {
   private gate = new NoticeGate();
   private errors: ConnectionErrors;
   private sessions = new WeakSet<Session>();
+  private loads: PendingLoads<string, Load, { ok: true } | { ok: false; reason: string }>;
   private quitting = false;
 
   constructor(
@@ -126,6 +141,10 @@ export class ServerWindows {
     ipcMain.on(BRIDGE_OUTCOME, (event, raw: unknown) => {
       if (this.bridgeSender(event)) setup.requests.answer(event.sender.id, raw);
     });
+    this.loads = new PendingLoads(
+      (serverId) => setup.whenReachable(serverId),
+      (serverId, load, reach) => this.arrive(serverId, load, reach),
+    );
     this.errors = new ConnectionErrors({
       pagesPreload: setup.pagesPreload,
       pageUrl: (words) => setup.connectionErrorUrl(words),
@@ -174,8 +193,7 @@ export class ServerWindows {
     const server = this.store.get(serverId);
     if (!server) return;
     const target = server.origin + SET_UP_PATH;
-    const known = this.windows.get(serverId);
-    if (known) void this.setup.whenReachable(serverId).then(() => known.webContents.loadURL(target));
+    if (this.windows.has(serverId)) this.load(serverId, { url: target });
     else this.ensure(server, target, true);
     this.show(serverId);
   }
@@ -190,16 +208,16 @@ export class ServerWindows {
     const server = this.store.get(serverId);
     if (!server || !isHandoffPage(finishUrl, server.origin)) return;
     this.show(serverId);
-    const window = this.windows.get(serverId);
-    if (!window) return;
-    void window.webContents
-      .loadURL(finishUrl, { extraHeaders: `${HANDOFF_HEADER}: 1\n` })
-      .then(() => {
+    this.load(serverId, {
+      url: finishUrl,
+      extraHeaders: `${HANDOFF_HEADER}: 1\n`,
+      then: () => {
         // Signed in: on to the page the window was on its way to.
         const target = next && appPage(server.origin, next);
-        if (target && !window.isDestroyed()) this.goTo(window.webContents, server, target);
-      })
-      .catch(() => {}); // A finish that did not load leaves the window where it failed, and the person starts again.
+        const window = this.windows.get(serverId);
+        if (target && window) this.goTo(window.webContents, server, target);
+      },
+    });
   }
 
   /**
@@ -305,7 +323,11 @@ export class ServerWindows {
     });
     this.windows.set(server.id, win);
     this.guard(win.webContents, server.id);
-    this.errors.watch(win, () => this.store.get(server.id));
+    this.errors.watch(
+      win,
+      () => this.store.get(server.id),
+      (url) => this.load(server.id, { url }),
+    );
     if (shown) this.store.change(server.id, { open: true });
 
     win.on("close", (event) => {
@@ -324,12 +346,34 @@ export class ServerWindows {
     win.on("focus", () => this.setup.changed());
     win.on("resize", () => this.placeBar(win, server.id));
     win.on("closed", () => {
-      if (this.windows.get(server.id) === win) this.windows.delete(server.id);
+      if (this.windows.get(server.id) !== win) return;
+      this.windows.delete(server.id);
+      this.loads.forget(server.id);
     });
-    void this.setup.whenReachable(server.id).then(() => {
-      if (!win.isDestroyed()) void win.webContents.loadURL(firstUrl);
-    });
+    this.load(server.id, { url: firstUrl });
     return win;
+  }
+
+  /** Loads an address in a server's window once the server can be reached; a newer load asked meanwhile wins. */
+  private load(serverId: string, load: Load) {
+    this.loads.ask(serverId, load);
+  }
+
+  /** A load whose wait is over: loaded when the server can be reached, and otherwise the reason shown over the window. */
+  private arrive(serverId: string, load: Load, reach: { ok: true } | { ok: false; reason: string }) {
+    const win = this.windows.get(serverId);
+    const server = this.store.get(serverId);
+    if (!win || win.isDestroyed() || !server) return;
+    if (!reach.ok) {
+      this.errors.show(win, load.url, { name: server.name, origin: server.origin, reason: reach.reason });
+      return;
+    }
+    void win.webContents
+      .loadURL(load.url, load.extraHeaders ? { extraHeaders: load.extraHeaders } : undefined)
+      .then(() => {
+        if (!win.isDestroyed()) load.then?.();
+      })
+      .catch(() => {}); // A load that failed shows the connection error (connection-error.ts watches for it).
   }
 
   /** The partition's user agent and permissions, set once per session. */
@@ -439,7 +483,7 @@ export class ServerWindows {
   /** Moves a server's page to `url` (on its origin), keeping the page when it is already the web app. */
   private goTo(contents: WebContents, server: Server, url: string) {
     if (!isOwnPage(contents.getURL(), server.origin) || contents.isLoading()) {
-      void contents.loadURL(url);
+      this.load(server.id, { url });
       return;
     }
     // The web app routes with the History API: pushing the path and telling

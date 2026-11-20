@@ -138,7 +138,8 @@ function start() {
     forgetUnread: (reporter) => unread.forget(reporter),
     requests,
     changed: () => refreshMenu(),
-    whenReachable: (serverId) => (serverId === list.localServer()?.id ? local.settled() : Promise.resolve()),
+    whenReachable: (serverId) =>
+      serverId === list.localServer()?.id ? local.whenRunning() : Promise.resolve({ ok: true as const }),
   });
   const list = new ServerList(store, windows, pages, requests, { fetcher, checks, signIn, local, loginItem });
   const panel = new Panel(pages, requests);

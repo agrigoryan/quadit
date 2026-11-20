@@ -8,6 +8,11 @@
 //
 // A page that loaded and then lost its server is the web app's business:
 // it has its own offline handling.
+//
+// Trying again goes through the window's own loader (server-windows.ts),
+// which loads only an address that may be loaded now; and the window can
+// show this page without trying at all (show), as for the server on this
+// computer while it is not running.
 
 import { BrowserWindow, WebContentsView } from "electron";
 
@@ -31,11 +36,18 @@ interface Failure {
 
 export class ConnectionErrors {
   private failures = new Map<BrowserWindow, Failure>();
+  /** How each watched window loads an address. */
+  private loaders = new Map<BrowserWindow, (url: string) => void>();
 
   constructor(private setup: ConnectionErrorSetup) {}
 
-  /** Watches a server's window: a failed load of its page shows the error over it until a load works. */
-  watch(win: BrowserWindow, server: () => { name: string; origin: string } | undefined) {
+  /**
+   * Watches a server's window: a failed load of its page shows the error
+   * over it until a load works. `load` is how the window loads an address,
+   * which trying again uses.
+   */
+  watch(win: BrowserWindow, server: () => { name: string; origin: string } | undefined, load: (url: string) => void) {
+    this.loaders.set(win, load);
     const contents = win.webContents;
     contents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
       const known = server();
@@ -47,7 +59,10 @@ export class ConnectionErrors {
       if (known && URL.parse(url)?.origin === known.origin) this.clear(win);
     });
     win.on("resize", () => this.place(win));
-    win.on("closed", () => this.clear(win));
+    win.on("closed", () => {
+      this.clear(win);
+      this.loaders.delete(win);
+    });
   }
 
   /** Tries every failed window again now: the computer woke, or the network came back. */
@@ -60,7 +75,8 @@ export class ConnectionErrors {
     for (const [win, failure] of this.failures) if (failure.view.webContents === contents) this.retry(win);
   }
 
-  private show(win: BrowserWindow, url: string, words: { name: string; origin: string; reason: string }) {
+  /** Shows the error over the window, about `url`, which it tries again later. */
+  show(win: BrowserWindow, url: string, words: { name: string; origin: string; reason: string }) {
     let failure = this.failures.get(win);
     if (!failure) {
       const view = new WebContentsView({
@@ -93,7 +109,7 @@ export class ConnectionErrors {
     failure.tries++;
     clearTimeout(failure.timer);
     // A failure shows the page again, with the next wait; a success clears it (did-navigate).
-    void win.webContents.loadURL(failure.url).catch(() => {});
+    this.loaders.get(win)?.(failure.url);
   }
 
   private clear(win: BrowserWindow) {

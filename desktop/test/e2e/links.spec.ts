@@ -1,8 +1,10 @@
 import { spawn } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { APP_VERSION, expect, test } from "./desktop";
+import { APP_VERSION, Desktop, expect, test } from "./desktop";
 import type { HandoffEvent } from "./handoff-fake";
-import { quadit } from "./run";
+import { newTask, quadit } from "./run";
 
 test("a link to another site opens in the system browser, and the window stays on the server", async ({
   desktop,
@@ -90,6 +92,31 @@ test("a quadit://open link shows the server's window at the path, from macOS and
   const exited = new Promise<number | null>((done) => second.once("exit", done));
   await expect(page).toHaveURL(`${run.server}/e2e/my-work`);
   expect(await exited).toBe(0);
+});
+
+test("a quadit://open link that starts the app opens its path, which the restored window's start page does not replace", async ({
+  run,
+}) => {
+  const { key } = await newTask(run, "Open me from a link");
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  let desktop = await Desktop.launch(data, run);
+  try {
+    await desktop.addServer(run.server);
+    await desktop.signedIn(run.server);
+  } finally {
+    await desktop.close();
+  }
+  // Started again by the link, with the server's window to restore: the link's page wins.
+  desktop = await Desktop.launch(data, run, [
+    `quadit://open?server=${encodeURIComponent(run.server)}&path=${encodeURIComponent(`/e2e/task/${key}`)}`,
+  ]);
+  try {
+    const page = await desktop.pageOf(run.server);
+    await expect(page.getByText("Open me from a link").first()).toBeVisible();
+    await expect(page).toHaveURL(`${run.server}/e2e/task/${key}`);
+  } finally {
+    await desktop.close();
+  }
 });
 
 test("a quadit://open link for a server the app is not connected to is refused, and nothing is added", async ({
