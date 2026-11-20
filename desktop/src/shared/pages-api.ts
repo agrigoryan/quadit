@@ -111,6 +111,8 @@ export interface ConnectView {
     version: string;
     /** Without one: the folder the app's own copy would be linked into, or the command to run by hand. */
     linkInto: string | null;
+    /** The profile of the login shell that connecting adds the line putting `linkInto` on the PATH to; null when none is needed. */
+    profile: string | null;
     manual: string | null;
   };
   /**

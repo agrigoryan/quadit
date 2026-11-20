@@ -64,7 +64,19 @@ function setUp({
   quaditOnPath = true,
   bundled = true,
   platform = "darwin",
-}: { quaditOnPath?: boolean; bundled?: boolean; platform?: NodeJS.Platform } = {}) {
+  writableOnPath = true,
+  ownBinOnPath = false,
+  shell = "/bin/zsh",
+}: {
+  quaditOnPath?: boolean;
+  bundled?: boolean;
+  platform?: NodeJS.Platform;
+  /** Whether the login PATH has a folder the person may write to (bin); without, only a folder that is not there. */
+  writableOnPath?: boolean;
+  /** Whether ~/.local/bin is on the login PATH, as Linux distributions put it, there or not. */
+  ownBinOnPath?: boolean;
+  shell?: string;
+} = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
   const home = join(root, "home");
   const bin = join(root, "bin");
@@ -81,7 +93,16 @@ function setUp({
     dataDir: join(root, "data"),
     platform,
     hostName: "mac",
-    cli: new QuaditCli(quaditOnPath || !bundled ? null : script, async () => `relative-folder:${bin}`),
+    cli: new QuaditCli(
+      quaditOnPath || !bundled ? null : script,
+      async () =>
+        [
+          "relative-folder",
+          writableOnPath ? bin : join(root, "not-a-folder"),
+          ...(ownBinOnPath ? [join(home, ".local", "bin")] : []),
+        ].join(":"),
+      { home, shell },
+    ),
     summaries: () => [
       {
         serverId: "s1",
@@ -446,6 +467,93 @@ describe("on Windows", () => {
         "Connecting agent tools is not available on Windows yet: it needs the quadit command, which has no Windows build.",
     });
     expect(existsSync(join(home, ".claude"))).toBe(false);
+  });
+});
+
+posixOnly("The app's quadit without a folder on the PATH it may write to", () => {
+  const LINE = 'export PATH="$HOME/.local/bin:$PATH" # Added by the Quadit app: Disconnect in the app takes it out.';
+
+  it("goes in ~/.local/bin, put on the PATH by one line in the login shell's profile, shown first and taken back with the last harness", async () => {
+    const { connections, connect, disconnect, home, root, choice } = setUp({
+      quaditOnPath: false,
+      writableOnPath: false,
+    });
+    const own = join(home, ".local", "bin");
+    const profile = join(home, ".zprofile");
+    expect((await connections.state()).cli).toMatchObject({
+      found: null,
+      linkInto: "~/.local/bin",
+      profile: "~/.zprofile",
+      manual: null,
+    });
+    const planned = await connections.planConnect(choice("codex"));
+    if (!planned.ok) throw new Error(planned.error);
+    expect(planned.plan.files.map((file) => file.path)).toEqual(
+      expect.arrayContaining([own, join(own, "quadit"), profile]),
+    );
+    connections.dropPlans();
+
+    const hint = await connect(choice("codex"));
+    expect(hint).toContain("Terminals opened from now on find quadit; reopen any that are open now.");
+    expect(readlinkSync(join(own, "quadit"))).toBe(join(root, "quadit-bundled"));
+    expect(readFileSync(profile, "utf8")).toBe(`${LINE}\n`);
+    // The login PATH this session sees has no ~/.local/bin yet: the app uses its link anyway, and adds no line twice.
+    expect((await connections.state()).cli.found).toBe(join(own, "quadit"));
+    await connect(choice("pi"));
+    expect(readFileSync(profile, "utf8")).toBe(`${LINE}\n`);
+
+    await disconnect("codex");
+    expect(readFileSync(profile, "utf8")).toBe(`${LINE}\n`);
+    expect(lstatSync(join(own, "quadit")).isSymbolicLink()).toBe(true);
+    await disconnect("pi");
+    // The profile the app made goes with its line; the link and the folder it made go too.
+    expect(existsSync(profile)).toBe(false);
+    expect(existsSync(own)).toBe(false);
+  });
+
+  it("keeps the rest of a profile there already, and takes out only its line", async () => {
+    const { connect, disconnect, home, choice } = setUp({
+      quaditOnPath: false,
+      writableOnPath: false,
+      shell: "/bin/bash",
+    });
+    writeFileSync(join(home, ".bash_profile"), "source ~/.bashrc\n");
+    await connect(choice("codex"));
+    expect(readFileSync(join(home, ".bash_profile"), "utf8")).toBe(`source ~/.bashrc\n${LINE}\n`);
+    expect(existsSync(join(home, ".profile"))).toBe(false);
+    await disconnect("codex");
+    expect(readFileSync(join(home, ".bash_profile"), "utf8")).toBe("source ~/.bashrc\n");
+  });
+
+  it("only makes ~/.local/bin and links there where it is on the PATH already but not there (Linux)", async () => {
+    const { connections, connect, home, choice } = setUp({
+      quaditOnPath: false,
+      writableOnPath: false,
+      ownBinOnPath: true,
+      shell: "/bin/bash",
+    });
+    expect((await connections.state()).cli).toMatchObject({ linkInto: "~/.local/bin", profile: null });
+    const planned = await connections.planConnect(choice("codex"));
+    if (!planned.ok) throw new Error(planned.error);
+    expect(planned.plan.files.some((file) => /profile/.test(file.path))).toBe(false);
+    connections.dropPlans();
+    await connect(choice("codex"));
+    expect(lstatSync(join(home, ".local", "bin", "quadit")).isSymbolicLink()).toBe(true);
+    expect(existsSync(join(home, ".profile"))).toBe(false);
+    expect(existsSync(join(home, ".bash_profile"))).toBe(false);
+  });
+
+  it("says how to put it there by hand for a shell whose profile it does not know, and changes nothing", async () => {
+    const { connections, home, choice } = setUp({ quaditOnPath: false, writableOnPath: false, shell: "/bin/tcsh" });
+    const { cli } = await connections.state();
+    expect(cli).toMatchObject({ linkInto: null, profile: null });
+    expect(cli.manual).toContain("ln -s");
+    expect(cli.manual).not.toContain("sudo");
+    expect(await connections.planConnect(choice("codex"))).toEqual({
+      ok: false,
+      error: expect.stringContaining("ln -s"),
+    });
+    expect(existsSync(join(home, ".local"))).toBe(false);
   });
 });
 

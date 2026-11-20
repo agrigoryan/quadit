@@ -40,6 +40,8 @@ function chosen(): SummaryView | undefined {
 
 function describeCli(view: ConnectView): string {
   if (view.cli.found) return `quadit ${view.cli.version} is on your PATH at ${view.cli.found}.`;
+  if (view.cli.linkInto && view.cli.profile)
+    return `quadit is not on your PATH: connecting puts the app's own copy in ${view.cli.linkInto} and adds that folder to your PATH in ${view.cli.profile}.`;
   if (view.cli.linkInto)
     return `quadit is not on your PATH: connecting links the app's own copy into ${view.cli.linkInto}.`;
   return `quadit is not on your PATH, and the app cannot put it there. Install it first: ${view.cli.manual ?? ""}`;

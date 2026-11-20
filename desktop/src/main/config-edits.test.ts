@@ -282,3 +282,70 @@ posixOnly("whole files and links", () => {
     expect(diff).toContain('+  "a": 1');
   });
 });
+
+posixOnly("Profile lines and folders", () => {
+  const LINE = 'export PATH="$HOME/.local/bin:$PATH" # Added by the Quadit app: Disconnect in the app takes it out.';
+
+  it("adds a marked line to the end of a file once, and takes exactly that line back out", () => {
+    const path = join(folder(), ".zprofile");
+    writeFileSync(path, "eval $(brew shellenv)");
+    const applied = apply([{ kind: "line", path, line: LINE }]);
+    expect(readFileSync(path, "utf8")).toBe(`eval $(brew shellenv)\n${LINE}\n`);
+    // Never twice.
+    expect(planChanges([{ kind: "line", path, line: LINE }])).toEqual({ edits: [], applied: [] });
+
+    writeFileSync(path, `${readFileSync(path, "utf8")}alias ll='ls -l'\n`);
+    expect(revert(applied)).toEqual([]);
+    expect(readFileSync(path, "utf8")).toBe("eval $(brew shellenv)\nalias ll='ls -l'\n");
+  });
+
+  it("makes a file that is not there for the line, and takes the file away with it when nothing else was added", () => {
+    const dir = folder();
+    const path = join(dir, "conf.d", "quadit.fish");
+    const applied = apply([{ kind: "line", path, line: "fish_add_path --global --path $HOME/.local/bin" }]);
+    expect(readFileSync(path, "utf8")).toBe("fish_add_path --global --path $HOME/.local/bin\n");
+    revert(applied);
+    expect(lstatSync(path, { throwIfNoEntry: false })).toBeUndefined();
+  });
+
+  it("writes the line through a profile that is a symbolic link, which stays a link", () => {
+    const dir = folder();
+    const real = join(dir, "dotfiles", "zprofile");
+    mkdirSync(join(dir, "dotfiles"));
+    writeFileSync(real, "export EDITOR=nvim\n");
+    const path = join(dir, ".zprofile");
+    symlinkSync(real, path);
+    const applied = apply([{ kind: "line", path, line: LINE }]);
+    expect(lstatSync(path).isSymbolicLink()).toBe(true);
+    expect(readFileSync(real, "utf8")).toBe(`export EDITOR=nvim\n${LINE}\n`);
+    revert(applied);
+    expect(lstatSync(path).isSymbolicLink()).toBe(true);
+    expect(readFileSync(real, "utf8")).toBe("export EDITOR=nvim\n");
+  });
+
+  it("makes a folder with a link in it, shows both, and takes both back, leaving a folder that holds more", () => {
+    const dir = folder();
+    const bin = join(dir, ".local", "bin");
+    const target = join(dir, "Quadit.app-quadit");
+    writeFileSync(target, "");
+    const changes = [
+      { kind: "folder" as const, path: bin },
+      { kind: "link" as const, path: join(bin, "quadit"), target },
+    ];
+    expect(planChanges(changes).edits.map((edit) => diffOf(edit))).toEqual([
+      expect.stringContaining("+(a new folder)"),
+      expect.stringContaining(`+→ ${target}`),
+    ]);
+    const applied = apply(changes);
+    expect(readlinkSync(join(bin, "quadit"))).toBe(target);
+    revert(applied);
+    expect(lstatSync(bin, { throwIfNoEntry: false })).toBeUndefined();
+    // A folder there already is never made, and one that holds the person's files now stays.
+    expect(planChanges([{ kind: "folder", path: dir }])).toEqual({ edits: [], applied: [] });
+    const again = apply(changes);
+    writeFileSync(join(bin, "mine"), "");
+    revert(again);
+    expect(statSync(bin).isDirectory()).toBe(true);
+    expect(lstatSync(join(bin, "quadit"), { throwIfNoEntry: false })).toBeUndefined();
+  });
+});

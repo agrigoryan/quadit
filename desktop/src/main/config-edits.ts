@@ -1,5 +1,6 @@
 // Edits to other programs' files (harness settings, skill files, the quadit
-// command's link), planned first and written only once the person has seen
+// command's link, its folder and the line in a shell profile that puts that
+// folder on the PATH), planned first and written only once the person has seen
 // them, and each recorded so that it can be taken back later, but only
 // where the file still says what was written.
 //
@@ -21,9 +22,11 @@ import {
   lstatSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   readlinkSync,
   realpathSync,
   renameSync,
+  rmdirSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -50,7 +53,11 @@ export type Change =
    */
   | { kind: "written-by"; path: string; shown: string }
   /** Makes `path` a symbolic link to `target`. */
-  | { kind: "link"; path: string; target: string };
+  | { kind: "link"; path: string; target: string }
+  /** Makes the folder `path`, where there is none. */
+  | { kind: "folder"; path: string }
+  /** Adds the whole line `line` (which says it was added by the app) to the end of a text file, unless it has it. */
+  | { kind: "line"; path: string; line: string };
 
 /**
  * What a change did, enough to take it back: the value a key had (absent
@@ -62,12 +69,16 @@ export type Applied =
   | { kind: "json-item"; path: string; keyPath: string[]; value: string; existed: number }
   | { kind: "toml"; path: string; table: string[]; block: string }
   | { kind: "file"; path: string; sha256: string; backup: string | null }
-  | { kind: "link"; path: string; target: string };
+  | { kind: "link"; path: string; target: string }
+  | { kind: "folder"; path: string }
+  /** `created`: the file was not there before the line. */
+  | { kind: "line"; path: string; line: string; created: boolean };
 
-/** A file as it is and as it will be: text, or for a link its target; null for no file. */
+/** A file as it is and as it will be: text, for a link its target, for a folder ""; null for none. */
 export interface FileEdit {
   path: string;
   link: boolean;
+  folder?: true;
   before: string | null;
   after: string | null;
   /** Written by another program (quadit login): `after` is only what the plan shows. */
@@ -95,9 +106,7 @@ export function planChanges(changes: Change[]): { edits: FileEdit[]; applied: Ap
     const change = { ...asked, path: changedPath(asked) };
     let edit = edits.get(change.path);
     if (!edit) {
-      const link = change.kind === "link";
-      const before = link ? readLink(change.path) : readText(change.path);
-      edit = { path: change.path, link, before, after: before };
+      edit = editOf(change.path, change.kind);
       edits.set(change.path, edit);
     }
     const done = applyChange(edit, change);
@@ -167,6 +176,16 @@ function applyChange(edit: FileEdit, change: Change): Applied | null {
       if (edit.after === change.target) return null;
       edit.after = change.target;
       return { kind: "link", path, target: change.target };
+    case "folder":
+      if (edit.after !== null) return null;
+      edit.after = "";
+      return { kind: "folder", path };
+    case "line": {
+      const text = edit.after ?? "";
+      if (text.split("\n").includes(change.line)) return null;
+      edit.after = `${text}${text === "" || text.endsWith("\n") ? "" : "\n"}${change.line}\n`;
+      return { kind: "line", path, line: change.line, created: edit.before === null };
+    }
   }
 }
 
@@ -178,23 +197,27 @@ function applyChange(edit: FileEdit, change: Change): Applied | null {
 export function planReverts(applied: Applied[]): { edits: FileEdit[]; notes: string[] } {
   const edits = new Map<string, FileEdit>();
   const notes: string[] = [];
-  for (const record of applied) {
+  // A folder last: what is in it goes first.
+  const ordered = [...applied.filter((r) => r.kind !== "folder"), ...applied.filter((r) => r.kind === "folder")];
+  for (const record of ordered) {
     let edit = edits.get(record.path);
     if (!edit) {
-      const link = record.kind === "link";
-      const before = link ? readLink(record.path) : readText(record.path);
-      edit = { path: record.path, link, before, after: before };
+      edit = editOf(record.path, record.kind);
       edits.set(record.path, edit);
     }
     if (edit.after === null) continue;
-    const kept = revertOne(edit, record);
+    const kept = revertOne(edit, record, edits);
     if (kept) notes.push(`${record.path}: ${kept}; left as it is.`);
   }
   return { edits: [...edits.values()].filter((e) => e.after !== e.before), notes };
 }
 
-/** Takes back one record on `edit`'s text; gives why not when the file no longer says what was written. */
-function revertOne(edit: FileEdit, record: Applied): string | null {
+/**
+ * Takes back one record on `edit`'s text; gives why not when the file no
+ * longer says what was written. `edits` are the other files this revert
+ * changes: a folder goes only when what is in it goes.
+ */
+function revertOne(edit: FileEdit, record: Applied, edits: Map<string, FileEdit>): string | null {
   const text = edit.after ?? "";
   switch (record.kind) {
     case "json": {
@@ -232,6 +255,21 @@ function revertOne(edit: FileEdit, record: Applied): string | null {
       if (text !== record.target) return "it no longer links to the app's quadit";
       edit.after = null;
       return null;
+    case "folder": {
+      // It holds files of the person's now: it stays, with nothing to say about it.
+      const left = readdirSync(record.path).filter((name) => edits.get(join(record.path, name))?.after !== null);
+      if (left.length === 0) edit.after = null;
+      return null;
+    }
+    case "line": {
+      const lines = text.split("\n");
+      const at = lines.indexOf(record.line);
+      if (at < 0) return null;
+      lines.splice(at, 1);
+      const rest = lines.join("\n");
+      edit.after = record.created && rest.trim() === "" ? null : rest;
+      return null;
+    }
   }
 }
 
@@ -253,7 +291,25 @@ function prune(text: string, record: { path: string; keyPath: string[]; existed:
 
 /** The first edit whose file is no longer as it was when planned, or null when none is. */
 export function changedSince(edits: FileEdit[]): FileEdit | null {
-  return edits.find((edit) => (edit.link ? readLink(edit.path) : readText(edit.path)) !== edit.before) ?? null;
+  return (
+    edits.find(
+      (edit) => editOf(edit.path, edit.folder ? "folder" : edit.link ? "link" : "file").before !== edit.before,
+    ) ?? null
+  );
+}
+
+/** An edit of `path` that changes nothing yet, as a change of `kind` reads it: a link's target, a folder, or text. */
+function editOf(path: string, kind: Change["kind"] | Applied["kind"]): FileEdit {
+  if (kind === "link") {
+    const before = readLink(path);
+    return { path, link: true, before, after: before };
+  }
+  if (kind === "folder") {
+    const before = statSync(path, { throwIfNoEntry: false })?.isDirectory() ? "" : null;
+    return { path, link: false, folder: true, before, after: before };
+  }
+  const before = readText(path);
+  return { path, link: false, before, after: before };
 }
 
 /**
@@ -263,7 +319,7 @@ export function changedSince(edits: FileEdit[]): FileEdit | null {
 export function backUp(edits: FileEdit[], backupDir: string): Map<string, string> {
   const backups = new Map<string, string>();
   for (const edit of edits) {
-    if (edit.before === null || edit.link) continue;
+    if (edit.before === null || edit.link || edit.folder) continue;
     mkdirSync(backupDir, { recursive: true, mode: 0o700 });
     const backup = join(backupDir, edit.path.replace(/^\/+/, "").replaceAll("/", "__"));
     copyFileSync(edit.path, backup);
@@ -277,7 +333,10 @@ export function backUp(edits: FileEdit[], backupDir: string): Map<string, string
 export function writeEdits(edits: FileEdit[]) {
   for (const edit of edits) {
     if (edit.writtenBy) continue;
-    if (edit.after === null) rmSync(edit.path, { force: true });
+    if (edit.folder) {
+      if (edit.after === null) rmdirSync(edit.path);
+      else mkdirSync(edit.path, { recursive: true });
+    } else if (edit.after === null) rmSync(edit.path, { force: true });
     else if (edit.link) {
       rmSync(edit.path, { force: true });
       symlinkSync(edit.after, edit.path);
@@ -303,6 +362,9 @@ function writeText(path: string, text: string) {
 
 /** The unified diff of an edit, as the plan shows it, with every token masked on both sides. */
 export function diffOf(edit: FileEdit): string {
+  if (edit.folder) {
+    return edit.after === null ? `-(the folder, empty now)\n` : `+(a new folder)\n`;
+  }
   const show = (side: string | null) => (side === null ? "" : edit.link ? `→ ${side}\n` : masked(side));
   return createTwoFilesPatch(edit.path, edit.path, show(edit.before), show(edit.after), "", "", { context: 3 })
     .split("\n")
@@ -343,6 +405,10 @@ export function targetOf(item: Change | Applied): string {
       return `file\n${path}`;
     case "link":
       return `link\n${path}`;
+    case "folder":
+      return `folder\n${path}`;
+    case "line":
+      return `line\n${path}\n${item.line}`;
   }
 }
 

@@ -164,7 +164,7 @@ function start() {
     dataDir,
     platform: process.platform,
     hostName: hostname(),
-    cli: new QuaditCli(bundledCli(), loginShellPath),
+    cli: new QuaditCli(bundledCli(), loginShellPath, { home: homedir(), shell: process.env.SHELL || "/bin/sh" }),
     summaries: () => requests.summaries(),
     server: (id) => store.get(id),
     ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),

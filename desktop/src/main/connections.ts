@@ -1,7 +1,10 @@
 // Connect: setting up an agent harness (harnesses.ts) to work with a Quadit
 // workspace, and taking it back. Two ways, either or both:
 //   CLI + skill  the quadit command on the login shell's PATH (the app's
-//                own copy linked there when there is none), the skill where
+//                own copy linked there when there is none, in a folder of
+//                the person's own put on the PATH by a line in their shell's
+//                profile when no folder on it is theirs: quadit-cli.ts),
+//                the skill where
 //                the harness reads skills, and a quadit login for an agent
 //                of the workspace: its own login, which the harness's
 //                environment setting points QUADIT_CONFIG at, where it has
@@ -17,8 +20,8 @@
 // id. The ledger (connections.json) records what each connection did, so
 // Disconnect takes back exactly that where the file still says what was
 // written. A change several connections need (the shared skill file, the
-// default login, the link) is made once, shared, and taken back with the
-// last of them.
+// default login, the link with its folder and profile line) is made once,
+// shared, and taken back with the last of them.
 
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -174,7 +177,9 @@ export class Connections {
       cli: {
         found: look.found?.path ?? null,
         version: look.found?.version ?? "",
-        linkInto: look.found || !cli.bundled ? null : look.linkInto,
+        linkInto: look.found || !cli.bundled || !look.linkInto ? null : homely(home, look.linkInto.folder),
+        profile:
+          look.found || !cli.bundled || !look.linkInto?.profile ? null : homely(home, look.linkInto.profile.path),
         manual: look.found || (cli.bundled && look.linkInto) ? null : manualInstall(cli.bundled),
       },
       defaultLogin,
@@ -231,14 +236,23 @@ export class Connections {
       const binary = look.found?.path ?? cli.bundled;
       if (!binary || (!look.found && !look.linkInto)) {
         throw new EditRefused(
-          `The quadit command is not on your PATH. Install it, then try again: ${manualInstall(cli.bundled)}`,
+          `The quadit command is not on your PATH. Put it there, then try again: ${manualInstall(cli.bundled)}`,
         );
       }
-      // The command on PATH may be the link another connection made: this one needs it too.
+      // The command on PATH may be the link another connection made: this one needs it too, with the folder and
+      // the profile line that came with it.
       const linked = look.found && others.get(targetOf({ kind: "link", path: look.found.path, target: "" }));
-      if (linked && linked.kind === "link") changes.push({ kind: "link", path: linked.path, target: linked.target });
-      else if (!look.found && look.linkInto && cli.bundled) {
-        changes.push({ kind: "link", path: join(look.linkInto, "quadit"), target: cli.bundled });
+      if (linked && linked.kind === "link") {
+        changes.push({ kind: "link", path: linked.path, target: linked.target });
+        for (const record of others.values()) {
+          if (record.kind === "folder" && record.path === dirname(linked.path)) changes.push(record);
+          if (record.kind === "line") changes.push({ kind: "line", path: record.path, line: record.line });
+        }
+      } else if (!look.found && look.linkInto && cli.bundled) {
+        const { folder, profile } = look.linkInto;
+        changes.push({ kind: "folder", path: folder });
+        changes.push({ kind: "link", path: join(folder, "quadit"), target: cli.bundled });
+        if (profile) changes.push({ kind: "line", path: profile.path, line: profile.line });
       }
       // An older quadit has no `login --path` (nor `login URL -`): it is to be updated, not worked around.
       const tooOld = (err: Error) => {
@@ -385,6 +399,8 @@ export class Connections {
       };
     }
     writeEdits(plan.edits);
+    const link = plan.applied.find((record) => record.kind === "link");
+    if (link) this.parts.cli.linked(link.path);
 
     const records = plan.applied.map((record) =>
       record.kind === "file"
@@ -402,7 +418,13 @@ export class Connections {
       at: Date.now(),
     };
     this.saveLedger(ledger);
-    return { ok: true, hint: connectedHint(harness, choice.methods, worksAs.handle, agent?.handle ?? worksAs.handle) };
+    const hint = connectedHint(harness, choice.methods, worksAs.handle, agent?.handle ?? worksAs.handle);
+    // The login PATH changed (a folder of the person's own, or the line that puts it there): open terminals keep the old one.
+    const newPath = plan.applied.some((record) => record.kind === "line" || record.kind === "folder");
+    return {
+      ok: true,
+      hint: newPath ? `${hint} Terminals opened from now on find quadit; reopen any that are open now.` : hint,
+    };
   }
 
   /** Plans taking back what Connect did for a harness, where its files still say what was written. */
@@ -549,11 +571,20 @@ function connectedHint(harness: Harness, methods: ConnectMethod[], cliAs: string
   return lines.join(" ");
 }
 
-/** How to put the quadit command on PATH by hand. */
+/**
+ * How to put the quadit command on PATH by hand: the app's copy linked into
+ * a folder of the person's own (a shell whose profile the app does not
+ * know), or, without one, the install script. Neither needs an administrator.
+ */
 function manualInstall(bundled: string | null): string {
   return bundled
-    ? `sudo ln -s '${bundled}' /usr/local/bin/quadit`
+    ? `mkdir -p ~/.local/bin && ln -s '${bundled}' ~/.local/bin/quadit, then add ~/.local/bin to your PATH`
     : "curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh";
+}
+
+/** `path` as a person writes it: ~ for the home folder. */
+function homely(home: string, path: string): string {
+  return path === home || path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
 }
 
 /** The server a quadit config file is for (never its token), or null when it says none. */
