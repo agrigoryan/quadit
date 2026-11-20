@@ -23,7 +23,8 @@ if (GOOS) {
   const root = join(import.meta.dirname, "..", "..");
   let version = "dev";
   try {
-    version = execFileSync("git", ["describe", "--tags", "--always", "--dirty"], {
+    // The server's own tags only (v*), as the Makefile: the desktop app's (desktop-v*) are another product's.
+    version = execFileSync("git", ["describe", "--tags", "--match", "v*", "--always", "--dirty"], {
       cwd: root,
       encoding: "utf8",
     }).trim();
