@@ -491,10 +491,7 @@ export class ServerWindows {
     });
     contents.on("did-create-window", (child) => this.guard(child.webContents, serverId));
 
-    // Counts the window's navigations, so that a sign-in finishing late can tell whether its page is still there.
-    let navigations = 0;
     const pageChanged = () => {
-      navigations++;
       const win = this.windows.get(serverId);
       const server = this.store.get(serverId);
       if (!win || win.webContents !== contents || !server) return;
@@ -504,11 +501,10 @@ export class ServerWindows {
       // Landed on the sign-in page: signed in without the form where the app can, unless a sign-in is under way
       // already, whose asker goes on itself.
       if (!signInPage || this.appSignIn.inFlight(serverId)) return;
-      const landed = navigations;
       const target = appPage(server.origin, this.waitingFor(serverId) ?? "/");
       void this.appSignIn.attempt(serverId).then((signedIn) => {
         // On to where the sign-in page was headed, only while the window still shows it and no newer load waits.
-        const still = !contents.isDestroyed() && landed === navigations && !this.loads.waiting(serverId);
+        const still = !contents.isDestroyed() && onSignInPage(contents, server) && !this.loads.waiting(serverId);
         if (signedIn && still && target) this.load(serverId, { url: target });
       });
     };
