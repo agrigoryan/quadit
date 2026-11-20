@@ -501,11 +501,13 @@ export class ServerWindows {
       // Landed on the sign-in page: signed in without the form where the app can, unless a sign-in is under way
       // already, whose asker goes on itself.
       if (!signInPage || this.appSignIn.inFlight(serverId)) return;
-      const target = appPage(server.origin, this.waitingFor(serverId) ?? "/");
       void this.appSignIn.attempt(serverId).then((signedIn) => {
-        // On to where the sign-in page was headed, only while the window still shows it and no newer load waits.
-        const still = !contents.isDestroyed() && onSignInPage(contents, server) && !this.loads.waiting(serverId);
-        if (signedIn && still && target) this.load(serverId, { url: target });
+        // On to where the sign-in page shown now is headed (a newer one may have replaced the one that asked: the web
+        // app sends a signed-out page to /login itself), only while the window still shows one and no newer load waits.
+        if (!signedIn || contents.isDestroyed() || !onSignInPage(contents, server) || this.loads.waiting(serverId))
+          return;
+        const target = appPage(server.origin, this.waitingFor(serverId) ?? "/");
+        if (target) this.load(serverId, { url: target });
       });
     };
     contents.on("did-navigate", () => {
