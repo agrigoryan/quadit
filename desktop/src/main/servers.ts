@@ -18,13 +18,18 @@ export interface Server {
   open: boolean;
   /** The sign-in hand-off version the server last said it speaks (0 when it has none). */
   handoff: number;
+  /** The version of the window without a title bar the server last said its pages are laid out for (0 when none; window-frame.ts). */
+  inset: number;
   /** The Quadit version the server last said it runs ("" until it has answered). */
   version: string;
   /** The version and fit the person was last told about when the server did not fit the app ("" when it fit). */
   warned: string;
 }
 
-type Change = Partial<Pick<Server, "name" | "open" | "handoff" | "version" | "warned">>;
+/** What a server last said it speaks, from its version answer (probe.ts). */
+export type Speaks = Pick<Server, "handoff" | "inset">;
+
+type Change = Partial<Pick<Server, "name" | "open" | "handoff" | "inset" | "version" | "warned">>;
 
 export class ServerStore {
   private servers: Server[];
@@ -47,12 +52,16 @@ export class ServerStore {
     return this.servers.find((server) => server.origin === origin);
   }
 
-  /** Adds the server at `origin`. One already there with that origin is kept (its id and session) and renamed when a name is given. */
-  add(origin: string, name: string, handoff: number): Server {
+  /**
+   * Adds the server at `origin`, which `speaks` what its version answer said. One already there with that origin is
+   * kept (its id and session) and renamed when a name is given.
+   */
+  add(origin: string, name: string, speaks: Speaks): Server {
     const known = this.byOrigin(origin);
     const named = name.trim() || new URL(origin).host;
+    const { handoff, inset } = speaks;
     if (known) {
-      this.change(known.id, { handoff, ...(name.trim() ? { name: named } : {}) });
+      this.change(known.id, { handoff, inset, ...(name.trim() ? { name: named } : {}) });
       return this.get(known.id) ?? known;
     }
     const server: Server = {
@@ -61,6 +70,7 @@ export class ServerStore {
       origin,
       open: false,
       handoff,
+      inset,
       version: "",
       warned: "",
     };
@@ -119,6 +129,7 @@ function readServers(file: string): Server[] {
             origin: item.origin,
             open: item.open === true,
             handoff: Number(item.handoff) || 0,
+            inset: Number(item.inset) || 0,
             version: typeof item.version === "string" ? item.version : "",
             warned: typeof item.warned === "string" ? item.warned : "",
           },

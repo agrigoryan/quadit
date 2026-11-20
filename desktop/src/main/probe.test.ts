@@ -20,7 +20,15 @@ describe("probe", () => {
         "/api/v1/version": [200, { name: "quadit", version: "1.4.0", surface: "abc", desktop: { handoff: 1 } }],
       }),
     );
-    expect(answer).toEqual({ reachable: true, version: "1.4.0", handoff: 1, fit: "ok" });
+    expect(answer).toEqual({ reachable: true, version: "1.4.0", handoff: 1, inset: 0, fit: "ok" });
+  });
+
+  it("knows which window without a title bar the server's pages are laid out for, and none when it does not say", async () => {
+    const says = (desktop: unknown) =>
+      probe(ORIGIN, server({ "/api/v1/version": [200, { name: "quadit", version: "2.0.0", desktop }] }));
+    expect(await says({ handoff: 1, inset: 1 })).toMatchObject({ reachable: true, inset: 1 });
+    expect(await says({ handoff: 1, inset: "1" })).toMatchObject({ reachable: true, inset: 0 });
+    expect(await says({ handoff: 1 })).toMatchObject({ reachable: true, inset: 0 });
   });
 
   it("says when the server speaks a newer hand-off than the app", async () => {
@@ -36,7 +44,7 @@ describe("probe", () => {
       ORIGIN,
       server({ "/api/v1/auth/config": [200, { setup_needed: false, version: "0.9.0", password: true }] }),
     );
-    expect(answer).toEqual({ reachable: true, version: "0.9.0", handoff: 0, fit: "old-server" });
+    expect(answer).toEqual({ reachable: true, version: "0.9.0", handoff: 0, inset: 0, fit: "old-server" });
   });
 
   it("refuses a server that is not Quadit", async () => {

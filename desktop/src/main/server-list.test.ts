@@ -23,13 +23,19 @@ type Owner = { ok: true; workspace: string | null } | { ok: false; error: string
 function setUp(owner: Owner[], startError?: string) {
   const store = new ServerStore(join(mkdtempSync(join(tmpdir(), "quadit-desktop-list-")), "servers.json"));
   const windowFetches = new Map<string, Fetch>();
-  const shown: { serverId: string; path: string }[] = [];
+  const shown: { serverId: string; path: string; inset?: number }[] = [];
   const ownerAsked: { fetch: Fetch; name: string }[] = [];
-  const fetcher: Fetch = async () => new Response(null, { status: 404 });
+  // The server it runs answers as this tree's server does.
+  const fetcher: Fetch = async (url) =>
+    new URL(url).pathname === "/api/v1/version"
+      ? Response.json({ name: "quadit", version: "9.9.9", desktop: { handoff: 1, inset: 1 } })
+      : new Response(null, { status: 404 });
   const windows = {
     show: () => {},
     // The page starts over: the app changed the window's session under it.
-    showAfresh: (serverId: string, path: string) => void shown.push({ serverId, path }),
+    // What the server speaks as its window is made, which takes its frame from it.
+    showAfresh: (serverId: string, path: string) =>
+      void shown.push({ serverId, path, inset: store.get(serverId)?.inset }),
     fetcher: (serverId: string) => {
       const fetch: Fetch = async () => new Response(null, { status: 404 });
       windowFetches.set(serverId, fetch);
@@ -87,7 +93,8 @@ describe("ServerList.setUpHere", () => {
     expect(server?.name).toBe(LOCAL_NAME);
     expect(list.localServer()?.id).toBe(server?.id);
     expect(ownerAsked).toEqual([{ fetch: windowFetches.get(server?.id ?? ""), name: "Lou Local" }]);
-    expect(shown).toEqual([{ serverId: server?.id, path: "/personal" }]);
+    expect(shown).toEqual([{ serverId: server?.id, path: "/personal", inset: 1 }]);
+    expect(server).toMatchObject({ handoff: 1, version: "9.9.9" });
   });
 
   it("says which workspace it made with the owner, and none when it signed in to an install set up before, which opens on its own first page", async () => {

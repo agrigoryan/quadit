@@ -1,6 +1,7 @@
 // Asking a server what it is (the desktop contract, section 1): whether it
-// is Quadit at all, and which version of the sign-in hand-off it speaks, so
-// the app can say plainly when a server is too old or too new for it.
+// is Quadit at all, which version of the sign-in hand-off it speaks, so
+// the app can say plainly when a server is too old or too new for it, and
+// which window without a title bar its pages are laid out for (section 9).
 
 /** The hand-off version this app speaks. */
 export const HANDOFF_VERSION = 1;
@@ -9,7 +10,15 @@ export const HANDOFF_VERSION = 1;
 export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 export type Probe =
-  { reachable: true; version: string; handoff: number; fit: Fit } | { reachable: false; reason: string };
+  | {
+      reachable: true;
+      version: string;
+      handoff: number;
+      /** The version of the window without a title bar the server's pages are laid out for (0: none; window-frame.ts). */
+      inset: number;
+      fit: Fit;
+    }
+  | { reachable: false; reason: string };
 
 /**
  * How the server and this app fit together:
@@ -34,12 +43,13 @@ export async function probe(origin: string, fetcher: Fetch, timeoutMs = 6000): P
   try {
     const about = await ask("/api/v1/version");
     if (about.status === 200 && about.body.name === "quadit") {
-      const desktop = about.body.desktop as { handoff?: unknown } | undefined;
+      const desktop = about.body.desktop as { handoff?: unknown; inset?: unknown } | undefined;
       const handoff = typeof desktop?.handoff === "number" ? desktop.handoff : 0;
       return {
         reachable: true,
         version: typeof about.body.version === "string" ? about.body.version : "",
         handoff,
+        inset: typeof desktop?.inset === "number" ? desktop.inset : 0,
         fit: fitOf(handoff),
       };
     }
@@ -52,6 +62,7 @@ export async function probe(origin: string, fetcher: Fetch, timeoutMs = 6000): P
           reachable: true,
           version: typeof signIn.body.version === "string" ? signIn.body.version : "",
           handoff: 0,
+          inset: 0,
           fit: "old-server",
         };
       }

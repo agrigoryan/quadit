@@ -7,18 +7,21 @@ import { ServerChecks, type Words } from "@/main/server-checks";
 import { ServerStore } from "@/main/servers";
 
 /** A Quadit server whose version answer can change, as one being upgraded; null is a server that does not answer. */
-function upgradable(start: { version: string; handoff: number } | null) {
+/** What a server's version answer says. */
+type Says = { version: string; handoff: number; inset?: number };
+
+function upgradable(start: Says | null) {
   let now = start;
   const fetcher: Fetch = async () => {
     if (!now) throw new TypeError("fetch failed");
-    return Response.json({ name: "quadit", version: now.version, desktop: { handoff: now.handoff } });
+    return Response.json({ name: "quadit", version: now.version, desktop: { handoff: now.handoff, inset: now.inset } });
   };
   return { fetcher, set: (next: typeof start) => (now = next) };
 }
 
-function setUp(start: { version: string; handoff: number } | null, handoffAdded = 1) {
+function setUp(start: Says | null, handoffAdded = 1) {
   const store = new ServerStore(join(mkdtempSync(join(tmpdir(), "quadit-desktop-checks-")), "servers.json"));
-  const server = store.add("https://quadit.example.com", "Work", handoffAdded);
+  const server = store.add("https://quadit.example.com", "Work", { handoff: handoffAdded, inset: 0 });
   const told: Words[] = [];
   const remote = upgradable(start);
   const checks = new ServerChecks(store, remote.fetcher, (words) => told.push(words));
@@ -50,6 +53,15 @@ describe("ServerChecks", () => {
     await checks.checkAll();
     expect(told).toHaveLength(2);
     expect(store.get(server.id)?.handoff).toBe(1);
+  });
+
+  it("keeps which window without a title bar a server's pages are laid out for, as it changes", async () => {
+    const { store, server, remote, checks } = setUp({ version: "2.0.0", handoff: 1, inset: 1 });
+    await checks.check(server.id);
+    expect(store.get(server.id)?.inset).toBe(1);
+    remote.set({ version: "1.0.0", handoff: 1 });
+    await checks.check(server.id);
+    expect(store.get(server.id)?.inset).toBe(0);
   });
 
   it("keeps what a server said last when it does not answer", async () => {

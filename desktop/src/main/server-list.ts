@@ -137,8 +137,10 @@ export class ServerList {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
     // Saved before its owner is made: quit before that, the next start finds its set-up unfinished and offers
-    // Welcome again (main.ts). Its hand-off is asked once it runs.
-    const server = this.store.add(origin, LOCAL_NAME, 0);
+    // Welcome again (main.ts). It runs now: what it speaks is asked before its window is made, which takes its
+    // frame from that (window-frame.ts).
+    const server = this.store.add(origin, LOCAL_NAME, { handoff: 0, inset: 0 });
+    await this.setup.checks.check(server.id);
     const owner = await local.setUpOwner(this.windows.fetcher(server.id), name.trim());
     if (!owner.ok) return owner;
     // Its window may be open already, on the web app's page saying the app sets it up: it starts over, signed in.
@@ -201,7 +203,7 @@ export class ServerList {
     }
     const answer = await probe(origin, this.setup.fetcher);
     if (!answer.reachable) return { ok: false, error: answer.reason };
-    const server = this.store.add(origin, name, answer.handoff);
+    const server = this.store.add(origin, name, answer);
     this.store.change(server.id, { version: answer.version });
     const path = this.destination?.origin === origin ? this.destination.path : undefined;
     if (path) this.destination = null;

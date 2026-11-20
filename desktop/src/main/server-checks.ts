@@ -27,7 +27,10 @@ export class ServerChecks {
     const server = this.store.get(serverId);
     if (!server) return undefined;
     const answer = await probe(server.origin, this.fetcher);
-    if (answer.reachable) this.store.change(server.id, { handoff: answer.handoff, version: answer.version });
+    if (answer.reachable) {
+      const { handoff, inset, version } = answer;
+      this.store.change(server.id, { handoff, inset, version });
+    }
     return answer;
   }
 
