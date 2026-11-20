@@ -11,10 +11,11 @@ name: desktop-ci
 #
 # Besides the app, it runs for the server's and the web app's side of the
 # desktop contract, for the command-line client the app carries
-# (desktop/scripts/cli.mjs) and Connect runs, and for what "Run Quadit on
-# this computer" runs of the server: quadit serve's flags and the web app's
-# first-run page. The desktop release runs it on the tagged commit before
-# it publishes anything.
+# (desktop/scripts/cli.mjs) and Connect runs, and for what "Set up on this
+# computer" runs of the server: quadit serve's flags, the set-up and the
+# sign-in the app makes with its key (an owner with no email), and the web
+# app's first-run page. The desktop release runs it on the tagged commit
+# before it publishes anything.
 on:
   push:
     branches: [main]
@@ -23,6 +24,10 @@ on:
       - ".gitattributes"
       - ".github/workflows/desktop-*.yml"
       - "internal/server/desktop*.go"
+      - "internal/server/app_key.go"
+      - "internal/server/auth.go"
+      - "internal/server/origin.go"
+      - "internal/engine/ch_bootstrap.go"
       - "internal/app/web.go"
       - "internal/cli/**"
       - "internal/app/app.go"

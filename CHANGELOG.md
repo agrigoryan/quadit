@@ -7,6 +7,7 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 ### Added
 
 - The desktop app can run Quadit on the computer it is on (macOS and Linux): "Run Quadit on this computer" starts the server the app carries, on `127.0.0.1` with its data in the app's data folder, while the app runs, so downloading the app is a whole install. `quadit serve --stop-on-stdin-close` shuts the server down when the program that started it is gone.
+- Setting up on this computer asks only for your name: the desktop app makes the account (no email, no password; both can be added later to sign in from a browser) and signs you in with a key it hands the server (`quadit serve --app-key-stdin`), with daily backups on.
 
 ## [0.1.0] - 2026-11-18
 
