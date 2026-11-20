@@ -1,10 +1,12 @@
-// Builds the quadit command (cmd/quadit, without the web app: the
-// command-line client is all the app needs of it) for each architecture the
-// app is packaged for on this system, into cli/<os>-<arch>/quadit, where
-// electron-builder.config.cjs takes it into the app's resources. Connect
-// (src/main/connections.ts) links it onto the PATH when the person has no
-// quadit of their own. Needs Go. There is no Windows build of the command,
-// so on Windows this builds nothing.
+// Builds the quadit command (cmd/quadit) with the web app inside, as
+// `make build` does, for each architecture the app is packaged for on this
+// system, into cli/<os>-<arch>/quadit, where electron-builder.config.cjs
+// takes it into the app's resources. The app uses it twice: Connect
+// (src/main/connections.ts) links it onto the PATH as the command-line
+// client when the person has no quadit of their own, and "Run Quadit on
+// this computer" (src/main/local-server.ts) runs it as a server, which
+// needs the web app. Needs Go and pnpm. There is no Windows build of the
+// command, so on Windows this builds nothing.
 //
 // Run: node scripts/cli.mjs (pnpm dist runs it).
 
@@ -28,11 +30,15 @@ if (GOOS) {
   } catch {
     // Not a git checkout: "dev", as the Makefile says.
   }
+  // The web app first: the build embeds web/dist.
+  const web = join(root, "web");
+  execFileSync("pnpm", ["install", "--frozen-lockfile"], { cwd: web, stdio: "inherit" });
+  execFileSync("pnpm", ["build"], { cwd: web, stdio: "inherit" });
   for (const [arch, goarch] of Object.entries(ARCHES)) {
     const out = join(import.meta.dirname, "..", "cli", `${GOOS}-${arch}`, "quadit");
     execFileSync(
       "go",
-      ["build", "-trimpath", "-ldflags", `-s -w -X main.version=${version}`, "-o", out, "./cmd/quadit"],
+      ["build", "-tags", "web", "-trimpath", "-ldflags", `-s -w -X main.version=${version}`, "-o", out, "./cmd/quadit"],
       { cwd: root, stdio: "inherit", env: { ...process.env, CGO_ENABLED: "0", GOOS, GOARCH: goarch } },
     );
   }
