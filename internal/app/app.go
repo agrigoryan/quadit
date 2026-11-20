@@ -22,6 +22,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/netip"
 	"os"
@@ -165,6 +166,12 @@ func Serve(args []string, version string) int {
 	input := bufio.NewReader(os.Stdin)
 	var appKey string
 	if run.flags.appKeyStdin {
+		// The key sets the install up and signs its owner in: nothing off
+		// this computer may reach a server that takes it.
+		if !onThisComputer(o.Listen) {
+			log.Error("cannot start", "err", fmt.Errorf("--app-key-stdin: --listen %s is not an address on this computer only (127.0.0.1, ::1 or localhost)", o.Listen))
+			return 1
+		}
 		key, err := readAppKey(input)
 		if err != nil {
 			log.Error("cannot start", "err", err)
@@ -331,7 +338,7 @@ func (run *serveRun) parse(args []string) {
 	fs.StringVar(&f.privateNets, "allow-private-networks", envOr("QUADIT_ALLOW_PRIVATE_NETWORKS", ""), "networks off the public internet that webhooks, push, the vault, imports and GitHub integrations may reach, e.g. 192.168.1.0/24,10.0.0.5; default none (QUADIT_ALLOW_PRIVATE_NETWORKS)")
 	fs.StringVar(&f.trustedProxies, "trusted-proxies", envOr("QUADIT_TRUSTED_PROXIES", "127.0.0.1,::1"), "the reverse proxies in front of the server, whose X-Forwarded-For says who the caller is: addresses or networks; empty trusts none (QUADIT_TRUSTED_PROXIES)")
 	fs.BoolVar(&f.stopOnStdinClose, "stop-on-stdin-close", false, "shut down when standard input closes: for a program that starts the server and holds its input open while it wants it running")
-	fs.BoolVar(&f.appKeyStdin, "app-key-stdin", false, "read a key from the first line of standard input before listening: a request that carries it in X-Quadit-App-Key is the desktop app that runs this server, which sets the install up and signs its owner in")
+	fs.BoolVar(&f.appKeyStdin, "app-key-stdin", false, "read a key from the first line of standard input before listening: a request that carries it in X-Quadit-App-Key is the desktop app that runs this server, which sets the install up and signs its owner in; --listen must then be on this computer only (127.0.0.1, ::1 or localhost)")
 	fs.Parse(args)
 }
 
@@ -354,6 +361,21 @@ func readAppKey(input *bufio.Reader) (string, error) {
 		return "", fmt.Errorf("--app-key-stdin: the key on standard input is not base64url of at least %d bytes", appKeyBytes)
 	}
 	return key, nil
+}
+
+// onThisComputer reports whether a listen address is reachable from this
+// computer only: a loopback address (127.0.0.0/8, ::1) or localhost. An
+// empty host (":4780") is every address the computer has.
+func onThisComputer(listen string) bool {
+	host, _, err := net.SplitHostPort(listen)
+	if err != nil {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	addr, err := netip.ParseAddr(host)
+	return err == nil && addr.IsLoopback()
 }
 
 // networks reads a list of networks (10.0.0.0/8) and single addresses

@@ -121,6 +121,38 @@ func TestServeTakesTheAppKeyFromItsInput(t *testing.T) {
 	}
 }
 
+// TestServeWithAnAppKeyListensOnThisComputerOnly: a server the app runs
+// with its key takes the app's set-up and sign-in, so it refuses to start
+// on an address another computer can reach.
+func TestServeWithAnAppKeyListensOnThisComputerOnly(t *testing.T) {
+	const key = "a2V5LW9mLXRoZS1hcHAtdGhhdC1ydW5zLXRoaXMtc2VydmVyLTEyMzQ"
+	for _, listen := range []string{":0", "0.0.0.0:0", "[::]:0", "192.168.1.20:0", "example.com:0"} {
+		t.Run(listen, func(t *testing.T) {
+			withoutQuaditEnv(t)
+			input := pipeAsStdin(t)
+			if _, err := input.WriteString(key + "\n"); err != nil {
+				t.Fatal(err)
+			}
+			log := pipeAsStderr(t)
+			done := make(chan int, 1)
+			go func() {
+				done <- Serve([]string{"--data", t.TempDir(), "--listen", listen, "--app-key-stdin"}, "test")
+			}()
+			if code := waitForExit(t, done); code != 1 {
+				t.Fatalf("quadit serve exited %d, want 1", code)
+			}
+			if said := log(); !strings.Contains(said, "this computer") {
+				t.Errorf("the log does not say why it stopped: %q", said)
+			}
+		})
+	}
+	for _, listen := range []string{"127.0.0.1:4780", "127.0.0.2:4780", "[::1]:4780", "localhost:4780"} {
+		if !onThisComputer(listen) {
+			t.Errorf("%s is taken as off this computer", listen)
+		}
+	}
+}
+
 // pipeAsStderr makes a pipe the process's standard error for the test, and
 // gives what was written to it once called.
 func pipeAsStderr(t *testing.T) func() string {
