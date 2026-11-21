@@ -9,6 +9,9 @@
 // first. "Done" and Escape take the page away, showing the one under it.
 // Opened by a server's page rather than by the person, it says which server
 // asked, and takes no input for its first moment on screen (hold-input.ts).
+// A redraw keeps each tool's card and changes it in place: its nodes are
+// replaced only when what it shows changes, so focus, a selection or a click
+// in it survive the redraw after a Connect or a Disconnect.
 
 import { button, element, make, separated } from "@/pages/dom";
 import { openSheet } from "@/pages/files-sheet";
@@ -41,8 +44,20 @@ let target: ConnectTarget | null = null;
 let defaultLogin: ConnectView["defaultLogin"] = null;
 /** What the last Disconnect of each tool left the person to know, which its card says until it connects again. */
 const takenBack = new Map<string, Disconnected>();
-/** What the cards' options do when the workspace shown changes (its agents are offered); made anew with the cards. */
-let workspaceChanged: (() => void)[] = [];
+/**
+ * The card of each tool shown, kept from one redraw to the next: `made`,
+ * what the card was made from (when it changes, a new card is made); `more`,
+ * what its More options and its line about the skill were drawn from;
+ * `fill`, what its options do when the workspace shown changes (its agents
+ * are offered).
+ */
+interface Shown {
+  card: ToolCard;
+  made: string;
+  more: string;
+  fill: (() => void) | null;
+}
+const shownCards = new Map<string, Shown>();
 /** Whether the page has shown its cards yet: input is let in once it has. */
 let shownOnce = false;
 
@@ -128,14 +143,14 @@ function reviewDisconnect(h: HarnessView): Promise<Disconnected | Refused> {
   });
 }
 
-function toolCard(h: HarnessView, addsCommand: boolean, handshake: Handshake | null): ToolCard {
+/** A new card for `h`, set up or not as `h` says, with where it stands when known (`handshake`). */
+function newCard(h: HarnessView, made: string, addsCommand: boolean, handshake: Handshake | null): Shown {
   const plainPlan = (): Promise<Planned> => {
     const at = chosen();
     if (!at) return Promise.resolve(NO_WORKSPACE);
     return api.planConnect(defaultChoice(h, at.serverId, at.summary));
   };
-  const worksAs = h.cliIdentity === "default" ? defaultLoginWords(defaultLogin) : null;
-  const card: ToolCard = new ToolCard({ ...h, ownLogin: h.cliIdentity === "own", worksAs }, addsCommand, {
+  const card: ToolCard = new ToolCard({ ...h, ownLogin: h.cliIdentity === "own", worksAs: workingAs(h) }, addsCommand, {
     connect: async () => {
       const planned = await plainPlan();
       if (!planned.ok) return planned;
@@ -156,21 +171,47 @@ function toolCard(h: HarnessView, addsCommand: boolean, handshake: Handshake | n
   const left = takenBack.get(h.id);
   if (h.connected) takenBack.delete(h.id);
   else if (left) card.takenBack(left);
-  // Connected, where and as whom; not, how and as whom it would be: the technical side, folded.
-  const options = h.connected ? connectedHow(h.connected) : optionsForm(h);
+  const shown: Shown = { card, made, more: "", fill: null };
+  drawMore(shown, h);
+  return shown;
+}
+
+/**
+ * Brings a kept card to what `h` says now, changing only what changed: set
+ * up or not, the quadit command's place in its line, and, below it, More
+ * options and the line about a skill changed by hand.
+ */
+function updateCard(shown: Shown, h: HarnessView, addsCommand: boolean, handshake: Handshake | null) {
+  if (shown.card.isSetUp !== !!h.connected) shown.card.markSetUp(!!h.connected, handshake);
+  if (h.connected) takenBack.delete(h.id);
+  shown.card.setAddsCommand(addsCommand);
+  drawMore(shown, h);
+}
+
+/**
+ * A card's More options (connected: where and as whom; not: how and as whom
+ * it would be, the technical side, folded) and the line about a skill
+ * changed by hand, drawn anew only when what they show changes.
+ */
+function drawMore(shown: Shown, h: HarnessView) {
+  const drawn = JSON.stringify([h.connected, h.skillChangedByHand]);
+  if (drawn === shown.more) return;
+  shown.more = drawn;
+  const form = h.connected ? null : optionsForm(h);
+  shown.fill = form?.fill ?? null;
+  const options = form?.form ?? connectedHow(h.connected);
   options.hidden = true;
-  const more = button(
+  const toggle = button(
     "More options",
     () => {
       options.hidden = !options.hidden;
-      more.setAttribute("aria-expanded", String(!options.hidden));
+      toggle.setAttribute("aria-expanded", String(!options.hidden));
     },
     "btn-text more",
     `More options for ${h.name}`,
   );
-  more.setAttribute("aria-expanded", "false");
-  card.extra.append(...(h.skillChangedByHand ? [skillChanged(h)] : []), more, options);
-  return card;
+  toggle.setAttribute("aria-expanded", "false");
+  shown.card.extra.replaceChildren(...(h.skillChangedByHand ? [skillChanged(h)] : []), toggle, options);
 }
 
 /** A connected tool whose Quadit skill the person changed by hand: the app leaves it, and offers to update it. */
@@ -188,14 +229,19 @@ function skillChanged(h: HarnessView): HTMLParagraphElement {
   return line;
 }
 
-function connectedHow(connected: NonNullable<HarnessView["connected"]>): HTMLParagraphElement {
+function connectedHow(connected: HarnessView["connected"]): HTMLParagraphElement {
+  if (!connected) return make("p");
   const how = connected.methods.map((m) => (m === "cli" ? "quadit command" : "MCP")).join(" and ");
   const where = [connected.server, connected.workspace].filter(Boolean).join(" · ");
   return make("p", `Connected (${how}) to ${where} as ${connected.agent}`, "where-to");
 }
 
-/** The technical choices for connecting `h`: how, as whom, and without asking each time; reviewed in the sheet. */
-function optionsForm(h: HarnessView): HTMLFormElement {
+/**
+ * The technical choices for connecting `h`: how, as whom, and without asking
+ * each time; reviewed in the sheet. `fill` offers the agents of the
+ * workspace shown, again when it changes.
+ */
+function optionsForm(h: HarnessView): { form: HTMLFormElement; fill: () => void } {
   const form = make("form", "", "options");
   form.noValidate = true;
   form.setAttribute("aria-label", `How to connect ${h.name}`);
@@ -257,6 +303,10 @@ function optionsForm(h: HarnessView): HTMLFormElement {
       option.value = NEW_AGENT;
       options.push(option);
     }
+    // The same agents as offered already: nothing changes, and a choice being made is left alone.
+    const offered = options.map((o) => `${o.value}\n${o.textContent}`).join("\n\n");
+    if (offered === agents.dataset.offered) return;
+    agents.dataset.offered = offered;
     const previous = agents.value;
     agents.replaceChildren(...options);
     if (options.some((o) => o.value === previous)) agents.value = previous;
@@ -283,7 +333,6 @@ function optionsForm(h: HarnessView): HTMLFormElement {
   };
   mcp.box.addEventListener("change", showIdentity);
   agents.addEventListener("change", showIdentity);
-  workspaceChanged.push(fillAgents);
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const at = chosen();
@@ -307,7 +356,7 @@ function optionsForm(h: HarnessView): HTMLFormElement {
     reviewConnect(h, () => api.planConnect(choice));
   });
   fillAgents();
-  return form;
+  return { form, fill: fillAgents };
 }
 
 async function render() {
@@ -340,14 +389,14 @@ async function render() {
   const here = view.harnesses.filter((h) => h.installed || h.connected);
   const away = view.harnesses.filter((h) => !h.installed && !h.connected);
   const addsCommand = !view.cli.found && view.cli.linkInto !== null;
-  // Where the connected tools stand, as far as known in a moment; a card not answered by then asks itself.
+  // Where the tools newly set up stand, as far as known in a moment; a card not answered by then asks itself, and
+  // one set up already asks on its own.
   const known = new Map<string, Handshake | null>();
   const asked = here
-    .filter((h) => h.connected)
+    .filter((h) => h.connected && !shownCards.get(h.id)?.card.isSetUp)
     .map((h) => api.toolHandshake(h.id).then((handshake) => void known.set(h.id, handshake)));
   await Promise.race([Promise.all(asked), new Promise((done) => setTimeout(done, FIRST_LOOK_MS))]);
-  workspaceChanged = [];
-  cardsBox.replaceChildren(...here.map((h) => toolCard(h, addsCommand, known.get(h.id) ?? null).element));
+  placeCards(here, addsCommand, known);
   await showTarget();
   if (!shownOnce) {
     shownOnce = true;
@@ -371,6 +420,40 @@ async function render() {
   others.replaceChildren(make("span", "Not on this computer:", "lbl"), separated(away.map((h) => h.name)));
 }
 
+/**
+ * Shows a card for each of `here`, in order: a tool's card kept and changed
+ * in place, a new one only for a tool not shown before or whose card's
+ * making changed (whom it works as); a card moved only when the order did.
+ */
+function placeCards(here: HarnessView[], addsCommand: boolean, known: Map<string, Handshake | null>) {
+  for (const [id, shown] of shownCards) {
+    if (here.some((h) => h.id === id)) continue;
+    shown.card.element.remove();
+    shownCards.delete(id);
+  }
+  here.forEach((h, i) => {
+    const made = JSON.stringify([h.id, h.name, h.initials, h.cliIdentity, h.listenVerified, workingAs(h)]);
+    const kept = shownCards.get(h.id);
+    const handshake = known.get(h.id) ?? null;
+    let shown: Shown;
+    if (kept && kept.made === made) {
+      shown = kept;
+      updateCard(shown, h, addsCommand, handshake);
+    } else {
+      kept?.card.element.remove();
+      shown = newCard(h, made, addsCommand, handshake);
+      shownCards.set(h.id, shown);
+    }
+    const at = cardsBox.children[i];
+    if (at !== shown.card.element) cardsBox.insertBefore(shown.card.element, at ?? null);
+  });
+}
+
+/** Whom a tool without a login of its own works as: this computer's default login, as the last look found it. */
+function workingAs(h: HarnessView): string | null {
+  return h.cliIdentity === "default" ? defaultLoginWords(defaultLogin) : null;
+}
+
 /** The workspace the window under this page shows (it changes as its page publishes), and its agents in the options. */
 async function showTarget() {
   target = await api.connectTarget();
@@ -380,7 +463,7 @@ async function showTarget() {
   openedBy.hidden = !target?.openedByPage;
   openedBy.textContent = target?.openedByPage ? `Opened by ${target.serverName}` : "";
   element("no-workspace").hidden = !!at;
-  for (const changed of workspaceChanged) changed();
+  for (const shown of shownCards.values()) shown.fill?.();
 }
 
 element("backups").addEventListener("click", () => void api.showBackups());

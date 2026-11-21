@@ -231,7 +231,7 @@ function showFound(result: FoundTools, onComputer: ToolView[]) {
       changed: (agent) => {
         if (card.isSetUp && addsCommand) {
           addsCommand = false;
-          for (const other of cards) other.commandAdded();
+          for (const other of cards) other.setAddsCommand(false);
         }
         if (!card.isSetUp) setUpAs.delete(tool.id);
         else if (agent !== undefined) setUpAs.set(tool.id, agent);

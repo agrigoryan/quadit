@@ -76,6 +76,8 @@ export class ToolCard {
   private setUp = false;
   /** Where it stands with Quadit once set up; null until the app has said. */
   private handshake: Handshake | null = null;
+  /** What the card's buttons and its standing lines were last drawn from: they are drawn anew only when it changes. */
+  private drawn = "";
   private addsCommand: boolean;
   private asking = false;
   private timer: ReturnType<typeof setInterval> | undefined;
@@ -161,9 +163,13 @@ export class ToolCard {
     this.watch(handshake === null);
   }
 
-  /** The quadit command is on this computer now (another card connected): this card's line stops promising it. */
-  commandAdded() {
-    this.addsCommand = false;
+  /**
+   * Whether connecting puts the quadit command on this computer too: not
+   * once another card's connecting put it there, and the card's line says so.
+   */
+  setAddsCommand(adds: boolean) {
+    if (this.addsCommand === adds) return;
+    this.addsCommand = adds;
     this.show();
   }
 
@@ -281,9 +287,16 @@ export class ToolCard {
     this.element.classList.toggle("set-up", stands === "waiting" || stands === "unknown");
     this.tileEl.classList.toggle("member", setUp);
     const where = tool.worksAs ? " using this computer’s login" : " here";
-    this.gives.textContent = `${tool.name} ${stands === "connected" ? "can now" : "will be able to"} take tasks, ask you questions and report back${where}.`;
-    this.diskText.textContent = diskLine(tool, this.addsCommand && !setUp, setUp);
+    setText(
+      this.gives,
+      `${tool.name} ${stands === "connected" ? "can now" : "will be able to"} take tasks, ask you questions and report back${where}.`,
+    );
+    setText(this.diskText, diskLine(tool, this.addsCommand && !setUp, setUp));
 
+    // Its nodes are replaced only when what they show changes: focus, a selection or a click in them survive the rest.
+    const drawn = JSON.stringify([stands, handshake]);
+    if (drawn === this.drawn) return;
+    this.drawn = drawn;
     if (stands === "found") {
       this.connectButton.textContent = "Connect";
       this.connectButton.setAttribute("aria-label", `Connect ${tool.name}`);
@@ -363,4 +376,9 @@ export class ToolCard {
     line.append(make("span", "", "found-dot"), document.createTextNode("Listening"));
     return line;
   }
+}
+
+/** Sets the text of `node`, leaving it alone when it says that already (a selection in it survives). */
+function setText(node: Node, text: string) {
+  if (node.textContent !== text) node.textContent = text;
 }
