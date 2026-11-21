@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countWord, diskLine, fileWords, filesSummary, sheetIntro } from "@/shared/change-words";
+import { countWord, diskLine, fileWords, filesSummary, sheetIntro, unrevokedWords } from "@/shared/change-words";
 
 describe("fileWords", () => {
   it("says what each kind of file is for, in plain words, with what happens to it", () => {
@@ -91,5 +91,21 @@ describe("sheetIntro", () => {
   it("says the tool gets a login of its own only when the plan makes one", () => {
     expect(sheetIntro("Codex", [{ role: "skill" }, { role: "login" }])).toContain("a login of its own");
     expect(sheetIntro("pi", [{ role: "skill" }, { role: "shared-login" }])).toContain("this computer’s Quadit login");
+  });
+});
+
+describe("unrevokedWords", () => {
+  it("says what happened, then what to do and where, by the token's name, and keeps the server's reason apart", () => {
+    const unrevoked = {
+      label: "Claude Code on mac",
+      agent: "claude-code",
+      server: "This computer",
+      reason: "Token revocation was refused",
+    };
+    expect(unrevokedWords(unrevoked, "Claude Code")).toEqual({
+      happened: "Claude Code is disconnected, but its key to this workspace could not be taken back.",
+      todo: "To take it back, open Quadit (This computer), go to Settings → Agents → @claude-code, and under Tokens revoke “Claude Code on mac”.",
+      reason: "The server said: Token revocation was refused.",
+    });
   });
 });

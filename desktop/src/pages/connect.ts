@@ -7,7 +7,7 @@
 // the sheet shows before anything is written. A connected tool's card says
 // where it is connected, and Disconnect shows what taking it back does first.
 
-import { button, element, make } from "@/pages/dom";
+import { button, element, make, separated } from "@/pages/dom";
 import { openSheet } from "@/pages/files-sheet";
 import { tile, ToolCard } from "@/pages/tool-card";
 import { defaultChoice, handleOf } from "@/shared/default-choice";
@@ -15,6 +15,7 @@ import { defaultLoginWords } from "@/shared/change-words";
 import type {
   ConnectChoice,
   ConnectView,
+  Disconnected,
   HarnessView,
   PagesApi,
   Planned,
@@ -33,6 +34,8 @@ const askedFor = new URLSearchParams(window.location.search).get("server");
 let views: SummaryView[] = [];
 /** The computer's default login, as the last look at the harnesses found it. */
 let defaultLogin: ConnectView["defaultLogin"] = null;
+/** What the last Disconnect of each tool left the person to know, which its card says until it connects again. */
+const takenBack = new Map<string, Disconnected>();
 /** What the cards' options do when the workspace chosen changes (its agents are offered); made anew with the cards. */
 let workspaceChanged: (() => void)[] = [];
 
@@ -89,7 +92,7 @@ function reviewConnect(h: HarnessView, plan: () => Promise<Planned>, card: ToolC
  * Shows what disconnecting does in the sheet, whose button does it; resolves
  * with how that went and what the person should know (closed: nothing).
  */
-function reviewDisconnect(h: HarnessView): Promise<{ ok: true; notes: string[] } | Refused> {
+function reviewDisconnect(h: HarnessView): Promise<Disconnected | Refused> {
   return new Promise((settle) => {
     let done = false;
     openSheet({
@@ -102,6 +105,7 @@ function reviewDisconnect(h: HarnessView): Promise<{ ok: true; notes: string[] }
           const applied = await api.applyDisconnect(planId);
           if (!applied.ok) return applied;
           done = true;
+          takenBack.set(h.id, applied);
           say(["Disconnected.", ...applied.notes].join(" "));
           settle(applied);
           void render();
@@ -142,6 +146,9 @@ function toolCard(h: HarnessView, addsCommand: boolean): ToolCard {
     changed: () => {},
   });
   card.markConnected(!!h.connected);
+  const left = takenBack.get(h.id);
+  if (h.connected) takenBack.delete(h.id);
+  else if (left) card.takenBack(left);
   if (h.connected) {
     const how = h.connected.methods.map((m) => (m === "cli" ? "quadit command" : "MCP")).join(" and ");
     const where = [h.connected.server, h.connected.workspace].filter(Boolean).join(" · ");
@@ -328,7 +335,7 @@ async function render() {
   );
   const others = element<HTMLParagraphElement>("others");
   others.hidden = noneFound || away.length === 0;
-  others.replaceChildren(make("span", "Not on this computer:", "lbl"), ...away.map((h) => make("span", h.name, "o")));
+  others.replaceChildren(make("span", "Not on this computer:", "lbl"), separated(away.map((h) => h.name)));
 }
 
 /** The workspaces to connect to (those a window shows now), keeping the one chosen. */

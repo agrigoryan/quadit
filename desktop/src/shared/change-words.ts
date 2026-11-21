@@ -5,7 +5,7 @@
 // makes to each file (PlanFile's role and change), never from reading a
 // diff, which stays behind "Show the exact changes".
 
-import type { FileChange, FileRole, PlanFile } from "@/shared/pages-api";
+import type { FileChange, FileRole, PlanFile, Unrevoked } from "@/shared/pages-api";
 
 /**
  * The line on a tool's card saying what connecting changes on disk (`done`:
@@ -40,6 +40,22 @@ export function diskLine(
 export function defaultLoginWords(login: { server: string | null; agent: string | null } | null): string | null {
   if (!login) return null;
   return `${login.agent ?? "an agent"}${login.server ? ` on ${login.server}` : ""}`;
+}
+
+/**
+ * The caution a card shows when a disconnect could not revoke the tool's
+ * token: what happened, what the person is to do and where in Quadit (the
+ * token by the name it is listed under), and the reason the server gave,
+ * which is shown quieter.
+ */
+export function unrevokedWords(unrevoked: Unrevoked, tool: string): { happened: string; todo: string; reason: string } {
+  return {
+    happened: `${tool} is disconnected, but its key to this workspace could not be taken back.`,
+    todo:
+      `To take it back, open Quadit (${unrevoked.server}), go to Settings → Agents → @${unrevoked.agent}, ` +
+      `and under Tokens revoke “${unrevoked.label}”.`,
+    reason: `The server said: ${unrevoked.reason.replace(/\.?$/, ".")}`,
+  };
 }
 
 /** What the sheet says first, before the files: what connecting gives the tool. */

@@ -69,6 +69,7 @@ function setUp({
   shell = "/bin/zsh",
   moreAgents = [],
   tokensWait = Promise.resolve(),
+  revokeRefused = "",
 }: {
   quaditOnPath?: boolean;
   bundled?: boolean;
@@ -82,6 +83,8 @@ function setUp({
   moreAgents?: { id: string; handle: string }[];
   /** The workspace's page makes a token only once this has settled. */
   tokensWait?: Promise<void>;
+  /** The workspace's page refuses to revoke a token, saying this. */
+  revokeRefused?: string;
 } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
   const home = join(root, "home");
@@ -137,6 +140,7 @@ function setUp({
     ask: async (_server, _workspace, request) => {
       asked.push(request);
       if (request.kind === "agent-token") await tokensWait;
+      if (request.kind === "revoke-token" && revokeRefused) return { ok: false, message: revokeRefused };
       if (request.kind === "agent-token")
         return { ok: true, token: { id: `t${++tokens}`, secret: `qd_secret${tokens}` } };
       if (request.kind === "agent") {
@@ -360,6 +364,26 @@ posixOnly("Connect and Disconnect", () => {
     expect(existsSync(join(home, ".claude/skills/quadit/SKILL.md"))).toBe(false);
     expect(asked.at(-1)).toEqual({ kind: "revoke-token", token: "t1" });
     expect(JSON.parse(ledger())).toEqual({ harnesses: {} });
+  });
+
+  it("says which token it could not revoke, of which agent and where, with the reason given, the tool disconnected all the same", async () => {
+    const { connections, connect, choice, home } = setUp({ revokeRefused: "Token revocation was refused" });
+    mkdirSync(join(home, ".claude"));
+    writeFileSync(join(home, ".claude", "settings.json"), "{}");
+    await connect(choice("claude"));
+    const planned = connections.planDisconnect("claude");
+    if (!planned.ok) throw new Error(planned.error);
+    expect(await connections.applyDisconnect(planned.plan.id)).toEqual({
+      ok: true,
+      notes: [],
+      unrevoked: {
+        label: "Claude Code on mac",
+        agent: "coder",
+        server: "Work",
+        reason: "Token revocation was refused",
+      },
+    });
+    expect((await connections.state()).harnesses.find((h) => h.id === "claude")?.connected).toBeNull();
   });
 
   it("leaves a file changed since alone, and says so", async () => {

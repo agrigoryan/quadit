@@ -8,8 +8,8 @@
 // Styled by tools.css.
 
 import { button, lineIcon, make } from "@/pages/dom";
-import { diskLine } from "@/shared/change-words";
-import type { Refused } from "@/shared/pages-api";
+import { diskLine, unrevokedWords } from "@/shared/change-words";
+import type { Disconnected, Refused } from "@/shared/pages-api";
 
 export interface CardTool {
   id: string;
@@ -32,7 +32,7 @@ export interface CardActions {
    * run, "Disconnect" later). Gives what the person should know after, which
    * the card shows (a token to revoke by hand).
    */
-  back: { label: string; run(): Promise<{ ok: true; notes?: string[] } | Refused> };
+  back: { label: string; run(): Promise<Disconnected | Refused> };
   /** Opens what connecting it changes (the sheet). */
   seeFiles(): void;
   /** Told after the card connected (as the agent with that handle, when known) or was taken back. */
@@ -57,6 +57,7 @@ export class ToolCard {
   private act: HTMLDivElement;
   private error: HTMLParagraphElement;
   private note: HTMLParagraphElement;
+  private caution: HTMLParagraphElement;
   private tryIt: HTMLParagraphElement;
   private connectButton: HTMLButtonElement;
   /** Room under the card's text for what a page adds (the Connect window's options). */
@@ -98,7 +99,10 @@ export class ToolCard {
     this.extra = make("div", "", "card-extra");
     this.note = make("p", "", "card-note");
     this.note.setAttribute("role", "status");
-    body.append(head, this.gives, this.disk, this.error, this.note, this.extra);
+    this.caution = make("p", "", "card-caution");
+    this.caution.setAttribute("role", "alert");
+    this.caution.hidden = true;
+    body.append(head, this.gives, this.disk, this.error, this.note, this.caution, this.extra);
 
     this.tryIt = make("p", "", "try");
     const tryLabel = make("b", "Try it:");
@@ -134,6 +138,7 @@ export class ToolCard {
     if (this.connected) return { ok: true };
     this.error.textContent = "";
     this.note.textContent = "";
+    this.caution.hidden = true;
     this.connectButton.disabled = true;
     this.connectButton.textContent = "Connecting…";
     const done = await this.actions.connect(planId);
@@ -160,9 +165,26 @@ export class ToolCard {
       return;
     }
     this.connected = false;
-    this.note.textContent = (done.notes ?? []).join(" ");
+    this.takenBack(done);
     this.show();
     this.actions.changed(false, null);
+  }
+
+  /**
+   * Says what the person should know after the connection was taken back:
+   * files left as they were, and, as a caution, a token still to revoke.
+   */
+  takenBack(done: Pick<Disconnected, "notes" | "unrevoked">) {
+    this.note.textContent = done.notes.join(" ");
+    this.caution.hidden = !done.unrevoked;
+    if (done.unrevoked) {
+      const words = unrevokedWords(done.unrevoked, this.tool.name);
+      this.caution.replaceChildren(
+        make("strong", words.happened),
+        ` ${words.todo}`,
+        make("span", words.reason, "reason"),
+      );
+    }
   }
 
   private show() {

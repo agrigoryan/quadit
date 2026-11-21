@@ -195,6 +195,27 @@ export interface PlanView {
 
 export type Planned = { ok: true; plan: PlanView } | { ok: false; error: string };
 
+/**
+ * A token a disconnect could not revoke (the server refused, or did not
+ * answer): the tool no longer uses it, but it still works until the person
+ * revokes it. `label` is the token's name as Quadit lists it under the
+ * agent's tokens; `agent` that agent's handle; `server` the server's name in
+ * the app; `reason` what was said.
+ */
+export interface Unrevoked {
+  label: string;
+  agent: string;
+  server: string;
+  reason: string;
+}
+
+/** What a disconnect leaves the person to know: files it left as they were, and a token still to revoke. */
+export interface Disconnected {
+  ok: true;
+  notes: string[];
+  unrevoked: Unrevoked | null;
+}
+
 /** Why something was refused; `stale`: the plan the person saw is gone or out of date, and they should look again. */
 export type Refused = { ok: false; error: string; stale?: true };
 
@@ -241,7 +262,7 @@ export interface PagesApi {
    */
   connectTool(id: string, planId?: string): Promise<{ ok: true; agent: string | null } | Refused>;
   /** Takes back what connectTool did (its Undo); gives what the person should know (a token to revoke by hand). */
-  disconnectTool(id: string): Promise<{ ok: true; notes: string[] } | Refused>;
+  disconnectTool(id: string): Promise<Disconnected | Refused>;
   /** What connecting one of those tools changes: the plan as it would be (kept for connectTool), or as it was carried out. */
   toolChanges(id: string): Promise<Planned>;
   /**
@@ -289,7 +310,7 @@ export interface PagesApi {
   planDisconnect(harness: string): Promise<Planned>;
   /** Drops the plan under review (Cancel). */
   dropPlan(): Promise<void>;
-  applyDisconnect(planId: string): Promise<{ ok: true; notes: string[] } | Refused>;
+  applyDisconnect(planId: string): Promise<Disconnected | Refused>;
   showBackups(): Promise<void>;
 }
 

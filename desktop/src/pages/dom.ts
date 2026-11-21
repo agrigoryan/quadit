@@ -42,3 +42,16 @@ export function lineIcon(paths: string[]): SVGSVGElement {
   }
   return svg;
 }
+
+/**
+ * Names in a line, a dot between each, that wraps without a dot at the start
+ * of a line: each name carries its dot before it, and the first of each line
+ * has its dot outside the box, which hides it (tools.css, .separated).
+ */
+export function separated(names: string[], className = ""): HTMLSpanElement {
+  const box = make("span", "", `separated ${className}`.trim());
+  const row = make("span", "", "separated-row");
+  row.append(...names.map((name) => make("span", name)));
+  box.append(row);
+  return box;
+}

@@ -52,8 +52,10 @@ import type {
   FileRole,
   PlanFile,
   Planned,
+  Disconnected,
   PlanView,
   Refused,
+  Unrevoked,
 } from "@/shared/pages-api";
 
 export interface ConnectionsParts {
@@ -117,6 +119,8 @@ type Plan =
       edits: FileEdit[];
       notes: string[];
       revoke: Connection["token"];
+      /** The handle of the agent the connection worked as, whose token `revoke` is. */
+      agent: string;
       /** The login file the connection made (its token's config), shared or not; null without one. */
       login: string | null;
       backupDir: string;
@@ -495,6 +499,7 @@ export class Connections {
         edits,
         notes,
         revoke,
+        agent: connection.agent.handle,
         login: token?.config ?? null,
         backupDir: this.backupDir(harness.id),
         warnings: [
@@ -517,7 +522,7 @@ export class Connections {
   }
 
   /** Carries out a disconnect plan the person saw (waiting for any other Apply under way); gives what they should know. */
-  applyDisconnect(planId: string): Promise<{ ok: true; notes: string[] } | Refused> {
+  applyDisconnect(planId: string): Promise<Disconnected | Refused> {
     const plan = this.plans.get(planId);
     this.plans.delete(planId);
     return this.inTurn(async () => {
@@ -535,18 +540,22 @@ export class Connections {
       const ledger = this.ledger();
       delete ledger.harnesses[plan.harness.id];
       this.saveLedger(ledger);
-      const notes = [...plan.notes];
+      let unrevoked: Unrevoked | null = null;
       if (plan.revoke) {
         const revoked = await this.parts.ask(plan.revoke.serverId, plan.revoke.workspaceId, {
           kind: "revoke-token",
           token: plan.revoke.id,
         });
         if (!revoked.ok) {
-          const server = this.parts.server(plan.revoke.serverId)?.name ?? "the server";
-          notes.push(`Revoke the token “${plan.revoke.label}” yourself in ${server}'s settings: ${revoked.message}`);
+          unrevoked = {
+            label: plan.revoke.label,
+            agent: plan.agent,
+            server: this.parts.server(plan.revoke.serverId)?.name ?? "its server",
+            reason: revoked.message,
+          };
         }
       }
-      return { ok: true, notes };
+      return { ok: true, notes: plan.notes, unrevoked };
     });
   }
 

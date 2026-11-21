@@ -22,6 +22,9 @@
   --ok: #4cc38a;
   --ok-soft: #173326;
   --fail: #ff8a7a;
+  /* The web app's caution: something waits on the person. */
+  --wait: #f0a04b;
+  --wait-soft: #38270f;
   --overlay: rgb(0 0 0 / 0.55);
   --shadow-panel: 0 0 0 1px rgb(255 255 255 / 0.06), -16px 0 40px -12px rgb(0 0 0 / 0.6);
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
@@ -409,7 +412,7 @@ button.undo:hover:not(:disabled) {
   margin-top: 8px;
 }
 
-/* What the person should know after taking a connection back: a token to revoke by hand. */
+/* What the person should know after taking a connection back: files left as they were. */
 .card-note {
   margin: 8px 0 0;
   font-size: 13px;
@@ -419,6 +422,74 @@ button.undo:hover:not(:disabled) {
 
 .card-note:empty {
   display: none;
+}
+
+/*
+ * The one line that asks the person to do something (a token to revoke by
+ * hand), in the web app's caution (its reveal dialog's warning): what
+ * happened and what to do, then the server's reason, quieter.
+ */
+.card-caution {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--wait-soft);
+  color: var(--wait);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.card-caution strong {
+  font-weight: 600;
+}
+
+.card-caution .reason {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+/* "Not on this computer: Codex · Gemini CLI · …" */
+.others {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.others .lbl {
+  flex: none;
+}
+
+/* A line of names (dom.ts, separated): the dot before the first name of each line falls outside, hidden. */
+.separated {
+  --dot: 29px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+}
+
+.separated-row {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 8px;
+  margin-left: calc(-1 * var(--dot));
+}
+
+.separated-row > span {
+  white-space: nowrap;
+}
+
+.separated-row > span::before {
+  content: "·";
+  display: inline-block;
+  width: var(--dot);
+  text-align: center;
+  color: var(--ink-3);
 }
 
 /* The sheet of what connecting changes. */

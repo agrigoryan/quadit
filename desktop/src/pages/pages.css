@@ -422,16 +422,6 @@ body.panel main {
 
 .connect .others {
   margin: 16px 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-
-.connect .others .o + .o::before {
-  content: "·";
-  margin-right: 12px;
 }
 
 .tool .where-to {
