@@ -10,6 +10,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
+import { BRIDGE_REQUEST } from "../../src/shared/bridge";
 import { Desktop, expect, fakeComputer, slowToStart, test } from "./desktop";
 
 /**
@@ -203,12 +204,24 @@ test("set up again on the data it kept, the first run opens the workspace at onc
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   const desktop = await Desktop.launch(data, run, [], { env: serverEnv(run.binary) });
   try {
+    const samples = await desktop.app.evaluateHandle(({ app }, channel) => {
+      const requests: string[] = [];
+      app.on("web-contents-created", (_event, contents) => {
+        const send = contents.send.bind(contents);
+        contents.send = (name, ...args) => {
+          if (name === channel && args[0]?.request?.kind === "samples") requests.push(contents.getURL());
+          send(name, ...args);
+        };
+      });
+      return requests;
+    }, BRIDGE_REQUEST);
     const { origin } = await setUpFromTheList(desktop);
+    expect(await samples.jsonValue()).toHaveLength(1);
     // Removed from the list: the server stops, and its data stays.
     await desktop.chooseMenuItem("servers");
     const list = await desktop.serverList();
     await list.getByRole("button", { name: "Remove This computer" }).click();
-    await list.getByRole("button", { name: "Remove", exact: true }).click();
+    await list.getByRole("button", { name: "Yes, remove This computer", exact: true }).click();
     const again = list.getByRole("button", { name: "Set up on this computer…" });
     await expect(again).toBeVisible({ timeout: 20_000 });
 
@@ -221,6 +234,8 @@ test("set up again on the data it kept, the first run opens the workspace at onc
     const page = await desktop.pageOf(origin);
     await expect(page).toHaveURL(new RegExp(`^${origin}/personal`), { timeout: 30_000 });
     const me = (await page.evaluate(async () => (await fetch("/api/v1/auth/me")).json())) as { user: { name: string } };
+    await expect(page.getByRole("heading", { level: 1, name: "My work" })).toBeVisible();
+    expect(await samples.jsonValue()).toHaveLength(1);
     // The account it kept, not a new one.
     expect(me.user.name).toBe("Lou Local");
   } finally {
