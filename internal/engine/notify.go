@@ -159,18 +159,15 @@ func (c *cx) watch(userID, subjectType, subjectID string) error {
 
 var markup = strings.NewReplacer("**", "", "__", "", "`", "", "~~", "", "# ", "", "> ", "", "- [ ] ", "", "- [x] ", "")
 
-// snippet is the start of some text on one line, with its Markdown marks
-// taken out, for showing in an inbox row or a notification.
+// snippet is the start of some text on one line, at most n characters (not
+// bytes: a line of Chinese is as long as one of English), with its
+// Markdown marks taken out, for showing in an inbox row or a notification.
 func snippet(s string, n int) string {
 	s = strings.Join(strings.Fields(markup.Replace(s)), " ")
-	if len(s) <= n {
+	if utf8.RuneCountInString(s) <= n {
 		return s
 	}
-	cut := n
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
-	}
-	return s[:cut] + "…"
+	return string([]rune(s)[:n]) + "…"
 }
 
 var (

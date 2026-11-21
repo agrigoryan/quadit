@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"strings"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -227,6 +228,62 @@ func TestACommentIsOnlyOnThePageItNames(t *testing.T) {
 					t.Errorf("got %v, want it refused as not found", err)
 				}
 			})
+		}
+	})
+}
+
+// TestACommentReachesWhomTheTaskIsWith: a comment on a task reaches its
+// assignee and whoever it waits on, even one who does not follow it (an
+// agent the task only waits on, an assignee who stopped following), but
+// never its own author.
+func TestACommentReachesWhomTheTaskIsWith(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		coder := w.agent("coder")
+		bea := w.agent("bea")
+		w.do(w.owner.ID, "project.create", M{"key": "OPS", "name": "Operations"})
+		w.do(w.owner.ID, "task.create", M{"project": "OPS", "title": "Rotate keys", "assignee": "@bea"})
+		w.do(w.owner.ID, "task.update", M{"id": "OPS-1", "waiting_on": "@coder"})
+		no := false
+		w.do(bea, "watch.set", M{"subject": "OPS-1", "watching": &no})
+		comments := func(who string) int {
+			n := 0
+			for _, item := range w.inbox(who) {
+				if item.Type == core.NoteComment {
+					n++
+				}
+			}
+			return n
+		}
+
+		w.do(w.owner.ID, "comment.create", M{"task": "OPS-1", "body": "The old keys expire on Friday."})
+		if got := comments(coder); got != 1 {
+			t.Fatalf("the agent the task waits on got %d comment items, want 1", got)
+		}
+		if got := comments(bea); got != 1 {
+			t.Fatalf("the assignee who stopped following got %d comment items, want 1", got)
+		}
+		w.do(coder, "comment.create", M{"task": "OPS-1", "body": "On it."})
+		if got := comments(coder); got != 1 {
+			t.Fatalf("the agent was told of its own comment: %d comment items", got)
+		}
+	})
+}
+
+// TestAnInboxItemsWordsAreCutByCharacters: the start of what an item is
+// about is cut at 200 characters, not bytes, so a line in Chinese is as
+// long as one in English.
+func TestAnInboxItemsWordsAreCutByCharacters(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		coder := w.agent("coder")
+		w.do(w.owner.ID, "project.create", M{"key": "OPS", "name": "Operations"})
+		w.do(w.owner.ID, "task.create", M{"project": "OPS", "title": "Translate", "assignee": "@coder"})
+		w.do(w.owner.ID, "comment.create", M{"task": "OPS-1", "body": strings.Repeat("钥匙", 150)})
+		items := w.inbox(coder)
+		got := []rune(items[len(items)-1].Snippet)
+		if len(got) != 201 || string(got[200:]) != "…" || string(got[:2]) != "钥匙" {
+			t.Fatalf("the item's words are %d characters: %q", len(got), string(got))
 		}
 	})
 }

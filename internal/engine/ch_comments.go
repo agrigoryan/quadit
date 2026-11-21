@@ -178,7 +178,15 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 	if err := c.handOn(cm, t, a, note); err != nil {
 		return err
 	}
-	if err := c.notifyWatchers(t, note, about{entity: "comment", id: cm.ID, text: cm.Body}); err != nil {
+	// A comment reaches whom the task is with, whether or not they follow
+	// it: its assignee and whoever it waits on. Then its followers.
+	what := about{entity: "comment", id: cm.ID, text: cm.Body}
+	for _, with := range []string{t.AssigneeID, t.WaitingOnID} {
+		if err := c.notifyTask(with, note, t, what); err != nil {
+			return err
+		}
+	}
+	if err := c.notifyWatchers(t, note, what); err != nil {
 		return err
 	}
 	return c.index(taskCommentEntry(t, cm))
