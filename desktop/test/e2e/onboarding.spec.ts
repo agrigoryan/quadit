@@ -153,6 +153,39 @@ test("the first run sets Quadit up on this computer in one window, connects the 
   }
 });
 
+test("Continue waits for both tools when pressed during Connect both", async ({ run }) => {
+  const computer = fakeComputer();
+  mkdirSync(join(computer.home, ".codex"));
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  const env = { QUADIT_DESKTOP_QUADIT: run.binary, HOME: computer.home, SHELL: computer.shell };
+  const desktop = await Desktop.launch(data, run, [], { env, firstStart: true });
+  const token = Promise.withResolvers<void>();
+  try {
+    const first = await desktop.firstRun();
+    await first.getByRole("button", { name: "Set up on this computer" }).click();
+    const both = first.getByRole("button", { name: "Connect both (2)" });
+    await expect(both).toBeVisible();
+    const page = await desktop.pageOf(await desktop.localOrigin());
+    // Hold the first token until Continue has been pressed, then let the real server answer.
+    await page.route("**/tokens", async (route) => {
+      if (route.request().method() === "POST") await token.promise;
+      await route.continue();
+    });
+    const issuing = page.waitForRequest((req) => req.method() === "POST" && req.url().endsWith("/tokens"));
+    await both.click();
+    await issuing;
+    await first.getByRole("button", { name: "Continue" }).click();
+    token.resolve();
+    await expect.poll(() => desktop.firstRunShown(), { timeout: 20_000 }).toBe(false);
+    await expect(page.getByText(/is for Claude Code/)).toBeVisible();
+    const ledger = JSON.parse(readFileSync(join(data, "connections.json"), "utf8"));
+    expect(Object.keys(ledger.harnesses).sort()).toEqual(["claude", "codex"]);
+  } finally {
+    token.resolve();
+    await desktop.close();
+  }
+});
+
 test("set up on a computer where no agent tool is found, the tools step says so calmly, comes back after a quit, and Skip lands on the sample tasks", async ({
   run,
 }) => {

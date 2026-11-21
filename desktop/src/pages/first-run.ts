@@ -163,8 +163,8 @@ let cards: ToolCard[] = [];
  * third sample task.
  */
 const connectedAs = new Map<string, string | null>();
-/** Continue or Skip was pressed: nothing new is started, and Connect all stops. */
-let finishing = false;
+/** The whole batch the person asked for, including tools still waiting their turn. */
+let connectingAll: Promise<void> | undefined;
 
 async function look() {
   const began = performance.now();
@@ -393,18 +393,17 @@ function renderMembers() {
  * away. A failure is said beside the buttons, and Continue tries again.
  */
 async function finish() {
-  finishing = true;
   found.inert = true;
   none.inert = true;
   cont.disabled = true;
   skip.disabled = true;
   finishError.textContent = "";
+  await connectingAll;
   const done = await api.finishFirstRun();
   if (done.ok) {
     await leave();
     return;
   }
-  finishing = false;
   found.inert = false;
   none.inert = false;
   cont.disabled = false;
@@ -485,13 +484,14 @@ address.addEventListener("input", () => (addInsecure.hidden = true));
 async function connectTheRest() {
   connectAll.disabled = true;
   for (const card of cards) {
-    if (finishing) break;
     if (!card.isConnected) await card.run();
   }
   connectAll.disabled = false;
 }
 
-connectAll.addEventListener("click", () => void connectTheRest());
+connectAll.addEventListener("click", () => {
+  connectingAll = connectTheRest();
+});
 element("look-again").addEventListener("click", () => void look());
 cont.addEventListener("click", () => void finish());
 skip.addEventListener("click", () => void finish());
