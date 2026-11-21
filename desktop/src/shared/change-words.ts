@@ -9,21 +9,37 @@ import type { FileChange, FileRole, PlanFile } from "@/shared/pages-api";
 
 /**
  * The line on a tool's card saying what connecting changes on disk (`done`:
- * what it changed): the quadit command when the computer has none on its
- * PATH yet (`addsCommand`), the skill, and the tool's own login where it can
- * have one (`ownLogin`), else this computer's.
+ * what it changed), and whom the tool works as: the quadit command when the
+ * computer has none on its PATH yet (`addsCommand`), the skill, and the
+ * tool's own login where it can have one (`ownLogin`); else it signs in with
+ * this computer's login, the one there already (`worksAs`, whom it is) or
+ * one made for it.
  */
-export function diskLine(tool: { ownLogin: boolean }, addsCommand: boolean, done: boolean): string {
+export function diskLine(
+  tool: { ownLogin: boolean; worksAs: string | null },
+  addsCommand: boolean,
+  done: boolean,
+): string {
   const things = [
     ...(addsCommand ? ["the quadit command"] : []),
     "the Quadit skill",
     ...(tool.ownLogin ? [done ? "a login file" : "a login file for this tool"] : []),
   ];
   const listed = things.length > 1 ? `${things.slice(0, -1).join(", ")} and ${things.at(-1)}` : things.join("");
-  const login = tool.ownLogin ? "" : "; it signs in with this computer’s Quadit login";
+  const login = tool.ownLogin
+    ? ""
+    : tool.worksAs
+      ? `; it works as ${tool.worksAs}, this computer’s Quadit login`
+      : "; it signs in with this computer’s Quadit login";
   return done
     ? `Added ${listed}${login}. A backup of everything is kept.`
     : `Adds ${listed}${login}. Nothing else is touched; a backup is kept.`;
+}
+
+/** The computer's default quadit login as a person reads it: "@ann on https://q.example"; null when there is none. */
+export function defaultLoginWords(login: { server: string | null; agent: string | null } | null): string | null {
+  if (!login) return null;
+  return `${login.agent ?? "an agent"}${login.server ? ` on ${login.server}` : ""}`;
 }
 
 /** What the sheet says first, before the files: what connecting gives the tool. */

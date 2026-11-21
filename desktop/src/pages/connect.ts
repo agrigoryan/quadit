@@ -11,7 +11,16 @@ import { button, element, make } from "@/pages/dom";
 import { openSheet } from "@/pages/files-sheet";
 import { tile, ToolCard } from "@/pages/tool-card";
 import { defaultChoice, handleOf } from "@/shared/default-choice";
-import type { ConnectChoice, ConnectView, HarnessView, PagesApi, Planned, SummaryView } from "@/shared/pages-api";
+import { defaultLoginWords } from "@/shared/change-words";
+import type {
+  ConnectChoice,
+  ConnectView,
+  HarnessView,
+  PagesApi,
+  Planned,
+  Refused,
+  SummaryView,
+} from "@/shared/pages-api";
 
 const api = window.quaditPages as PagesApi;
 const workspaces = element<HTMLSelectElement>("workspace");
@@ -43,7 +52,7 @@ function describeCli(view: ConnectView): string {
 }
 
 function loginName(login: NonNullable<ConnectView["defaultLogin"]>): string {
-  return `${login.agent ?? "an agent its server did not name"} on ${login.server ?? "its server"}`;
+  return defaultLoginWords(login) ?? "";
 }
 
 function say(text: string) {
@@ -52,7 +61,7 @@ function say(text: string) {
 }
 
 /** Plans `choice` and shows the plan in the sheet, whose button connects; the plan is dropped if the sheet closes first. */
-function reviewConnect(h: HarnessView, plan: Promise<Planned>, card: ToolCard) {
+function reviewConnect(h: HarnessView, plan: () => Promise<Planned>, card: ToolCard) {
   let applied = false;
   openSheet({
     tool: h,
@@ -76,14 +85,17 @@ function reviewConnect(h: HarnessView, plan: Promise<Planned>, card: ToolCard) {
   });
 }
 
-/** Shows what disconnecting does in the sheet, whose button does it; resolves with how that went (closed: nothing). */
-function reviewDisconnect(h: HarnessView): Promise<{ ok: true } | { ok: false; error: string }> {
+/**
+ * Shows what disconnecting does in the sheet, whose button does it; resolves
+ * with how that went and what the person should know (closed: nothing).
+ */
+function reviewDisconnect(h: HarnessView): Promise<{ ok: true; notes: string[] } | Refused> {
   return new Promise((settle) => {
     let done = false;
     openSheet({
       tool: h,
       kind: "disconnect",
-      plan: api.planDisconnect(h.id),
+      plan: () => api.planDisconnect(h.id),
       action: {
         label: `Disconnect ${h.name}`,
         run: async (planId) => {
@@ -91,7 +103,7 @@ function reviewDisconnect(h: HarnessView): Promise<{ ok: true } | { ok: false; e
           if (!applied.ok) return applied;
           done = true;
           say(["Disconnected.", ...applied.notes].join(" "));
-          settle({ ok: true });
+          settle(applied);
           void render();
           return { ok: true };
         },
@@ -111,7 +123,8 @@ function toolCard(h: HarnessView, addsCommand: boolean): ToolCard {
     if (!view) return Promise.resolve({ ok: false, error: "Open a workspace in one of Quadit's windows first." });
     return api.planConnect(defaultChoice(h, view.serverId, view.summary));
   };
-  const card: ToolCard = new ToolCard({ ...h, ownLogin: h.cliIdentity === "own" }, addsCommand, {
+  const worksAs = h.cliIdentity === "default" ? defaultLoginWords(defaultLogin) : null;
+  const card: ToolCard = new ToolCard({ ...h, ownLogin: h.cliIdentity === "own", worksAs }, addsCommand, {
     connect: async () => {
       const planned = await plainPlan();
       if (!planned.ok) return planned;
@@ -124,7 +137,7 @@ function toolCard(h: HarnessView, addsCommand: boolean): ToolCard {
     back: { label: "Disconnect", run: () => reviewDisconnect(h) },
     seeFiles: () => {
       if (card.isConnected) void reviewDisconnect(h);
-      else reviewConnect(h, plainPlan(), card);
+      else reviewConnect(h, plainPlan, card);
     },
     changed: () => {},
   });
@@ -261,7 +274,7 @@ function optionsForm(h: HarnessView, card: ToolCard): HTMLFormElement {
           : { id: agents.value },
       allowUnattended: unattended.box.checked,
     };
-    reviewConnect(h, api.planConnect(choice), card);
+    reviewConnect(h, () => api.planConnect(choice), card);
   });
   fillAgents();
   return form;

@@ -7,11 +7,19 @@
 //      list does the work: server-list.ts, setUpHere), whose workspace then
 //      loads under the page; or "Connect to a server instead", whose window
 //      that one becomes, on its sign-in page, which ends the first run.
-//   2. Connect your AI tools (first-connect.ts), after a set-up here, always.
+//   2. Connect your AI tools (first-connect.ts), for an install this app has
+//      just set up: one set up before, whose data was kept (re-added, or
+//      restored under the app), opens on its workspace with nothing more.
 //   Continue or Skip makes the sample tasks, shows the workspace on them, and
 //   ends the first run. Ended, by the page or by closing its window, it is
 //   over for good: the app no longer starts with it (settings: setupDone),
 //   and it comes back only when the person asks ("Set Up on This Computer…").
+//   The app quitting during the tools step is no end: the step is owed
+//   (settings: pendingFirstRun), and the next start resumes it.
+//
+// Each showing is one run, which owns what it began: work a run started that
+// finishes after it ended (its window closed, a newer run shown) shows no
+// window, begins no step and ends nothing.
 //
 // The page is an app page in a view of its own, in the app's session: it gets
 // the pages API and never the bridge, and the server's page under it, in its
@@ -22,81 +30,152 @@ import type { AppPages } from "@/main/app-pages";
 import type { FirstConnect } from "@/main/first-connect";
 import type { ServerList } from "@/main/server-list";
 import type { ServerWindows } from "@/main/server-windows";
-import type { Settings } from "@/main/settings";
+import type { ServerStore } from "@/main/servers";
+import type { PendingFirstRun, Settings } from "@/main/settings";
+import type { AddResult, Refused } from "@/shared/pages-api";
 
 export interface FirstRunParts {
   pages: Pick<AppPages, "answer" | "view">;
-  settings: Settings;
+  settings: Pick<Settings, "get" | "change">;
+  store: Pick<ServerStore, "list" | "get">;
   /** The full name of the person's account on this computer (account-name.ts). */
   accountName(): Promise<string>;
   list: Pick<ServerList, "setUpHere" | "add" | "localServer">;
-  windows: Pick<ServerWindows, "cover" | "uncover" | "show">;
-  firstConnect: FirstConnect;
+  windows: Pick<ServerWindows, "cover" | "uncover" | "show" | "showAfresh">;
+  /** The tools step for the workspace `workspace` (its slug) of the server `serverId`. */
+  toolsStep(serverId: string, workspace: string): FirstConnect;
 }
 
+/** One showing of the first run. */
+interface Run {
+  view: WebContentsView;
+  /** The id a server added in this run takes, to take the window made for it; null over an existing server's window. */
+  donor: string | null;
+  /** The tools step, once this app has set the install up (or resumed one owed), with the person's name. */
+  tools: { step: FirstConnect; person: string } | null;
+}
+
+const OVER: Refused = { ok: false, error: "The first run is over: set Quadit up from the menu." };
+
 export class FirstRun {
-  /** The page and the id of the server whose window it covers (or the one about to be added); none when not running. */
-  private shown: { view: WebContentsView; serverId: string } | undefined;
+  private run: Run | undefined;
 
   constructor(private parts: FirstRunParts) {
-    const { firstConnect } = parts;
+    const tools = () => this.run?.tools?.step;
     parts.pages.answer({
       showWelcome: () => this.show(),
       accountName: () => parts.accountName(),
+      firstRunStep: () => {
+        const person = this.run?.tools?.person;
+        return person === undefined ? { step: "welcome" } : { step: "tools", person };
+      },
       setUpHere: (_sender, name) => this.setUpHere(typeof name === "string" ? name : ""),
       connectServer: (_sender, address, allowInsecure) => this.connectServer(String(address), allowInsecure === true),
-      lookForTools: () => firstConnect.look(),
-      connectTool: (_sender, id) => firstConnect.connect(String(id)),
-      disconnectTool: (_sender, id) => firstConnect.disconnect(String(id)),
-      toolChanges: (_sender, id) => firstConnect.changes(String(id)),
+      lookForTools: () => tools()?.look() ?? OVER,
+      connectTool: (_sender, id, planId) =>
+        tools()?.connect(String(id), typeof planId === "string" ? planId : undefined) ?? OVER,
+      disconnectTool: (_sender, id) => tools()?.disconnect(String(id)) ?? OVER,
+      toolChanges: (_sender, id) => tools()?.changes(String(id)) ?? OVER,
       finishFirstRun: () => this.finish(),
       endFirstRun: () => this.end(),
     });
   }
 
-  /** Starts the first run on its Welcome, or brings its window to the front when it is running. */
-  show() {
-    const { pages, windows, list } = this.parts;
-    if (this.shown) {
-      windows.cover(this.shown.view, null, () => this.end());
-      return;
-    }
-    const view = pages.view("first-run.html");
-    // Over the window of the server on this computer when it is in the list (its set-up unfinished), else over a
-    // window made for the server the person is about to set up or add.
-    const serverId = windows.cover(view, list.localServer()?.id ?? null, () => this.end());
-    this.shown = { view, serverId };
+  /**
+   * Whether the app starts with the first run: on its very first start (no
+   * server yet), and while a tools step is owed to a server still in the list.
+   */
+  due(): boolean {
+    const { settings, store } = this.parts;
+    const pending = settings.get().pendingFirstRun;
+    if (pending) return !!store.get(pending.serverId);
+    return !settings.get().setupDone && store.list().length === 0;
   }
 
-  /** Sets Quadit up on this computer in the first run's window, which then shows its workspace under the tools step. */
-  private async setUpHere(name: string): Promise<{ ok: true } | { ok: false; error: string }> {
-    if (!this.shown) return { ok: false, error: "The first run is over: set Quadit up from the menu." };
-    const done = await this.parts.list.setUpHere(name, this.shown.serverId);
+  /**
+   * Shows the first run, or brings its window to the front when it is
+   * running: at its tools step when one is owed (over that server's window),
+   * else on its Welcome.
+   */
+  show() {
+    const { pages, windows, list, settings, store } = this.parts;
+    if (this.run) {
+      windows.cover(this.run.view, null, () => this.closed(this.run));
+      return;
+    }
+    const pending = settings.get().pendingFirstRun;
+    const owed = pending && store.get(pending.serverId) ? pending : null;
+    const view = pages.view("first-run.html");
+    const run: Run = { view, donor: null, tools: owed && this.toolsFor(owed) };
+    this.run = run;
+    // Over the window of the server the tools step is owed to, or of the server on this computer when it is in the
+    // list (its set-up unfinished), else over a window made for the server the person is about to set up or add.
+    run.donor = windows.cover(view, owed?.serverId ?? list.localServer()?.id ?? null, () => this.closed(run));
+  }
+
+  /**
+   * Sets Quadit up on this computer in the first run's window. A new install:
+   * the tools step is owed from now on, and its workspace loads under the
+   * page. One set up before: its workspace loads, and the first run is over
+   * once the page has gone.
+   */
+  private async setUpHere(name: string): Promise<{ ok: true; next: "tools" | "workspace" } | Refused> {
+    const run = this.run;
+    if (!run) return OVER;
+    const done = await this.parts.list.setUpHere(name, run.donor ?? undefined);
+    // Done for good whatever happened meanwhile; shown only to the run that asked.
     if (!done.ok) return done;
-    this.parts.firstConnect.begin(done.serverId, done.workspace);
-    return { ok: true };
+    if (this.run !== run) return OVER;
+    if (done.workspace === null) {
+      this.parts.windows.showAfresh(done.serverId, "/");
+      return { ok: true, next: "workspace" };
+    }
+    const pending = { serverId: done.serverId, workspace: done.workspace, person: name.trim() };
+    this.parts.settings.change({ pendingFirstRun: pending });
+    run.tools = this.toolsFor(pending);
+    this.parts.windows.showAfresh(done.serverId, `/${encodeURIComponent(done.workspace)}`);
+    return { ok: true, next: "tools" };
   }
 
   /** Adds a server elsewhere, whose window the first run's becomes, on its sign-in page: the first run is over. */
-  private async connectServer(address: string, allowInsecure: boolean) {
-    const added = await this.parts.list.add(address, "", allowInsecure, this.shown?.serverId);
-    if (added.ok) this.end();
+  private async connectServer(address: string, allowInsecure: boolean): Promise<AddResult> {
+    const run = this.run;
+    if (!run) return OVER;
+    const added = await this.parts.list.add(address, "", allowInsecure, run.donor ?? undefined);
+    if (added.ok) this.closed(run);
     return added;
   }
 
-  /** The tools step is done: the sample tasks are made, and the window goes to them, under the page. */
-  private async finish() {
-    const shown = this.shown;
-    const path = await this.parts.firstConnect.finish();
-    if (shown && path) this.parts.windows.show(shown.serverId, path);
+  /**
+   * The tools step's end: once what was asked before is done, the samples
+   * are asked for and the window goes to them, under the page, which then
+   * ends the first run (endFirstRun). A failure is said, and changes nothing.
+   */
+  private async finish(): Promise<{ ok: true } | Refused> {
+    const run = this.run;
+    const tools = run?.tools;
+    if (!run || !tools) return OVER;
+    const done = await tools.step.finish();
+    if (!done.ok) return done;
+    if (this.run !== run) return OVER;
+    this.parts.windows.show(tools.step.serverId, done.path);
+    return { ok: true };
   }
 
-  /** The first run is over: its page goes, the window under it stays, and the app no longer starts with it. */
+  /** The first run is over (the page went, or its window closed): its page goes, the window under it stays. */
   private end() {
-    if (!this.shown) return;
-    this.shown = undefined;
-    this.parts.firstConnect.end();
+    this.closed(this.run);
+  }
+
+  /** Ends `run` when it is still the one shown: the app no longer starts with it, and no tools step is owed. */
+  private closed(run: Run | undefined) {
+    if (!run || this.run !== run) return;
+    this.run = undefined;
     this.parts.windows.uncover();
-    this.parts.settings.change({ setupDone: true });
+    this.parts.settings.change({ setupDone: true, pendingFirstRun: null });
+  }
+
+  private toolsFor(pending: PendingFirstRun): Run["tools"] {
+    return { step: this.parts.toolsStep(pending.serverId, pending.workspace), person: pending.person };
   }
 }

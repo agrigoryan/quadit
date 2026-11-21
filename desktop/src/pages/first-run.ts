@@ -106,6 +106,11 @@ async function setUp() {
     return;
   }
   person = name;
+  // Set up before, its data kept: the app signed in, and the workspace is there under this page.
+  if (done.next === "workspace") {
+    await leave();
+    return;
+  }
   nextStep();
   void look();
 }
@@ -146,12 +151,20 @@ const connectAll = element<HTMLButtonElement>("connect-all");
 const skip = element<HTMLButtonElement>("skip");
 const later = element<HTMLSpanElement>("later");
 const cont = element<HTMLButtonElement>("continue");
+const finishError = element<HTMLSpanElement>("finish-error");
 
 /** Every tool Connect knows, as the last look found them, and the cards of those found, in the order shown. */
 let tools: ToolView[] = [];
 let cards: ToolCard[] = [];
-/** The tools connected in this step, in the order they were: the first one's agent gets the third sample task. */
-let connectedOrder: string[] = [];
+/**
+ * The tools connected in this step, in the order they were, with the handle
+ * of the workspace's agent each works as (null: none of this workspace, a
+ * tool on this computer's login elsewhere). The first with an agent gets the
+ * third sample task.
+ */
+const connectedAs = new Map<string, string | null>();
+/** Continue or Skip was pressed: nothing new is started, and Connect all stops. */
+let finishing = false;
 
 async function look() {
   const began = performance.now();
@@ -161,7 +174,7 @@ async function look() {
   none.hidden = true;
   checking.replaceChildren();
   cards = [];
-  connectedOrder = [];
+  connectedAs.clear();
   renderProgress();
   const result = await api.lookForTools();
   await goDown(result.tools, lookingPace(result.tools.length, performance.now() - began));
@@ -201,21 +214,23 @@ function showFound(result: FoundTools, onComputer: ToolView[]) {
   let addsCommand = result.addsCommand;
   cards = onComputer.map((tool, i) => {
     const card: ToolCard = new ToolCard(tool, addsCommand, {
-      connect: () => api.connectTool(tool.id),
+      connect: (planId) => api.connectTool(tool.id, planId),
       back: { label: "Undo", run: () => api.disconnectTool(tool.id) },
+      // Its Connect carries out the plan shown, which the app keeps for it.
       seeFiles: () =>
         openSheet({
           tool,
           kind: "connect",
-          plan: api.toolChanges(tool.id),
-          action: card.isConnected ? undefined : { label: `Connect ${tool.name}`, run: () => card.run() },
+          plan: () => api.toolChanges(tool.id),
+          action: card.isConnected ? undefined : { label: `Connect ${tool.name}`, run: (planId) => card.run(planId) },
         }),
-      changed: (connected) => {
+      changed: (connected, agent) => {
         if (connected && addsCommand) {
           addsCommand = false;
           for (const other of cards) other.commandAdded();
         }
-        connectedOrder = connected ? [...connectedOrder, tool.id] : connectedOrder.filter((id) => id !== tool.id);
+        if (connected) connectedAs.set(tool.id, agent);
+        else connectedAs.delete(tool.id);
         renderProgress();
       },
     });
@@ -252,7 +267,7 @@ function showNone() {
 /** What changes as tools connect: the count, Connect all, the footer, the members and the example. */
 function renderProgress() {
   const total = cards.length;
-  const done = connectedOrder.length;
+  const done = connectedAs.size;
   const left = total - done;
   element("count").textContent =
     done === 0 ? `${total} found` : left === 0 ? `${done} connected` : `${done} connected, ${left} to go`;
@@ -311,15 +326,32 @@ function renderMembers() {
   } else {
     for (const card of cards) {
       const { tool } = card;
+      const agent = connectedAs.get(tool.id);
       rows.push(
-        card.isConnected
-          ? member(avatar(tool.initials, "agent", colourOf(tool.id)), tool.name, "Agent", "Joined just now", "ok")
-          : member(avatar(tool.initials, "place"), tool.name, "", "Not connected", "", true),
+        agent
+          ? member(
+              avatar(tool.initials, "agent", colourOf(tool.id)),
+              tool.name,
+              `Agent @${agent}`,
+              "Joined just now",
+              "ok",
+            )
+          : card.isConnected
+            ? // Connected as this computer's login, which is no agent of this workspace.
+              member(
+                avatar(tool.initials, "place"),
+                tool.name,
+                `Works as ${tool.worksAs ?? "this computer's login"}`,
+                "Not a member here",
+                "",
+                true,
+              )
+            : member(avatar(tool.initials, "place"), tool.name, "", "Not connected", "", true),
       );
     }
   }
   list.replaceChildren(...rows);
-  const agents = connectedOrder.length;
+  const agents = [...connectedAs.values()].filter(Boolean).length;
   element("member-count").textContent =
     agents === 0 ? "1 person" : `1 person, ${agents} ${agents === 1 ? "agent" : "agents"}`;
 
@@ -328,7 +360,8 @@ function renderMembers() {
   example.hidden = state === "looking";
   const first = person.split(/\s+/)[0] || "you";
   element("example-title").textContent = `Say hello and tell ${first} what you can do`;
-  const connectedFirst = cards.find((c) => c.tool.id === connectedOrder[0]);
+  const firstAgent = [...connectedAs].find(([, agent]) => agent)?.[0];
+  const connectedFirst = cards.find((c) => c.tool.id === firstAgent);
   const shown = connectedFirst ?? cards[0];
   const agentName = shown?.tool.name ?? "Your agent";
   const filled = !!connectedFirst;
@@ -354,20 +387,39 @@ function renderMembers() {
   );
 }
 
-/** Continue or Skip: the samples are made, the workspace shows on them, and this page fades away. */
+/**
+ * Continue or Skip: once what was asked before is done, the workspace's
+ * samples are asked for and the window shows them; then this page fades
+ * away. A failure is said beside the buttons, and Continue tries again.
+ */
 async function finish() {
+  finishing = true;
+  found.inert = true;
+  none.inert = true;
   cont.disabled = true;
   skip.disabled = true;
-  try {
-    await api.finishFirstRun();
-  } finally {
-    // The first run ends even when the samples could not be asked for: the workspace is there under it.
-    if (!stillMotion()) {
-      document.body.classList.add("leaving");
-      await wait(STEP_MS);
-    }
-    await api.endFirstRun();
+  finishError.textContent = "";
+  const done = await api.finishFirstRun();
+  if (done.ok) {
+    await leave();
+    return;
   }
+  finishing = false;
+  found.inert = false;
+  none.inert = false;
+  cont.disabled = false;
+  skip.disabled = false;
+  cont.textContent = "Try again";
+  finishError.textContent = done.error;
+}
+
+/** The first run is over: this page fades, showing the window under it, and goes. */
+async function leave() {
+  if (!stillMotion()) {
+    document.body.classList.add("leaving");
+    await wait(STEP_MS);
+  }
+  await api.endFirstRun();
 }
 
 /** The field of small squares behind the stage, after the website's hero; `searching`: a band of light across it. */
@@ -432,7 +484,10 @@ address.addEventListener("input", () => (addInsecure.hidden = true));
 /** Connects the tools not connected yet, one after another. */
 async function connectTheRest() {
   connectAll.disabled = true;
-  for (const card of cards) if (!card.isConnected) await card.run();
+  for (const card of cards) {
+    if (finishing) break;
+    if (!card.isConnected) await card.run();
+  }
   connectAll.disabled = false;
 }
 
@@ -442,7 +497,8 @@ cont.addEventListener("click", () => void finish());
 skip.addEventListener("click", () => void finish());
 // Enter continues, wherever it is not a control's own key.
 document.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter" || toolsStep.hidden || cont.disabled || document.querySelector(".sheet")) return;
+  if (event.key !== "Enter" || toolsStep.hidden || cont.disabled || document.querySelector("dialog.sheet[open]"))
+    return;
   if (event.target instanceof Element && event.target.closest("button, a, input, select, textarea, summary")) return;
   event.preventDefault();
   void finish();
@@ -453,7 +509,21 @@ addEventListener("resize", () => {
 
 async function start() {
   showDots(0);
-  const [local, name] = await Promise.all([api.localServer(), api.accountName().catch(() => "")]);
+  const [step, local, name] = await Promise.all([
+    api.firstRunStep(),
+    api.localServer(),
+    api.accountName().catch(() => ""),
+  ]);
+  // Resumed after the account was made (the app quit during the tools step): straight to it.
+  if (step.step === "tools") {
+    person = step.person;
+    welcome.hidden = true;
+    showDots(1);
+    toolsStep.hidden = false;
+    cont.focus();
+    void look();
+    return;
+  }
   if (!local.available) {
     showForm("connect", false);
     return;

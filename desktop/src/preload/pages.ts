@@ -29,6 +29,7 @@ const api: PagesApi = {
   toolChanges: call("toolChanges"),
   finishFirstRun: call("finishFirstRun"),
   endFirstRun: call("endFirstRun"),
+  firstRunStep: call("firstRunStep"),
   controlLocalServer: call("controlLocalServer"),
   showLocalServerFiles: call("showLocalServerFiles"),
   setOpenAtLogin: call("setOpenAtLogin"),

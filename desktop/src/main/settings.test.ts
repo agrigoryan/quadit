@@ -10,7 +10,13 @@ function file() {
 
 describe("Settings", () => {
   it("starts from the defaults without a file, and with a damaged one", () => {
-    const defaults = { setupDone: false, captureShortcut: true, lastCapture: null, localPort: null };
+    const defaults = {
+      setupDone: false,
+      captureShortcut: true,
+      lastCapture: null,
+      localPort: null,
+      pendingFirstRun: null,
+    };
     expect(new Settings(file()).get()).toEqual(defaults);
     const damaged = file();
     writeFileSync(damaged, "{not json");
@@ -31,5 +37,14 @@ describe("Settings", () => {
       writeFileSync(path, JSON.stringify({ localPort }));
       expect(new Settings(path).get().localPort, String(localPort)).toBeNull();
     }
+  });
+
+  it("keeps a first run owed across restarts, and reads one that is not whole as none", () => {
+    const path = file();
+    const pending = { serverId: "abc", workspace: "personal", person: "Lou" };
+    new Settings(path).change({ pendingFirstRun: pending });
+    expect(new Settings(path).get().pendingFirstRun).toEqual(pending);
+    writeFileSync(path, JSON.stringify({ pendingFirstRun: { serverId: "abc" } }));
+    expect(new Settings(path).get().pendingFirstRun).toBeNull();
   });
 });

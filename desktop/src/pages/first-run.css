@@ -920,6 +920,15 @@ button {
   font-size: 13px;
 }
 
+.foot .finish-error {
+  color: var(--fail);
+  overflow-wrap: anywhere;
+}
+
+.foot .finish-error:empty {
+  display: none;
+}
+
 .foot .later button.btn-text {
   font-size: 14px;
 }

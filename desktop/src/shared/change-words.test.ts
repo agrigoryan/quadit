@@ -63,20 +63,26 @@ describe("countWord", () => {
 
 describe("diskLine", () => {
   it("says what connecting a tool with a login of its own adds, and that nothing else is touched", () => {
-    expect(diskLine({ ownLogin: true }, false, false)).toBe(
+    expect(diskLine({ ownLogin: true, worksAs: null }, false, false)).toBe(
       "Adds the Quadit skill and a login file for this tool. Nothing else is touched; a backup is kept.",
     );
-    expect(diskLine({ ownLogin: true }, false, true)).toBe(
+    expect(diskLine({ ownLogin: true, worksAs: null }, false, true)).toBe(
       "Added the Quadit skill and a login file. A backup of everything is kept.",
     );
   });
 
   it("names the quadit command when the computer has none yet, and the computer's login for a tool without its own", () => {
-    expect(diskLine({ ownLogin: true }, true, false)).toBe(
+    expect(diskLine({ ownLogin: true, worksAs: null }, true, false)).toBe(
       "Adds the quadit command, the Quadit skill and a login file for this tool. Nothing else is touched; a backup is kept.",
     );
-    expect(diskLine({ ownLogin: false }, false, false)).toBe(
+    expect(diskLine({ ownLogin: false, worksAs: null }, false, false)).toBe(
       "Adds the Quadit skill; it signs in with this computer’s Quadit login. Nothing else is touched; a backup is kept.",
+    );
+  });
+
+  it("says whom a tool without a login of its own works as, when this computer's login is there already", () => {
+    expect(diskLine({ ownLogin: false, worksAs: "@ann on https://q.example" }, false, true)).toBe(
+      "Added the Quadit skill; it works as @ann on https://q.example, this computer’s Quadit login. A backup of everything is kept.",
     );
   });
 });

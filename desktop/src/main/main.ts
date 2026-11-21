@@ -184,14 +184,20 @@ function start() {
   const firstRun = new FirstRun({
     pages,
     settings,
+    store,
     list,
     windows,
-    firstConnect: new FirstConnect({
-      connections,
-      summaries: () => requests.summaries(),
-      ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
-      sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
-    }),
+    toolsStep: (serverId, workspace) =>
+      new FirstConnect(
+        {
+          connections,
+          summaries: () => requests.summaries(),
+          ask: (server, workspaceId, request) => requests.toWorkspace(server, workspaceId, request),
+          sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
+        },
+        serverId,
+        workspace,
+      ),
     accountName: () =>
       accountName(process.platform, userInfo().username, async (command, args) => {
         const { stdout } = await run(command, args, { timeout: 5_000 });
@@ -318,7 +324,7 @@ function start() {
   const shown = windows.restore({ show: !atLogin });
   if (atLogin) {
     // Nothing to show.
-  } else if (!settings.get().setupDone && store.list().length === 0) firstRun.show();
+  } else if (firstRun.due()) firstRun.show();
   else if (!shown) list.show();
   // Servers upgrade and downgrade while the app is away: ask each again.
   void checks.checkAll();

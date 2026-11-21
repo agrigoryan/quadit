@@ -18,6 +18,20 @@ export interface AppSettings {
    * that server's identity. Null until then.
    */
   localPort: number | null;
+  /**
+   * A first run that is not over though this app has made the install's
+   * account (first-run.ts): the app quit during its tools step, which the
+   * next start resumes for that server's workspace, with the person's name.
+   * Null when there is none.
+   */
+  pendingFirstRun: PendingFirstRun | null;
+}
+
+/** The first run's tools step, owed to the workspace `workspace` (its slug) of the server `serverId`. */
+export interface PendingFirstRun {
+  serverId: string;
+  workspace: string;
+  person: string;
 }
 
 export class Settings {
@@ -62,5 +76,19 @@ function readSettings(file: string): AppSettings {
     typeof raw.localPort === "number" && Number.isInteger(raw.localPort) && raw.localPort > 0 && raw.localPort < 65536
       ? raw.localPort
       : null;
-  return { setupDone: raw.setupDone === true, captureShortcut: raw.captureShortcut !== false, lastCapture, localPort };
+  const pending = raw.pendingFirstRun as Partial<PendingFirstRun> | null | undefined;
+  const pendingFirstRun =
+    pending &&
+    typeof pending.serverId === "string" &&
+    typeof pending.workspace === "string" &&
+    typeof pending.person === "string"
+      ? { serverId: pending.serverId, workspace: pending.workspace, person: pending.person }
+      : null;
+  return {
+    setupDone: raw.setupDone === true,
+    captureShortcut: raw.captureShortcut !== false,
+    lastCapture,
+    localPort,
+    pendingFirstRun,
+  };
 }

@@ -9,23 +9,34 @@
 
 import { button, lineIcon, make } from "@/pages/dom";
 import { diskLine } from "@/shared/change-words";
+import type { Refused } from "@/shared/pages-api";
 
 export interface CardTool {
   id: string;
   name: string;
   initials: string;
+  /** Whether it gets a quadit login of its own; else whom it works as, when this computer's login is there already. */
   ownLogin: boolean;
+  worksAs: string | null;
 }
 
 export interface CardActions {
-  /** Connects the tool; the card shows its progress, and then Connected or the error. */
-  connect(): Promise<{ ok: true } | { ok: false; error: string }>;
-  /** Takes the connection back; its label is the button's ("Undo" in the first run, "Disconnect" later). */
-  back: { label: string; run(): Promise<{ ok: true } | { ok: false; error: string }> };
+  /**
+   * Connects the tool, with the plan the sheet showed when `planId` is given;
+   * the card shows its progress, and then Connected or the error. Gives the
+   * handle of the workspace's agent it works as, when the page knows it.
+   */
+  connect(planId?: string): Promise<{ ok: true; agent?: string | null } | Refused>;
+  /**
+   * Takes the connection back; its label is the button's ("Undo" in the first
+   * run, "Disconnect" later). Gives what the person should know after, which
+   * the card shows (a token to revoke by hand).
+   */
+  back: { label: string; run(): Promise<{ ok: true; notes?: string[] } | Refused> };
   /** Opens what connecting it changes (the sheet). */
   seeFiles(): void;
-  /** Told after the card connected or was taken back. */
-  changed(connected: boolean): void;
+  /** Told after the card connected (as the agent with that handle, when known) or was taken back. */
+  changed(connected: boolean, agent: string | null): void;
 }
 
 /** A tile with a tool's initials; `small` for the lists of names. */
@@ -45,6 +56,7 @@ export class ToolCard {
   private diskText: Text;
   private act: HTMLDivElement;
   private error: HTMLParagraphElement;
+  private note: HTMLParagraphElement;
   private tryIt: HTMLParagraphElement;
   private connectButton: HTMLButtonElement;
   /** Room under the card's text for what a page adds (the Connect window's options). */
@@ -84,7 +96,9 @@ export class ToolCard {
     this.error = make("p", "", "card-error");
     this.error.setAttribute("role", "alert");
     this.extra = make("div", "", "card-extra");
-    body.append(head, this.gives, this.disk, this.error, this.extra);
+    this.note = make("p", "", "card-note");
+    this.note.setAttribute("role", "status");
+    body.append(head, this.gives, this.disk, this.error, this.note, this.extra);
 
     this.tryIt = make("p", "", "try");
     const tryLabel = make("b", "Try it:");
@@ -112,13 +126,17 @@ export class ToolCard {
     this.show();
   }
 
-  /** Connects it, as its button does; resolves once it has, or has failed (the card says why). */
-  async run(): Promise<{ ok: true } | { ok: false; error: string }> {
+  /**
+   * Connects it, as its button does (with the plan the sheet showed when
+   * `planId` is given); resolves once it has, or has failed (the card says why).
+   */
+  async run(planId?: string): Promise<{ ok: true; agent?: string | null } | Refused> {
     if (this.connected) return { ok: true };
     this.error.textContent = "";
+    this.note.textContent = "";
     this.connectButton.disabled = true;
     this.connectButton.textContent = "Connecting…";
-    const done = await this.actions.connect();
+    const done = await this.actions.connect(planId);
     this.connectButton.disabled = false;
     if (!done.ok) {
       this.connectButton.textContent = "Try again";
@@ -128,7 +146,7 @@ export class ToolCard {
     }
     this.connected = true;
     this.show();
-    this.actions.changed(true);
+    this.actions.changed(true, done.agent ?? null);
     return done;
   }
 
@@ -142,8 +160,9 @@ export class ToolCard {
       return;
     }
     this.connected = false;
+    this.note.textContent = (done.notes ?? []).join(" ");
     this.show();
-    this.actions.changed(false);
+    this.actions.changed(false, null);
   }
 
   private show() {

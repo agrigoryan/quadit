@@ -103,6 +103,7 @@ function setUp(
     captureShortcut: true,
     lastCapture: null,
     localPort: options.port ?? null,
+    pendingFirstRun: null,
   };
   const addressed: Asked[] = [];
   const spawned: { binary: string; args: string[]; env: NodeJS.ProcessEnv; stdio: unknown[]; process: FakeProcess }[] =

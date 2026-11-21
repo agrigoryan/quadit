@@ -80,6 +80,12 @@ export interface ToolView {
   found: boolean;
   /** Whether connecting gives it a quadit login of its own (else it uses this computer's: HarnessView's cliIdentity). */
   ownLogin: boolean;
+  /**
+   * For a tool without a login of its own, when this computer has a default
+   * quadit login already: whom it works as, as a person reads it ("@ann on
+   * https://q.example"); connecting makes no agent for it. Null otherwise.
+   */
+  worksAs: string | null;
 }
 
 /** The agent tools as the first run finds them, and whether connecting one puts the quadit command on this computer too. */
@@ -180,15 +186,17 @@ export interface PlanFile {
   note?: string;
 }
 
-/** Every file a plan changes, as a diff, the folder its backups go to, and what the person should know first. */
+/** Every file a plan changes, as a diff, and what the person should know first. */
 export interface PlanView {
   id: string;
   files: PlanFile[];
-  backupDir: string;
   warnings: string[];
 }
 
 export type Planned = { ok: true; plan: PlanView } | { ok: false; error: string };
+
+/** Why something was refused; `stale`: the plan the person saw is gone or out of date, and they should look again. */
+export type Refused = { ok: false; error: string; stale?: true };
 
 export interface PagesApi {
   listServers(): Promise<ServerView[]>;
@@ -213,10 +221,11 @@ export interface PagesApi {
    * The first run's Welcome (desktop contract §10): sets Quadit up on this
    * computer, starting the server here (or the one set up before), making its
    * owner, named `name`, and loading its workspace in the window the first run
-   * shows over; on one set up already, signs in instead. The first run goes on
-   * to its tools step.
+   * shows over. `next`: "tools", the install is new and the first run goes on
+   * to its tools step; "workspace", it was set up before (its data kept), the
+   * app signed in, and the first run is over.
    */
-  setUpHere(name: string): Promise<{ ok: true } | { ok: false; error: string }>;
+  setUpHere(name: string): Promise<{ ok: true; next: "tools" | "workspace" } | { ok: false; error: string }>;
   /**
    * The first run's other way: adds the server at `address` (as addServer),
    * whose window, the one the first run showed over, opens on its sign-in
@@ -225,14 +234,24 @@ export interface PagesApi {
   connectServer(address: string, allowInsecure?: boolean): Promise<AddResult>;
   /** The agent tools Connect knows, and which are on this computer; takes at least about a second. */
   lookForTools(): Promise<FoundTools>;
-  /** Connects a tool lookForTools found, with the defaults and nothing asked. */
-  connectTool(id: string): Promise<{ ok: true } | { ok: false; error: string }>;
-  /** Takes back what connectTool did (its Undo). */
-  disconnectTool(id: string): Promise<{ ok: true } | { ok: false; error: string }>;
-  /** What connecting one of those tools changes: the plan as it would be, or as it was carried out. */
+  /**
+   * Connects a tool lookForTools found: with the plan toolChanges showed when
+   * `planId` is that one's, else with the defaults and nothing asked. Gives
+   * the handle of the workspace's agent it works as (null: none of this workspace).
+   */
+  connectTool(id: string, planId?: string): Promise<{ ok: true; agent: string | null } | Refused>;
+  /** Takes back what connectTool did (its Undo); gives what the person should know (a token to revoke by hand). */
+  disconnectTool(id: string): Promise<{ ok: true; notes: string[] } | Refused>;
+  /** What connecting one of those tools changes: the plan as it would be (kept for connectTool), or as it was carried out. */
   toolChanges(id: string): Promise<Planned>;
-  /** Ends the tools step: makes the sample tasks and shows the workspace on them, under the first run. */
-  finishFirstRun(): Promise<void>;
+  /**
+   * Ends the tools step, once what was asked before is done: the workspace's
+   * page is asked for its sample tasks and the window shows them, under the
+   * first run. A failure is said, and the step can be ended again.
+   */
+  finishFirstRun(): Promise<{ ok: true } | { ok: false; error: string }>;
+  /** Where the first run starts: Welcome, or, resumed after the account was made, the tools step for `person`. */
+  firstRunStep(): Promise<{ step: "welcome" } | { step: "tools"; person: string }>;
   /** Takes the first run away, showing the window under it; it never comes back by itself. */
   endFirstRun(): Promise<void>;
   controlLocalServer(control: LocalControl): Promise<void>;
@@ -265,11 +284,12 @@ export interface PagesApi {
 
   connectState(): Promise<ConnectView>;
   planConnect(c: ConnectChoice): Promise<Planned>;
-  applyConnect(planId: string): Promise<{ ok: true; hint: string } | { ok: false; error: string }>;
+  /** `stale`: the plan is gone or a file changed since: look again. */
+  applyConnect(planId: string): Promise<{ ok: true; hint: string } | Refused>;
   planDisconnect(harness: string): Promise<Planned>;
   /** Drops the plan under review (Cancel). */
   dropPlan(): Promise<void>;
-  applyDisconnect(planId: string): Promise<{ ok: true; notes: string[] } | { ok: false; error: string }>;
+  applyDisconnect(planId: string): Promise<{ ok: true; notes: string[] } | Refused>;
   showBackups(): Promise<void>;
 }
 
