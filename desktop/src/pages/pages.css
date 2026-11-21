@@ -1,4 +1,4 @@
-/* The app's own small pages: the server list, the sign-in bar, setup, Connect, the menu-bar panel and quick capture (the first run has first-run.css). Dark, the app's default theme; they have no theme setting of their own. */
+/* The app's own pages: the server list, the sign-in bar, setup, Connect agents, the menu-bar panel and quick capture (the first run has first-run.css). Dark, the app's default theme; they have no theme setting of their own. */
 
 :root {
   color-scheme: dark;
@@ -93,8 +93,10 @@ button.link {
   padding: 28px 24px 40px;
 }
 
+/* Over a server window: its top clear of the strip the window's buttons are in (.window-strip). */
 .page.connect {
   max-width: 760px;
+  padding-top: max(28px, calc(env(titlebar-area-height, 0px) + 12px));
 }
 
 .page.capture {
@@ -288,10 +290,11 @@ body.bar p {
 }
 
 /*
- * The connection error covers the whole window. In a window without a title
- * bar (src/main/window-frame.ts) the window is dragged by the strip at its top,
- * where the buttons are: Electron hands a view the overlay as it falls on the
- * view, so this strip is as tall as that one; with a title bar it has none.
+ * The connection error and Connect agents cover the whole window. In a window
+ * without a title bar (src/main/window-frame.ts) the window is dragged by the
+ * strip at its top, where the buttons are: Electron hands a view the overlay
+ * as it falls on the view, so this strip is as tall as that one; with a title
+ * bar it has none.
  */
 .window-strip {
   position: fixed;
@@ -399,15 +402,20 @@ body.panel main {
   color: var(--warn);
 }
 
-/* The Connect window: the workspace to connect to over the cards (tools.css), and a card's More options. */
+/* Connect agents: its title with Done, over the cards (tools.css), and a card's More options. */
 
-.where {
-  display: grid;
-  gap: 4px;
-  margin: 20px 0 12px;
+.connect-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.where select,
+.connect-head h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
 .options select,
 .options input[type="text"] {
   padding: 6px 8px;

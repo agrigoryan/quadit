@@ -5,11 +5,13 @@
 //      or "Connect to a server instead", the address form (on Windows, the
 //      only way). A server added there takes the window: the first run is over.
 //   2. Connect your AI tools: looking (at least about a second:
-//      shared/looking.ts), then a card per tool found (tool-card.ts), the
-//      tools not here in a line, and beside them the workspace's members, each
-//      found tool a place that fills when it connects, and an example of a
-//      task handed to an agent. Continue (Enter) or Skip ends it: the sample
-//      tasks are made, the workspace shows on them, and this page goes.
+//      shared/looking.ts), then a card per tool found (tool-card.ts: once
+//      set up, it shows the line to say in the tool and waits for the tool,
+//      which Continue never does), the tools not here in a line, and beside
+//      them the workspace's members, each found tool a place that fills when
+//      it connects, and an example of a task handed to an agent. Continue
+//      (Enter) or Skip ends it: the sample tasks are made, the workspace
+//      shows on them, and this page goes.
 // Each change of step slides and fades for 200 ms; with reduced motion,
 // nothing moves (first-run.css).
 
@@ -216,7 +218,7 @@ function showFound(result: FoundTools, onComputer: ToolView[]) {
   cards = onComputer.map((tool, i) => {
     const card: ToolCard = new ToolCard(tool, addsCommand, {
       connect: (planId) => api.connectTool(tool.id, planId),
-      back: { label: "Undo", run: () => api.disconnectTool(tool.id) },
+      back: () => api.disconnectTool(tool.id),
       // Its Connect carries out the plan shown, which the app keeps for it.
       seeFiles: () =>
         openSheet({

@@ -1,11 +1,12 @@
-// The Connect window (src/main/connections.ts): the agent tools on this
-// computer as the same cards and the same sheet as the first run's tools step
-// (tool-card.ts, files-sheet.ts; desktop contract §10), for the workspace
-// chosen at the top. A card's Connect uses the defaults and asks nothing;
-// "See the files" shows what it changes first; "More options" holds the
-// technical choices (MCP, which agent, without asking each time), whose plan
-// the sheet shows before anything is written. A connected tool's card says
-// where it is connected, and Disconnect shows what taking it back does first.
+// Connect agents (src/main/connect-page.ts; desktop contract §11), laid over
+// a server's window, for the workspace that window shows: the agent tools on
+// this computer as the same cards and the same sheet as the first run's tools
+// step (tool-card.ts, files-sheet.ts). A card's Connect uses the defaults and
+// asks nothing; "See the files" shows what it changes first; "More options"
+// holds the technical choices (MCP, which agent, without asking each time),
+// whose plan the sheet shows before anything is written, and, once a tool is
+// connected, where and as whom. Disconnect shows what taking it back does
+// first. "Done" and Escape take the page away, showing the one under it.
 
 import { button, element, make, separated } from "@/pages/dom";
 import { openSheet } from "@/pages/files-sheet";
@@ -14,36 +15,38 @@ import { defaultChoice, handleOf } from "@/shared/default-choice";
 import { defaultLoginWords } from "@/shared/change-words";
 import type {
   ConnectChoice,
+  ConnectTarget,
   ConnectView,
   Disconnected,
+  Handshake,
   HarnessView,
   PagesApi,
   Planned,
   Refused,
-  SummaryView,
 } from "@/shared/pages-api";
 
 const api = window.quaditPages as PagesApi;
-const workspaces = element<HTMLSelectElement>("workspace");
 const cardsBox = element<HTMLDivElement>("cards");
 const result = element<HTMLParagraphElement>("result");
 const NEW_AGENT = "";
-/** The server whose page opened this window (its "Connect a tool on this computer"): its workspace is chosen first. */
-const askedFor = new URLSearchParams(window.location.search).get("server");
+/** How long the page waits for where the connected tools stand before it shows them; a card asks again itself. */
+const FIRST_LOOK_MS = 1_500;
 
-let views: SummaryView[] = [];
+/** The window this page is over: its server, and the workspace its page shows. */
+let target: ConnectTarget | null = null;
 /** The computer's default login, as the last look at the harnesses found it. */
 let defaultLogin: ConnectView["defaultLogin"] = null;
 /** What the last Disconnect of each tool left the person to know, which its card says until it connects again. */
 const takenBack = new Map<string, Disconnected>();
-/** What the cards' options do when the workspace chosen changes (its agents are offered); made anew with the cards. */
+/** What the cards' options do when the workspace shown changes (its agents are offered); made anew with the cards. */
 let workspaceChanged: (() => void)[] = [];
 
-const keyOf = (v: SummaryView) => JSON.stringify([v.serverId, v.summary.workspace.id]);
-
-function chosen(): SummaryView | undefined {
-  return views.find((v) => keyOf(v) === workspaces.value);
+/** The workspace to connect to, once the window's page shows one. */
+function chosen(): { serverId: string; summary: NonNullable<ConnectTarget["summary"]> } | undefined {
+  return target?.summary ? { serverId: target.serverId, summary: target.summary } : undefined;
 }
+
+const NO_WORKSPACE: Refused = { ok: false, error: "Open a workspace in this window first." };
 
 function describeCli(view: ConnectView): string {
   if (view.cli.found) return `quadit ${view.cli.version} is on your PATH at ${view.cli.found}.`;
@@ -64,7 +67,7 @@ function say(text: string) {
 }
 
 /** Plans `choice` and shows the plan in the sheet, whose button connects; the plan is dropped if the sheet closes first. */
-function reviewConnect(h: HarnessView, plan: () => Promise<Planned>, card: ToolCard) {
+function reviewConnect(h: HarnessView, plan: () => Promise<Planned>) {
   let applied = false;
   openSheet({
     tool: h,
@@ -76,8 +79,7 @@ function reviewConnect(h: HarnessView, plan: () => Promise<Planned>, card: ToolC
         const done = await api.applyConnect(planId);
         if (!done.ok) return done;
         applied = true;
-        card.markConnected(true);
-        say(`Connected. ${done.hint}`);
+        say(done.hint);
         void render();
         return { ok: true };
       },
@@ -121,11 +123,11 @@ function reviewDisconnect(h: HarnessView): Promise<Disconnected | Refused> {
   });
 }
 
-function toolCard(h: HarnessView, addsCommand: boolean): ToolCard {
+function toolCard(h: HarnessView, addsCommand: boolean, handshake: Handshake | null): ToolCard {
   const plainPlan = (): Promise<Planned> => {
-    const view = chosen();
-    if (!view) return Promise.resolve({ ok: false, error: "Open a workspace in one of Quadit's windows first." });
-    return api.planConnect(defaultChoice(h, view.serverId, view.summary));
+    const at = chosen();
+    if (!at) return Promise.resolve(NO_WORKSPACE);
+    return api.planConnect(defaultChoice(h, at.serverId, at.summary));
   };
   const worksAs = h.cliIdentity === "default" ? defaultLoginWords(defaultLogin) : null;
   const card: ToolCard = new ToolCard({ ...h, ownLogin: h.cliIdentity === "own", worksAs }, addsCommand, {
@@ -134,45 +136,46 @@ function toolCard(h: HarnessView, addsCommand: boolean): ToolCard {
       if (!planned.ok) return planned;
       const done = await api.applyConnect(planned.plan.id);
       if (!done.ok) return done;
-      say(`Connected. ${done.hint}`);
+      say(done.hint);
       void render();
       return { ok: true };
     },
-    back: { label: "Disconnect", run: () => reviewDisconnect(h) },
+    back: () => reviewDisconnect(h),
     seeFiles: () => {
       if (card.isConnected) void reviewDisconnect(h);
-      else reviewConnect(h, plainPlan, card);
+      else reviewConnect(h, plainPlan);
     },
     changed: () => {},
   });
-  card.markConnected(!!h.connected);
+  card.markConnected(!!h.connected, handshake);
   const left = takenBack.get(h.id);
   if (h.connected) takenBack.delete(h.id);
   else if (left) card.takenBack(left);
-  if (h.connected) {
-    const how = h.connected.methods.map((m) => (m === "cli" ? "quadit command" : "MCP")).join(" and ");
-    const where = [h.connected.server, h.connected.workspace].filter(Boolean).join(" · ");
-    card.extra.append(make("p", `Connected (${how}) to ${where} as ${h.connected.agent}`, "where-to"));
-  } else {
-    const options = optionsForm(h, card);
-    options.hidden = true;
-    const more = button(
-      "More options",
-      () => {
-        options.hidden = !options.hidden;
-        more.setAttribute("aria-expanded", String(!options.hidden));
-      },
-      "btn-text more",
-      `More options for ${h.name}`,
-    );
-    more.setAttribute("aria-expanded", "false");
-    card.extra.append(more, options);
-  }
+  // Connected, where and as whom; not, how and as whom it would be: the technical side, folded.
+  const options = h.connected ? connectedHow(h.connected) : optionsForm(h);
+  options.hidden = true;
+  const more = button(
+    "More options",
+    () => {
+      options.hidden = !options.hidden;
+      more.setAttribute("aria-expanded", String(!options.hidden));
+    },
+    "btn-text more",
+    `More options for ${h.name}`,
+  );
+  more.setAttribute("aria-expanded", "false");
+  card.extra.append(more, options);
   return card;
 }
 
+function connectedHow(connected: NonNullable<HarnessView["connected"]>): HTMLParagraphElement {
+  const how = connected.methods.map((m) => (m === "cli" ? "quadit command" : "MCP")).join(" and ");
+  const where = [connected.server, connected.workspace].filter(Boolean).join(" · ");
+  return make("p", `Connected (${how}) to ${where} as ${connected.agent}`, "where-to");
+}
+
 /** The technical choices for connecting `h`: how, as whom, and without asking each time; reviewed in the sheet. */
-function optionsForm(h: HarnessView, card: ToolCard): HTMLFormElement {
+function optionsForm(h: HarnessView): HTMLFormElement {
   const form = make("form", "", "options");
   form.noValidate = true;
   form.setAttribute("aria-label", `How to connect ${h.name}`);
@@ -263,16 +266,16 @@ function optionsForm(h: HarnessView, card: ToolCard): HTMLFormElement {
   workspaceChanged.push(fillAgents);
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    const view = chosen();
+    const at = chosen();
     error.textContent = "";
-    if (!view) {
-      error.textContent = "Open a workspace in one of Quadit's windows first.";
+    if (!at) {
+      error.textContent = NO_WORKSPACE.error;
       return;
     }
     const choice: ConnectChoice = {
       harness: h.id,
-      serverId: view.serverId,
-      workspaceId: view.summary.workspace.id,
+      serverId: at.serverId,
+      workspaceId: at.summary.workspace.id,
       methods: [...(cli.box.checked ? ["cli" as const] : []), ...(mcp.box.checked && h.mcp ? ["mcp" as const] : [])],
       agent: workAs.hidden
         ? null
@@ -281,7 +284,7 @@ function optionsForm(h: HarnessView, card: ToolCard): HTMLFormElement {
           : { id: agents.value },
       allowUnattended: unattended.box.checked,
     };
-    reviewConnect(h, () => api.planConnect(choice), card);
+    reviewConnect(h, () => api.planConnect(choice));
   });
   fillAgents();
   return form;
@@ -314,12 +317,18 @@ async function render() {
         ]
       : []),
   );
-  await fillWorkspaces();
   const here = view.harnesses.filter((h) => h.installed || h.connected);
   const away = view.harnesses.filter((h) => !h.installed && !h.connected);
   const addsCommand = !view.cli.found && view.cli.linkInto !== null;
+  // Where the connected tools stand, as far as known in a moment; a card not answered by then asks itself.
+  const known = new Map<string, Handshake | null>();
+  const asked = here
+    .filter((h) => h.connected)
+    .map((h) => api.toolHandshake(h.id).then((handshake) => void known.set(h.id, handshake)));
+  await Promise.race([Promise.all(asked), new Promise((done) => setTimeout(done, FIRST_LOOK_MS))]);
   workspaceChanged = [];
-  cardsBox.replaceChildren(...here.map((h) => toolCard(h, addsCommand).element));
+  cardsBox.replaceChildren(...here.map((h) => toolCard(h, addsCommand, known.get(h.id) ?? null).element));
+  await showTarget();
   // With none found here, the list of tools that are not waits, folded.
   const noneFound = view.supported && here.length === 0;
   element("none-found").hidden = !noneFound;
@@ -338,29 +347,24 @@ async function render() {
   others.replaceChildren(make("span", "Not on this computer:", "lbl"), separated(away.map((h) => h.name)));
 }
 
-/** The workspaces to connect to (those a window shows now), keeping the one chosen. */
-async function fillWorkspaces() {
-  const previous = workspaces.value;
-  views = (await api.summaries()).filter((v) => v.listening);
-  workspaces.replaceChildren(
-    ...views.map((v) => {
-      const option = make("option", `${v.serverName} · ${v.summary.workspace.name}`);
-      option.value = keyOf(v);
-      return option;
-    }),
-  );
-  const first = views.find((v) => v.serverId === askedFor);
-  if (views.some((v) => keyOf(v) === previous)) workspaces.value = previous;
-  else if (first) workspaces.value = keyOf(first);
-  element("no-workspace").hidden = views.length > 0;
+/** The workspace the window under this page shows (it changes as its page publishes), and its agents in the options. */
+async function showTarget() {
+  target = await api.connectTarget();
+  const at = chosen();
+  element("where").textContent = at ? `For ${at.summary.workspace.name} on ${target?.serverName ?? ""}.` : "";
+  element("no-workspace").hidden = !!at;
   for (const changed of workspaceChanged) changed();
 }
 
 element("backups").addEventListener("click", () => void api.showBackups());
-workspaces.addEventListener("change", () => {
-  for (const changed of workspaceChanged) changed();
+element("done").addEventListener("click", () => void api.closeConnect());
+// Escape goes back to the page under this one; with the sheet open, it closes the sheet (files-sheet.ts).
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || document.querySelector("dialog[open]")) return;
+  event.preventDefault();
+  void api.closeConnect();
 });
 
-// The workspaces change as windows come and go; the harnesses only when the page asks again.
-api.onChanged(() => void fillWorkspaces());
+// What the window shows changes as its page publishes; the harnesses only when the page asks again.
+api.onChanged(() => void showTarget());
 void render();

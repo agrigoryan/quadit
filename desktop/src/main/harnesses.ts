@@ -204,7 +204,15 @@ export const HARNESSES: readonly Harness[] = [
       signIn: "In a terminal, run: opencode mcp auth quadit",
     },
   },
-  { id: "pi", name: "pi", initials: "pi", command: "pi", trace: ".pi", skills: ".agents/skills", listenVerified: false },
+  {
+    id: "pi",
+    name: "pi",
+    initials: "pi",
+    command: "pi",
+    trace: ".pi",
+    skills: ".agents/skills",
+    listenVerified: false,
+  },
   {
     id: "copilot",
     name: "GitHub Copilot CLI",

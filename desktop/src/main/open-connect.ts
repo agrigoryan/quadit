@@ -1,15 +1,15 @@
-// A server's page asking the app to open its Connect agents window (the
-// bridge's openConnect, desktop contract §8: the web app's "Connect a tool
-// on this computer"). Only a server's own page may ask (server-windows.ts
-// checks the sender), and the app opens its own window at most once a
-// second however often it is asked: a page cannot flood the screen.
+// A server's page asking the app to lay Connect agents over its window (the
+// bridge's openConnect, desktop contract §8 and §11: the web app's "Connect
+// a tool on this computer"). Only a server's own page may ask
+// (server-windows.ts checks the sender), and the app answers at most once a
+// second however often it is asked: a page cannot keep the app busy.
 
 const ASK_EVERY_MS = 1_000;
 
 export class OpenConnect {
   private last = Number.NEGATIVE_INFINITY;
 
-  /** `open` opens (or focuses) the Connect window for a server; `now` is the time in ms. */
+  /** `open` lays Connect agents over a server's window (or brings it to the front); `now` is the time in ms. */
   constructor(
     private open: (serverId: string) => void,
     private now: () => number = Date.now,

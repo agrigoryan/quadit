@@ -36,7 +36,7 @@ function harness({ covered = "" }: { covered?: string } = {}) {
       uncover: (view) => void said.push(`uncover ${viewId(view)}`),
     },
     target: (serverId): ConnectTarget => ({ serverId, serverName: `Server ${serverId}`, summary: null }),
-    copy: () => {},
+    copy: async () => {},
     showBackups: async () => {},
   });
   /** Calls the page's method `name` as the page in the view `view` (its number) would. */

@@ -11,8 +11,13 @@
     <link rel="stylesheet" href="tools.css" />
   </head>
   <body>
-    <main class="page connect">
-      <h1>Connect agents</h1>
+    <div class="window-strip"></div>
+    <main class="page connect" aria-labelledby="connect-title">
+      <header class="connect-head">
+        <h1 id="connect-title">Connect agents</h1>
+        <button id="done" type="button" class="btn btn-line btn-sm">Done</button>
+      </header>
+      <p id="where" class="hint"></p>
       <p class="hint">
         Connect an AI tool to work in Quadit. You can see every file it changes first, and Disconnect takes it back.
       </p>
@@ -22,11 +27,7 @@
       </p>
 
       <section id="tools" aria-label="Agent tools">
-        <label class="where">
-          <span>Workspace</span>
-          <select id="workspace"></select>
-        </label>
-        <p id="no-workspace" class="hint" hidden>Open a workspace in one of Quadit's windows first.</p>
+        <p id="no-workspace" class="notice" hidden>Open a workspace in this window first.</p>
         <ul id="notices" class="list"></ul>
         <p id="none-found" class="notice" hidden>
           No agent tools found on this computer. Quadit works with Claude Code, Codex, Gemini CLI and others: install

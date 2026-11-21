@@ -191,10 +191,7 @@ function start() {
   // server on this computer's, else the first server's, made and shown; with no server, the list to add one.
   const openConnect = () => {
     const server =
-      windows.focused() ??
-      store.list().find((s) => windows.isShown(s.id)) ??
-      list.localServer() ??
-      store.list()[0];
+      windows.focused() ?? store.list().find((s) => windows.isShown(s.id)) ?? list.localServer() ?? store.list()[0];
     if (server) connect.show(server.id);
     else list.show();
   };

@@ -167,9 +167,7 @@ export interface ConnectView {
  *              workspace): only what Connect wrote is known.
  */
 export type Handshake =
-  | { state: "waiting"; code: string | null }
-  | { state: "connected"; listening: boolean }
-  | { state: "unknown" };
+  { state: "waiting"; code: string | null } | { state: "connected"; listening: boolean } | { state: "unknown" };
 
 /** The window Connect agents is laid over: its server, and the workspace its page shows (null: none yet, or signed out). */
 export interface ConnectTarget {

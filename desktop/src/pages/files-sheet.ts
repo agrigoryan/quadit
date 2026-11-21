@@ -3,7 +3,7 @@
 // first (shared/change-words.ts: what it is, a sentence, the path in small
 // type, what happens to it), then the copy kept and the way back, and the
 // exact changes, file by file, only behind "Show the exact changes". The
-// first run's tools step and the Connect window both use it. Styled by
+// first run's tools step and Connect agents both use it. Styled by
 // tools.css.
 
 import { button, lineIcon, make } from "@/pages/dom";

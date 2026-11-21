@@ -1,9 +1,9 @@
 /*
  * The agent tools' cards (tool-card.ts) and the sheet of what connecting
- * changes (files-sheet.ts), as the first run and the Connect window show
- * them, with the buttons they use. The colours are the web app's dark theme
- * (web/src/styles/tokens.css), named apart from pages.css's, which the
- * Connect window loads too.
+ * changes (files-sheet.ts), as the first run and Connect agents show them,
+ * with the buttons they use. The colours are the web app's dark theme
+ * (web/src/styles/tokens.css), named apart from pages.css's, which Connect
+ * agents loads too.
  */
 
 :root {
@@ -258,8 +258,9 @@ button.link-blue:hover {
 
 .tool .head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 6px 12px;
   min-height: 44px;
   margin-top: -2px;
 }
@@ -334,6 +335,89 @@ button.link-blue:hover {
   box-shadow:
     inset 0 0 0 1px rgb(76 195 138 / 0.35),
     0 1px 2px rgb(0 0 0 / 0.3);
+}
+
+.tool.set-up {
+  box-shadow:
+    inset 0 0 0 1px var(--rule-strong),
+    0 1px 2px rgb(0 0 0 / 0.3);
+}
+
+/*
+ * Where a set-up tool stands: the line to say in it with Copy and the live
+ * wait, or, connected, whether it listens.
+ */
+.stand {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.stand:empty {
+  display: none;
+}
+
+.tool .stand {
+  margin-top: 8px;
+}
+
+.set-up-line {
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.say {
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.say code {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+  font: 600 13.5px/1.4 var(--mono);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.waiting,
+.listen {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* The live wait: a dot that breathes while the card asks. */
+.pulse {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--wait);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.listen.on {
+  color: var(--ok);
+  font-weight: 550;
+}
+
+.tool .unverified {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--ink-3);
 }
 
 .connected {
@@ -605,11 +689,16 @@ button.x .line-icon {
   line-height: 1.55;
 }
 
+/*
+ * Clipped to its corners, not hidden: a box that hides its overflow may be
+ * squeezed to nothing in the sheet's grid, whose height is the window's
+ * (it scrolls), where clip keeps the box as tall as its files.
+ */
 .files {
   display: grid;
   border-radius: 12px;
   box-shadow: inset 0 0 0 1px var(--rule);
-  overflow: hidden;
+  overflow: clip;
 }
 
 .files .file {
@@ -800,7 +889,8 @@ button.x .line-icon {
   .connected,
   .sheet::backdrop,
   .sheet,
-  .spinner {
+  .spinner,
+  .pulse {
     animation: none;
   }
 

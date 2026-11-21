@@ -37,7 +37,7 @@ export interface ConnectPageParts {
   /** What a server's window shows: its server, and the workspace its page published; null for a server not added. */
   target(serverId: string): ConnectTarget | null;
   /** Puts text on the clipboard. */
-  copy(text: string): void;
+  copy(text: string): Promise<void>;
   /** Shows the folder of the backups Connect keeps. */
   showBackups(): Promise<void>;
 }
