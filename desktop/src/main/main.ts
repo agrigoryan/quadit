@@ -17,7 +17,18 @@ import { homedir, hostname, userInfo } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import { app, BrowserWindow, clipboard, dialog, Menu, net, powerMonitor, shell, webContents } from "electron";
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  Menu,
+  net,
+  powerMonitor,
+  shell,
+  type WebContents,
+  webContents,
+} from "electron";
 import { accountName } from "@/main/account-name";
 import { AppPages } from "@/main/app-pages";
 import { Capture } from "@/main/capture";
@@ -29,6 +40,7 @@ import { LocalServer, loopbackPorts } from "@/main/local-server";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
 import { SignInFlows } from "@/main/handoff";
 import { ActivateAfterStart, coldStart, Quiet, secondStart } from "@/main/launch";
+import { QuitGuard } from "@/main/quit";
 import { menuTemplate } from "@/main/menu";
 import { Panel } from "@/main/panel";
 import { loginShellPath, QuaditCli } from "@/main/quadit-cli";
@@ -98,6 +110,30 @@ function start() {
   const quiet = new Quiet(starting.server === "background");
   const activated = new ActivateAfterStart(starting.server === "background");
   app.on("browser-window-focus", () => quiet.seen());
+
+  // Quitting while a page uploads asks the person once (quit.ts); in the background nobody is there to answer, so
+  // nothing waits and the quit goes through.
+  const watchingUpdates = app.isPackaged || !!process.env.QUADIT_DESKTOP_CHECK_UPDATES;
+  const quitting = new QuitGuard<WebContents>({
+    ask: (page) => {
+      const options = {
+        type: "warning" as const,
+        message: "A file is still uploading.",
+        detail: "If you quit now, the upload is lost.",
+        buttons: ["Don't quit", "Quit"],
+        defaultId: 0,
+        cancelId: 0,
+      };
+      const win = BrowserWindow.fromWebContents(page);
+      const answer = win ? dialog.showMessageBoxSync(win, options) : dialog.showMessageBoxSync(options);
+      return answer === 1 ? "quit" : "stay";
+    },
+    inBackground: () => quiet.holding,
+    stayed: () => {
+      windows.stayOpen();
+      if (watchingUpdates) updates.start();
+    },
+  });
 
   const fetcher = (url: string, init?: RequestInit) => net.fetch(url, init);
   const checks = new ServerChecks(store, fetcher, (words) => quiet.say(() => void warn(words)));
@@ -170,6 +206,7 @@ function start() {
     openConnect: (serverId) => connect.asked(serverId),
     signInWithoutForm: (serverId, fetch) =>
       serverId === list.localServer()?.id ? local.signInOwner(fetch) : Promise.resolve(false),
+    letUnload: (contents) => quitting.letGo(contents),
     isSignedIn: (serverId, fetch) =>
       serverId === list.localServer()?.id ? local.isSignedIn(fetch) : Promise.resolve(false),
   });
@@ -346,6 +383,7 @@ function start() {
     if (!BrowserWindow.getAllWindows().some((win) => win.isVisible())) list.show();
   });
   app.on("before-quit", () => {
+    quitting.quitBegan();
     windows.quit();
     updates.stop();
   });
@@ -384,7 +422,7 @@ function start() {
   // The app may have been updated, and its quadit with it: the skills Connect wrote follow, silently, in the
   // background too. One not refreshed now (no quadit answered) is at the next start.
   void connections.refreshSkills().catch(() => {});
-  if (app.isPackaged || process.env.QUADIT_DESKTOP_CHECK_UPDATES) updates.start();
+  if (watchingUpdates) updates.start();
   // Only now that the windows are made: making one can run the system's
   // event loop, which may hand in a link, and handled then it would make
   // the server list a second time while the first is still being made.

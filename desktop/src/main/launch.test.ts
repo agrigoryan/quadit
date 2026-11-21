@@ -62,7 +62,9 @@ describe("Quiet", () => {
     quiet.say(() => said.push("the first run"));
     quiet.say(() => said.push("a server no longer fits"));
     expect(said).toEqual([]);
+    expect(quiet.holding).toBe(true);
     quiet.seen();
+    expect(quiet.holding).toBe(false);
     expect(said).toEqual(["the first run", "a server no longer fits"]);
     quiet.seen();
     expect(said).toHaveLength(2);

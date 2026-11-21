@@ -143,6 +143,12 @@ export interface WindowsSetup {
   isSignedIn(serverId: string, fetch: Fetch): Promise<boolean>;
   /** A server's page asked for Connect agents over its window (open-connect.ts); connect-page.ts decides. */
   openConnect(serverId: string): void;
+  /**
+   * A server's page (`contents`) holds on to itself as it would be unloaded
+   * (its beforeunload: an upload under way): whether it is let go
+   * (quit.ts). Not let go, it stays, as a browser's page does.
+   */
+  letUnload(contents: WebContents): boolean;
 }
 
 export class ServerWindows {
@@ -447,6 +453,11 @@ export class ServerWindows {
     this.quitting = true;
   }
 
+  /** The quit was given up (the person chose to stay): closing a window hides it again. */
+  stayOpen() {
+    this.quitting = false;
+  }
+
   /**
    * The computer woke: a window whose page could not be loaded tries again,
    * and every loaded page is told the network may be back ("online"), which
@@ -682,6 +693,10 @@ export class ServerWindows {
       this.setup.requests.forget(reporter);
     });
     giveContextMenu(contents);
+    // Its beforeunload (an upload under way) would end a quit without a word; the app decides (quit.ts).
+    contents.on("will-prevent-unload", (event) => {
+      if (this.setup.letUnload(contents)) event.preventDefault();
+    });
 
     const stopIfAway = (event: { preventDefault(): void }, url: string) => {
       const server = this.store.get(serverId);

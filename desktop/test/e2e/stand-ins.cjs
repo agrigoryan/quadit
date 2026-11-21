@@ -6,7 +6,7 @@
 //   shell.openExternal          records the address instead of opening the system browser
 //   Notification.prototype.show records the notification instead of showing it
 //   dialog.showMessageBox       records the message and answers with its cancel button, or with the
-//                               button a test asked for (e2e.answers, first in first out)
+//   dialog.showMessageBoxSync   button a test asked for (e2e.answers, first in first out)
 //   app.setBadgeCount           records the count (macOS shows a badge only once the app may
 //                               notify, which a test cannot wait for, so the system's own is unreliable)
 //
@@ -37,4 +37,9 @@ dialog.showMessageBox = async (...args) => {
   const options = args.at(-1);
   recorded.dialogs.push(`${options.message} ${options.detail ?? ""}`.trim());
   return { response: recorded.answers.shift() ?? options.cancelId ?? 0, checkboxChecked: false };
+};
+dialog.showMessageBoxSync = (...args) => {
+  const options = args.at(-1);
+  recorded.dialogs.push(`${options.message} ${options.detail ?? ""}`.trim());
+  return recorded.answers.shift() ?? options.cancelId ?? 0;
 };

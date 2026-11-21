@@ -76,6 +76,11 @@ export class Quiet {
   /** `background`: the app was started with --background. */
   constructor(private quiet: boolean) {}
 
+  /** Whether it holds what the app says: it runs in the background, and the person has not opened it since. */
+  get holding(): boolean {
+    return this.quiet;
+  }
+
   /** Told to start in the background while running: quiet until the person next opens it. */
   background() {
     this.quiet = true;
