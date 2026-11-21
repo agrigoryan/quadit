@@ -94,6 +94,8 @@ test("the first run sets Quadit up on this computer in one window, connects the 
     await expect(card.getByText(/^Connect to Quadit \S{6}$/)).toBeVisible();
     await expect(card.getByText("Waiting for Claude Code…")).toBeVisible();
     await expect(first.getByText("Joined just now")).toBeVisible();
+    // Set up is not connected: the step says so until the tool gives its code back.
+    await expect(first.getByText("1 set up", { exact: true })).toBeVisible();
     await expect(first.getByText("Connect more later from the Agents page.")).toBeVisible();
     await expect(first.getByRole("button", { name: "Skip for now" })).toBeHidden();
     await screen(first, "07-set-up-waiting.png");

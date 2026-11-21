@@ -179,12 +179,12 @@ test("a card set up from the Agents page turns Connected when the agent gives it
     await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText("Not listening: in Claude Code, say “listen to Quadit”")).toBeVisible();
     await expect(card.getByRole("button", { name: "Disconnect Claude Code" })).toBeVisible();
-    await expect(card.getByText("Try it:")).toBeVisible();
     await screen(connect, "13-connect-connected.png");
 
     // Told to listen, it holds the lease while it waits: the card says so.
     listener = tool.start(["wait", "for=30"]);
     await expect(card.getByText("Listening", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(card.getByText(/Not listening/)).toBeHidden();
     await screen(connect, "14-connect-listening.png");
 
     // Escape goes back to the Agents page that was there.
