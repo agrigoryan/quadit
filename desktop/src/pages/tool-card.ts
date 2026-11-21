@@ -2,21 +2,23 @@
 // and Connect agents both show it, so the two never look like different
 // products: a neutral tile with the tool's initials (no logos), its name,
 // "Found on this computer", what connecting gives, and what it changes on
-// disk with "See the files". Its three states:
+// disk with "See the files". Its states:
 //   found      "Connect";
 //   set up     written on this computer, waiting for the tool: the line to
-//              say in it (`Connect to Quadit ABC123`) with Copy, a live
+//              say in it (`Connect to Quadit ABC234`) with Copy, a live
 //              "Waiting for Codex…", "New code" when it has none, and Undo;
-//   connected  the agent gave the code back: "Connected", whether it
-//              listens, how to try it, and Disconnect.
-// A set-up card asks the app where its tool stands every couple of seconds
-// while it is on the page (main/handshake.ts says how the server's answer is
-// read); where the server cannot say, it shows "Connected" as written, as
-// before connecting was proven. A tool whose listening was not verified says
-// so, quietly. A failure shows on the card with "Try again". Styled by
-// tools.css.
+//   connected  the server says the agent gave the code back: "Connected",
+//              and whether it listens or how to have it listen; Disconnect;
+// and, set up but where it stands not known here (it works as another
+// server's login, or no answer came yet), a plain line saying so, never
+// "Connected". A set-up card asks the app where its tool stands every couple
+// of seconds while it is on the page (main/handshake.ts says how the
+// server's answer is read; no answer changes nothing). A tool whose
+// listening was not verified says so, quietly. A failure shows on the card
+// with "Try again". Styled by tools.css.
 
 import { button, lineIcon, make } from "@/pages/dom";
+import { isConnectCode } from "@/shared/bridge";
 import { diskLine, unrevokedWords } from "@/shared/change-words";
 import type { Disconnected, Handshake, PagesApi, Refused } from "@/shared/pages-api";
 
@@ -47,14 +49,18 @@ export interface CardActions {
   connect(planId?: string): Promise<{ ok: true; agent?: string | null } | Refused>;
   /**
    * Takes the connection back (Undo while it waits for the tool, Disconnect
-   * once connected). Gives what the person should know after, which the card
+   * otherwise). Gives what the person should know after, which the card
    * shows (a token to revoke by hand).
    */
   back(): Promise<Disconnected | Refused>;
   /** Opens what connecting it changes (the sheet). */
   seeFiles(): void;
-  /** Told after the card connected (as the agent with that handle, when known) or was taken back. */
-  changed(connected: boolean, agent: string | null): void;
+  /**
+   * Told whenever the card's state changes: set up (`agent`: the handle of
+   * the workspace's agent it works as, null for none), taken back, or
+   * where the tool stands (`agent` undefined then).
+   */
+  changed(agent?: string | null): void;
 }
 
 /** A tile with a tool's initials; `small` for the lists of names. */
@@ -67,7 +73,7 @@ export function tile(initials: string, className = ""): HTMLSpanElement {
 export class ToolCard {
   readonly element: HTMLElement;
   /** Whether Connect has set it up on this computer (written). */
-  private connected = false;
+  private setUp = false;
   /** Where it stands with Quadit once set up; null until the app has said. */
   private handshake: Handshake | null = null;
   private addsCommand: boolean;
@@ -81,7 +87,6 @@ export class ToolCard {
   private error: HTMLParagraphElement;
   private note: HTMLParagraphElement;
   private caution: HTMLParagraphElement;
-  private tryIt: HTMLParagraphElement;
   private connectButton: HTMLButtonElement;
   /** Room under the card's text for what a page adds (Connect agents' More options). */
   readonly extra: HTMLDivElement;
@@ -130,28 +135,28 @@ export class ToolCard {
     this.caution.hidden = true;
     body.append(head, this.stand, this.gives, disk, unverified, this.error, this.note, this.caution, this.extra);
 
-    this.tryIt = make("p", "", "try");
-    const tryLabel = make("b", "Try it:");
-    const ask = make("q", "what is on my Quadit list?");
-    this.tryIt.append(tryLabel, ` in ${tool.name}, ask `, ask);
-
-    card.append(this.tileEl, body, this.tryIt);
+    card.append(this.tileEl, body);
     this.element = card;
     this.show();
   }
 
-  /** Whether Connect has set it up on this computer. */
+  /** Whether Connect has set it up on this computer: its files are written, whether or not the tool reached Quadit. */
+  get isSetUp(): boolean {
+    return this.setUp;
+  }
+
+  /** Whether the server says the tool's agent proved it reached Quadit (its code given back). */
   get isConnected(): boolean {
-    return this.connected;
+    return this.setUp && this.handshake?.state === "connected";
   }
 
   /**
    * Shows the card set up (or not) without doing anything: what the page
    * found it to be, with where it stands when the page knows (else the card asks).
    */
-  markConnected(connected: boolean, handshake: Handshake | null = null) {
-    this.connected = connected;
-    this.handshake = connected ? handshake : null;
+  markSetUp(setUp: boolean, handshake: Handshake | null = null) {
+    this.setUp = setUp;
+    this.handshake = setUp ? handshake : null;
     this.show();
     this.watch(handshake === null);
   }
@@ -168,7 +173,7 @@ export class ToolCard {
    * says why). Where the tool stands then is asked after, never waited for.
    */
   async run(planId?: string): Promise<{ ok: true; agent?: string | null } | Refused> {
-    if (this.connected) return { ok: true };
+    if (this.setUp) return { ok: true };
     this.error.textContent = "";
     this.note.textContent = "";
     this.caution.hidden = true;
@@ -182,38 +187,39 @@ export class ToolCard {
       this.error.textContent = done.error;
       return done;
     }
-    this.markConnected(true);
-    this.actions.changed(true, done.agent ?? null);
+    this.markSetUp(true);
+    this.actions.changed(done.agent ?? null);
     return done;
   }
 
   /** Asks where the tool stands now, unless the card is gone from its page or not set up; shows it when it changed. */
   private async ask() {
-    if (this.asking || !this.connected) return;
+    if (this.asking || !this.setUp) return;
     this.asking = true;
     const now = await api.toolHandshake(this.tool.id).finally(() => (this.asking = false));
-    if (!this.connected) return;
+    if (!this.setUp) return;
     if (now === null) {
       // Taken back elsewhere (another page of the app).
-      this.markConnected(false);
-      this.actions.changed(false, null);
+      this.markSetUp(false);
+      this.actions.changed();
       return;
     }
     if (JSON.stringify(now) === JSON.stringify(this.handshake)) return;
     this.handshake = now;
     this.show();
+    this.actions.changed();
   }
 
   /** Asks every couple of seconds while the card is set up and on its page; `now`: once at once, too. */
   private watch(now: boolean) {
-    if (!this.connected) {
+    if (!this.setUp) {
       clearInterval(this.timer);
       this.timer = undefined;
       return;
     }
     if (now) void this.ask();
     this.timer ??= setInterval(() => {
-      if (this.connected && this.element.isConnected) return void this.ask();
+      if (this.setUp && this.element.isConnected) return void this.ask();
       clearInterval(this.timer);
       this.timer = undefined;
     }, ASK_EVERY_MS);
@@ -228,9 +234,9 @@ export class ToolCard {
       this.error.textContent = done.error;
       return;
     }
-    this.markConnected(false);
+    this.markSetUp(false);
     this.takenBack(done);
-    this.actions.changed(false, null);
+    this.actions.changed();
   }
 
   /**
@@ -250,7 +256,7 @@ export class ToolCard {
     }
   }
 
-  /** A new connect code, for a set-up tool that has none (it ran out); the card shows its line once made. */
+  /** A new connect code, for a set-up tool that has none (gone, or run out); the card shows its line once made. */
   private async newCode(control: HTMLButtonElement) {
     this.error.textContent = "";
     control.disabled = true;
@@ -264,51 +270,71 @@ export class ToolCard {
   }
 
   private show() {
-    const { tool, connected, handshake } = this;
+    const { tool, setUp, handshake } = this;
     // Set up, the server has not said yet or says the agent has not proven it: it waits for the tool.
-    const waiting = connected && (handshake === null || handshake.state === "waiting");
-    const proven = connected && !waiting;
-    this.element.classList.toggle("done", proven);
-    this.element.classList.toggle("set-up", waiting);
-    this.tileEl.classList.toggle("member", connected);
+    const stands = !setUp
+      ? "found"
+      : handshake?.state === "connected" || handshake?.state === "unknown"
+        ? handshake.state
+        : "waiting";
+    this.element.classList.toggle("done", stands === "connected");
+    this.element.classList.toggle("set-up", stands === "waiting" || stands === "unknown");
+    this.tileEl.classList.toggle("member", setUp);
     const where = tool.worksAs ? " using this computer’s login" : " here";
-    this.gives.textContent = `${tool.name} ${proven ? "can now" : "will be able to"} take tasks, ask you questions and report back${where}.`;
-    this.diskText.textContent = diskLine(tool, this.addsCommand && !connected, connected);
-    this.tryIt.hidden = !proven;
+    this.gives.textContent = `${tool.name} ${stands === "connected" ? "can now" : "will be able to"} take tasks, ask you questions and report back${where}.`;
+    this.diskText.textContent = diskLine(tool, this.addsCommand && !setUp, setUp);
 
-    if (!connected) {
+    if (stands === "found") {
       this.connectButton.textContent = "Connect";
       this.connectButton.setAttribute("aria-label", `Connect ${tool.name}`);
       this.act.replaceChildren(this.connectButton);
       this.stand.replaceChildren();
       return;
     }
-    const label = waiting ? "Undo" : "Disconnect";
+    const label = stands === "waiting" ? "Undo" : "Disconnect";
     const back = button(label, () => void this.takeBack(back), "undo", `${label} ${tool.name}`);
-    if (waiting) {
-      this.act.replaceChildren(back);
-      this.stand.replaceChildren(...this.waitingLines(handshake?.state === "waiting" ? handshake.code : undefined));
+    if (handshake?.state === "connected") {
+      const badge = make("span", "", "connected");
+      badge.setAttribute("role", "status");
+      badge.append(lineIcon(["M20 6 9 17l-5-5"]), document.createTextNode("Connected"));
+      this.act.replaceChildren(badge, back);
+      this.stand.replaceChildren(this.listening(handshake.listening));
       return;
     }
-    const badge = make("span", "", "connected");
-    badge.setAttribute("role", "status");
-    badge.append(lineIcon(["M20 6 9 17l-5-5"]), document.createTextNode("Connected"));
-    this.act.replaceChildren(badge, back);
-    this.stand.replaceChildren(...(handshake?.state === "connected" ? [this.listening(handshake.listening)] : []));
+    this.act.replaceChildren(back);
+    if (handshake?.state === "unknown")
+      this.stand.replaceChildren(
+        make("p", `Set up on ${HERE}. Whether it reached Quadit is not known here.`, "set-up-line"),
+      );
+    else this.stand.replaceChildren(...this.waitingLines(handshake));
   }
 
   /**
    * What a set-up card says while it waits for the tool: with a code, the
-   * line to say in the tool, its Copy and the live wait; without one (it ran
-   * out), "New code"; `code` undefined: the app has not said yet.
+   * line to say in the tool, its Copy and the live wait; without one (gone
+   * or run out), "New code", or, when making one failed, why and "Try
+   * again"; before the app has said, only that it is set up. Only a code is
+   * ever put in the line the person pastes into their agent (isConnectCode).
    */
-  private waitingLines(code: string | null | undefined): HTMLElement[] {
+  private waitingLines(handshake: Extract<Handshake, { state: "waiting" }> | null): HTMLElement[] {
     const { name } = this.tool;
-    if (code === undefined) return [make("p", `Set up on ${HERE}.`, "set-up-line")];
+    if (!handshake) return [make("p", `Set up on ${HERE}.`, "set-up-line")];
     const lead = make("p", `Set up on ${HERE}. Now open ${name} and say:`, "set-up-line");
-    if (code === null) {
-      const again = button("New code", () => void this.newCode(again), "btn btn-line btn-sm", `New code for ${name}`);
-      return [lead, again];
+    const { code, refused } = handshake;
+    if (!isConnectCode(code)) {
+      if (!refused) {
+        const again = button("New code", () => void this.newCode(again), "btn btn-line btn-sm", `New code for ${name}`);
+        return [lead, again];
+      }
+      const why = make("p", refused, "card-error");
+      why.setAttribute("role", "alert");
+      const again = button(
+        "Try again",
+        () => void this.newCode(again),
+        "btn btn-line btn-sm",
+        `Try making a code for ${name} again`,
+      );
+      return [lead, why, again];
     }
     const line = `Connect to Quadit ${code}`;
     const say = make("p", "", "say");

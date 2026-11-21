@@ -160,12 +160,13 @@ const foot = element<HTMLElement>("tools-foot");
 let tools: ToolView[] = [];
 let cards: ToolCard[] = [];
 /**
- * The tools connected in this step, in the order they were, with the handle
- * of the workspace's agent each works as (null: none of this workspace, a
- * tool on this computer's login elsewhere). The first with an agent gets the
- * third sample task.
+ * The tools set up in this step, in the order they were, with the handle of
+ * the workspace's agent each works as (null: none of this workspace, a tool
+ * on this computer's login elsewhere). The first with an agent gets the
+ * third sample task. Set up is not connected: a tool is connected once its
+ * card says the server has its code back (ToolCard.isConnected).
  */
-const connectedAs = new Map<string, string | null>();
+const setUpAs = new Map<string, string | null>();
 /** The whole batch the person asked for, including tools still waiting their turn. */
 let connectingAll: Promise<void> | undefined;
 
@@ -177,7 +178,7 @@ async function look() {
   none.hidden = true;
   checking.replaceChildren();
   cards = [];
-  connectedAs.clear();
+  setUpAs.clear();
   renderProgress();
   const result = await api.lookForTools();
   await goDown(result.tools, lookingPace(result.tools.length, performance.now() - began));
@@ -225,15 +226,15 @@ function showFound(result: FoundTools, onComputer: ToolView[]) {
           tool,
           kind: "connect",
           plan: () => api.toolChanges(tool.id),
-          action: card.isConnected ? undefined : { label: `Connect ${tool.name}`, run: (planId) => card.run(planId) },
+          action: card.isSetUp ? undefined : { label: `Connect ${tool.name}`, run: (planId) => card.run(planId) },
         }),
-      changed: (connected, agent) => {
-        if (connected && addsCommand) {
+      changed: (agent) => {
+        if (card.isSetUp && addsCommand) {
           addsCommand = false;
           for (const other of cards) other.commandAdded();
         }
-        if (connected) connectedAs.set(tool.id, agent);
-        else connectedAs.delete(tool.id);
+        if (!card.isSetUp) setUpAs.delete(tool.id);
+        else if (agent !== undefined) setUpAs.set(tool.id, agent);
         renderProgress();
       },
     });
@@ -264,13 +265,22 @@ function showNone() {
   renderProgress();
 }
 
-/** What changes as tools connect: the count, Connect all, the footer, the members and the example. */
+/**
+ * What changes as tools are set up and connect: the count ("1 set up", then
+ * "1 connected" once the tool gave its code back), Connect all, the footer,
+ * the members and the example.
+ */
 function renderProgress() {
   const total = cards.length;
-  const done = connectedAs.size;
+  const done = setUpAs.size;
+  const connected = cards.filter((card) => card.isConnected).length;
   const left = total - done;
-  element("count").textContent =
-    done === 0 ? `${total} found` : left === 0 ? `${done} connected` : `${done} connected, ${left} to go`;
+  const counts = [
+    connected > 0 ? `${connected} connected` : "",
+    done > connected ? `${done - connected} set up` : "",
+    left > 0 ? `${left} to go` : "",
+  ];
+  element("count").textContent = done === 0 ? `${total} found` : counts.filter(Boolean).join(", ");
   connectAll.hidden = left < 2;
   connectAll.textContent = left === 2 ? "Connect both (2)" : `Connect all (${left})`;
   skip.hidden = done > 0;
@@ -326,18 +336,18 @@ function renderMembers() {
   } else {
     for (const card of cards) {
       const { tool } = card;
-      const agent = connectedAs.get(tool.id);
+      const agent = setUpAs.get(tool.id);
       rows.push(
         agent
           ? member(
               avatar(tool.initials, "agent", colourOf(tool.id)),
               tool.name,
               `Agent @${agent}`,
-              tool.worksAs ? "Connected" : "Joined just now",
+              tool.worksAs ? (card.isConnected ? "Connected" : "Set up") : "Joined just now",
               "ok",
             )
-          : card.isConnected
-            ? // Connected as this computer's login, which is no agent of this workspace.
+          : card.isSetUp
+            ? // Set up as this computer's login, which is no agent of this workspace.
               member(
                 avatar(tool.initials, "place"),
                 tool.name,
@@ -351,21 +361,20 @@ function renderMembers() {
     }
   }
   list.replaceChildren(...rows);
-  const agents = new Set([...connectedAs.values()].filter(Boolean)).size;
+  const agents = new Set([...setUpAs.values()].filter(Boolean)).size;
   element("member-count").textContent =
     agents === 0 ? "1 person" : `1 person, ${agents} ${agents === 1 ? "agent" : "agents"}`;
 
-  // The example: a task like the third sample, handed to the first tool connected (or the first found).
+  // The example: a task like the third sample, handed to the first tool set up (or the first found).
   const example = element<HTMLElement>("example");
   example.hidden = state === "looking";
   const first = person.split(/\s+/)[0] || "you";
   element("example-title").textContent = `Say hello and tell ${first} what you can do`;
-  const firstAgent = [...connectedAs].find(([, agent]) => agent);
-  const connectedFirst = cards.find((c) => c.tool.id === firstAgent?.[0]);
-  const shown = connectedFirst ?? cards.find((card) => !card.isConnected);
-  const agentName =
-    connectedFirst?.tool.worksAs && firstAgent ? `@${firstAgent[1]}` : (shown?.tool.name ?? "Your agent");
-  const filled = !!connectedFirst;
+  const firstAgent = [...setUpAs].find(([, agent]) => agent);
+  const setUpFirst = cards.find((c) => c.tool.id === firstAgent?.[0]);
+  const shown = setUpFirst ?? cards.find((card) => !card.isSetUp);
+  const agentName = setUpFirst?.tool.worksAs && firstAgent ? `@${firstAgent[1]}` : (shown?.tool.name ?? "Your agent");
+  const filled = !!setUpFirst;
   const exampleAvatar = () =>
     filled && shown
       ? avatar(shown.tool.initials, "agent", colourOf(shown.tool.id), true)
@@ -484,11 +493,11 @@ connectForm.addEventListener("submit", (event) => {
 addInsecure.addEventListener("click", () => void addServer(true));
 // The yes was for the address shown: another address asks again.
 address.addEventListener("input", () => (addInsecure.hidden = true));
-/** Connects the tools not connected yet, one after another. */
+/** Sets up the tools not set up yet, one after another. */
 async function connectTheRest() {
   connectAll.disabled = true;
   for (const card of cards) {
-    if (!card.isConnected) await card.run();
+    if (!card.isSetUp) await card.run();
   }
   connectAll.disabled = false;
 }

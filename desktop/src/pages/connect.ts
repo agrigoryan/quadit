@@ -142,12 +142,12 @@ function toolCard(h: HarnessView, addsCommand: boolean, handshake: Handshake | n
     },
     back: () => reviewDisconnect(h),
     seeFiles: () => {
-      if (card.isConnected) void reviewDisconnect(h);
+      if (card.isSetUp) void reviewDisconnect(h);
       else reviewConnect(h, plainPlan);
     },
     changed: () => {},
   });
-  card.markConnected(!!h.connected, handshake);
+  card.markSetUp(!!h.connected, handshake);
   const left = takenBack.get(h.id);
   if (h.connected) takenBack.delete(h.id);
   else if (left) card.takenBack(left);
