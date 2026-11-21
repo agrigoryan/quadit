@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -40,18 +41,42 @@ const stoppedFile = "server-stopped"
 const (
 	appStarted     = "Quadit was not running; started it."
 	appNotStarted  = "Quadit could not be started: open the Quadit app."
+	appSilent      = "Quadit is running but its server does not answer: look at the Quadit menu."
 	appStoppedNote = "Quadit's server is stopped: start it from the Quadit menu."
 )
 
-// appStarter starts the app in the background. The real one runs the
-// system's command; tests give one of their own.
+// appStarter starts the app in the background, and says whether it is
+// running already: on macOS, starting a running app would only bring its
+// window forward, without telling it anything. The real one runs the
+// system's commands; tests give one of their own.
 type appStarter interface {
+	running() bool
 	start(app appLogin) error
 }
 
 // systemStarter starts the app with the command appCommand gives, never
 // through a shell.
 type systemStarter struct{}
+
+// running reports whether the app runs: on macOS, whether the system knows
+// an application of its bundle id (lsappinfo, which needs no permission,
+// and finds the app wherever its bundle is and whatever it is called). On
+// Linux a second start of the app hands its arguments to the first, so it
+// is always started.
+func (systemStarter) running() bool {
+	if runtime.GOOS != "darwin" {
+		return false
+	}
+	argv := runningCommand()
+	out, err := exec.Command(argv[0], argv[1:]...).Output() //nolint:gosec // a fixed argument list
+	return err == nil && appFound(out)
+}
+
+// runningCommand asks macOS for a running application of the app's bundle
+// id; appFound reads its answer, which names the application, or is empty.
+func runningCommand() []string { return []string{"lsappinfo", "find", "bundleid=" + appBundleID} }
+
+func appFound(out []byte) bool { return strings.Contains(string(out), "ASN:") }
 
 func (systemStarter) start(app appLogin) error {
 	argv, err := appCommand(runtime.GOOS, app)
@@ -113,8 +138,14 @@ func (a *appStart) revive(ctx context.Context, client *http.Client, base string,
 	if _, err := os.Stat(filepath.Join(a.dir, stoppedFile)); err == nil {
 		return false, appStoppedNote
 	}
-	if err := a.starter.start(a.login); err != nil {
-		return false, appNotStarted
+	// An app that runs already is only waited for: its server may be on its way.
+	running := a.starter.running()
+	failed := appSilent
+	if !running {
+		if err := a.starter.start(a.login); err != nil {
+			return false, appNotStarted
+		}
+		failed = appNotStarted
 	}
 	ctx, cancel := context.WithTimeout(ctx, a.within)
 	defer cancel()
@@ -126,13 +157,15 @@ func (a *appStart) revive(ctx context.Context, client *http.Client, base string,
 		if resp, err := client.Do(req); err == nil {
 			resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
-				fmt.Fprintln(a.stderr, appStarted)
+				if !running {
+					fmt.Fprintln(a.stderr, appStarted)
+				}
 				return true, ""
 			}
 		}
 		select {
 		case <-ctx.Done():
-			return false, appNotStarted
+			return false, failed
 		case <-time.After(250 * time.Millisecond):
 		}
 	}

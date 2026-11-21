@@ -18,12 +18,16 @@ import (
 )
 
 // fakeStarter stands in for starting the app: it counts its starts, and
-// with serve brings a server up on the address that was refused.
+// with serve brings a server up on the address that was refused; with
+// already it says the app runs.
 type fakeStarter struct {
-	starts int
-	serve  func()
-	fail   error
+	starts  int
+	serve   func()
+	fail    error
+	already bool
 }
+
+func (f *fakeStarter) running() bool { return f.already }
 
 func (f *fakeStarter) start(appLogin) error {
 	f.starts++
@@ -92,6 +96,29 @@ func TestTheCommandStartsTheAppWhenItsServerIsNotRunning(t *testing.T) {
 			if err == nil || !strings.HasSuffix(err.Error(), "\n  Quadit could not be started: open the Quadit app.") || stderr.Len() != 0 {
 				t.Fatalf("%s: the request ended with %v, stderr %q", name, err, stderr.String())
 			}
+		}
+	})
+
+	t.Run("running already: nothing started, the server waited for", func(t *testing.T) {
+		base, up := downServer(t)
+		starter := &fakeStarter{already: true}
+		var stderr bytes.Buffer
+		go func() {
+			time.Sleep(100 * time.Millisecond) // the server comes up while the command waits
+			up()
+		}()
+		text, err := appClient(base, t.TempDir(), starter, &stderr).Text(context.Background(), "/me", nil)
+		if err != nil || text != "you are @codex\n" || starter.starts != 0 || stderr.Len() != 0 {
+			t.Fatalf("the request answered %q, %v after %d starts; stderr %q", text, err, starter.starts, stderr.String())
+		}
+	})
+
+	t.Run("running already and its server never answering: the error says to look at its menu", func(t *testing.T) {
+		base, _ := downServer(t)
+		starter := &fakeStarter{already: true}
+		_, err := appClient(base, t.TempDir(), starter, io.Discard).Text(context.Background(), "/me", nil)
+		if err == nil || !strings.HasSuffix(err.Error(), "\n  Quadit is running but its server does not answer: look at the Quadit menu.") || starter.starts != 0 {
+			t.Fatalf("the request ended with %v after %d starts", err, starter.starts)
 		}
 	})
 
@@ -187,6 +214,13 @@ func TestTheAppIsStartedWithoutAShell(t *testing.T) {
 	}
 	if _, err := appCommand("windows", appLogin{Path: `C:\Quadit\Quadit.exe`}); err == nil {
 		t.Fatal("Windows: an app was to be started")
+	}
+	// Whether it runs on macOS is asked by its bundle id; the answer names it, or is empty.
+	if argv := runningCommand(); !slices.Equal(argv, []string{"lsappinfo", "find", "bundleid=io.github.agrigoryan.quadit"}) {
+		t.Fatalf("running is asked with %q", argv)
+	}
+	if !appFound([]byte("ASN:0x0-0xe08e08-\"Quadit\":\n")) || appFound([]byte("\n")) {
+		t.Fatal("lsappinfo's answer is misread")
 	}
 }
 
