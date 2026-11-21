@@ -230,11 +230,13 @@ test("the minimum-size first-run window keeps Welcome and both setup choices rea
     const first = await desktop.firstRun();
     const setup = first.getByRole("button", { name: "Set up on this computer", exact: true });
     await expect(setup).toBeVisible();
-    await desktop.app.evaluate(({ BrowserWindow }) => {
-      const win = BrowserWindow.getAllWindows().find((w) => w.isVisible())!;
-      const [width, height] = win.getMinimumSize();
-      win.setSize(width, height);
+    const contentHeight = await desktop.app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w.isVisible());
+      if (!win) throw new Error("Welcome has no visible window");
+      win.setSize(480, 400);
+      return win.getContentBounds().height;
     });
+    await expect.poll(() => first.evaluate(() => innerHeight)).toBe(contentHeight);
     const logo = first.locator(".mark");
     await logo.scrollIntoViewIfNeeded();
     await expect(logo).toBeInViewport({ ratio: 1 });
