@@ -186,23 +186,42 @@ func (s *Store) Write(ctx context.Context, workspaceID string, fn func(store.Tx)
 		if err != nil {
 			return err
 		}
-		write := &writeTx{conn: conn{runner: r, workspaceID: workspaceID}, seq: seq}
-		if err := fn(write); err != nil {
-			return err
-		}
-		if write.seq == seq {
-			return nil
-		}
-		if _, err = r.exec(ctx, `UPDATE workspaces SET seq = ?, updated_at = ? WHERE id = ?`, write.seq, time.Now().UnixMilli(), workspaceID); err != nil {
-			return err
-		}
-		if s.d.notify != nil {
-			// Tell every server sharing this database that the feed moved.
-			// The database delivers it when, and only if, this write commits.
-			err = s.d.notify.feedMoved(ctx, r, workspaceID, write.seq)
-		}
-		return err
+		return s.writeIn(ctx, r, workspaceID, seq, fn)
 	})
+}
+
+// CreateWorkspace adds the workspace ws and writes to it in the same
+// transaction. The new row holds the workspace's lock until the commit, as
+// Write's first statement does.
+func (s *Store) CreateWorkspace(ctx context.Context, ws core.Workspace, fn func(store.Tx) error) error {
+	return s.inTx(ctx, func(r runner) error {
+		if err := (conn{runner: r}).Insert(ctx, ws); err != nil {
+			return err
+		}
+		return s.writeIn(ctx, r, ws.ID, ws.Seq, fn)
+	})
+}
+
+// writeIn runs fn as a write to the workspace inside the transaction r,
+// whose last event number is seq, and then records the numbers fn handed
+// out.
+func (s *Store) writeIn(ctx context.Context, r runner, workspaceID string, seq int64, fn func(store.Tx) error) error {
+	write := &writeTx{conn: conn{runner: r, workspaceID: workspaceID}, seq: seq}
+	if err := fn(write); err != nil {
+		return err
+	}
+	if write.seq == seq {
+		return nil
+	}
+	if _, err := r.exec(ctx, `UPDATE workspaces SET seq = ?, updated_at = ? WHERE id = ?`, write.seq, time.Now().UnixMilli(), workspaceID); err != nil {
+		return err
+	}
+	if s.d.notify != nil {
+		// Tell every server sharing this database that the feed moved.
+		// The database delivers it when, and only if, this write commits.
+		return s.d.notify.feedMoved(ctx, r, workspaceID, write.seq)
+	}
+	return nil
 }
 
 // WorkspaceID is the workspace the write is to.

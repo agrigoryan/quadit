@@ -230,6 +230,13 @@ type Store interface {
 	// safe, and events get their numbers in the order they commit.
 	Write(ctx context.Context, workspaceID string, fn func(Tx) error) error
 
+	// CreateWorkspace runs fn in one transaction that first adds the
+	// workspace ws and then writes to it as Write does, so a new workspace
+	// and its first rows and events are there together or not at all. A
+	// workspace whose id or slug is taken is ErrConflict, and nothing is
+	// written.
+	CreateWorkspace(ctx context.Context, ws core.Workspace, fn func(Tx) error) error
+
 	// Atomic runs fn in one transaction outside any workspace's sequence,
 	// for sign-in, settings and other install-level writes.
 	Atomic(ctx context.Context, fn func(DB) error) error

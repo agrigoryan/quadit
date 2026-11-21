@@ -277,6 +277,12 @@ func (s *faultyStore) Write(ctx context.Context, workspaceID string, fn func(sto
 	})
 }
 
+func (s *faultyStore) CreateWorkspace(ctx context.Context, ws core.Workspace, fn func(store.Tx) error) error {
+	return s.Store.CreateWorkspace(ctx, ws, func(tx store.Tx) error {
+		return fn(faultyTx{faultyDB: &faultyDB{DB: tx, faults: s.faults}, tx: tx})
+	})
+}
+
 // faultyTx is a faulty store's write: its reads and writes fail as the
 // store's do; the event numbers and the events themselves never fail.
 type faultyTx struct {
