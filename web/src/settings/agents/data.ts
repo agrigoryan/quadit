@@ -1,7 +1,9 @@
 // The shapes the Agents pages work with beyond the store (an agent's limits,
-// the tokens issued to it) and how their fields are written. What each agent
-// is doing right now is in data/listening.ts.
+// the tokens issued to it, its connect codes) and how their fields are
+// written. What each agent is doing right now is in data/listening.ts.
 
+import { api, workspacePath } from "@/data/api";
+import { inWorkspace } from "@/data/query";
 import { t } from "@/lib/i18n";
 import type { Member } from "@/types/core";
 
@@ -51,3 +53,30 @@ export function toLimit(text: string): number | null {
   const n = Number(s);
   return Number.isInteger(n) && n >= 0 ? n : null;
 }
+
+/** A connect code as it is made: the six characters are in this answer only. */
+export interface ConnectCode {
+  id: string;
+  code: string;
+  agent: string;
+  tool: string;
+  expires_at: number;
+}
+
+/** Whether a connect code was given back, as its maker reads it. */
+export interface ConnectCodeState {
+  id: string;
+  used: boolean;
+  expired: boolean;
+}
+
+/** Makes a connect code for an agent (its user id) and the tool it runs in; it replaces the open one of the same tool. */
+export const makeConnectCode = (slug: string, agent: string, tool: string) =>
+  api.post<ConnectCode>(workspacePath(slug, "/connect-codes"), { agent, tool });
+
+/** The key a connect code's state is read under. */
+export const connectCodeKey = (slug: string, id: string) => [...inWorkspace(slug), "connect-code", id] as const;
+
+/** Reads whether a connect code (by its id) was given back. */
+export const readConnectCode = (slug: string, id: string, signal?: AbortSignal) =>
+  api.get<ConnectCodeState>(workspacePath(slug, `/connect-codes/${encodeURIComponent(id)}`), signal);

@@ -21,29 +21,19 @@ import { NO_WORK, useAgentWork, useClaims, useResources } from "@/insights/agent
 import { Resources } from "@/insights/agents/resources";
 import { useSessions } from "@/insights/agents/session-data";
 import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helper-agents";
-import { Button } from "@/ui/button";
+import { canConnectTools, ConnectToolsButton } from "@/ui/connect-tools";
 import { Checkbox } from "@/ui/form";
 import { EmptyState } from "@/ui/empty";
 
 const NO_SESSIONS: AgentSession[] = [];
 const everySession = () => true;
 
-/**
- * Whether the desktop app this page is in can connect agent tools on its
- * computer (openConnect): not a browser, an older app, or Windows.
- */
-const canConnectTools = () => !!window.quaditDesktop?.openConnect;
-
-/** Opens the desktop app's Connect window, which sets agent tools on this computer up to work here. */
+/** Opens the desktop app's Connect, which sets agent tools on this computer up to work here. */
 function ConnectToolButton({ main }: { main?: boolean }) {
   return (
-    <Button
-      variant={main ? "primary" : "secondary"}
-      size={main ? "md" : "sm"}
-      onClick={() => window.quaditDesktop?.openConnect?.()}
-    >
+    <ConnectToolsButton variant={main ? "primary" : "secondary"} size={main ? "md" : "sm"}>
       {t("agents.connect")}
-    </Button>
+    </ConnectToolsButton>
   );
 }
 
@@ -56,7 +46,8 @@ export function AgentsPage() {
   const can = useCan();
   const members = useMembers();
   const now = useNow(15_000);
-  const live = useLive<{ agents: AgentState[] }>("/agents");
+  // Read again while shown: a listener's lease ends without an event.
+  const live = useLive<{ agents: AgentState[] }>("/agents", { everyMs: 20_000 });
   const { sessions, error: sessionsError } = useSessions("limit=300", everySession);
   const claims = useClaims();
   const resources = useResources();

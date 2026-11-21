@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, CornerDownRight, Plus, Radio } from "lucide-react";
+import { ChevronRight, CornerDownRight, Plus } from "lucide-react";
 import { useNavigate } from "react-router";
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
@@ -7,7 +7,8 @@ import { useCan } from "@/data/access";
 import { useLookupEvenIfGone, useMembers } from "@/data/selectors";
 import { CreateAgentDialog } from "@/settings/agents/agent-create";
 import { type AgentMember } from "@/settings/agents/data";
-import { type AgentState, useAgentStates } from "@/data/listening";
+import { connectionOf, useAgentStates } from "@/data/listening";
+import type { AgentState } from "@/types/dashboard";
 import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helper-agents";
 import { useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
@@ -17,21 +18,7 @@ import { EmptyRow, Page, Rows } from "@/ui/page-layout";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
-import { Tooltip } from "@/ui/tooltip";
-
-/** Whether a program is waiting for this agent's work, as a small mark with its meaning on hover. */
-export function ListeningMark({ on, withText }: { on: boolean; withText?: boolean }) {
-  return (
-    <Tooltip label={on ? t("agents.listeningHint") : t("agents.notListeningHint")}>
-      <span className={cx("inline-flex items-center gap-1 text-xs whitespace-nowrap", on ? "text-ok" : "text-ink-3")}>
-        <Radio className="size-3.5" aria-hidden />
-        <span className={withText ? "" : "max-lg:sr-only"}>
-          {on ? t("agents.listening") : t("agents.notListening")}
-        </span>
-      </span>
-    </Tooltip>
-  );
-}
+import { ConnectionMark } from "@/ui/connection-mark";
 
 export function StateBadge({ state }: { state: AgentState | undefined }) {
   if (!state) return null;
@@ -128,7 +115,7 @@ export function AgentsPage() {
                       <When ms={a.last_seen_at} />
                     </span>
                   </span>
-                  {state && !done && <ListeningMark on={state.listening} />}
+                  {state && !done && <ConnectionMark connection={connectionOf(a, state)} withText="wide" />}
                   <ChevronRight className="size-4 shrink-0 text-ink-3" aria-hidden />
                 </button>
               );

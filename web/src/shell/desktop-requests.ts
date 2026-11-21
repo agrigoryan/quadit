@@ -18,6 +18,8 @@ import { reading, replyPlace } from "@/pages/inbox-actions";
 import { type CreatedToken, tokensChanged } from "@/settings/ui/tokens";
 import { createTask } from "@/tasks/actions";
 import { getSamplesProject, samplesPath } from "@/tasks/samples";
+import { readConnection } from "@/data/listening";
+import { makeConnectCode, readConnectCode } from "@/settings/agents/data";
 import type { Changes } from "@/types/changes.gen";
 import type { Decision, DecisionOption, Notification } from "@/types/core";
 import type { DesktopAction, DesktopNotification, DesktopOutcome, DesktopRequest } from "@/types/desktop";
@@ -94,7 +96,29 @@ async function carryOut(request: DesktopRequest): Promise<DesktopOutcome> {
       return { ok: true };
     case "samples":
       return samplesForTheApp(request.agent);
+    case "connect-code": {
+      if (getRow("members", request.agent)?.kind !== "agent") return refused(t("desktop.gone"));
+      const made = await makeConnectCode(slug, request.agent, request.tool);
+      return { ok: true, id: made.id, code: made.code };
+    }
+    case "agent-state":
+      return agentState(request.agent, request.code);
   }
+}
+
+/**
+ * How far an agent is connected, for a card in the app that asks every
+ * couple of seconds while it waits: the server's reading of the agents is
+ * shared and at most a few seconds old; a code is one row to read.
+ */
+async function agentState(agent: string, code: string | undefined): Promise<DesktopOutcome> {
+  const { slug } = getState();
+  const [connection, codeUsed] = await Promise.all([
+    readConnection(agent),
+    code ? readConnectCode(slug, code).then((state) => state.used) : false,
+  ]);
+  if (!connection) return refused(t("desktop.gone"));
+  return { ok: true, connected: connection !== "not_connected", listening: connection === "listening", codeUsed };
 }
 
 /** Makes the task or the page quick capture asked for, and says where it is. */

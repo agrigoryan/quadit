@@ -14,10 +14,12 @@ import {
   draftOf,
   limitsOf,
 } from "@/settings/agents/agent-form";
-import { ListeningMark, StateBadge } from "@/settings/agents/agents";
+import { StateBadge } from "@/settings/agents/agents";
 import { type AgentMember } from "@/settings/agents/data";
-import { useAgentStates } from "@/data/listening";
+import { connectionOf, useAgentStates } from "@/data/listening";
+import { ConnectionMark } from "@/ui/connection-mark";
 import { isFinishedHelper, useHelperLabel } from "@/settings/agents/helper-agents";
+import { AgentConnectCode } from "@/settings/agents/connect-code";
 import { AgentTokens } from "@/settings/agents/tokens";
 import { useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
@@ -110,7 +112,7 @@ function AgentBody({ agent }: { agent: AgentMember }) {
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>@{agent.handle}</span>
           <StateBadge state={state} />
-          {state && <ListeningMark on={state.listening} withText />}
+          {state && <ConnectionMark connection={connectionOf(agent, state)} withText />}
           {isFinishedHelper(agent) ? (
             <Badge>{t("agents.finished")}</Badge>
           ) : agent.suspended_at ? (
@@ -130,6 +132,8 @@ function AgentBody({ agent }: { agent: AgentMember }) {
           {state?.doing && <Fact label={state.task ?? ""}>{state.doing}</Fact>}
         </Card>
       </Section>
+
+      <AgentConnectCode agent={agent} canMake={can.agentTokens(agent)} />
 
       <AgentTokens agent={agent} canEdit={can.agentTokens(agent)} />
 

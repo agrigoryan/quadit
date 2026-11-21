@@ -11,7 +11,8 @@ import { useLookup, useRowEvenIfGone } from "@/data/selectors";
 import { count } from "@/lib/amounts";
 import type { AgentState } from "@/types/dashboard";
 import type { Claim } from "@/types/agents";
-import { AgentStateChip, isStranded, NotListening } from "@/insights/ui/agent-state";
+import { AgentStateChip, isStranded, NotConnected, NotListening } from "@/insights/ui/agent-state";
+import { connectionOf } from "@/data/listening";
 import type { AgentWork } from "@/insights/agents/agent-data";
 import { SessionRow } from "@/insights/agents/session-row";
 import { isFinishedHelper } from "@/settings/agents/helper-agents";
@@ -148,18 +149,21 @@ function WaitsOnIt({ work, now }: { work: AgentWork; now: number }) {
   );
 }
 
-/** Whether anything would wake it, and when it last did something. */
-function Reach({ state, now }: { state: AgentState; now: number }) {
+/** How far it is connected, whether anything would wake it, and when it last did something. */
+function Reach({ member, state, now }: { member: Member; state: AgentState; now: number }) {
   const seen = parseWhen(state.last_seen);
+  const connection = connectionOf(member, state);
   return (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
-      {state.listening ? (
-        <span className="inline-flex items-center gap-1 text-ink-2" title={t("agents.reach.listeningHint")}>
+      {connection === "listening" ? (
+        <span className="inline-flex items-center gap-1 text-ink-2" title={t("agents.connection.listeningHint")}>
           <Ear className="size-3" aria-hidden />
-          {t("agents.listening")}
+          {t("agents.connection.listening")}
         </span>
-      ) : (
+      ) : connection === "connected" ? (
         <NotListening urgent={isStranded(state)} />
+      ) : (
+        <NotConnected urgent={isStranded(state)} />
       )}
       <span className="min-w-0 truncate" title={seen ? exact(seen) : undefined}>
         {seen ? t("agents.lastActed", { when: ago(seen, now) }) : t("agents.neverActed")}
@@ -273,7 +277,7 @@ export function AgentCard({ member, state, helpers, helperNote, work, sessions, 
         <WaitsOnIt work={work} now={now} />
       </section>
 
-      {state && <Reach state={state} now={now} />}
+      {state && <Reach member={member} state={state} now={now} />}
 
       <section>
         <h4 className={label}>{t("agents.sessions")}</h4>

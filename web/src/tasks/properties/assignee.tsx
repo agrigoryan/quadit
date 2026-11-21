@@ -4,9 +4,9 @@ import { useMemo } from "react";
 import { CircleSlash, UserRound } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { mayBeGivenWork } from "@/data/access";
-import { useListening } from "@/data/listening";
+import { useConnection, useListening } from "@/data/listening";
 import { useMe, useMember, useMembers } from "@/data/selectors";
-import type { Task } from "@/types/core";
+import type { Member, Task } from "@/types/core";
 import { who } from "@/detail/data";
 import { setAssignee } from "@/tasks/actions";
 import { orNone, Pill, pill } from "@/tasks/properties/create-pill";
@@ -24,6 +24,7 @@ import {
 import { memberOf, memberWord } from "@/tasks/properties/query-words";
 import { memberItems, noneItem } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
+import { ConnectionMark } from "@/ui/connection-mark";
 import { ListeningDot } from "@/ui/listening-dot";
 import { Picker } from "@/ui/picker";
 import { Tooltip } from "@/ui/tooltip";
@@ -35,7 +36,13 @@ function AssigneeRow(panel: PanelProps) {
   const name = person ? person.name : t("task.unassigned");
   return (
     <>
-      <PickerRow property={assignee} panel={panel} value={name} empty={!person}>
+      <PickerRow
+        property={assignee}
+        panel={panel}
+        value={name}
+        empty={!person}
+        after={person?.kind === "agent" && <AgentConnection agent={person} />}
+      >
         <Avatar member={person} size="xs" />
         <span className="truncate">{name}</span>
       </PickerRow>
@@ -55,6 +62,12 @@ function AssigneeRow(panel: PanelProps) {
       )}
     </>
   );
+}
+
+/** How far an agent assignee is connected: whether what is written on the task reaches it. */
+function AgentConnection({ agent }: { agent: Member }) {
+  const connection = useConnection()(agent);
+  return connection ? <ConnectionMark connection={connection} /> : null;
 }
 
 function AssigneePill({ project, value, onChange }: CreateProps) {

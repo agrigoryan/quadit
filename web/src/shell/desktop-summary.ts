@@ -6,7 +6,8 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { can } from "@/data/access";
-import { type AgentState, useAgentStates } from "@/data/listening";
+import { useAgentStates } from "@/data/listening";
+import type { AgentState } from "@/types/dashboard";
 import { useLookup, useMe, useOpenDecisions, useProjects, useSlug } from "@/data/selectors";
 import { useStore } from "@/data/store";
 import { t } from "@/lib/i18n";

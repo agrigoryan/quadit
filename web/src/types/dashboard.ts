@@ -67,6 +67,9 @@ export interface AgentState {
   since?: string;
   /** Whom its work waits on, when all of it waits ("@aram"). */
   waits_on?: string;
+  /** When it first proved it reached Quadit from inside its tool, "2026-11-21 14:02" UTC; missing: not connected yet. */
+  connected_at?: string;
+  /** Its listener holds its lease (`quadit wait`, `quadit listen`), or a webhook pushes to it. */
   listening: boolean;
   last_seen?: string;
   last_action?: string;

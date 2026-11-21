@@ -13,6 +13,15 @@ export const agentStrings = {
   "agents.notListening": "Nothing is listening",
   "agents.notListeningHint":
     "No program is waiting for this agent's work. Tasks given to it will sit until one connects with its token.",
+  "agents.connection.listening": "Listening",
+  "agents.connection.connected": "Connected, not listening",
+  "agents.connection.not_connected": "Not connected yet",
+  "agents.connection.listeningHint":
+    "It is listening for its work right now, or a webhook pushes to it: it will see what is written here.",
+  "agents.connection.connectedHint":
+    "It has reached Quadit from inside its tool and works when someone asks it there. Until then, what is written here waits.",
+  "agents.connection.not_connectedHint":
+    "It has never reached Quadit from inside its tool. Connect it from the desktop app, or with a connect code on its page in Settings.",
   "agents.state.working": "Working",
   "agents.state.waiting": "Waiting on someone",
   "agents.state.has_work": "Has work",
@@ -91,6 +100,20 @@ export const agentStrings = {
   "agent.removeLead": "Its tokens stop working and its open tasks become unassigned. Its history stays under its name.",
   "agent.suspend.title": "Suspend {name}?",
   "agent.remove.title": "Remove {name}?",
+
+  "connectCode.title": "Connect code",
+  "connectCode.lead":
+    "Proves the agent reaches Quadit from inside its tool: say the line in the tool, and the agent gives the code back with its own login. Good once, for seven days.",
+  "connectCode.tool": "Tool",
+  "connectCode.toolHint": "Where the agent runs, as you would name it: Codex, Claude Code, Cursor.",
+  "connectCode.make": "Make a connect code",
+  "connectCode.again": "Make a new code",
+  "connectCode.say": "In {tool}, say:",
+  "connectCode.line": "Connect to Quadit {code}",
+  "connectCode.waiting": "Waiting for {tool}…",
+  "connectCode.used": "Connected: {tool} gave the code back.",
+  "connectCode.expired": "This code ran out. Make a new one.",
+  "connectCode.adminsOnly": "Only admins and the person who answers for this agent can make it a connect code.",
 
   "tokens.title": "Tokens",
   "tokens.lead": "A token lets a program act as this agent. It is shown once, when it is made.",

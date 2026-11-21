@@ -129,6 +129,16 @@ export interface Comment {
   deleted_at?: number;
 }
 
+export interface ConnectCode {
+  id: string;
+  agent_id: string;
+  tool: string;
+  created_by: string;
+  created_at: number;
+  expires_at: number;
+  used_at?: number;
+}
+
 export interface Cursor {
   WorkspaceID: string;
   UserID: string;
@@ -391,6 +401,7 @@ export interface Member {
   last_seen_at?: number;
   last_action?: string;
   listening_until?: number;
+  connected_at?: number;
   created_at: number;
   updated_seq: number;
   suspended_at?: number;

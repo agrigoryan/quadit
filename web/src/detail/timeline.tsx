@@ -9,6 +9,7 @@ import { useLookup, useMember } from "@/data/selectors";
 import { useTaskEvents } from "@/data/task-detail";
 import type { Task } from "@/types/core";
 import { CommentCard, When } from "@/detail/comment-card";
+import { CommentReach } from "@/detail/comment-reach";
 import { Composer } from "@/detail/composer";
 import { nameOf, useAttachmentsBySubject } from "@/detail/data";
 import { Section } from "@/detail/section";
@@ -103,6 +104,7 @@ export function Timeline({ task, loading, waiting }: Props) {
       {can.editTask(task) && (
         <div className="mt-3">
           <Composer task={task} />
+          <CommentReach task={task} />
         </div>
       )}
     </Section>

@@ -76,4 +76,18 @@ describe("useLive", () => {
     expect(result.current.loading).toBe(false);
     expect(server.requests).toEqual([]);
   });
+
+  it("reads again on its beat while shown, for an answer no event changes", async () => {
+    server.get(AGENTS, { n: 1 });
+    const { result, unmount } = renderHook(() => useLive<{ n: number }>("/agents", { everyMs: 50 }), {
+      wrapper: WithQuery,
+    });
+    await waitFor(() => expect(result.current.data?.n).toBe(1));
+    server.get(AGENTS, { n: 2 });
+    await waitFor(() => expect(result.current.data?.n).toBe(2));
+    unmount();
+    const asked = server.count(AGENTS);
+    await new Promise((done) => setTimeout(done, 150));
+    expect(server.count(AGENTS)).toBe(asked);
+  });
 });

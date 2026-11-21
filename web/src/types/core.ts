@@ -91,6 +91,8 @@ export type Member = {
   last_action?: string;
   last_seen_at?: number;
   listening_until?: number;
+  /** When an agent first proved it reached Quadit from inside its tool; missing: not connected yet. */
+  connected_at?: number;
   created_at: number;
   updated_seq: number;
   suspended_at?: number;

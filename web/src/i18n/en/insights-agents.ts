@@ -32,8 +32,6 @@ export const agentsStrings = {
   "agents.showMore": "{n} more",
   "agents.showLess": "Show fewer",
 
-  "agents.reach.listeningHint":
-    "A companion is holding a wait for it, or a webhook pushes to it: it will hear about new work.",
   "agents.lastActed": "Last acted {when}",
   "agents.neverActed": "Has not acted yet",
 

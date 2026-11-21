@@ -21,19 +21,26 @@ export interface Live<T> {
   refetch: () => void;
 }
 
-const liveKey = (slug: string, path: string | null) => [...inWorkspace(slug), "live", path] as const;
+/** The key a live read of `path` is cached under. */
+export const liveKey = (slug: string, path: string | null) => [...inWorkspace(slug), "live", path] as const;
 
 /**
  * GET a path under the workspace (`/dashboard?project=SVA`) and keep the
  * answer current. Pass null to fetch nothing. `only` narrows which feed
  * events cause a refetch (by entity type); leave it out to follow them all.
+ * `everyMs` also reads it again on that beat while it is shown, for an
+ * answer that changes without an event (the server's clock decides it).
  */
-export function useLive<T>(path: string | null, opts: { throttleMs?: number; only?: string[] } = {}): Live<T> {
+export function useLive<T>(
+  path: string | null,
+  opts: { throttleMs?: number; only?: string[]; everyMs?: number } = {},
+): Live<T> {
   const slug = useStore((s) => s.slug);
   const query = useQuery({
     queryKey: liveKey(slug, path),
     queryFn: ({ signal }) => api.get<T>(workspacePath(slug, path ?? ""), signal),
     enabled: path !== null,
+    refetchInterval: opts.everyMs,
   });
   const throttle = opts.throttleMs ?? 2000;
   const only = opts.only?.join(",") ?? "";

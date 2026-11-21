@@ -62,7 +62,11 @@ export type DesktopRequest =
    * Where the sample tasks are: their task list's path, or the workspace's own when it has none (they are never
    * made here). `agent` (an agent's user id) is given the third while it has nobody.
    */
-  | { kind: "samples"; agent?: string };
+  | { kind: "samples"; agent?: string }
+  /** Makes a connect code for an agent (by user id) and the tool it runs in ("Codex"); it replaces that tool's open one. */
+  | { kind: "connect-code"; agent: string; tool: string }
+  /** How far an agent (by user id) is connected and, with `code` (a connect code's id), whether that code was used. */
+  | { kind: "agent-state"; agent: string; code?: string };
 
 /** How a request went: what it made, or the server's refusal (at most 500 characters). */
 export type DesktopOutcome =
@@ -71,6 +75,13 @@ export type DesktopOutcome =
       path?: string;
       agent?: { id: string; handle: string; name: string };
       token?: { id: string; secret: string };
+      /** A connect code made (connect-code): its id, to ask about it, and its six characters, shown once. */
+      id?: string;
+      code?: string;
+      /** An agent's state (agent-state): it proved it reached Quadit from its tool; its listener holds its lease; the code asked about was used. */
+      connected?: boolean;
+      listening?: boolean;
+      codeUsed?: boolean;
     }
   | { ok: false; message: string; path?: string };
 

@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
+import { queryClient } from "@/data/query";
 import { clearStore, getState, loadBootstrap, patchRow } from "@/data/store";
 import { clearUndo } from "@/data/undo";
 import { answer } from "@/shell/desktop-requests";
@@ -29,6 +30,8 @@ beforeEach(() => {
       return Promise.resolve({ results: batch.map((c) => ({ key: c.type === "task.create" ? "SVA-9" : undefined })) });
     }
     posts.push({ path, body });
+    if (path.endsWith("/connect-codes"))
+      return Promise.resolve({ id: "cc1", code: "K7PQ2M", agent: "a1", tool: "Codex" });
     return Promise.resolve({ token: "qd_secret", info: { id: "tok1", name: "Claude Code on mac" } });
   });
   vi.spyOn(api, "del").mockResolvedValue({ ok: true });
@@ -198,5 +201,65 @@ describe("the end of the app's first run", () => {
   it("gives the third sample to an agent only", async () => {
     expect(await answer({ kind: "samples", agent: "u1" })).toMatchObject({ ok: false });
     expect(sent()).toEqual([]);
+  });
+});
+
+describe("a tool's card in the app's Connect", () => {
+  let reads: string[] = [];
+  const serve = (agents: unknown[], used: boolean) =>
+    vi.spyOn(api, "get").mockImplementation((path: string) => {
+      reads.push(path);
+      if (path.endsWith("/agents")) return Promise.resolve({ agents });
+      return Promise.resolve({ id: "cc1", used, expired: false });
+    });
+  beforeEach(() => {
+    reads = [];
+    queryClient.clear();
+  });
+
+  it("makes a connect code for the agent and the tool, and hands back its id and its characters", async () => {
+    expect(await answer({ kind: "connect-code", agent: "a1", tool: "Codex" })).toEqual({
+      ok: true,
+      id: "cc1",
+      code: "K7PQ2M",
+    });
+    expect(posts).toEqual([{ path: "/api/v1/w/acme/connect-codes", body: { agent: "a1", tool: "Codex" } }]);
+    expect(await answer({ kind: "connect-code", agent: "u1", tool: "Codex" })).toMatchObject({ ok: false });
+  });
+
+  it("says an agent is not connected yet, then that its code was used and it is connected", async () => {
+    serve([{ user_id: "a1", listening: false }], false);
+    expect(await answer({ kind: "agent-state", agent: "a1", code: "cc1" })).toEqual({
+      ok: true,
+      connected: false,
+      listening: false,
+      codeUsed: false,
+    });
+    serve([{ user_id: "a1", listening: false }], true);
+    patchRow("members", "a1", { connected_at: 1700000000000 });
+    expect(await answer({ kind: "agent-state", agent: "a1", code: "cc1" })).toEqual({
+      ok: true,
+      connected: true,
+      listening: false,
+      codeUsed: true,
+    });
+  });
+
+  it("says it is listening, from a reading of the agents shared for a few seconds, and asks about no code unless given one", async () => {
+    serve([{ user_id: "a1", listening: true, connected_at: "2026-11-21 14:02" }], false);
+    for (let i = 0; i < 3; i++) {
+      expect(await answer({ kind: "agent-state", agent: "a1" })).toEqual({
+        ok: true,
+        connected: true,
+        listening: true,
+        codeUsed: false,
+      });
+    }
+    expect(reads).toEqual(["/api/v1/w/acme/agents"]);
+  });
+
+  it("refuses a member that is not an agent", async () => {
+    serve([], false);
+    expect(await answer({ kind: "agent-state", agent: "u1" })).toMatchObject({ ok: false });
   });
 });

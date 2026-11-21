@@ -6,7 +6,7 @@
 
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentState } from "@/data/listening";
+import type { AgentState } from "@/types/dashboard";
 import { clearStore, loadBootstrap, mergeRows, patchRow } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 import type { QuaditDesktop } from "@/types/desktop";
@@ -15,6 +15,7 @@ import type { QuaditDesktop } from "@/types/desktop";
 const agentStates: Record<string, AgentState> = {
   a1: {
     handle: "@claude",
+    name: "Claude",
     user_id: "a1",
     state: "working",
     task: "SVA-5",
@@ -23,7 +24,15 @@ const agentStates: Record<string, AgentState> = {
     open_tasks: 1,
     waiting_on_it: 0,
   },
-  a2: { handle: "@codex", user_id: "a2", state: "idle", listening: false, open_tasks: 0, waiting_on_it: 0 },
+  a2: {
+    handle: "@codex",
+    name: "Codex",
+    user_id: "a2",
+    state: "idle",
+    listening: false,
+    open_tasks: 0,
+    waiting_on_it: 0,
+  },
 };
 vi.mock("@/data/listening", () => ({ useAgentStates: () => ({ data: agentStates, error: "" }) }));
 

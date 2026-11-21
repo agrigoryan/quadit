@@ -184,6 +184,12 @@ export const detail = {
   "comment.editLabel": "Edit your comment",
   "comment.delete": "Delete comment",
   "comment.placeholder": "Leave a comment… @ mentions someone",
+  "comment.reach.listening": "@{handle} is listening and will see this.",
+  "comment.reach.connected":
+    "@{handle} is not listening. It will see this when you next ask it: in {tool}, say “check Quadit”.",
+  "comment.reach.notConnected": "@{handle} has not connected yet.",
+  "comment.reach.connect": "Connect it",
+  "comment.reach.connectInSettings": "Connect it in Settings",
   "comment.label": "New comment",
   "comment.send": "Send",
   "comment.attach": "Attach files",

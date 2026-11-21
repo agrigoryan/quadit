@@ -2,7 +2,7 @@
 // what it is doing, and whether anything would wake it. A state is always an
 // icon and words, never colour alone.
 
-import { CircleDashed, EarOff, Hourglass, Inbox, Loader } from "lucide-react";
+import { CircleDashed, EarOff, Hourglass, Inbox, Loader, Unplug } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import type { AgentState, AgentStateName } from "@/types/dashboard";
@@ -48,6 +48,26 @@ export function NotListening({ urgent, className }: { urgent?: boolean; classNam
     >
       <EarOff className="size-3" aria-hidden />
       {t(urgent ? "ins.agent.notListeningUrgent" : "ins.agent.notListening")}
+    </span>
+  );
+}
+
+/**
+ * The flag for an agent that has never reached Quadit from inside its tool.
+ * Loud when work is queued for it.
+ */
+export function NotConnected({ urgent, className }: { urgent?: boolean; className?: string }) {
+  return (
+    <span
+      title={t("agents.connection.not_connectedHint")}
+      className={cx(
+        "inline-flex h-5 shrink-0 items-center gap-1 rounded-sm px-1.5 text-xs font-medium whitespace-nowrap",
+        urgent ? "bg-danger-soft text-danger" : "border border-line text-ink-3",
+        className,
+      )}
+    >
+      <Unplug className="size-3" aria-hidden />
+      {t("agents.connection.not_connected")}
     </span>
   );
 }
