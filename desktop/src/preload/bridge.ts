@@ -16,6 +16,7 @@ import {
   BRIDGE_LISTENING,
   BRIDGE_NOTIFY,
   BRIDGE_OPEN_CONNECT,
+  BRIDGE_ORIGIN,
   BRIDGE_OUTCOME,
   BRIDGE_PUBLISH,
   BRIDGE_REQUEST,
@@ -24,7 +25,6 @@ import {
   type DesktopOutcome,
   type DesktopRequest,
   notificationOf,
-  ORIGIN_SWITCH,
   outcomeOf,
   type QuaditDesktop,
   summaryOf,
@@ -35,9 +35,10 @@ function switchValue(prefix: string): string {
   return process.argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length) ?? "";
 }
 
-const origin = switchValue(ORIGIN_SWITCH);
+// Asked of the main process, which knows the server of every window it made (server-windows.ts).
+const origin: unknown = ipcRenderer.sendSync(BRIDGE_ORIGIN);
 
-if (origin && window.location.origin === origin) {
+if (typeof origin === "string" && origin && window.location.origin === origin) {
   // The page's one request handler, set by onRequest.
   let handler: ((request: DesktopRequest) => Promise<DesktopOutcome>) | null = null;
   ipcRenderer.on(BRIDGE_REQUEST, (_event, { id, request }: { id: string; request: DesktopRequest }) => {

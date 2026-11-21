@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { ServerStore } from "@/main/servers";
+import { newServerId, ServerStore } from "@/main/servers";
 
 function file() {
   return join(mkdtempSync(join(tmpdir(), "quadit-desktop-servers-")), "servers.json");
@@ -29,6 +29,14 @@ describe("ServerStore", () => {
     });
     expect(server.id).toMatch(/^[0-9a-f]{12}$/);
     expect(new ServerStore(path).list()).toEqual([server]);
+  });
+
+  it("adds a server with the id it is given, which an origin already there does not take", () => {
+    const store = new ServerStore(file());
+    const id = newServerId();
+    expect(store.add("https://quadit.example.com", "", { handoff: 1, inset: 1 }, id).id).toBe(id);
+    expect(store.add("https://quadit.example.com", "", { handoff: 1, inset: 1 }, newServerId()).id).toBe(id);
+    expect(newServerId()).not.toBe(newServerId());
   });
 
   it("keeps one entry per origin, with its id, renamed only when a name is given", () => {

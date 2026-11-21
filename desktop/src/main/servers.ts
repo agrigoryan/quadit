@@ -31,6 +31,11 @@ export type Speaks = Pick<Server, "handoff" | "inset">;
 
 type Change = Partial<Pick<Server, "name" | "open" | "handoff" | "inset" | "version" | "warned">>;
 
+/** A new server id, never one in use: 12 random hex digits. */
+export function newServerId(): string {
+  return randomBytes(6).toString("hex");
+}
+
 export class ServerStore {
   private servers: Server[];
   private listeners = new Set<() => void>();
@@ -53,10 +58,11 @@ export class ServerStore {
   }
 
   /**
-   * Adds the server at `origin`, which `speaks` what its version answer said. One already there with that origin is
-   * kept (its id and session) and renamed when a name is given.
+   * Adds the server at `origin`, which `speaks` what its version answer said, with the id `id` when given (one made
+   * by newServerId for a window made before its server was known: server-windows.ts), a new one otherwise. One
+   * already there with that origin is kept (its id and session) and renamed when a name is given.
    */
-  add(origin: string, name: string, speaks: Speaks): Server {
+  add(origin: string, name: string, speaks: Speaks, id = newServerId()): Server {
     const known = this.byOrigin(origin);
     const named = name.trim() || new URL(origin).host;
     const { handoff, inset } = speaks;
@@ -65,7 +71,7 @@ export class ServerStore {
       return this.get(known.id) ?? known;
     }
     const server: Server = {
-      id: randomBytes(6).toString("hex"),
+      id,
       name: named,
       origin,
       open: false,

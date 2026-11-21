@@ -16,6 +16,16 @@
 import type { BrowserWindowConstructorOptions } from "electron";
 import type { Server } from "@/main/servers";
 
+/** The version of this layout the app lays its windows out for: a server's version answer's desktop.inset at least this. */
+export const INSET_VERSION = 1;
+
+/**
+ * What the first run's window is made for before its server is known
+ * (server-windows.ts, cover): a server whose pages are laid out for this
+ * app's window, as the server the app carries is.
+ */
+export const FIRST_RUN_SPEAKS: Pick<Server, "inset"> = { inset: INSET_VERSION };
+
 /** The strip's height: the web app's top bar's (its h-11), so the bar and the sidebar's strip line up with it. */
 export const STRIP_HEIGHT = 44;
 
@@ -37,7 +47,7 @@ export interface Frame {
 
 /** The frame of a server's window on `platform`, for a server whose record says what its pages are laid out for. */
 export function frameFor(platform: NodeJS.Platform, server: Pick<Server, "inset">): Frame {
-  if (platform !== "darwin" || server.inset < 1) return { options: {}, strip: 0 };
+  if (platform !== "darwin" || server.inset < INSET_VERSION) return { options: {}, strip: 0 };
   return {
     options: {
       titleBarStyle: "hiddenInset",
