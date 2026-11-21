@@ -258,6 +258,20 @@ describe("a tool's card in the app's Connect", () => {
     expect(reads).toEqual(["/api/v1/w/acme/agents"]);
   });
 
+  it("says a code replaced or cleared away since was not used", async () => {
+    vi.spyOn(api, "get").mockImplementation((path: string) =>
+      path.endsWith("/agents")
+        ? Promise.resolve({ agents: [{ user_id: "a1", listening: false }] })
+        : Promise.reject(new ApiError(404, { code: "not_found", message: "connect code not found" })),
+    );
+    expect(await answer({ kind: "agent-state", agent: "a1", code: "gone" })).toEqual({
+      ok: true,
+      connected: false,
+      listening: false,
+      codeUsed: false,
+    });
+  });
+
   it("refuses a member that is not an agent", async () => {
     serve([], false);
     expect(await answer({ kind: "agent-state", agent: "u1" })).toMatchObject({ ok: false });

@@ -19,6 +19,7 @@ import { type CreatedToken, tokensChanged } from "@/settings/ui/tokens";
 import { createTask } from "@/tasks/actions";
 import { getSamplesProject, samplesPath } from "@/tasks/samples";
 import { readConnection } from "@/data/listening";
+import { isNotFound } from "@/data/query";
 import { makeConnectCode, readConnectCode } from "@/settings/agents/data";
 import type { Changes } from "@/types/changes.gen";
 import type { Decision, DecisionOption, Notification } from "@/types/core";
@@ -115,7 +116,13 @@ async function agentState(agent: string, code: string | undefined): Promise<Desk
   const { slug } = getState();
   const [connection, codeUsed] = await Promise.all([
     readConnection(agent),
-    code ? readConnectCode(slug, code).then((state) => state.used) : false,
+    // A code replaced since, or one that ran out and was cleared away, was not used.
+    code
+      ? readConnectCode(slug, code).then(
+          (state) => state.used,
+          (err: unknown) => (isNotFound(err) ? false : Promise.reject(err)),
+        )
+      : false,
   ]);
   if (!connection) return refused(t("desktop.gone"));
   return { ok: true, connected: connection !== "not_connected", listening: connection === "listening", codeUsed };
