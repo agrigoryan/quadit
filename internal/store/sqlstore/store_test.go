@@ -16,6 +16,11 @@ import (
 func TestCreateWorkspaceIsOneWrite(t *testing.T) {
 	eachDB(t, func(t *testing.T, s *Store) {
 		ctx := context.Background()
+		// A project names who made it, and Postgres holds it to a person who is there.
+		me := id.New()
+		if err := s.Insert(ctx, core.User{ID: me, Kind: "person", Name: "Me", Email: me + "@example.com", CreatedAt: 1, UpdatedAt: 1}); err != nil {
+			t.Fatal(err)
+		}
 		newWorkspace := func(slug string) core.Workspace {
 			return core.Workspace{ID: id.New(), Slug: slug, Name: slug, CreatedAt: 1, UpdatedAt: 1}
 		}
@@ -35,7 +40,7 @@ func TestCreateWorkspaceIsOneWrite(t *testing.T) {
 					t.Fatalf("the write is to %s, want %s", tx.WorkspaceID(), ws.ID)
 				}
 				seq := tx.NextSeq()
-				return tx.Insert(ctx, core.Project{ID: id.New(), Key: "GS", Name: "Getting started", CreatedAt: 1, UpdatedAt: 1, CreatedSeq: seq, UpdatedSeq: seq})
+				return tx.Insert(ctx, core.Project{ID: id.New(), Key: "GS", Name: "Getting started", CreatedBy: me, CreatedAt: 1, UpdatedAt: 1, CreatedSeq: seq, UpdatedSeq: seq})
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -53,7 +58,7 @@ func TestCreateWorkspaceIsOneWrite(t *testing.T) {
 			ws := newWorkspace("failed")
 			broke := errors.New("broke")
 			err := s.CreateWorkspace(ctx, ws, func(tx store.Tx) error {
-				if err := tx.Insert(ctx, core.Project{ID: id.New(), Key: "GS", Name: "Getting started", CreatedAt: 1, UpdatedAt: 1}); err != nil {
+				if err := tx.Insert(ctx, core.Project{ID: id.New(), Key: "GS", Name: "Getting started", CreatedBy: me, CreatedAt: 1, UpdatedAt: 1}); err != nil {
 					return err
 				}
 				return broke
