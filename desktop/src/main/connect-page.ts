@@ -22,7 +22,7 @@
 //
 // It answers what the page asks of Connect (connections.ts), and what any
 // tool card asks, the first run's too: where a tool stands with Quadit, a new
-// connect code, and copying a code's line.
+// connect code, copying a code's line, and updating a skill changed by hand.
 
 import type { WebContents, WebContentsView } from "electron";
 import type { AppPages } from "@/main/app-pages";
@@ -42,6 +42,7 @@ export interface ConnectPageParts {
     | "dropPlans"
     | "handshake"
     | "newCode"
+    | "updateSkill"
   >;
   windows: Pick<ServerWindows, "cover" | "uncover" | "isCovered" | "inFront">;
   /** What a server's window shows: its server, and the workspace its page published; null for a server not added. */
@@ -89,6 +90,7 @@ export class ConnectPage {
       showBackups: () => parts.showBackups(),
       toolHandshake: (_sender, harness) => connections.handshake(String(harness)),
       newConnectCode: (_sender, harness) => connections.newCode(String(harness)),
+      updateSkill: (_sender, harness) => connections.updateSkill(String(harness)),
       copyText: (_sender, text) => parts.copy(String(text)),
     });
   }

@@ -49,6 +49,7 @@ const api: PagesApi = {
   closeConnect: call("closeConnect"),
   toolHandshake: call("toolHandshake"),
   newConnectCode: call("newConnectCode"),
+  updateSkill: call("updateSkill"),
   copyText: call("copyText"),
   connectState: call("connectState"),
   planConnect: call("planConnect"),

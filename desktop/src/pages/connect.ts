@@ -169,8 +169,23 @@ function toolCard(h: HarnessView, addsCommand: boolean, handshake: Handshake | n
     `More options for ${h.name}`,
   );
   more.setAttribute("aria-expanded", "false");
-  card.extra.append(more, options);
+  card.extra.append(...(h.skillChangedByHand ? [skillChanged(h)] : []), more, options);
   return card;
+}
+
+/** A connected tool whose Quadit skill the person changed by hand: the app leaves it, and offers to update it. */
+function skillChanged(h: HarnessView): HTMLParagraphElement {
+  const line = make("p", `The Quadit skill for ${h.name} was changed by hand; `, "skill-changed");
+  const run = async () => {
+    update.disabled = true;
+    const done = await api.updateSkill(h.id);
+    update.disabled = false;
+    if (done.ok) return void render();
+    line.append(make("span", ` ${done.error}`, "card-error"));
+  };
+  const update = button("Update it", () => void run(), "link-blue", `Update the Quadit skill for ${h.name}`);
+  line.append(update);
+  return line;
 }
 
 function connectedHow(connected: NonNullable<HarnessView["connected"]>): HTMLParagraphElement {

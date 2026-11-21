@@ -31,6 +31,12 @@
 // person's page wants it (handshake.ts). A server is only ever asked about
 // an agent of its own: a tool that works as a login of another server (the
 // computer's default one) has no code and is never asked about.
+//
+// The skill Connect wrote is kept up to date with the quadit the tools run
+// (the app's own, updated with the app): at every start, a skill file that
+// still says what Connect wrote is rewritten through the same plan, backup
+// and ledger, so Disconnect still takes back exactly what is there; one the
+// person changed since is left, and its tool says so (refreshSkills).
 
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -185,6 +191,7 @@ export class Connections {
     const binary = look.found?.path ?? cli.bundled;
     const defaultConfig = supported && binary ? await cli.defaultConfig(binary).catch(() => null) : null;
     const ledger = this.ledger();
+    const skill = supported && binary && Object.keys(ledger.harnesses).length > 0 ? await this.skillOf(binary) : null;
     const defaultLogin =
       defaultConfig && binary && existsSync(defaultConfig)
         ? {
@@ -207,6 +214,7 @@ export class Connections {
           mcp: !!harness.mcp,
           cliIdentity: harness.env ? "own" : "default",
           listenVerified: harness.listenVerified,
+          skillChangedByHand: !!connection && skill !== null && this.skillState(ledger, harness, skill) === "by hand",
           connected: connection
             ? {
                 methods: connection.methods,
@@ -228,6 +236,108 @@ export class Connections {
       defaultLogin,
       claudePlugin: claudePluginInstalled(home),
     };
+  }
+
+  /**
+   * Brings the skill of every tool Connect set up up to date with the skill
+   * the quadit it uses carries now (the one on the PATH, else the app's
+   * own). A skill file that still says what Connect wrote is rewritten,
+   * backed up first, and the ledger records the new text, so Disconnect
+   * takes back exactly what is there; one changed by hand since is left as
+   * it is (its tool's card offers updateSkill); a skill the app did not
+   * install is never touched. Run at every start of the app, in the
+   * background too: the person agreed to these files when connecting. Gives
+   * the files rewritten, and those left for being changed by hand.
+   */
+  refreshSkills(): Promise<{ updated: string[]; changedByHand: string[] }> {
+    return this.inTurn(async () => {
+      const done = { updated: [] as string[], changedByHand: [] as string[] };
+      const ledger = this.ledger();
+      if (this.parts.platform === "win32" || Object.keys(ledger.harnesses).length === 0) return done;
+      const skill = await this.currentSkill();
+      if (skill === null) return done;
+      const seen = new Set<string>();
+      for (const id of Object.keys(ledger.harnesses)) {
+        const harness = HARNESSES.find((h) => h.id === id);
+        const path = harness && this.skillPath(ledger, harness);
+        if (!harness || !path || seen.has(path)) continue;
+        seen.add(path);
+        const state = this.skillState(ledger, harness, skill);
+        if (state === "by hand") done.changedByHand.push(path);
+        else if (state === "outdated" && this.rewriteSkill(ledger, path, skill)) done.updated.push(path);
+      }
+      if (done.updated.length > 0) this.saveLedger(ledger);
+      return done;
+    });
+  }
+
+  /** Writes the skill the tools' quadit carries now over a tool's skill the person changed by hand (its card's "Update it"). */
+  updateSkill(harnessId: string): Promise<{ ok: true } | Refused> {
+    return this.inTurn(async () => {
+      const ledger = this.ledger();
+      const harness = HARNESSES.find((h) => h.id === harnessId);
+      const path = harness && ledger.harnesses[harnessId] ? this.skillPath(ledger, harness) : null;
+      if (!harness || !path) return { ok: false, error: `${harness?.name ?? "It"} is not connected.` };
+      const skill = await this.currentSkill();
+      if (skill === null) return { ok: false, error: "The quadit command did not give its skill: try again." };
+      if (readText(path) !== skill && !this.rewriteSkill(ledger, path, skill))
+        return { ok: false, error: `${path} cannot be written.` };
+      this.saveLedger(ledger);
+      return { ok: true };
+    });
+  }
+
+  /** The skill the quadit the tools run carries: the one on the login shell's PATH, else the app's own; null when none says. */
+  private async currentSkill(): Promise<string | null> {
+    const look = await this.parts.cli.look();
+    const binary = look.found?.path ?? this.parts.cli.bundled;
+    return binary ? this.skillOf(binary) : null;
+  }
+
+  private skillOf(binary: string): Promise<string | null> {
+    return this.parts.cli.skill(binary).catch(() => null);
+  }
+
+  /** Where `harness` reads the Quadit skill, when Connect wrote it there (the ledger has it); null otherwise. */
+  private skillPath(ledger: Ledger, harness: Harness): string | null {
+    const path = realPath(join(this.parts.home, harness.skills, "quadit", "SKILL.md"));
+    const wrote = ledger.harnesses[harness.id]?.edits.some((record) => record.kind === "file" && record.path === path);
+    return wrote ? path : null;
+  }
+
+  /**
+   * How `harness`'s skill file stands against `skill`, the text its quadit
+   * carries now: up to date (or gone, or not the app's), still what Connect
+   * wrote and so outdated, or changed by hand since.
+   */
+  private skillState(ledger: Ledger, harness: Harness, skill: string): "current" | "outdated" | "by hand" {
+    const path = this.skillPath(ledger, harness);
+    const record = ledger.harnesses[harness.id]?.edits.find((r) => r.kind === "file" && r.path === path);
+    const text = path && readText(path);
+    if (!path || record?.kind !== "file" || !text || text === skill) return "current";
+    return sha256(text) === record.sha256 ? "outdated" : "by hand";
+  }
+
+  /**
+   * Writes `skill` at `path`, backed up first, and records its text in every
+   * connection that shares the file (the original's backup stays, for
+   * Disconnect); false when it cannot be written.
+   */
+  private rewriteSkill(ledger: Ledger, path: string, skill: string): boolean {
+    try {
+      const { edits } = planChanges([{ kind: "file", path, content: skill }]);
+      backUp(edits, this.backupDir("skill"));
+      writeEdits(edits);
+    } catch (err) {
+      if (err instanceof EditRefused) return false;
+      throw err;
+    }
+    for (const connection of Object.values(ledger.harnesses)) {
+      for (const record of connection.edits) {
+        if (record.kind === "file" && record.path === path) record.sha256 = sha256(skill);
+      }
+    }
+    return true;
   }
 
   /** Whether `harness` is on this computer: its trace in the home folder, or its command in a folder of `path`. */

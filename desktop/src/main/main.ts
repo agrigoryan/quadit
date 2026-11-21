@@ -381,6 +381,9 @@ function start() {
   else if (!shown) list.show();
   // Servers upgrade and downgrade while the app is away: ask each again.
   void checks.checkAll();
+  // The app may have been updated, and its quadit with it: the skills Connect wrote follow, silently, in the
+  // background too. One not refreshed now (no quadit answered) is at the next start.
+  void connections.refreshSkills().catch(() => {});
   if (app.isPackaged || process.env.QUADIT_DESKTOP_CHECK_UPDATES) updates.start();
   // Only now that the windows are made: making one can run the system's
   // event loop, which may hand in a link, and handled then it would make

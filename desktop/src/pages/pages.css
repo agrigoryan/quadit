@@ -446,6 +446,12 @@ body.panel main {
   overflow-wrap: anywhere;
 }
 
+.tool .skill-changed {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
 .tool button.more {
   margin-top: 8px;
   font-size: 12.5px;

@@ -126,6 +126,8 @@ export interface HarnessView {
   cliIdentity: "own" | "default";
   /** Whether an agent in it was seen to listen (main/harnesses.ts). */
   listenVerified: boolean;
+  /** Connected, its Quadit skill was changed by hand since the app wrote it, so the app does not update it by itself. */
+  skillChangedByHand: boolean;
   connected: { methods: ConnectMethod[]; server: string; workspace: string; agent: string } | null;
 }
 
@@ -349,6 +351,8 @@ export interface PagesApi {
   toolHandshake(id: string): Promise<Handshake | null>;
   /** Makes a new connect code for a tool Connect has set up, replacing the one it had. */
   newConnectCode(id: string): Promise<{ ok: true } | Refused>;
+  /** Writes the app's Quadit skill over a connected tool's one the person changed by hand. */
+  updateSkill(id: string): Promise<{ ok: true } | Refused>;
   /** Puts `text` on the clipboard (a connect code's line). */
   copyText(text: string): Promise<void>;
   connectState(): Promise<ConnectView>;

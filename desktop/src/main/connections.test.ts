@@ -8,6 +8,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   readlinkSync,
   realpathSync,
@@ -30,7 +31,8 @@ const ORIGIN = "https://q.example";
 /**
  * A quadit that answers what Connect runs: version, skill, login --path,
  * login URL - with the token on stdin (noting each login's arguments in
- * PATH.logins), and --json me, which says the login with token T is the
+ * PATH.logins), skill (PATH.skill's text when there is one, as a newer
+ * quadit's), and --json me, which says the login with token T is the
  * agent @as-T.
  */
 function standIn(path: string, defaultConfig: string) {
@@ -46,7 +48,7 @@ case "$1" in
     token=$(sed -n 's/.*"token": *"\\([^"]*\\)".*/\\1/p' "$config")
     [ -n "$token" ] || { echo "not signed in" >&2; exit 1; }
     printf '{"user_id":"id-%s","handle":"@as-%s","name":"As %s"}\\n' "$token" "$token" "$token" ;;
-  skill) printf '# Quadit skill\\n' ;;
+  skill) cat '${path}.skill' 2>/dev/null || printf '# Quadit skill\\n' ;;
   login)
     if [ "$2" = "--path" ]; then echo "\${QUADIT_CONFIG:-$default}"; exit 0; fi
     [ "$3" = "-" ] || exit 2
@@ -632,6 +634,81 @@ posixOnly("the app's own server's logins (desktop contract §11, amendment)", ()
     const { connect, choice, root } = setUp();
     await connect(choice("claude"));
     expect(readFileSync(join(root, "quadit-bundled.logins"), "utf8").trim()).toBe(`login ${ORIGIN} -`);
+  });
+});
+
+posixOnly("the skill, kept up to date with the app's quadit", () => {
+  const NEWER = "# Quadit skill\n\n## Connect\n\n## Listening\n";
+
+  it("leaves a skill that is up to date as it is", async () => {
+    const { connections, connect, choice, read, ledger } = setUp();
+    await connect(choice("claude"));
+    const before = ledger();
+    expect(await connections.refreshSkills()).toEqual({ updated: [], changedByHand: [] });
+    expect(read(".claude/skills/quadit/SKILL.md")).toBe("# Quadit skill\n");
+    expect(ledger()).toBe(before);
+  });
+
+  it("rewrites one the app wrote that is out of date, backed up first, and Disconnect then takes the new one away", async () => {
+    const { connections, connect, disconnect, choice, read, home, root } = setUp();
+    await connect(choice("claude"));
+    // The app was updated: its quadit carries a newer skill.
+    writeFileSync(join(root, "quadit-bundled.skill"), NEWER);
+    const skill = join(home, ".claude", "skills", "quadit", "SKILL.md");
+    expect(await connections.refreshSkills()).toEqual({ updated: [skill], changedByHand: [] });
+    expect(read(".claude/skills/quadit/SKILL.md")).toBe(NEWER);
+    const backups = readdirSync(join(root, "data", "backups")).filter((d) => d.endsWith("-skill"));
+    expect(backups).toHaveLength(1);
+    expect(
+      readFileSync(join(root, "data", "backups", backups[0] ?? "", skill.slice(1).replaceAll("/", "__")), "utf8"),
+    ).toBe("# Quadit skill\n");
+    expect(await disconnect("claude")).toEqual([]);
+    expect(existsSync(skill)).toBe(false);
+  });
+
+  it("rewrites a skill tools share once, for all of them, and takes it away with the last", async () => {
+    const { connections, connect, disconnect, choice, read, home, root } = setUp();
+    await connect(choice("gemini"));
+    await connect(choice("cursor", { agent: null }));
+    writeFileSync(join(root, "quadit-bundled.skill"), NEWER);
+    const skill = join(home, ".agents", "skills", "quadit", "SKILL.md");
+    expect(await connections.refreshSkills()).toEqual({ updated: [skill], changedByHand: [] });
+    expect(read(".agents/skills/quadit/SKILL.md")).toBe(NEWER);
+    await disconnect("gemini");
+    expect(existsSync(skill)).toBe(true);
+    await disconnect("cursor");
+    expect(existsSync(skill)).toBe(false);
+  });
+
+  it("leaves one the person changed by hand, says so on the tool, and updates it when asked", async () => {
+    const { connections, connect, choice, read, home, root } = setUp();
+    await connect(choice("claude"));
+    const skill = join(home, ".claude", "skills", "quadit", "SKILL.md");
+    writeFileSync(skill, "# My own notes\n");
+    writeFileSync(join(root, "quadit-bundled.skill"), NEWER);
+    expect(await connections.refreshSkills()).toEqual({ updated: [], changedByHand: [skill] });
+    expect(read(".claude/skills/quadit/SKILL.md")).toBe("# My own notes\n");
+    const claude = async () => (await connections.state()).harnesses.find((h) => h.id === "claude");
+    expect((await claude())?.skillChangedByHand).toBe(true);
+
+    expect(await connections.updateSkill("claude")).toEqual({ ok: true });
+    expect(read(".claude/skills/quadit/SKILL.md")).toBe(NEWER);
+    expect((await claude())?.skillChangedByHand).toBe(false);
+    // What the person wrote is kept in a backup.
+    const backups = readdirSync(join(root, "data", "backups")).filter((d) => d.endsWith("-skill"));
+    expect(
+      readFileSync(join(root, "data", "backups", backups[0] ?? "", skill.slice(1).replaceAll("/", "__")), "utf8"),
+    ).toBe("# My own notes\n");
+  });
+
+  it("never touches a skill the app did not install", async () => {
+    const { connections, home, root, read } = setUp();
+    mkdirSync(join(home, ".claude", "skills", "quadit"), { recursive: true });
+    writeFileSync(join(home, ".claude", "skills", "quadit", "SKILL.md"), "# Installed by hand\n");
+    writeFileSync(join(root, "quadit-bundled.skill"), NEWER);
+    expect(await connections.refreshSkills()).toEqual({ updated: [], changedByHand: [] });
+    expect(read(".claude/skills/quadit/SKILL.md")).toBe("# Installed by hand\n");
+    expect(await connections.updateSkill("claude")).toEqual({ ok: false, error: "Claude Code is not connected." });
   });
 });
 

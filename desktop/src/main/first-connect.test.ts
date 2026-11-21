@@ -21,6 +21,7 @@ function harness(id: string, name: string, extra: Partial<HarnessView> = {}): Ha
     mcp: true,
     cliIdentity: "own",
     listenVerified: true,
+    skillChangedByHand: false,
     connected: null,
     ...extra,
   };
