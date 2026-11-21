@@ -124,13 +124,14 @@ const useTaskQuery = (taskId: string | undefined, fetch: boolean) => {
 /**
  * Loads a task's contents when it opens (and again whenever the live stream
  * comes back: anything missed while it was down is then fetched). Returns
- * "loading", "ready" or an error message.
+ * "loading", "waiting" (held back until the server can be reached: data/query.ts),
+ * "ready" or an error message.
  */
 export function useTaskDetail(taskId: string | undefined): string {
   const query = useTaskQuery(taskId, true);
   if (query.data) return "ready";
   // A 401 has sent the person to sign in: keep showing that it loads.
-  return readError(query.error) || "loading";
+  return readError(query.error) || (query.fetchStatus === "paused" ? "waiting" : "loading");
 }
 
 /** A task's history, oldest first. Empty until useTaskDetail has loaded it. */

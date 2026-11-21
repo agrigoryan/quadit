@@ -65,3 +65,59 @@ test("a change made just before a reload reaches the server from the next page",
   await expect.poll(async () => Object.values((await widths()) ?? {})).toEqual([start + 10]);
   await expect(handle).toHaveAttribute("aria-valuenow", String(start + 10));
 });
+
+test("a task opened while the server cannot be reached says that it waits, and loads by itself once it can", async ({
+  page,
+  context,
+  project,
+  quadit,
+}) => {
+  const other = await project.newTask("Mow the lawn");
+  const key = await project.newTask("Paint the fence");
+  await quadit.cli("comment", key, "Two coats, the second on Friday.");
+  await page.goto(`/e2e/p/${project.key}/tasks`);
+  const row = page.getByRole("link", { name: `Open ${key}` });
+  await expect(row).toBeVisible();
+  // The page has shown a task before, so what it needs to show one is already loaded.
+  await page.getByRole("link", { name: `Open ${other}` }).click();
+  await expect(
+    page.getByRole("complementary", { name: other }).getByRole("heading", { name: "Activity" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("complementary", { name: other })).toBeHidden();
+
+  await context.setOffline(true);
+  await row.click();
+  const task = page.getByRole("complementary", { name: key });
+  await expect(task.getByText("Waiting for a connection. The rest loads by itself")).toBeVisible();
+
+  await context.setOffline(false);
+  await expect(task.getByText("Two coats, the second on Friday.")).toBeVisible({ timeout: 15_000 });
+  await expect(task.getByText("Waiting for a connection")).toBeHidden();
+});
+
+// A phone that slept, a tunnel that came back without its connections: the
+// request goes out and nothing ever comes back, not even an error.
+test("a task whose requests get no answer at all is asked for again, and loads", async ({ page, project, quadit }) => {
+  const key = await project.newTask("Sand the table");
+  await quadit.cli("comment", key, "Start with the coarse paper.");
+  await page.clock.install();
+  await page.goto(`/e2e/p/${project.key}/tasks`);
+  const row = page.getByRole("link", { name: `Open ${key}` });
+  await expect(row).toBeVisible();
+
+  // The first request for the task's contents is never answered; those after it are.
+  let lost = 0;
+  await page.route(/\/tasks\/[^/?]+\?raw=1$/, (route) => (lost++ === 0 ? undefined : route.continue()));
+  await row.click();
+  const task = page.getByRole("complementary", { name: key });
+  await expect(task.getByRole("heading", { name: "Activity" })).toBeVisible();
+  await expect.poll(() => lost).toBe(1);
+  await expect(task.getByText("Start with the coarse paper.")).toBeHidden();
+
+  // Given up after twenty seconds, then asked for again.
+  await page.clock.fastForward(21_000);
+  await page.clock.fastForward(2000);
+  await expect(task.getByText("Start with the coarse paper.")).toBeVisible({ timeout: 15_000 });
+  expect(lost).toBe(2);
+});

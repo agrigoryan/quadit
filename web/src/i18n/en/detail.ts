@@ -94,6 +94,7 @@ export const detail = {
   "detail.files.drop": "Drop files to attach them to this task",
 
   "timeline.title": "Activity",
+  "timeline.noConnection": "Waiting for a connection. The rest loads by itself as soon as the server can be reached.",
   "timeline.created": "created this task",
   "timeline.status": "moved this from {from} to {to}",
   "timeline.statusTo": "moved this to {to}",

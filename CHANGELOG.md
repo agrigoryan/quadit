@@ -4,6 +4,10 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+### Fixed
+
+- A task opened on a page whose connection had died without a word (a phone that slept, a tunnel that came back without it) no longer shows a spinner under Activity for ever: a read the server does not begin to answer in 20 seconds counts as not reached and is tried again, the live stream is given 15 seconds to open, and while the server cannot be reached the task says that it waits for a connection.
+
 ## [0.3.0] - 2026-11-21
 
 ### Added

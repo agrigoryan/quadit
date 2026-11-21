@@ -1,5 +1,5 @@
-// When to try again (data/api.ts): whenReachable's waits, and what ends them early; and a
-// request called off is not a network failure.
+// When to try again (data/api.ts): whenReachable's waits, and what ends them early; a
+// request called off is not a network failure; and a read left unanswered is one.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, NetworkError, noteReachable, onReachableAgain, whenReachable } from "@/data/api";
@@ -172,5 +172,81 @@ describe("a request called off", () => {
     const reason = new Error("left the page");
     vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(reason);
     await expect(api.get("/ok", stop.signal)).rejects.toBe(reason);
+  });
+});
+
+describe("a read the server does not begin to answer", () => {
+  it("is given up after twenty seconds, and counts as the server not reached", async () => {
+    const slow = server.hold("/slow");
+    const read = api.get("/slow").catch((err: unknown) => err);
+    await later(19_999);
+    expect(slow.calls[0]?.aborted).toBe(false);
+    await later(1);
+    expect(slow.calls[0]?.aborted).toBe(true);
+    expect(await read).toBeInstanceOf(NetworkError);
+  });
+
+  /** A fetch whose answer begins after `headersAt` and whose body takes `bodyTakes` more; it notes the signal it was given. */
+  function answersSlowly(headersAt: number, bodyTakes: number) {
+    const seen = { signal: undefined as AbortSignal | undefined };
+    vi.spyOn(globalThis, "fetch").mockImplementationOnce((_path, init) => {
+      const signal = init?.signal ?? undefined;
+      seen.signal = signal;
+      const text = () =>
+        new Promise<string>((arrived, lost) => {
+          setTimeout(() => arrived('{"n":1}'), bodyTakes);
+          signal?.addEventListener("abort", () => lost(new DOMException("The operation was aborted.", "AbortError")));
+        });
+      return new Promise<Response>((begun) => setTimeout(() => begun({ status: 200, text } as Response), headersAt));
+    });
+    return seen;
+  }
+
+  it("is held to the time only until the answer begins: the rest may take as long as it takes", async () => {
+    const seen = answersSlowly(19_000, 60_000);
+    const read = api.get("/slow");
+    await later(79_000);
+    expect(await read).toEqual({ n: 1 });
+    expect(seen.signal?.aborted).toBe(false);
+  });
+
+  it("can still be called off while the rest of the answer arrives, and then fails as called off", async () => {
+    const seen = answersSlowly(1000, 60_000);
+    const stop = new AbortController();
+    const read = api.get("/slow", stop.signal).catch((err: unknown) => err);
+    await later(5000);
+    stop.abort();
+    const failed = await read;
+    expect(seen.signal?.aborted).toBe(true);
+    expect(failed).not.toBeInstanceOf(NetworkError);
+    expect(failed).toMatchObject({ name: "AbortError" });
+  });
+
+  it("waits longer for a read that says its answer takes longer to begin", async () => {
+    const slow = server.hold("/slow");
+    const read = api.get("/slow", undefined, { startsWithin: 120_000 }).catch((err: unknown) => err);
+    await later(119_999);
+    expect(slow.calls[0]?.aborted).toBe(false);
+    await later(1);
+    expect(await read).toBeInstanceOf(NetworkError);
+  });
+
+  it("fails as called off, not as unreachable, when its own signal ends it first", async () => {
+    const slow = server.hold("/slow");
+    const stop = new AbortController();
+    const read = api.get("/slow", stop.signal).catch((err: unknown) => err);
+    await later(5000);
+    stop.abort();
+    expect(await read).not.toBeInstanceOf(NetworkError);
+    expect(slow.calls[0]?.aborted).toBe(true);
+  });
+
+  it("leaves a write to end by itself: whether it arrived is not known", async () => {
+    const slow = server.hold("/slow", "POST");
+    const write = api.post("/slow", {});
+    await later(120_000);
+    expect(slow.calls[0]?.aborted).toBe(false);
+    slow.calls[0]?.answer({ done: true });
+    expect(await write).toEqual({ done: true });
   });
 });

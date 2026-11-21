@@ -4,7 +4,8 @@
 // a connection that dies without an error (a sleeping laptop, a proxy that
 // lost its server) stays "open" for ever, and the server's heartbeats, being
 // comments, are never shown to the page. Reading the bytes ourselves we see
-// the heartbeats, and a stream silent for too long is closed and reported.
+// the heartbeats, and a stream silent for too long is closed and reported,
+// as is one the server does not accept in time.
 // We also see the status when the server refuses the stream (401, 403, 404)
 // instead of a bare "error".
 //
@@ -15,6 +16,12 @@ import type { FeedEvent } from "@/types/core";
 
 /** The server writes a heartbeat every 25 seconds. Two missed and a margin: the connection is dead. */
 const QUIET_MS = 60_000;
+/**
+ * The server accepts a stream at once. A request it has not answered by now
+ * went down a connection that is dead (a phone that slept, a tunnel that came
+ * back without it), which the browser may take minutes to notice.
+ */
+const OPEN_MS = 15_000;
 
 export interface EventStreamHandlers {
   /** The server accepted the stream. */
@@ -40,10 +47,12 @@ export function openEventStream(url: string, handlers: EventStreamHandlers): Eve
   let closed = false;
   let heard = Date.now();
   let watch: ReturnType<typeof setInterval> | undefined;
+  const opening = setTimeout(() => end(null), OPEN_MS);
 
   const end = (status: number | null) => {
     if (closed) return;
     closed = true;
+    clearTimeout(opening);
     clearInterval(watch);
     abort.abort();
     handlers.onClose(status);
@@ -91,6 +100,7 @@ export function openEventStream(url: string, handlers: EventStreamHandlers): Eve
     } catch {
       return end(null);
     }
+    clearTimeout(opening);
     // 204: the server will not stream to this session (one made to take a picture of a page).
     if (!res.ok || res.status === 204 || !res.body) return end(res.ok && res.status !== 204 ? null : res.status);
     if (closed) return;
@@ -119,6 +129,7 @@ export function openEventStream(url: string, handlers: EventStreamHandlers): Eve
     close() {
       if (closed) return;
       closed = true;
+      clearTimeout(opening);
       clearInterval(watch);
       abort.abort();
     },

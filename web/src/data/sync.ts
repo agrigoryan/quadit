@@ -57,6 +57,12 @@ import type { FeedEvent, Task } from "@/types/core";
 
 /** Past this long without the stream, start from a fresh copy instead of replaying. */
 const LONG_GAP_MS = 5 * 60_000;
+/**
+ * How long the copy's answer has to begin. The server reads all of it before
+ * it sends the first byte, which for a big workspace takes longer than any
+ * other read: given up as early as those, it would be asked for again for ever.
+ */
+const COPY_STARTS_WITHIN_MS = 2 * 60_000;
 /** A follower this many pages of events behind fetches a fresh copy instead. */
 const CATCH_UP_PAGES = 3;
 /** Past this many events applied while the finished work was on its way, patching it is not worth it: the whole copy is fetched again. */
@@ -205,6 +211,7 @@ async function fetchCopy(s: Session, fresh: boolean, signal: AbortSignal) {
   const data = await api.get<BootstrapData>(
     workspacePath(s.slug, whole ? "/bootstrap" : "/bootstrap?part=open"),
     signal,
+    { startsWithin: COPY_STARTS_WITHIN_MS },
   );
   s.rest?.abort();
   s.rest = null;
@@ -231,7 +238,9 @@ async function loadRest(s: Session) {
     for (let attempt = 0; ; attempt++) {
       let data: RestData;
       try {
-        data = await api.get<RestData>(workspacePath(s.slug, "/bootstrap?part=rest"), signal);
+        data = await api.get<RestData>(workspacePath(s.slug, "/bootstrap?part=rest"), signal, {
+          startsWithin: COPY_STARTS_WITHIN_MS,
+        });
       } catch (err) {
         // Refused: the stream is refused too, and that is where leaving is handled.
         if (err instanceof ApiError && err.status < 500) return;

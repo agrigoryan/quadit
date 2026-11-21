@@ -47,7 +47,18 @@ const Line = memo(function Line({ actorId, at, text, note, quiet }: LineProps) {
 
 const lineText = (item: LineItem) => joinPhrases(item.phrases);
 
-export function Timeline({ task, loading }: { task: Task; loading: boolean }) {
+interface Props {
+  task: Task;
+  /** The task's contents have not arrived yet. */
+  loading: boolean;
+  /**
+   * They are not being asked for either, until the server can be reached: said in words, not with a spinner
+   * that never ends, and under whatever of the task the page already holds (a comment that came live).
+   */
+  waiting?: boolean;
+}
+
+export function Timeline({ task, loading, waiting }: Props) {
   const events = useTaskEvents(task.id);
   const comments = useLookup("comments");
   const stored = useStoredRows();
@@ -58,7 +69,7 @@ export function Timeline({ task, loading }: { task: Task; loading: boolean }) {
 
   return (
     <Section title={t("timeline.title")} className="pb-6">
-      {loading && items.length === 0 ? (
+      {loading && !waiting && items.length === 0 ? (
         <Loading />
       ) : (
         <ol className="mt-1 flex flex-col gap-2.5">
@@ -85,6 +96,9 @@ export function Timeline({ task, loading }: { task: Task; loading: boolean }) {
             ),
           )}
         </ol>
+      )}
+      {waiting && (
+        <output className="mt-3 block px-3 text-center text-sm text-ink-2">{t("timeline.noConnection")}</output>
       )}
       {can.editTask(task) && (
         <div className="mt-3">

@@ -126,6 +126,38 @@ describe("openEventStream", () => {
     expect(empty.heard).toMatchObject({ opened: 0, closed: [null] });
   });
 
+  it("gives up a stream the server has not accepted after fifteen seconds, and reports it as dropped", async () => {
+    let aborted = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        (_url: string, init: RequestInit) =>
+          new Promise<Response>((_answer, fail) => {
+            init.signal?.addEventListener("abort", () => {
+              aborted = true;
+              fail(new DOMException("The operation was aborted.", "AbortError"));
+            });
+          }),
+      ),
+    );
+    const { heard, handlers } = listen();
+    openEventStream("/events", handlers);
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(heard.closed).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(aborted).toBe(true);
+    expect(heard).toMatchObject({ opened: 0, closed: [null] });
+  });
+
+  it("does not hold a stream it accepted in time to the time it had to open", async () => {
+    serve();
+    const { heard, handlers } = listen();
+    openEventStream("/events", handlers);
+    await flush();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(heard).toMatchObject({ opened: 1, closed: [] });
+  });
+
   it("calls nothing after close()", async () => {
     const server = serve();
     const { heard, handlers } = listen();

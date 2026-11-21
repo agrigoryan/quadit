@@ -35,7 +35,7 @@ const NO_UPLOADS: PendingUpload[] = [];
 
 interface Props {
   task: Task;
-  /** "loading", "ready", or what went wrong fetching the task's details. */
+  /** "loading", "waiting" (for the server to be reachable), "ready", or what went wrong fetching the task's details. */
   status: string;
   layout: TaskLayout;
 }
@@ -58,8 +58,9 @@ export function TaskBody({ task, status, layout }: Props) {
   const [relating, setRelating] = useState<Adding | null>(null);
   const relate = (type: Adding["type"], pick: boolean) => setRelating((r) => ({ type, pick, n: (r?.n ?? 0) + 1 }));
 
-  const loading = status === "loading";
-  const failed = status !== "loading" && status !== "ready";
+  const waiting = status === "waiting";
+  const loading = status === "loading" || waiting;
+  const failed = !loading && status !== "ready";
   const readOnly = !can.editTask(task);
   const page = layout === "page";
   const show = {
@@ -167,7 +168,7 @@ export function TaskBody({ task, status, layout }: Props) {
           {show.files && <Attachments task={task} files={files} pending={pending} onAttach={attach} />}
           <MentionedIn task={task} />
 
-          <Timeline task={task} loading={loading} />
+          <Timeline task={task} loading={loading} waiting={waiting} />
         </div>
       </div>
     </div>

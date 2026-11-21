@@ -53,10 +53,51 @@ interface RequestOptions {
   quiet401?: boolean;
   /** The answer is plain text (a read asked for with ?format=text), handed over as it is. A refusal is JSON still. */
   plain?: boolean;
+  /** How long a read's answer has to begin, in milliseconds, when the server needs longer for it than for other reads. */
+  startsWithin?: number;
 }
 
 const request = <T>(method: string, path: string, opts: RequestOptions = {}) =>
   noted(fetchAnswer<T>(method, path, opts));
+
+/**
+ * How long a read's answer has to begin, unless the read says otherwise
+ * (startsWithin). A request sent down a connection that died without a word
+ * (a phone that slept, a tunnel that came back without it) is otherwise left
+ * waiting for as long as the browser allows, which is minutes: past this it
+ * counts as the server not reached, which every reader already knows how to
+ * wait out and try again.
+ */
+const READ_STARTS_WITHIN_MS = 20_000;
+
+/**
+ * The time a read's answer has to begin. Its signal is the one the request
+ * is made with: it aborts when the caller's does, for as long as the request
+ * lasts, and when `ms` pass before met().
+ */
+function startLimit(ms: number, caller?: AbortSignal) {
+  const abort = new AbortController();
+  let passed = false;
+  const passOn = () => abort.abort(caller?.reason);
+  const timer = setTimeout(() => {
+    passed = true;
+    abort.abort();
+  }, ms);
+  if (caller?.aborted) passOn();
+  else caller?.addEventListener("abort", passOn);
+  return {
+    signal: abort.signal,
+    /** Whether it was the time, not the caller, that ended the request. */
+    passed: () => passed,
+    /** The answer has begun: however long the rest of it takes to arrive is the network's business. */
+    met: () => clearTimeout(timer),
+    /** The request is over: lets go of the caller's signal. */
+    release() {
+      clearTimeout(timer);
+      caller?.removeEventListener("abort", passOn);
+    },
+  };
+}
 
 async function fetchAnswer<T>(method: string, path: string, opts: RequestOptions): Promise<T> {
   const headers: Record<string, string> = { Accept: opts.plain ? "text/plain" : "application/json" };
@@ -69,26 +110,39 @@ async function fetchAnswer<T>(method: string, path: string, opts: RequestOptions
     headers["Content-Type"] = "application/json";
   }
 
-  let res: Response;
+  // A write is left to end by itself: whether it arrived is not known, and saying it did not would be a guess.
+  const limit = method === "GET" ? startLimit(opts.startsWithin ?? READ_STARTS_WITHIN_MS, opts.signal) : null;
   try {
-    res = await fetch(path, { method, headers, body, signal: opts.signal, credentials: "same-origin" });
-  } catch (err) {
-    if (calledOff(err, opts.signal)) throw err;
-    throw new NetworkError(err);
-  }
+    let res: Response;
+    try {
+      res = await fetch(path, {
+        method,
+        headers,
+        body,
+        signal: limit?.signal ?? opts.signal,
+        credentials: "same-origin",
+      });
+    } catch (err) {
+      if (!limit?.passed() && calledOff(err, opts.signal)) throw err;
+      throw new NetworkError(err);
+    }
+    limit?.met();
 
-  // A gateway in front of a stopped server answers 502-504: same as offline.
-  if (res.status >= 502 && res.status <= 504) throw new NetworkError();
+    // A gateway in front of a stopped server answers 502-504: same as offline.
+    if (res.status >= 502 && res.status <= 504) throw new NetworkError();
 
-  let text: string;
-  try {
-    text = await res.text();
-  } catch (err) {
-    // The connection went away while the answer was arriving.
-    if (calledOff(err, opts.signal)) throw err;
-    throw new NetworkError(err);
+    let text: string;
+    try {
+      text = await res.text();
+    } catch (err) {
+      // The connection went away while the answer was arriving.
+      if (calledOff(err, opts.signal)) throw err;
+      throw new NetworkError(err);
+    }
+    return answer<T>(res.status, text, opts);
+  } finally {
+    limit?.release();
   }
-  return answer<T>(res.status, text, opts);
 }
 
 /**
@@ -254,7 +308,8 @@ export function whenReachable(attempt: number, signal?: AbortSignal): Promise<vo
 }
 
 export const api = {
-  get: <T>(path: string, signal?: AbortSignal) => request<T>("GET", path, { signal }),
+  get: <T>(path: string, signal?: AbortSignal, opts?: Pick<RequestOptions, "startsWithin">) =>
+    request<T>("GET", path, { ...opts, signal }),
   /** A read in its plain-text form, as an agent or the CLI reads it. */
   getText: (path: string, signal?: AbortSignal) => request<string>("GET", path, { signal, plain: true }),
   post: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>("POST", path, { ...opts, body }),

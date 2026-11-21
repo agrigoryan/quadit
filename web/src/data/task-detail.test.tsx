@@ -80,6 +80,17 @@ describe("useTaskDetail", () => {
     await waitFor(() => expect(result.current.status).toBe("ready"));
   });
 
+  it("says it waits while the server cannot be reached, asking nothing, and reads the task once it can", async () => {
+    server.get(TASK, raw([]));
+    server.get(EVENTS, { events: [] });
+    act(() => useStore.setState({ stream: "down" }));
+    const { result } = open();
+    await waitFor(() => expect(result.current.status).toBe("waiting"));
+    expect(server.count(TASK)).toBe(0);
+    act(() => useStore.setState({ stream: "live" }));
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+  });
+
   it("keeps saying it loads after a 401: the person is on the way to sign in", async () => {
     server.get(TASK, refuse(401, "signed out"));
     server.get(EVENTS, { events: [] });
