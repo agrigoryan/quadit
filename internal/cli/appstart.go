@@ -7,6 +7,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -40,6 +41,7 @@ const stoppedFile = "server-stopped"
 // one more line of the error when it could not.
 const (
 	appStarted     = "Quadit was not running; started it."
+	appStartedOnce = "Quadit was not running; started it. Run the command again."
 	appNotStarted  = "Quadit could not be started: open the Quadit app."
 	appSilent      = "Quadit is running but its server does not answer: look at the Quadit menu."
 	appStoppedNote = "Quadit's server is stopped: start it from the Quadit menu."
@@ -56,6 +58,14 @@ type appStarter interface {
 
 // systemStarter starts the app with the command appCommand gives, never
 // through a shell.
+//
+// What it guards against, and what not: the app it starts is named by the
+// login file, so a login file anyone else could write, or an app path
+// anyone else could replace, would let another account on the computer
+// have this one run its program. Those are refused (loginIsPrivate,
+// appPathIsSafe), and macOS's commands are run by their full paths, not
+// found on PATH. A program that can already write this person's own files
+// can do anything they can, and is not something a check here could stop.
 type systemStarter struct{}
 
 // running reports whether the app runs: on macOS, whether the system knows
@@ -74,7 +84,7 @@ func (systemStarter) running(ctx context.Context) bool {
 
 // runningCommand asks macOS for a running application of the app's bundle
 // id; appFound reads its answer, which names the application, or is empty.
-func runningCommand() []string { return []string{"lsappinfo", "find", "bundleid=" + appBundleID} }
+func runningCommand() []string { return []string{"/usr/bin/lsappinfo", "find", "bundleid=" + appBundleID} }
 
 func appFound(out []byte) bool { return strings.Contains(string(out), "ASN:") }
 
@@ -82,6 +92,11 @@ func (systemStarter) start(ctx context.Context, app appLogin) error {
 	argv, err := appCommand(runtime.GOOS, app)
 	if err != nil {
 		return err
+	}
+	if runtime.GOOS != "darwin" {
+		if err := appPathIsSafe(argv[0]); err != nil {
+			return err
+		}
 	}
 	// Detached from the command's end: the app goes on running after it.
 	cmd := exec.CommandContext(context.WithoutCancel(ctx), argv[0], argv[1:]...) //nolint:gosec // the argument list of appCommand: a fixed command, or the app's own path as the app recorded it
@@ -101,7 +116,7 @@ func (systemStarter) start(ctx context.Context, app appLogin) error {
 func appCommand(goos string, app appLogin) ([]string, error) {
 	switch goos {
 	case "darwin":
-		return []string{"open", "-g", "-j", "-b", appBundleID, "--args", "--background"}, nil
+		return []string{"/usr/bin/open", "-g", "-j", "-b", appBundleID, "--args", "--background"}, nil
 	case "linux":
 		if !filepath.IsAbs(app.Path) {
 			return nil, fmt.Errorf("the login names no path of the app to start (%q)", app.Path)
@@ -120,6 +135,26 @@ type appStart struct {
 	within  time.Duration // how long the server is waited for once the app starts
 	stderr  io.Writer
 	tried   bool
+	// note is what the one try said when it did not end with the server
+	// answering, said again on every later failure of the run (a change
+	// sent again after the first try ended).
+	note string
+}
+
+// appPathIsSafe refuses an app to start that another account could have
+// put there: not a full path, not a regular file, not one that can be run,
+// or one that others than its owner may write.
+func appPathIsSafe(path string) error {
+	info, err := os.Stat(path)
+	switch {
+	case err != nil:
+		return err
+	case !filepath.IsAbs(path) || !info.Mode().IsRegular() || info.Mode()&0o111 == 0:
+		return fmt.Errorf("%s is not an app to run", path)
+	case info.Mode()&0o022 != 0:
+		return fmt.Errorf("%s may be changed by others than its owner, so it is not run", path)
+	}
+	return nil
 }
 
 // appStartWithin is how long the command waits for the server once it
@@ -129,13 +164,29 @@ const appStartWithin = 20 * time.Second
 // revive starts the app when a request to base was refused at the
 // connection because its server is not running: the address is this
 // computer's own, the network is not kept from the command, and this run
-// has not tried yet. It says whether the server now answers (the request
-// is then sent again), or the line to add to the error.
-func (a *appStart) revive(ctx context.Context, client *http.Client, base string, err error) (answers bool, note string) {
-	if a.tried || !refused(err) || !onThisComputer(base) || os.Getenv("CODEX_SANDBOX_NETWORK_DISABLED") == "1" {
+// has not tried yet. It says whether Quadit now answers there (the request
+// is then sent again, when resend says it can be), or the line to add to
+// the error.
+func (a *appStart) revive(ctx context.Context, client *http.Client, base string, err error, resend bool) (answers bool, note string) {
+	if !refused(err) || !onThisComputer(base) || os.Getenv("CODEX_SANDBOX_NETWORK_DISABLED") == "1" {
 		return false, ""
 	}
+	if a.tried {
+		return false, a.note
+	}
 	a.tried = true
+	answers, a.note = a.startAndWait(ctx, client, base)
+	if answers && !resend {
+		// A body that cannot be sent twice (a file going up) is not sent again.
+		answers, a.note = false, appStartedOnce
+	}
+	return answers, a.note
+}
+
+// startAndWait starts the app, unless the person stopped its server or it
+// runs already, and waits for Quadit to answer at base: the line to say on
+// failure, or that it answers.
+func (a *appStart) startAndWait(ctx context.Context, client *http.Client, base string) (answers bool, note string) {
 	if _, err := os.Stat(filepath.Join(a.dir, stoppedFile)); err == nil {
 		return false, appStoppedNote
 	}
@@ -151,18 +202,14 @@ func (a *appStart) revive(ctx context.Context, client *http.Client, base string,
 	ctx, cancel := context.WithTimeout(ctx, a.within)
 	defer cancel()
 	for {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/healthz", nil)
-		if err != nil {
-			return false, appNotStarted
-		}
-		if resp, err := client.Do(req); err == nil {
-			resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				if !running {
-					fmt.Fprintln(a.stderr, appStarted)
-				}
-				return true, ""
+		switch isQuadit(ctx, client, base) {
+		case quaditAnswers:
+			if !running {
+				fmt.Fprintln(a.stderr, appStarted)
 			}
+			return true, ""
+		case otherAnswers:
+			return false, failed // the request is not sent to whatever took the address
 		}
 		select {
 		case <-ctx.Done():
@@ -170,6 +217,32 @@ func (a *appStart) revive(ctx context.Context, client *http.Client, base string,
 		case <-time.After(250 * time.Millisecond):
 		}
 	}
+}
+
+// What answers at an address: nothing yet, Quadit, or something else.
+const (
+	nothingAnswers = iota
+	quaditAnswers
+	otherAnswers
+)
+
+// isQuadit asks what answers at base: Quadit says its name in
+// /api/v1/version, which any other service saying "ok" does not.
+func isQuadit(ctx context.Context, client *http.Client, base string) int {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/api/v1/version", nil)
+	if err != nil {
+		return otherAnswers
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nothingAnswers
+	}
+	defer resp.Body.Close()
+	var v struct{ Name string }
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&v) != nil || v.Name != "quadit" {
+		return otherAnswers
+	}
+	return quaditAnswers
 }
 
 // refused reports whether a request failed because nothing listens at the

@@ -304,7 +304,7 @@ func TestAnAgentConnectsAndListensWithTheCommand(t *testing.T) {
 		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys", "assignee": "@coder"})
 		out, code = s.quadit(t, coder, "wait", "for=5")
 		lines := strings.Split(strings.TrimSpace(out), "\n")
-		if code != 0 || len(lines) != 4 || !strings.HasPrefix(lines[0], "ITEM #") || !strings.Contains(lines[0], " assigned OPS-1 from @aram: ") {
+		if code != 0 || len(lines) != 5 || !strings.HasPrefix(lines[0], "ITEM #") || !strings.Contains(lines[0], " assigned OPS-1 from @aram: ") {
 			t.Fatalf("quadit wait said (%d):\n%s", code, out)
 		}
 		if out, code := s.quadit(t, coder, "wait", "for=1"); code == 0 || !strings.Contains(out, "quadit wait take=1") {
@@ -321,9 +321,21 @@ func TestAnAgentConnectsAndListensWithTheCommand(t *testing.T) {
 			return out
 		}
 		run(lines[1])
-		run(lines[2])
-		lines[3] = strings.Replace(lines[3], "for=5", "for=1", 1)
-		if again := run(lines[3]); !strings.HasPrefix(again, "IDLE\n") {
+		// The answering line, sent twice (as two sessions handed the same item would), makes one comment.
+		answer := strings.Replace(lines[2], `"…"`, "Rotated.", 1)
+		if !strings.HasPrefix(answer, "quadit comment OPS-1 Rotated. --id=") {
+			t.Fatalf("the answering line is %q", lines[2])
+		}
+		run(answer)
+		run(answer)
+		var shown struct{ Comments []struct{ By string } }
+		s.call(t, s.owner, "", "GET", w+"/tasks/OPS-1", nil, 200, &shown)
+		if len(shown.Comments) != 1 || shown.Comments[0].By != "@coder" {
+			t.Fatalf("the answer sent twice made the comments %+v", shown.Comments)
+		}
+		run(lines[3])
+		lines[4] = strings.Replace(lines[4], "for=5", "for=1", 1)
+		if again := run(lines[4]); !strings.HasPrefix(again, "IDLE\n") {
 			t.Fatalf("after the ack the next wait said:\n%s", again)
 		}
 		if !s.listening(t, "coder") {

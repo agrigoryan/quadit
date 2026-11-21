@@ -8,6 +8,8 @@ package cli
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,7 +53,12 @@ func (r *runner) listen(in input) error {
 		maxItemPause = 5 * time.Minute  // an item's command keeps failing
 	)
 	readPause, itemPause := firstPause, firstPause
-	lease := keptLease()
+	kept, err := openLeaseFile()
+	if err != nil {
+		return err
+	}
+	defer kept.close()
+	lease := kept.kept()
 	for {
 		page, err := r.nextItem(cursor, lease, take, waitHold)
 		if err != nil {
@@ -69,8 +76,11 @@ func (r *runner) listen(in input) error {
 			continue
 		}
 		readPause = firstPause
+		if !leaseForm.MatchString(page.Lease) {
+			return errStrangeLease
+		}
 		if page.Lease != lease {
-			keepLease(page.Lease)
+			kept.keep(page.Lease)
 		}
 		lease, take = page.Lease, false
 		r.sayLeftAlone(page.Skipped)
@@ -208,36 +218,17 @@ func (r *runner) sayLeftAlone(n int) {
 	}
 }
 
-// leasePath is where listen keeps its lease's id: beside the login file.
-func leasePath() string { return configPath() + ".lease" }
-
-// keptLease is the lease id listen kept, or "" for none (or one not of the
-// form a lease id has).
-func keptLease() string {
-	raw, err := os.ReadFile(leasePath())
-	if err != nil {
-		return ""
-	}
-	if id := strings.TrimSpace(string(raw)); leaseForm.MatchString(id) {
-		return id
-	}
-	return ""
-}
-
-// keepLease keeps a lease id for the next start of listen. Best effort: a
-// listen that cannot keep it takes a new one when it starts again, after
-// the old one ran out.
-func keepLease(id string) {
-	if err := os.WriteFile(leasePath(), []byte(id+"\n"), 0o600); err != nil {
-		fmt.Fprintln(os.Stderr, "the listener's lease could not be kept for the next start:", err)
-	}
-}
+// errStrangeLease refuses to use a lease id the server sent that is not of
+// the form quadit gives one: it would go into a file and into commands.
+var errStrangeLease = errors.New("the server sent a lease id quadit does not recognize, so nothing is printed to run")
 
 // listenItem is an inbox item as GET /listen answers it.
 type listenItem struct {
+	ID      string `json:"id"`
 	Seq     int64  `json:"seq"`
 	Type    string `json:"type"`
 	By      string `json:"by"`
+	ByAgent bool   `json:"by_agent"`
 	Task    string `json:"task"`
 	Title   string `json:"title"`
 	Snippet string `json:"snippet"`
@@ -316,7 +307,7 @@ func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) er
 			return err
 		}
 		if !leaseForm.MatchString(page.Lease) {
-			return errors.New("the server sent a lease id quadit does not recognize, so nothing is printed to run")
+			return errStrangeLease
 		}
 		lease, take = page.Lease, false
 		next := fmt.Sprintf("%s lease=%s", goOn, lease)
@@ -328,6 +319,9 @@ func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) er
 			}
 			fmt.Fprintln(r.out, item.line())
 			fmt.Fprintf(r.out, "%s   # read it\n", reading)
+			if answering := item.answering(); answering != "" {
+				fmt.Fprintf(r.out, "%s   # answer with this line, your words in the quotes\n", answering)
+			}
 			fmt.Fprintf(r.out, "quadit ack %d listen lease=%s   # once it is handled\n", item.Seq, lease)
 			fmt.Fprintf(r.out, "%s   # then go on listening\n", next)
 			r.sayLeftAlone(skipped)
@@ -369,7 +363,11 @@ func (item listenItem) line() string {
 		parts = append(parts, "page "+item.Page)
 	}
 	if handleForm.MatchString(item.By) {
-		parts = append(parts, "from "+item.By)
+		from := "from " + item.By
+		if item.ByAgent {
+			from += " (agent)"
+		}
+		parts = append(parts, from)
 	}
 	text := item.Snippet
 	if text == "" {
@@ -386,6 +384,29 @@ func (item listenItem) line() string {
 	}, text)
 	runes := []rune(strings.Join(strings.Fields(text), " "))
 	return strings.Join(parts, " ") + `: "` + string(runes[:min(len(runes), 200)]) + `"`
+}
+
+// answering is the command that answers the item where it was asked: in
+// the comment thread it came from, or on its task. It carries a change id
+// made from the item's own id, the same each time, so an answer sent twice
+// (two sessions handed the same item, or one sent again after a crash) is
+// made once. Nothing for an item there is no such place for, or whose ids
+// are not of their form.
+func (item listenItem) answering() string {
+	if !pageForm.MatchString(item.ID) {
+		return ""
+	}
+	sum := sha256.Sum256([]byte("quadit answer " + item.ID))
+	h := hex.EncodeToString(sum[:16])
+	// A UUID's form: version 8 (made by its maker's own rule), the usual variant.
+	answerID := h[0:8] + "-" + h[8:12] + "-8" + h[13:16] + "-" + string("89ab"[sum[8]&3]) + h[17:20] + "-" + h[20:32]
+	switch {
+	case pageForm.MatchString(item.Thread):
+		return fmt.Sprintf(`quadit reply %s "…" --id=%s`, item.Thread, answerID)
+	case taskForm.MatchString(item.Task):
+		return fmt.Sprintf(`quadit comment %s "…" --id=%s`, item.Task, answerID)
+	}
+	return ""
 }
 
 // reading is the command that reads what the item is about; it refuses an

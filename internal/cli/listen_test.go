@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -357,5 +359,76 @@ func TestConnectSendsTheCodeAsTheServerKeepsIt(t *testing.T) {
 	}
 	if sent.Code != "K7QX4M" {
 		t.Fatalf("connect sent %q", sent.Code)
+	}
+}
+
+// TestOneListenPerLogin: a second `quadit listen` on the login of one that
+// runs is refused before it asks anything, so two companions never run
+// their command for the same item.
+func TestOneListenPerLogin(t *testing.T) {
+	t.Setenv("QUADIT_CONFIG", filepath.Join(t.TempDir(), "codex.json"))
+	first, err := openLeaseFile()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.close()
+	asked := false
+	srv := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { asked = true })
+	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: &bytes.Buffer{}}
+	err = r.listen(input{rest: []string{"--exec", "true"}})
+	if !errors.Is(err, errAnotherListen) || asked {
+		t.Fatalf("a second listen ended with %v (asked the server: %v)", err, asked)
+	}
+}
+
+// TestListenKeepsNoLeaseItDoesNotRecognize: a lease id the server sends
+// that is not of the form quadit gives one is neither kept nor printed.
+func TestListenKeepsNoLeaseItDoesNotRecognize(t *testing.T) {
+	t.Setenv("QUADIT_CONFIG", filepath.Join(t.TempDir(), "codex.json"))
+	srv := &listenServer{lease: "KQ7MX4PA; rm -rf ~", item: `{"seq":1,"type":"assigned","task":"SVA-1"}`}
+	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: &bytes.Buffer{}}
+	err := r.listen(input{rest: []string{"--exec", "true"}})
+	if !errors.Is(err, errStrangeLease) {
+		t.Fatalf("listen ended with %v", err)
+	}
+	if raw, _ := os.ReadFile(filepath.Join(filepath.Dir(os.Getenv("QUADIT_CONFIG")), "codex.json.lease")); len(raw) != 0 {
+		t.Fatalf("the lease file holds %q", raw)
+	}
+}
+
+// TestWaitGivesTheLineThatAnswersAnItemOnce: an item of a comment thread
+// comes with the line that answers in that thread, and one of a task with
+// the line that comments on it, each with a change id made from the item's
+// id, the same every time; one from an agent says so.
+func TestWaitGivesTheLineThatAnswersAnItemOnce(t *testing.T) {
+	wait := func(item string) []string {
+		t.Helper()
+		out := &bytes.Buffer{}
+		r := &runner{ctx: context.Background(), c: testClient(t, &listenServer{item: item}), out: out}
+		if err := r.wait(input{}); err != nil {
+			t.Fatal(err)
+		}
+		return strings.Split(strings.TrimSpace(out.String()), "\n")
+	}
+	const note = "0192f4a2-7c3e-7a10-9d2b-3c4d5e6f7a8b"
+	thread := wait(`{"id":"` + note + `","seq":9,"type":"replied","by":"@bot","by_agent":true,"task":"SVA-1","thread":"0192f4a2-0000-7000-8000-000000000001"}`)
+	if !strings.HasPrefix(thread[0], "ITEM #9 replied SVA-1 from @bot (agent): ") {
+		t.Fatalf("the item's line is %q", thread[0])
+	}
+	answer := regexp.MustCompile(`^quadit reply 0192f4a2-0000-7000-8000-000000000001 "…" --id=([0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})   # `)
+	m := answer.FindStringSubmatch(thread[2])
+	if m == nil {
+		t.Fatalf("the answering line is %q", thread[2])
+	}
+	again := wait(`{"id":"` + note + `","seq":9,"type":"replied","by":"@bot","task":"SVA-1","thread":"0192f4a2-0000-7000-8000-000000000001"}`)
+	if again[2] != thread[2] {
+		t.Fatalf("the same item gave two answering lines:\n%s\n%s", thread[2], again[2])
+	}
+	onTask := wait(`{"id":"` + note + `","seq":9,"type":"assigned","by":"@ann","task":"SVA-1"}`)
+	if !strings.HasPrefix(onTask[2], `quadit comment SVA-1 "…" --id=`+m[1]) {
+		t.Fatalf("the answering line of a task's item is %q", onTask[2])
+	}
+	if lines := wait(`{"seq":9,"type":"assigned","by":"@ann","task":"SVA-1"}`); len(lines) != 4 {
+		t.Fatalf("an item with no id of its own was given an answering line: %q", lines)
 	}
 }

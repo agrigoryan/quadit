@@ -57,6 +57,10 @@ func downServer(t *testing.T) (base string, up func()) {
 			return
 		}
 		srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/api/v1/version" {
+				_, _ = io.WriteString(w, `{"name":"quadit","version":"test"}`)
+				return
+			}
 			_, _ = io.WriteString(w, "you are @codex\n")
 		}))
 		srv.Listener.Close()
@@ -136,16 +140,48 @@ func TestTheCommandStartsTheAppWhenItsServerIsNotRunning(t *testing.T) {
 		}
 	})
 
-	t.Run("stopped on purpose: nothing started, and the error says so", func(t *testing.T) {
+	t.Run("stopped on purpose: nothing started, and every failure of the run says so", func(t *testing.T) {
 		base, _ := downServer(t)
 		dir := t.TempDir()
 		if err := os.WriteFile(filepath.Join(dir, "server-stopped"), nil, 0o600); err != nil {
 			t.Fatal(err)
 		}
 		starter := &fakeStarter{}
-		_, err := appClient(base, dir, starter, io.Discard).Text(context.Background(), "/me", nil)
-		if err == nil || !strings.HasSuffix(err.Error(), "\n  Quadit's server is stopped: start it from the Quadit menu.") || starter.starts != 0 {
-			t.Fatalf("the request ended with %v after %d starts", err, starter.starts)
+		c := appClient(base, dir, starter, io.Discard)
+		for i := range 2 { // a change is sent again when the server is not reached
+			_, err := c.Text(context.Background(), "/me", nil)
+			if err == nil || !strings.HasSuffix(err.Error(), "\n  Quadit's server is stopped: start it from the Quadit menu.") || starter.starts != 0 {
+				t.Fatalf("request %d ended with %v after %d starts", i+1, err, starter.starts)
+			}
+		}
+	})
+
+	t.Run("something else answering there is not Quadit: nothing is sent to it", func(t *testing.T) {
+		base, _ := downServer(t)
+		other := func() {
+			l, err := net.Listen("tcp", strings.TrimPrefix(base, "http://"))
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, "ok") }))
+			srv.Listener.Close()
+			srv.Listener = l
+			srv.Start()
+			t.Cleanup(srv.Close)
+		}
+		_, err := appClient(base, t.TempDir(), &fakeStarter{serve: other}, io.Discard).Text(context.Background(), "/me", nil)
+		if err == nil || !strings.HasSuffix(err.Error(), "\n  Quadit could not be started: open the Quadit app.") {
+			t.Fatalf("the request ended with %v", err)
+		}
+	})
+
+	t.Run("a file going up is not sent twice: the app is started and the command asked for again", func(t *testing.T) {
+		base, up := downServer(t)
+		c := appClient(base, t.TempDir(), &fakeStarter{serve: up}, io.Discard)
+		_, err := c.workspaceRequest(context.Background(), apiRequest{method: http.MethodPost, path: "/files", body: io.LimitReader(strings.NewReader("bytes"), 5)})
+		if err == nil || !strings.HasSuffix(err.Error(), "\n  Quadit was not running; started it. Run the command again.") {
+			t.Fatalf("the upload ended with %v", err)
 		}
 	})
 
@@ -189,7 +225,7 @@ func TestTheAppIsStartedOnlyForItsServerNotRunning(t *testing.T) {
 			}
 			starter := &fakeStarter{fail: errors.New("not started, only counted")}
 			a := &appStart{starter: starter, dir: t.TempDir(), within: time.Millisecond, stderr: io.Discard}
-			a.revive(context.Background(), http.DefaultClient, c.base, c.err)
+			a.revive(context.Background(), http.DefaultClient, c.base, c.err, true)
 			if got := starter.starts == 1; got != c.want {
 				t.Fatalf("started: %v, want %v", got, c.want)
 			}
@@ -202,7 +238,7 @@ func TestTheAppIsStartedOnlyForItsServerNotRunning(t *testing.T) {
 // (which must be a full path), and none elsewhere.
 func TestTheAppIsStartedWithoutAShell(t *testing.T) {
 	mac, err := appCommand("darwin", appLogin{Path: "/Applications/Quadit.app/Contents/MacOS/Quadit; rm -rf ~"})
-	if err != nil || !slices.Equal(mac, []string{"open", "-g", "-j", "-b", "io.github.agrigoryan.quadit", "--args", "--background"}) {
+	if err != nil || !slices.Equal(mac, []string{"/usr/bin/open", "-g", "-j", "-b", "io.github.agrigoryan.quadit", "--args", "--background"}) {
 		t.Fatalf("macOS: %q, %v", mac, err)
 	}
 	linux, err := appCommand("linux", appLogin{Path: "/opt/Quadit/quadit desktop; echo $HOME"})
@@ -216,7 +252,7 @@ func TestTheAppIsStartedWithoutAShell(t *testing.T) {
 		t.Fatal("Windows: an app was to be started")
 	}
 	// Whether it runs on macOS is asked by its bundle id; the answer names it, or is empty.
-	if argv := runningCommand(); !slices.Equal(argv, []string{"lsappinfo", "find", "bundleid=io.github.agrigoryan.quadit"}) {
+	if argv := runningCommand(); !slices.Equal(argv, []string{"/usr/bin/lsappinfo", "find", "bundleid=io.github.agrigoryan.quadit"}) {
 		t.Fatalf("running is asked with %q", argv)
 	}
 	if !appFound([]byte("ASN:0x0-0xe08e08-\"Quadit\":\n")) || appFound([]byte("\n")) {
@@ -253,5 +289,44 @@ func TestLoginMarksALoginTheAppMakes(t *testing.T) {
 	}
 	if saved := run(srv.URL, "-"); saved.App != nil {
 		t.Fatalf("a login made by hand kept the app's mark: %+v", saved.App)
+	}
+}
+
+// TestTheAppIsStartedOnlyFromFilesNobodyElseCouldWrite: the login that
+// names the app must be this account's own and closed to others, and the
+// app a full path to a program only its owner may change.
+func TestTheAppIsStartedOnlyFromFilesNobodyElseCouldWrite(t *testing.T) {
+	dir := t.TempDir()
+	login := filepath.Join(dir, "codex.json")
+	if err := os.WriteFile(login, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !loginIsPrivate(login) {
+		t.Fatal("a login file of this account, closed to others, is not taken")
+	}
+	if err := os.Chmod(login, 0o620); err != nil {
+		t.Fatal(err)
+	}
+	if loginIsPrivate(login) {
+		t.Fatal("a login file its group may write is taken")
+	}
+
+	app := filepath.Join(dir, "quadit-desktop")
+	if err := os.WriteFile(app, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := appPathIsSafe(app); err != nil {
+		t.Fatalf("an app only its owner may change is refused: %v", err)
+	}
+	for name, mode := range map[string]os.FileMode{"its group may change it": 0o775, "it cannot be run": 0o644} {
+		if err := os.Chmod(app, mode); err != nil {
+			t.Fatal(err)
+		}
+		if appPathIsSafe(app) == nil {
+			t.Fatalf("an app that %s is taken", name)
+		}
+	}
+	if appPathIsSafe(dir) == nil || appPathIsSafe("quadit-desktop") == nil {
+		t.Fatal("a folder, or a path that is not a full one, is taken")
 	}
 }

@@ -78,7 +78,8 @@ func NewClient() (*Client, error) {
 			}
 		}
 		c.URL, c.Token = sc.URL, sc.Token
-		if sc.App != nil {
+		// The app is started only for a login file nobody else could have written (systemStarter).
+		if sc.App != nil && loginIsPrivate(configPath()) {
 			c.app = &appStart{login: *sc.App, dir: filepath.Dir(configPath()), starter: systemStarter{}, within: appStartWithin, stderr: os.Stderr}
 		}
 	}
@@ -158,10 +159,10 @@ func (c *Client) workspaceRequest(ctx context.Context, r apiRequest) ([]byte, er
 		return c.HTTP.Do(req)
 	}
 	resp, err := send()
-	// A body that can be read again from its start can be sent again.
-	rewind, again := r.body.(io.Seeker)
-	if err != nil && c.app != nil && (r.body == nil || again) {
-		answers, note := c.app.revive(ctx, c.HTTP, c.URL, err)
+	if err != nil && c.app != nil {
+		// A body that can be read again from its start can be sent again.
+		rewind, again := r.body.(io.Seeker)
+		answers, note := c.app.revive(ctx, c.HTTP, c.URL, err, r.body == nil || again)
 		if note != "" {
 			return nil, fmt.Errorf("cannot reach %s: %w\n  %s", c.URL, err, note)
 		}
