@@ -10,6 +10,7 @@ package engine
 
 import (
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -42,6 +43,9 @@ type samplesAddArgs struct {
 // is still there and has nobody. Either way the change's answer (ref, key)
 // is the project.
 func samplesAdd(c *cx, a samplesAddArgs) error {
+	if err := c.forPeople(); err != nil {
+		return err
+	}
 	agentID, err := c.sampleAgent(a.Agent)
 	if err != nil {
 		return err
@@ -53,9 +57,14 @@ func samplesAdd(c *cx, a samplesAddArgs) error {
 	if !there {
 		return c.makeSamples(agentID)
 	}
+	// Nothing may be written here, so nothing else checks that the
+	// credential reaches the project it is told of.
+	if err := c.reachesSamples(project); err != nil {
+		return err
+	}
 	if agentID != "" && len(project.Samples) == 3 {
 		var third core.Task
-		found, err := store.Find(c.ctx, c.tx, &third, store.Eq("id", project.Samples[2]), store.Live)
+		found, err := store.Find(c.ctx, c.tx, &third, store.Eq("id", project.Samples[2]), store.Eq("project_id", project.ID), store.Live)
 		if err != nil {
 			return err
 		}
@@ -66,6 +75,25 @@ func samplesAdd(c *cx, a samplesAddArgs) error {
 		}
 	}
 	c.ref, c.key = project.ID, project.Key
+	return nil
+}
+
+// forPeople refuses an agent: the samples are a person's start in Quadit,
+// and an agent removing them would delete tasks and a project without the
+// approval its policy may ask for those.
+func (c *cx) forPeople() error {
+	if c.actor.Kind != core.KindPerson {
+		return forbidden("the sample tasks are for people to add and remove, not agents")
+	}
+	return nil
+}
+
+// reachesSamples refuses a credential kept to projects that do not include
+// the samples' project.
+func (c *cx) reachesSamples(project core.Project) error {
+	if len(c.scope.Projects) > 0 && !slices.Contains(c.scope.Projects, project.ID) {
+		return forbidden("your access does not include this project")
+	}
 	return nil
 }
 
@@ -159,14 +187,15 @@ func (c *cx) sampleProjects() ([]core.Project, error) {
 }
 
 // samplesThere finds the samples that are there: the project of the first
-// that still has a sample task out of the trash.
+// that still has a sample task in it, out of the trash (archived counts).
+// A sample moved to another project is the person's task, no sample.
 func (c *cx) samplesThere() (core.Project, bool, error) {
 	projects, err := c.sampleProjects()
 	if err != nil {
 		return core.Project{}, false, err
 	}
 	for _, p := range projects {
-		n, err := c.tx.Count(c.ctx, "tasks", store.In("id", p.Samples), store.Live)
+		n, err := c.tx.Count(c.ctx, "tasks", store.In("id", p.Samples), store.Eq("project_id", p.ID), store.Live)
 		if err != nil {
 			return core.Project{}, false, err
 		}
@@ -177,18 +206,24 @@ func (c *cx) samplesThere() (core.Project, bool, error) {
 	return core.Project{}, false, nil
 }
 
-// samplesRemove sends the sample tasks that are left to the trash, as the
-// one who asks deleting them would, and each samples' project with them
-// when nothing else is in it: a task or a page the person added keeps it.
-// With no samples left it does nothing.
+// samplesRemove sends the sample tasks that are left in their project to
+// the trash, as the one who asks deleting them would, and each samples'
+// project with them when nothing of the person's is in it
+// (holdsOnlySamples). With no samples left it does nothing.
 func samplesRemove(c *cx, _ struct{}) error {
+	if err := c.forPeople(); err != nil {
+		return err
+	}
 	projects, err := c.sampleProjects()
 	if err != nil {
 		return err
 	}
 	for _, p := range projects {
+		if err := c.reachesSamples(p); err != nil {
+			return err
+		}
 		var left []core.Task
-		if err := c.tx.List(c.ctx, &left, store.Q{Where: []store.Cond{store.In("id", p.Samples), store.Live}}); err != nil {
+		if err := c.tx.List(c.ctx, &left, store.Q{Where: []store.Cond{store.In("id", p.Samples), store.Eq("project_id", p.ID), store.Live}}); err != nil {
 			return err
 		}
 		for _, t := range left {
@@ -196,19 +231,50 @@ func samplesRemove(c *cx, _ struct{}) error {
 				return err
 			}
 		}
-		tasks, err := c.tx.Count(c.ctx, "tasks", store.Eq("project_id", p.ID), store.Live)
+		only, err := c.holdsOnlySamples(p)
 		if err != nil {
 			return err
 		}
-		pages, err := c.tx.Count(c.ctx, "docs", store.Eq("project_id", p.ID), store.Live)
-		if err != nil {
-			return err
-		}
-		if tasks == 0 && pages == 0 {
+		if only {
 			if err := c.applyNested("project.delete", map[string]any{"id": p.ID}); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// projectRows are the tables whose rows belong to a project (project_id)
+// and stay with it in the trash: what a person may have put in the
+// samples' project. Tasks are counted apart; milestones are in an epic.
+var projectRows = []string{"statuses", "labels", "epics", "cycles", "docs", "views", "templates", "preferences", "webhooks", "integrations"}
+
+// holdsOnlySamples says whether nothing of the person's is left in the
+// samples' project p: no task out of the trash, no rule that watches it, and
+// no row of projectRows made or changed since the samples were made. The
+// statuses and the label the samples came with are made before their first
+// task, so the first task's place in the feed tells them from the rest;
+// when it has been purged from the trash nothing tells, and the project is
+// the person's.
+func (c *cx) holdsOnlySamples(p core.Project) (bool, error) {
+	tasks, err := c.tx.Count(c.ctx, "tasks", store.Eq("project_id", p.ID), store.Live)
+	if err != nil || tasks > 0 || len(p.Samples) == 0 {
+		return false, err
+	}
+	var first core.Task
+	found, err := store.Find(c.ctx, c.tx, &first, store.Eq("id", p.Samples[0]))
+	if err != nil || !found {
+		return false, err
+	}
+	for _, table := range projectRows {
+		n, err := c.tx.Count(c.ctx, table, store.Eq("project_id", p.ID), store.Live, store.Gt("updated_seq", first.CreatedSeq))
+		if err != nil || n > 0 {
+			return false, err
+		}
+	}
+	var rules []core.Rule
+	if err := c.tx.List(c.ctx, &rules, store.Q{Where: []store.Cond{store.Live}}); err != nil {
+		return false, err
+	}
+	return !slices.ContainsFunc(rules, func(r core.Rule) bool { return r.Match != nil && r.Match.ProjectID == p.ID }), nil
 }

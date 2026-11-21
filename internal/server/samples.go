@@ -8,7 +8,6 @@ import (
 	"github.com/agrigoryan/quadit/internal/engine"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/plainjson"
-	"github.com/agrigoryan/quadit/internal/store"
 )
 
 // The sample tasks to try Quadit with, as the web app and the desktop app
@@ -38,9 +37,12 @@ func (s *Server) handleAddSamples(x *c) error {
 	if err != nil {
 		return err
 	}
-	var project core.Project
-	if err := x.db.Get(x.ctx(), &project, store.Eq("id", res.Ref)); err != nil {
+	project, err := x.resolver(x.ctx()).Project(res.Ref)
+	if err != nil {
 		return err
+	}
+	if !x.canProject(project.ID) {
+		return errNotFound("project " + project.Key)
 	}
 	status := 200
 	if slices.ContainsFunc(res.Events, func(ev core.Event) bool { return ev.Type == "project.created" }) {

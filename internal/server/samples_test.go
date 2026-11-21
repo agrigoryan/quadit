@@ -3,6 +3,7 @@ package server_test
 import (
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/server"
@@ -125,6 +126,25 @@ func TestTheSamplesAreAskedForAndRemoved(t *testing.T) {
 			s.call(t, s.owner, "", "POST", w+"/samples", M{"agent": "@nobody"}, 400, nil)
 		})
 
+		t.Run("a credential kept to other projects learns nothing of them", func(t *testing.T) {
+			s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+			var narrow struct{ Token string }
+			s.call(t, s.owner, "", "POST", w+"/tokens", M{"name": "narrow", "projects": []string{"SVA"}}, 201, &narrow)
+			for _, method := range []string{"POST", "DELETE"} {
+				if out := s.call(t, nil, narrow.Token, method, w+"/samples", M{}, 403, nil); strings.Contains(out, made.Project.ID) {
+					t.Fatalf("%s /samples told a credential kept to SVA of the samples' project: %s", method, out)
+				}
+			}
+		})
+
+		t.Run("an agent may not", func(t *testing.T) {
+			s.change(t, s.owner, "", "member.update", M{"id": "@codex", "role": "admin"})
+			var bot struct{ Token string }
+			s.call(t, s.owner, "", "POST", w+"/tokens", M{"name": "bot", "user": "@codex"}, 201, &bot)
+			s.call(t, nil, bot.Token, "POST", w+"/samples", M{}, 403, nil)
+			s.call(t, nil, bot.Token, "DELETE", w+"/samples", nil, 403, nil)
+		})
+
 		t.Run("a member may not", func(t *testing.T) {
 			bea, _ := s.invitedPerson(t)
 			s.call(t, bea, "", "POST", w+"/samples", M{}, 403, nil)
@@ -133,7 +153,7 @@ func TestTheSamplesAreAskedForAndRemoved(t *testing.T) {
 
 		t.Run("removed, and asked for again", func(t *testing.T) {
 			s.call(t, s.owner, "", "DELETE", w+"/samples", nil, 204, nil)
-			if got := s.liveProjects(t, "games"); len(got) != 0 {
+			if got := s.liveProjects(t, "games"); !slices.Equal(got, []string{"SVA"}) {
 				t.Fatalf("after removing the samples the projects are %v", got)
 			}
 			s.call(t, s.owner, "", "DELETE", w+"/samples", nil, 204, nil)
