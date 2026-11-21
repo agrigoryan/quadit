@@ -10,6 +10,10 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 - On macOS the desktop app's server windows have no title bar: the page fills the window to its top edge, the window's buttons sit over its top left corner, and the window is dragged by the sidebar's top and the top bar. A server says its pages are laid out for this in `GET /api/v1/version` (`desktop.inset`); a server that does not say so keeps a window with a title bar.
 - A new install starts with a "Getting started" project of three sample tasks to try Quadit with, whether the web form or the desktop app sets it up; a note above them says what they are for, and one click sends them to the trash. An empty workspace's "Create your first project" offers "Try it with sample tasks". The API has `POST` and `DELETE /api/v1/w/{workspace}/samples`, and the changes `samples.add` and `samples.remove`.
 
+### Changed
+
+- The desktop app's first run happens in one window, the one the workspace opens in, instead of small windows of its own: Welcome, then "Connect your AI tools", which looks for the tools on the computer and shows each as a card that connects with one button, says in plain words which files it changes, and takes it back with Undo; Continue opens the workspace on its sample tasks. The Connect window shows the tools with the same cards, its technical choices under More options.
+
 ### Fixed
 
 - In the desktop app, Help → Quadit Website opens the website, not the source code.
