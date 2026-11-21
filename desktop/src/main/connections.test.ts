@@ -67,6 +67,8 @@ function setUp({
   writableOnPath = true,
   ownBinOnPath = false,
   shell = "/bin/zsh",
+  moreAgents = [],
+  tokensWait = Promise.resolve(),
 }: {
   quaditOnPath?: boolean;
   bundled?: boolean;
@@ -76,6 +78,10 @@ function setUp({
   /** Whether ~/.local/bin is on the login PATH, as Linux distributions put it, there or not. */
   ownBinOnPath?: boolean;
   shell?: string;
+  /** Agents of the workspace besides @coder and @boss, by id and handle. */
+  moreAgents?: { id: string; handle: string }[];
+  /** The workspace's page makes a token only once this has settled. */
+  tokensWait?: Promise<void>;
 } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
   const home = join(root, "home");
@@ -114,6 +120,14 @@ function setUp({
           agents: [
             { id: "u2", handle: "coder", name: "Coder", state: "idle", detail: "", path: "/acme", usable: true },
             { id: "u3", handle: "boss", name: "Boss", state: "idle", detail: "", path: "/acme", usable: false },
+            ...moreAgents.map((a) => ({
+              ...a,
+              name: a.handle,
+              state: "idle" as const,
+              detail: "",
+              path: "/acme",
+              usable: true,
+            })),
           ],
           projects: [],
         },
@@ -122,6 +136,7 @@ function setUp({
     server: (id) => (id === "s1" ? { name: "Work", origin: ORIGIN } : undefined),
     ask: async (_server, _workspace, request) => {
       asked.push(request);
+      if (request.kind === "agent-token") await tokensWait;
       if (request.kind === "agent-token")
         return { ok: true, token: { id: `t${++tokens}`, secret: `qd_secret${tokens}` } };
       if (request.kind === "agent") {
@@ -422,6 +437,7 @@ posixOnly("Connect and Disconnect", () => {
     expect(await connections.applyConnect(planned.plan.id)).toEqual({
       ok: false,
       error: `${join(home, ".cursor", "mcp.json")} changed since you reviewed the plan: review it again.`,
+      stale: true,
     });
     expect(await connections.applyConnect(planned.plan.id)).toMatchObject({ ok: false });
   });
@@ -456,6 +472,30 @@ posixOnly("the default login", () => {
     expect(JSON.parse(ledger()).harnesses.cursor.agent).toEqual({ id: "id-qd_secret1", handle: "as-qd_secret1" });
   });
 
+  it("makes no agent for a tool that works as the default login there already, whatever was chosen, and says that login's agent is the tool's only when it is an agent of this workspace", async () => {
+    // The default login (token qd_mine) is @as-qd_mine of this server, and an agent of the workspace.
+    const member = setUp({ moreAgents: [{ id: "id-qd_mine", handle: "as-qd_mine" }] });
+    mkdirSync(member.configDir, { recursive: true });
+    writeFileSync(join(member.configDir, "config.json"), JSON.stringify({ url: ORIGIN, token: "qd_mine" }));
+    const create = { create: { name: "Cursor", handle: "cursor" } };
+    const planned = await member.connections.planConnect(member.choice("cursor", { agent: create }));
+    if (!planned.ok) throw new Error(planned.error);
+    expect(await member.connections.applyConnect(planned.plan.id)).toMatchObject({
+      ok: true,
+      agent: { id: "id-qd_mine", handle: "as-qd_mine" },
+    });
+    expect(member.asked).toEqual([]);
+
+    // A login for another server, or for someone not an agent here, is the tool's, but not an agent of this workspace.
+    const elsewhere = setUp();
+    mkdirSync(elsewhere.configDir, { recursive: true });
+    writeFileSync(join(elsewhere.configDir, "config.json"), JSON.stringify({ url: "https://other", token: "qd_mine" }));
+    const other = await elsewhere.connections.planConnect(elsewhere.choice("pi", { agent: create }));
+    if (!other.ok) throw new Error(other.error);
+    expect(await elsewhere.connections.applyConnect(other.plan.id)).toMatchObject({ ok: true, agent: null });
+    expect(elsewhere.asked).toEqual([]);
+  });
+
   it("still asks for an agent where the choice holds: with no default login yet, or for MCP", async () => {
     const { connections, connect, choice } = setUp();
     expect(await connections.planConnect(choice("gemini", { agent: null }))).toEqual({
@@ -475,6 +515,38 @@ posixOnly("the default login", () => {
     expect(await connections.planConnect(choice("pi", { agent: null }))).toEqual({
       ok: false,
       error: expect.stringContaining("did not say who it is"),
+    });
+  });
+});
+
+posixOnly("Apply, from two windows at once", () => {
+  it("applies one plan at a time, checking each against the files as the one before left them", async () => {
+    // Cursor and pi would both make the default login: pi is planned while Cursor's Apply waits for its token.
+    let tokens = () => {};
+    const { connections, choice, configDir } = setUp({ tokensWait: new Promise((go) => (tokens = go)) });
+    const cursor = await connections.planConnect(choice("cursor"));
+    if (!cursor.ok) throw new Error(cursor.error);
+    const first = connections.applyConnect(cursor.plan.id);
+    const pi = await connections.planConnect(choice("pi"));
+    if (!pi.ok) throw new Error(pi.error);
+    const second = connections.applyConnect(pi.plan.id);
+    tokens();
+    expect(await first).toMatchObject({ ok: true });
+    // The skill they share is the first file Cursor's Apply wrote that pi's plan did not expect.
+    expect(await second).toEqual({
+      ok: false,
+      error: expect.stringMatching(/changed since you reviewed the plan: review it again\.$/),
+      stale: true,
+    });
+    expect(JSON.parse(readFileSync(join(configDir, "config.json"), "utf8"))).toMatchObject({ token: "qd_secret1" });
+  });
+
+  it("says a plan that is gone is to be looked at again", async () => {
+    const { connections } = setUp();
+    expect(await connections.applyConnect("nope")).toEqual({
+      ok: false,
+      error: "That plan is gone: review the changes again.",
+      stale: true,
     });
   });
 });

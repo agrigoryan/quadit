@@ -53,6 +53,7 @@ import type {
   PlanFile,
   Planned,
   PlanView,
+  Refused,
 } from "@/shared/pages-api";
 
 export interface ConnectionsParts {
@@ -97,6 +98,8 @@ type Plan =
       agent: { id: string; handle: string; name: string } | null;
       /** Who the quadit command will work as when that is the default login already there, not the agent chosen. */
       worksAs: { id: string; handle: string } | null;
+      /** The server that default login is for, as its file says (null: it says none). */
+      worksAsServer: string | null;
       edits: FileEdit[];
       applied: Applied[];
       /** Changes another connection made already, recorded for this one too. */
@@ -124,6 +127,12 @@ const MASKED_TOKEN = "qd_…";
 
 export class Connections {
   private plans = new Map<string, Plan>();
+  /**
+   * Applies, one at a time whichever window asked: connections share files
+   * (the skill, the default login, the command's link), so each is checked
+   * against the files as the one before left them.
+   */
+  private applying: Promise<unknown> = Promise.resolve();
   private ledgerFile: string;
 
   constructor(private parts: ConnectionsParts) {
@@ -230,6 +239,7 @@ export class Connections {
     const warnings: string[] = [];
     let login: { binary: string; config: string } | null = null;
     let worksAs: { id: string; handle: string } | null = null;
+    let worksAsServer: string | null = null;
     let sharedToken: Connection["token"] = null;
     if (methods.includes("cli")) {
       const look = await cli.look();
@@ -277,6 +287,7 @@ export class Connections {
           );
         });
         worksAs = { id: who.id, handle: who.handle };
+        worksAsServer = savedServer(defaultConfig);
         const made = others.has(targetOf({ kind: "written-by", path: defaultConfig, shown }));
         warnings.push(
           `${harness.name} has no setting the app can use to give quadit its own login, so there quadit works as this ` +
@@ -340,6 +351,7 @@ export class Connections {
       origin,
       agent,
       worksAs,
+      worksAsServer,
       edits,
       applied,
       shared,
@@ -360,78 +372,109 @@ export class Connections {
   }
 
   /**
-   * Carries out a connect plan the person saw; it is good for one Apply.
-   * Gives what to do next, and the workspace's agent the tool was connected
-   * as (null where the quadit command alone works as a default login there already).
+   * Carries out a connect plan the person saw; it is good for one Apply, and
+   * waits for any other Apply under way. Gives what to do next, and the
+   * workspace's agent the tool works as: the one chosen (or made), or, for a
+   * tool that works as the computer's default login, that login's agent when
+   * it is an agent of this workspace on this server (null otherwise).
    */
-  async applyConnect(
+  applyConnect(
     planId: string,
-  ): Promise<{ ok: true; hint: string; agent: { id: string; handle: string } | null } | { ok: false; error: string }> {
+  ): Promise<{ ok: true; hint: string; agent: { id: string; handle: string } | null } | Refused> {
+    // Taken at once: a second Apply of the same plan, or a new plan meanwhile, finds it gone.
     const plan = this.plans.get(planId);
     this.plans.delete(planId);
-    if (plan?.kind !== "connect") return { ok: false, error: "That plan is gone: review the changes again." };
-    const changed = changedSince(plan.edits);
-    if (changed) return { ok: false, error: `${changed.path} changed since you reviewed the plan: review it again.` };
-    const { choice, harness } = plan;
-    const ask = (request: DesktopRequest) => this.parts.ask(choice.serverId, choice.workspaceId, request);
+    return this.inTurn(async () => {
+      if (plan?.kind !== "connect")
+        return { ok: false, error: "That plan is gone: review the changes again.", stale: true };
+      const { choice, harness } = plan;
+      if (this.ledger().harnesses[harness.id])
+        return { ok: false, error: `${harness.name} is connected already.`, stale: true };
+      const changed = changedSince(plan.edits);
+      if (changed)
+        return {
+          ok: false,
+          error: `${changed.path} changed since you reviewed the plan: review it again.`,
+          stale: true,
+        };
+      const ask = (request: DesktopRequest) => this.parts.ask(choice.serverId, choice.workspaceId, request);
 
-    let agent = plan.agent;
-    if (!agent && choice.agent && "create" in choice.agent) {
-      const made = await ask({ kind: "agent", create: choice.agent.create });
-      if (!made.ok || !made.agent) return { ok: false, error: made.ok ? "The agent was not made." : made.message };
-      agent = made.agent;
-    }
-    const worksAs = plan.worksAs ?? agent;
-    if (!worksAs) return { ok: false, error: "Pick an agent you may connect as." };
-
-    const backups = backUp(plan.edits, plan.backupDir);
-    let token = plan.sharedToken;
-    if (plan.login) {
-      const label = `${harness.name} on ${this.parts.hostName}`;
-      const issued = await ask({ kind: "agent-token", agent: worksAs.id, label });
-      if (!issued.ok || !issued.token) return { ok: false, error: issued.ok ? "No token was made." : issued.message };
-      try {
-        await this.parts.cli.login(plan.login.binary, plan.origin, issued.token.secret, plan.login.config);
-      } catch (err) {
-        void ask({ kind: "revoke-token", token: issued.token.id });
-        return { ok: false, error: (err as Error).message };
+      // An agent is made only where the choice holds: a tool on a default login there already works as that login.
+      const choiceHolds = !plan.worksAs || choice.methods.includes("mcp");
+      let agent = plan.agent;
+      if (choiceHolds && !agent && choice.agent && "create" in choice.agent) {
+        const made = await ask({ kind: "agent", create: choice.agent.create });
+        if (!made.ok || !made.agent) return { ok: false, error: made.ok ? "The agent was not made." : made.message };
+        agent = made.agent;
       }
-      token = {
-        id: issued.token.id,
-        label,
-        config: realPath(plan.login.config),
+      const worksAs = plan.worksAs ?? agent;
+      if (!worksAs) return { ok: false, error: "Pick an agent you may connect as." };
+
+      const backups = backUp(plan.edits, plan.backupDir);
+      let token = plan.sharedToken;
+      if (plan.login) {
+        const label = `${harness.name} on ${this.parts.hostName}`;
+        const issued = await ask({ kind: "agent-token", agent: worksAs.id, label });
+        if (!issued.ok || !issued.token) return { ok: false, error: issued.ok ? "No token was made." : issued.message };
+        try {
+          await this.parts.cli.login(plan.login.binary, plan.origin, issued.token.secret, plan.login.config);
+        } catch (err) {
+          void ask({ kind: "revoke-token", token: issued.token.id });
+          return { ok: false, error: (err as Error).message };
+        }
+        token = {
+          id: issued.token.id,
+          label,
+          config: realPath(plan.login.config),
+          serverId: choice.serverId,
+          workspaceId: choice.workspaceId,
+        };
+      }
+      writeEdits(plan.edits);
+      const link = plan.applied.find((record) => record.kind === "link");
+      if (link) this.parts.cli.linked(link.path);
+
+      const records = plan.applied.map((record) =>
+        record.kind === "file"
+          ? { ...record, sha256: sha256(readText(record.path) ?? ""), backup: backups.get(record.path) ?? null }
+          : record,
+      );
+      const ledger = this.ledger();
+      ledger.harnesses[harness.id] = {
         serverId: choice.serverId,
         workspaceId: choice.workspaceId,
+        methods: choice.methods,
+        agent: { id: worksAs.id, handle: worksAs.handle },
+        edits: [...records, ...plan.shared],
+        token,
+        at: Date.now(),
       };
-    }
-    writeEdits(plan.edits);
-    const link = plan.applied.find((record) => record.kind === "link");
-    if (link) this.parts.cli.linked(link.path);
+      this.saveLedger(ledger);
+      const hint = connectedHint(harness, choice.methods, worksAs.handle, agent?.handle ?? worksAs.handle);
+      // The login PATH changed (a folder of the person's own, or the line that puts it there): open terminals keep the old one.
+      const newPath = plan.applied.some((record) => record.kind === "line" || record.kind === "folder");
+      return {
+        ok: true,
+        hint: newPath ? `${hint} Terminals opened from now on find quadit; reopen any that are open now.` : hint,
+        agent: choiceHolds ? agent && { id: agent.id, handle: agent.handle } : this.memberOf(plan, worksAs),
+      };
+    });
+  }
 
-    const records = plan.applied.map((record) =>
-      record.kind === "file"
-        ? { ...record, sha256: sha256(readText(record.path) ?? ""), backup: backups.get(record.path) ?? null }
-        : record,
-    );
-    const ledger = this.ledger();
-    ledger.harnesses[harness.id] = {
-      serverId: choice.serverId,
-      workspaceId: choice.workspaceId,
-      methods: choice.methods,
-      agent: { id: worksAs.id, handle: worksAs.handle },
-      edits: [...records, ...plan.shared],
-      token,
-      at: Date.now(),
-    };
-    this.saveLedger(ledger);
-    const hint = connectedHint(harness, choice.methods, worksAs.handle, agent?.handle ?? worksAs.handle);
-    // The login PATH changed (a folder of the person's own, or the line that puts it there): open terminals keep the old one.
-    const newPath = plan.applied.some((record) => record.kind === "line" || record.kind === "folder");
-    return {
-      ok: true,
-      hint: newPath ? `${hint} Terminals opened from now on find quadit; reopen any that are open now.` : hint,
-      agent: agent ? { id: agent.id, handle: agent.handle } : null,
-    };
+  /**
+   * The default login a plan works as, when it is an agent of the plan's
+   * workspace on the plan's server: the login's file names that server, and
+   * the workspace's window lists the agent. Null otherwise.
+   */
+  private memberOf(
+    plan: Extract<Plan, { kind: "connect" }>,
+    who: { id: string; handle: string },
+  ): { id: string; handle: string } | null {
+    if (plan.worksAsServer !== plan.origin) return null;
+    const summary = this.parts
+      .summaries()
+      .find((s) => s.serverId === plan.choice.serverId && s.summary.workspace.id === plan.choice.workspaceId)?.summary;
+    return summary?.agents.some((a) => a.id === who.id) ? who : null;
   }
 
   /** Plans taking back what Connect did for a harness, where its files still say what was written. */
@@ -473,29 +516,44 @@ export class Connections {
     }
   }
 
-  async applyDisconnect(planId: string): Promise<{ ok: true; notes: string[] } | { ok: false; error: string }> {
+  /** Carries out a disconnect plan the person saw (waiting for any other Apply under way); gives what they should know. */
+  applyDisconnect(planId: string): Promise<{ ok: true; notes: string[] } | Refused> {
     const plan = this.plans.get(planId);
     this.plans.delete(planId);
-    if (plan?.kind !== "disconnect") return { ok: false, error: "That plan is gone: review the changes again." };
-    const changed = changedSince(plan.edits);
-    if (changed) return { ok: false, error: `${changed.path} changed since you reviewed the plan: review it again.` };
-    backUp(plan.edits, plan.backupDir);
-    writeEdits(plan.edits);
-    const ledger = this.ledger();
-    delete ledger.harnesses[plan.harness.id];
-    this.saveLedger(ledger);
-    const notes = [...plan.notes];
-    if (plan.revoke) {
-      const revoked = await this.parts.ask(plan.revoke.serverId, plan.revoke.workspaceId, {
-        kind: "revoke-token",
-        token: plan.revoke.id,
-      });
-      if (!revoked.ok) {
-        const server = this.parts.server(plan.revoke.serverId)?.name ?? "the server";
-        notes.push(`Revoke the token “${plan.revoke.label}” yourself in ${server}'s settings: ${revoked.message}`);
+    return this.inTurn(async () => {
+      if (plan?.kind !== "disconnect")
+        return { ok: false, error: "That plan is gone: review the changes again.", stale: true };
+      const changed = changedSince(plan.edits);
+      if (changed)
+        return {
+          ok: false,
+          error: `${changed.path} changed since you reviewed the plan: review it again.`,
+          stale: true,
+        };
+      backUp(plan.edits, plan.backupDir);
+      writeEdits(plan.edits);
+      const ledger = this.ledger();
+      delete ledger.harnesses[plan.harness.id];
+      this.saveLedger(ledger);
+      const notes = [...plan.notes];
+      if (plan.revoke) {
+        const revoked = await this.parts.ask(plan.revoke.serverId, plan.revoke.workspaceId, {
+          kind: "revoke-token",
+          token: plan.revoke.id,
+        });
+        if (!revoked.ok) {
+          const server = this.parts.server(plan.revoke.serverId)?.name ?? "the server";
+          notes.push(`Revoke the token “${plan.revoke.label}” yourself in ${server}'s settings: ${revoked.message}`);
+        }
       }
-    }
-    return { ok: true, notes };
+      return { ok: true, notes };
+    });
+  }
+
+  private inTurn<T>(work: () => Promise<T>): Promise<T> {
+    const turn = this.applying.then(work);
+    this.applying = turn.catch(() => {});
+    return turn;
   }
 
   private view(plan: Plan): PlanView {
@@ -530,7 +588,7 @@ export class Connections {
         });
       }
     }
-    return { id: plan.id, files, backupDir: plan.backupDir, warnings: plan.warnings };
+    return { id: plan.id, files, warnings: plan.warnings };
   }
 
   private workspaceName(serverId: string, workspaceId: string): string {
