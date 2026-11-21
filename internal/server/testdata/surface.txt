@@ -697,6 +697,7 @@ cli attach
 cli changes
 cli comment
 cli comments
+cli connect
 cli context
 cli create
 cli dashboard
@@ -738,6 +739,7 @@ cli tasks
 cli unclear
 cli update
 cli upload
+cli wait
 cli whoami
 cli work
 cli write

@@ -155,6 +155,14 @@ func TestTheListener(t *testing.T) {
 			}
 		})
 
+		t.Run("a person's login is refused", func(t *testing.T) {
+			var r refusal
+			s.call(t, s.owner, "", "GET", w+"/listen?wait=0", nil, 403, &r)
+			if !strings.Contains(r.Error.Message, "a person's, not an agent's") {
+				t.Fatalf("a person listening is told %q", r.Error.Message)
+			}
+		})
+
 		t.Run("a wait on another cursor is not listening", func(t *testing.T) {
 			bot := s.agentToken(t, "bot")
 			s.call(t, nil, bot, "GET", w+"/events?cursor=main&mine=1&others=1&wait=1", nil, 200, nil)

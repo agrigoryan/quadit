@@ -35,13 +35,18 @@ const (
 // listenerRoutes are the routes of the listener.
 func (s *Server) listenerRoutes() []route {
 	return []route{
-		{"GET /api/v1/w/{ws}/listen", s.workspaceMember(s.handleNextInboxItem), "The listener's read: the next item of the caller's inbox after its cursor \"listen\", waiting for one up to wait seconds (at most 55). It holds the listener's lease: the first call takes it, and each call after gives its id as lease=; while it lives (five minutes past the end of the last wait) another session is refused (reason listening_elsewhere) unless it asks with take=1, and the member counts as listening. Answers {lease, seq, item}: no item when the wait ended with none, the cursor then moved past what came. An item is acknowledged with PUT cursors/listen {seq, lease}.", "wait: seconds, up to 55; lease: the id the last call answered with; take: true to take the lease from the session that holds it", "follow"},
+		{"GET /api/v1/w/{ws}/listen", s.workspaceMember(s.handleNextInboxItem), "The listener's read: the next item of the caller's inbox after its cursor \"listen\", waiting for one up to wait seconds (at most 55). It holds the listener's lease: the first call takes it, and each call after gives its id as lease=; while it lives (five minutes past the end of the last wait) another session is refused (reason listening_elsewhere) unless it asks with take=1, and the member counts as listening. Answers {lease, seq, item}: no item when the wait ended with none, the cursor then moved past what came. An item is acknowledged with PUT cursors/listen {seq, lease}. An agent's login only.", "wait: seconds, up to 55; lease: the id the last call answered with; take: true to take the lease from the session that holds it", "follow"},
 	}
 }
 
 // handleNextInboxItem answers the listener's next inbox item, holding the
 // lease while it waits.
 func (s *Server) handleNextInboxItem(x *c) error {
+	// An agent listening with a person's login (the computer's own, when its
+	// tool did not get the agent's) would answer as that person.
+	if x.member.Kind != core.KindAgent {
+		return errForbidden("this login is @%s's, a person's, not an agent's: an agent listens with its own login", x.member.Handle)
+	}
 	v := x.r.URL.Query()
 	wait := min(x.intParam("wait", 0), maxFeedWait)
 	lease, err := s.holdLease(x, v.Get("lease"), truthyParam(v, "take"), time.Duration(wait)*time.Second)
