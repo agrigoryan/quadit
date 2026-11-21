@@ -78,13 +78,28 @@ describe("Requests", () => {
     page(1, "s1", "acme");
     const late = requests.toWorkspace("s1", "acme", { kind: "revoke-token", token: "t" });
     vi.advanceTimersByTime(20_000);
-    await expect(late).resolves.toEqual({ ok: false, message: expect.stringContaining("did not answer") });
+    await expect(late).resolves.toEqual({
+      ok: false,
+      message: expect.stringContaining("did not answer"),
+      unanswered: true,
+    });
 
     const pending = requests.toWorkspace("s1", "acme", { kind: "revoke-token", token: "t" });
     requests.forget(1);
-    await expect(pending).resolves.toMatchObject({ ok: false });
+    await expect(pending).resolves.toMatchObject({ ok: false, unanswered: true });
     // Its summary went with it.
     expect(requests.summaries()).toEqual([]);
+  });
+
+  it("tells a page's own refusal from no answer, and a page cannot pass its refusal off as no answer", async () => {
+    const { requests, page, lastTo } = setUp();
+    page(1, "s1", "acme");
+    expect(await requests.toWorkspace("s1", "other", { kind: "revoke-token", token: "t" })).toMatchObject({
+      unanswered: true,
+    });
+    const answer = requests.toWorkspace("s1", "acme", { kind: "revoke-token", token: "t" });
+    requests.answer(1, { id: lastTo(1)?.id, outcome: { ok: false, message: "Refused.", unanswered: true } });
+    expect(await answer).toEqual({ ok: false, message: "Refused." });
   });
 
   it("holds a page's answer to the outcome's shape", async () => {

@@ -16,10 +16,11 @@
 // Once the end has begun, nothing new is taken, until it fails.
 
 import type { Connections } from "@/main/connections";
-import type { DesktopOutcome, DesktopRequest, DesktopSummary } from "@/shared/bridge";
+import type { Answer } from "@/main/requests";
+import type { DesktopRequest, DesktopSummary } from "@/shared/bridge";
 import { defaultLoginWords } from "@/shared/change-words";
 import { defaultChoice } from "@/shared/default-choice";
-import type { FoundTools, Planned, PlanView, Refused, ToolView } from "@/shared/pages-api";
+import type { Disconnected, FoundTools, Planned, PlanView, Refused, ToolView } from "@/shared/pages-api";
 
 export interface FirstConnectParts {
   connections: Pick<
@@ -29,7 +30,7 @@ export interface FirstConnectParts {
   /** The workspaces the server windows show now (Requests.summaries). */
   summaries(): { serverId: string; summary: DesktopSummary; listening: boolean }[];
   /** Asks the page that speaks for a workspace (Requests.toWorkspace). */
-  ask(serverId: string, workspaceId: string, request: DesktopRequest): Promise<DesktopOutcome>;
+  ask(serverId: string, workspaceId: string, request: DesktopRequest): Promise<Answer>;
   sleep(ms: number): Promise<void>;
 }
 
@@ -101,7 +102,7 @@ export class FirstConnect {
   }
 
   /** Takes back what connecting a tool in this step did (its Undo), asking nothing; gives what the person should know. */
-  disconnect(toolId: string): Promise<{ ok: true; notes: string[] } | Refused> {
+  disconnect(toolId: string): Promise<Disconnected | Refused> {
     if (this.finishing) return Promise.resolve(FINISHING);
     return this.inTurn(async () => {
       if (!this.done.has(toolId)) return { ok: false, error: "It was not connected here." };
@@ -131,23 +132,27 @@ export class FirstConnect {
   /**
    * The end of the step, once every Connect and Undo asked before it is
    * done: asks the workspace's page for its sample tasks, the third for the
-   * first tool connected that is an agent there; gives the path to open. A
-   * failure is said, and the step takes work again, so the end can be tried again.
+   * first tool connected that is an agent there, and opens the path it gives
+   * (`open`). A failure is said in one sentence, which tells "no answer" from
+   * "it answered no" (with the reason given); the step then takes work again,
+   * so the end can be tried again.
    */
   finish(open: (path: string) => Promise<boolean>): Promise<{ ok: true } | Refused> {
     this.finishing = true;
     return this.inTurn(async () => {
       const shown = await this.workspaceShown();
-      const outcome = shown
+      const outcome: Answer = shown
         ? await this.parts.ask(this.serverId, shown.workspace.id, this.samplesRequest())
-        : ({ ok: false, message: "its window has not finished opening" } as const);
+        : { ok: false, message: "Its window has not finished opening.", unanswered: true };
       if (outcome.ok && (await open(outcome.path ?? `/${encodeURIComponent(this.workspace)}`))) return { ok: true };
       this.finishing = false;
       return {
         ok: false,
         error: outcome.ok
-          ? "Could not open the page in your workspace. Try again."
-          : `Your workspace did not answer: ${outcome.message.replace(/\.$/, "")}. Try again.`,
+          ? "The sample tasks are ready, but their page did not open."
+          : "unanswered" in outcome
+            ? "Quadit could not reach your workspace to set up the sample tasks."
+            : `Your workspace said no to the sample tasks: ${sentence(outcome.message)}`,
       };
     });
   }
@@ -183,4 +188,9 @@ export class FirstConnect {
     this.queue = turn.catch(() => {});
     return turn;
   }
+}
+
+/** A reason as the end of a sentence: with its full stop. */
+function sentence(reason: string): string {
+  return /[.!?]$/.test(reason) ? reason : `${reason}.`;
 }

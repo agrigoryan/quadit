@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { FirstConnect, type FirstConnectParts } from "@/main/first-connect";
-import type { DesktopOutcome, DesktopRequest, DesktopSummary } from "@/shared/bridge";
-import type { ConnectChoice, ConnectView, HarnessView, Planned, PlanView, Refused } from "@/shared/pages-api";
+import type { Answer } from "@/main/requests";
+import type { DesktopRequest, DesktopSummary } from "@/shared/bridge";
+import type {
+  ConnectChoice,
+  ConnectView,
+  HarnessView,
+  Planned,
+  PlanView,
+  Refused,
+  Unrevoked,
+} from "@/shared/pages-api";
 
 function harness(id: string, name: string, extra: Partial<HarnessView> = {}): HarnessView {
   return {
@@ -40,7 +49,7 @@ const PLAN: PlanView = {
   warnings: [],
 };
 
-const SAMPLES_PATH: DesktopOutcome = { ok: true, path: "/personal/projects/GS" };
+const SAMPLES_PATH: Answer = { ok: true, path: "/personal/projects/GS" };
 
 type Applied = { ok: true; hint: string; agent: { id: string; handle: string } | null } | Refused;
 
@@ -69,7 +78,7 @@ function setUp({
   cliFound = true,
   defaultLogin = null,
   answer = SAMPLES_PATH,
-  notes = [],
+  unrevoked = null,
 }: {
   harnesses?: HarnessView[];
   planned?: Planned[];
@@ -79,8 +88,8 @@ function setUp({
   agents?: DesktopSummary["agents"];
   cliFound?: boolean;
   defaultLogin?: ConnectView["defaultLogin"];
-  answer?: DesktopOutcome;
-  notes?: string[];
+  answer?: Answer;
+  unrevoked?: Unrevoked | null;
 } = {}) {
   const choices: ConnectChoice[] = [];
   const appliedIds: string[] = [];
@@ -115,7 +124,7 @@ function setUp({
       planDisconnect: (id) => ({ ok: true, plan: { ...PLAN, id: `undo-${id}` } }),
       applyDisconnect: async (planId) => {
         disconnected.push(planId);
-        return { ok: true, notes };
+        return { ok: true, notes: [], unrevoked };
       },
       dropPlans: () => {},
     },
@@ -242,12 +251,12 @@ describe("FirstConnect", () => {
   });
 
   it("takes a connection back with Undo, asking nothing, gives what the person should know, and only one it made", async () => {
-    const note = "Revoke the token “Claude Code on mac” yourself in This computer's settings: it did not answer.";
-    const { first, disconnected } = setUp({ notes: [note] });
+    const unrevoked = { label: "Claude Code on mac", agent: "claude-code", server: "This computer", reason: "No." };
+    const { first, disconnected } = setUp({ unrevoked });
     await first.look();
     expect(await first.disconnect("claude")).toMatchObject({ ok: false });
     await first.connect("claude");
-    expect(await first.disconnect("claude")).toEqual({ ok: true, notes: [note] });
+    expect(await first.disconnect("claude")).toEqual({ ok: true, notes: [], unrevoked });
     expect(disconnected).toEqual(["undo-claude"]);
   });
 
@@ -307,7 +316,7 @@ describe("FirstConnect", () => {
 
   it("takes no Connect or Undo once the end has begun, and takes them again when it failed", async () => {
     const { first, finish, appliedIds } = setUp({
-      answer: { ok: false, message: "The page does not take requests now." },
+      answer: { ok: false, message: "The sample assignment was refused" },
     });
     await first.look();
     const finishing = finish();
@@ -315,10 +324,30 @@ describe("FirstConnect", () => {
     expect(await first.disconnect("claude")).toEqual({ ok: false, error: "Quadit is opening your workspace." });
     expect(await finishing).toEqual({
       ok: false,
-      error: "Your workspace did not answer: The page does not take requests now. Try again.",
+      error: "Your workspace said no to the sample tasks: The sample assignment was refused.",
     });
     expect(appliedIds).toEqual([]);
     expect(await first.connect("claude")).toMatchObject({ ok: true });
+  });
+
+  it("says no answer apart from a refusal, and a page that did not open apart from both, in one sentence each", async () => {
+    const silent = setUp({
+      answer: { ok: false, message: "The server's page did not answer in time.", unanswered: true },
+    });
+    expect(await silent.finish()).toEqual({
+      ok: false,
+      error: "Quadit could not reach your workspace to set up the sample tasks.",
+    });
+    const unopened = setUp();
+    expect(await unopened.first.finish(async () => false)).toEqual({
+      ok: false,
+      error: "The sample tasks are ready, but their page did not open.",
+    });
+    const neverShown = setUp({ opensAfter: Number.POSITIVE_INFINITY });
+    expect(await neverShown.finish()).toEqual({
+      ok: false,
+      error: "Quadit could not reach your workspace to set up the sample tasks.",
+    });
   });
 
   it("keeps the tools step usable when the workspace could not navigate", async () => {

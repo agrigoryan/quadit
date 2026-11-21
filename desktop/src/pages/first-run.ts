@@ -13,7 +13,7 @@
 // Each change of step slides and fades for 200 ms; with reduced motion,
 // nothing moves (first-run.css).
 
-import { element, make } from "@/pages/dom";
+import { element, make, separated } from "@/pages/dom";
 import { openSheet } from "@/pages/files-sheet";
 import { tile, ToolCard } from "@/pages/tool-card";
 import { countWord } from "@/shared/change-words";
@@ -151,7 +151,8 @@ const connectAll = element<HTMLButtonElement>("connect-all");
 const skip = element<HTMLButtonElement>("skip");
 const later = element<HTMLSpanElement>("later");
 const cont = element<HTMLButtonElement>("continue");
-const finishError = element<HTMLSpanElement>("finish-error");
+const finishError = element<HTMLParagraphElement>("finish-error");
+const foot = element<HTMLElement>("tools-foot");
 
 /** Every tool Connect knows, as the last look found them, and the cards of those found, in the order shown. */
 let tools: ToolView[] = [];
@@ -243,7 +244,7 @@ function showFound(result: FoundTools, onComputer: ToolView[]) {
   const others = element<HTMLParagraphElement>("others");
   const away = tools.filter((t) => !t.found);
   others.hidden = away.length === 0;
-  others.replaceChildren(make("span", "Not on this computer:", "lbl"), ...away.map((t) => make("span", t.name, "o")));
+  others.replaceChildren(make("span", "Not on this computer:", "lbl"), separated(away.map((t) => t.name)));
   found.hidden = false;
   renderProgress();
 }
@@ -388,7 +389,8 @@ function renderMembers() {
 /**
  * Continue or Skip: once what was asked before is done, the workspace's
  * samples are asked for and the window shows them; then this page fades
- * away. A failure is said beside the buttons, and Continue tries again.
+ * away. A failure is said beside the button, which then tries again; the
+ * line about later gives way to it meanwhile.
  */
 async function finish() {
   found.inert = true;
@@ -396,6 +398,7 @@ async function finish() {
   cont.disabled = true;
   skip.disabled = true;
   finishError.textContent = "";
+  foot.classList.remove("failed");
   await connectingAll;
   const done = await api.finishFirstRun();
   if (done.ok) {
@@ -408,6 +411,7 @@ async function finish() {
   skip.disabled = false;
   cont.textContent = "Try again";
   finishError.textContent = done.error;
+  foot.classList.add("failed");
 }
 
 /** The first run is over: this page fades, showing the window under it, and goes. */

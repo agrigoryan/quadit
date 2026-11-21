@@ -15,6 +15,16 @@
 
 import { type DesktopOutcome, type DesktopRequest, type DesktopSummary, outcomeOf, REPLY_MAX } from "@/shared/bridge";
 
+/**
+ * How a request went: the page's own outcome, or, when no page answered it
+ * (none listened, the one asked went away or took too long, or said nothing
+ * the app understands), a refusal marked `unanswered`. A page cannot mark
+ * its own outcome so: what it sends is rebuilt from the outcome's shape.
+ */
+export type Answer = DesktopOutcome | Unanswered;
+
+type Unanswered = Extract<DesktopOutcome, { ok: false }> & { unanswered: true };
+
 /** Hands a request to a page; false when there is no such page any more. */
 export type PageSend = (page: number, message: { id: string; request: DesktopRequest }) => boolean;
 
@@ -30,7 +40,7 @@ interface Page {
 
 export class Requests {
   private pages = new Map<number, Page>();
-  private pending = new Map<string, { page: number; settle(outcome: DesktopOutcome): void }>();
+  private pending = new Map<string, { page: number; settle(outcome: Answer): void }>();
   private published = 0;
   private sent = 0;
 
@@ -58,8 +68,7 @@ export class Requests {
   forget(page: number) {
     if (!this.pages.delete(page)) return;
     for (const request of this.pending.values()) {
-      if (request.page === page)
-        request.settle({ ok: false, message: "The server's window went away before it answered." });
+      if (request.page === page) request.settle(unanswered("The server's window went away before it answered."));
     }
     this.changed();
   }
@@ -70,9 +79,7 @@ export class Requests {
     const { id, outcome } = raw as Record<string, unknown>;
     const request = typeof id === "string" ? this.pending.get(id) : undefined;
     if (!request || request.page !== page) return;
-    request.settle(
-      outcomeOf(outcome) ?? { ok: false, message: "The server's page gave an answer the app does not understand." },
-    );
+    request.settle(outcomeOf(outcome) ?? unanswered("The server's page gave an answer the app does not understand."));
   }
 
   /** The summary of every workspace a page shows, once each: its newest publisher's. */
@@ -91,7 +98,7 @@ export class Requests {
   }
 
   /** Asks the page that speaks for a workspace of a server. */
-  toWorkspace(serverId: string, workspaceId: string, request: DesktopRequest): Promise<DesktopOutcome> {
+  toWorkspace(serverId: string, workspaceId: string, request: DesktopRequest): Promise<Answer> {
     let found: number | undefined;
     let foundAt = -1;
     for (const [id, page] of this.pages) {
@@ -103,7 +110,7 @@ export class Requests {
   }
 
   /** Asks one page of a server: the one a notification came from. */
-  toPage(page: number, serverId: string, request: DesktopRequest): Promise<DesktopOutcome> {
+  toPage(page: number, serverId: string, request: DesktopRequest): Promise<Answer> {
     const known = this.pages.get(page);
     if (!known || known.serverId !== serverId || !known.listening) return Promise.resolve(notListening());
     if (request.kind === "action" && (request.text?.length ?? 0) > REPLY_MAX) {
@@ -111,11 +118,8 @@ export class Requests {
     }
     const id = `r${++this.sent}`;
     return new Promise((resolve) => {
-      const timer = setTimeout(
-        () => settle({ ok: false, message: "The server's page did not answer in time." }),
-        TIMEOUT_MS,
-      );
-      const settle = (outcome: DesktopOutcome) => {
+      const timer = setTimeout(() => settle(unanswered("The server's page did not answer in time.")), TIMEOUT_MS);
+      const settle = (outcome: Answer) => {
         clearTimeout(timer);
         this.pending.delete(id);
         resolve(outcome);
@@ -130,7 +134,7 @@ export class Requests {
    * workspace's summary offers, so a request goes only to the server that
    * made it, whatever the panel was told.
    */
-  act(serverId: string, workspaceId: string, action: { request: string; text?: string }): Promise<DesktopOutcome> {
+  act(serverId: string, workspaceId: string, action: { request: string; text?: string }): Promise<Answer> {
     const summary = this.summaries().find(
       (s) => s.serverId === serverId && s.summary.workspace.id === workspaceId,
     )?.summary;
@@ -153,6 +157,10 @@ export class Requests {
   }
 }
 
-function notListening(): DesktopOutcome {
-  return { ok: false, message: "No window of that server can do this now: open it and try there." };
+function notListening(): Unanswered {
+  return unanswered("No window of that server can do this now: open it and try there.");
+}
+
+function unanswered(message: string): Unanswered {
+  return { ok: false, message, unanswered: true };
 }
