@@ -103,8 +103,10 @@ for v in $(env | sed -n 's/^\(QUADIT_[A-Z_]*\)=.*/\1/p'); do unset "$v"; done
 # shellcheck disable=SC2016
 case $tool in
 codex) default_command='codex exec --skip-git-repo-check -s workspace-write -c sandbox_workspace_write.network_access=true -c "shell_environment_policy.set={QUADIT_CONFIG=\"$AGENT_CHECK_LOGIN\"}" "$1"' ;;
-# The prompt comes before --allowedTools, which takes every word after it as a tool.
-claude) default_command='claude -p "$1" --output-format json --allowedTools "Bash($AGENT_CHECK_WRAPPER:*)" "Bash(quadit:*)"' ;;
+# The prompt comes before --allowedTools, which takes every word after it as a tool. Claude Code prefers a skill of
+# the same name in the home folder to the project's (seen 2026-11-21: with an older quadit skill in ~/.claude/skills
+# it followed that one), so it is told to load the project's settings and skills only, and no MCP server at all.
+claude) default_command='claude -p "$1" --output-format json --setting-sources project,local --strict-mcp-config --allowedTools "Bash($AGENT_CHECK_WRAPPER:*)" "Bash(quadit:*)"' ;;
 agy) default_command='agy -p "$1" --dangerously-skip-permissions' ;;
 gemini) default_command='GEMINI_CLI_TRUST_WORKSPACE=true gemini -p "$1"' ;;
 cursor-agent) default_command='cursor-agent -p --force "$1"' ;;
