@@ -151,9 +151,9 @@ Each tool, as `scripts/agent-listen-check.sh TOOL` finds it (a throwaway server,
 
 | Tool | Connect and listen | Idle cost |
 | --- | --- | --- |
-| Claude Code | not verified yet | |
-| Codex | not verified yet | |
-| Antigravity CLI | not verified yet | |
+| Claude Code | verified on 2026-11-21 with 2.1.330 | not reported by the tool |
+| Codex | verified on 2026-11-21 with codex-cli 0.170.0 | not reported by the tool |
+| Antigravity CLI | verified on 2026-11-21 with 1.5.14 | not reported by the tool |
 | Gemini CLI | not verified yet | |
 | Cursor | not verified yet | |
 | GitHub Copilot CLI | not verified yet | |
