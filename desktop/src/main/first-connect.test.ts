@@ -127,7 +127,13 @@ function setUp({
     sleep: async () => void waits++,
   };
   const first = new FirstConnect(parts, "s1", "personal");
-  return { first, choices, appliedIds, disconnected, asked, waits: () => waits };
+  const paths: string[] = [];
+  const finish = () =>
+    first.finish(async (path) => {
+      paths.push(path);
+      return true;
+    });
+  return { first, finish, paths, choices, appliedIds, disconnected, asked, waits: () => waits };
 }
 
 describe("FirstConnect", () => {
@@ -246,7 +252,7 @@ describe("FirstConnect", () => {
   });
 
   it("ends by asking the workspace's page for the samples, the third task for the first tool connected that still is", async () => {
-    const { first, asked } = setUp({
+    const { first, finish, paths, asked } = setUp({
       harnesses: [
         harness("claude", "Claude Code", { installed: true }),
         harness("codex", "Codex", { installed: true }),
@@ -258,7 +264,8 @@ describe("FirstConnect", () => {
     await first.connect("claude");
     await first.connect("pi");
     await first.disconnect("codex");
-    expect(await first.finish()).toEqual({ ok: true, path: "/personal/projects/GS" });
+    expect(await finish()).toEqual({ ok: true });
+    expect(paths).toEqual(["/personal/projects/GS"]);
     // Codex was first, and was taken back: Claude Code, connected second, is the agent.
     expect(asked).toEqual([{ kind: "samples", agent: "agent-2" }]);
   });
@@ -277,10 +284,10 @@ describe("FirstConnect", () => {
 
   it("ends only after a Connect asked before it is done, and asks for the samples with that tool's agent", async () => {
     const apply = held<void>();
-    const { first, asked } = setUp({ applyWaits: [apply.promise] });
+    const { first, finish, asked } = setUp({ applyWaits: [apply.promise] });
     await first.look();
     const connecting = first.connect("claude");
-    const finishing = first.finish();
+    const finishing = finish();
     apply.settle();
     expect(await connecting).toMatchObject({ ok: true });
     expect(await finishing).toMatchObject({ ok: true });
@@ -288,20 +295,22 @@ describe("FirstConnect", () => {
   });
 
   it("ends only after an Undo asked before it is done, and asks without the agent taken back", async () => {
-    const { first, asked } = setUp();
+    const { first, finish, asked } = setUp();
     await first.look();
     await first.connect("claude");
     const undoing = first.disconnect("claude");
-    const finishing = first.finish();
+    const finishing = finish();
     expect(await undoing).toMatchObject({ ok: true });
     expect(await finishing).toMatchObject({ ok: true });
     expect(asked).toEqual([{ kind: "samples" }]);
   });
 
   it("takes no Connect or Undo once the end has begun, and takes them again when it failed", async () => {
-    const { first, appliedIds } = setUp({ answer: { ok: false, message: "The page does not take requests now." } });
+    const { first, finish, appliedIds } = setUp({
+      answer: { ok: false, message: "The page does not take requests now." },
+    });
     await first.look();
-    const finishing = first.finish();
+    const finishing = finish();
     expect(await first.connect("claude")).toEqual({ ok: false, error: "Quadit is opening your workspace." });
     expect(await first.disconnect("claude")).toEqual({ ok: false, error: "Quadit is opening your workspace." });
     expect(await finishing).toEqual({
@@ -312,8 +321,17 @@ describe("FirstConnect", () => {
     expect(await first.connect("claude")).toMatchObject({ ok: true });
   });
 
+  it("keeps the tools step usable when the workspace could not navigate", async () => {
+    const { first, finish } = setUp();
+    await first.look();
+    expect(await first.finish(async () => false)).toMatchObject({ ok: false });
+    expect(await first.connect("claude")).toMatchObject({ ok: true });
+    expect(await finish()).toEqual({ ok: true });
+  });
+
   it("opens the workspace when its page answers without a path", async () => {
-    const { first } = setUp({ answer: { ok: true } });
-    expect(await first.finish()).toEqual({ ok: true, path: "/personal" });
+    const { finish, paths } = setUp({ answer: { ok: true } });
+    expect(await finish()).toEqual({ ok: true });
+    expect(paths).toEqual(["/personal"]);
   });
 });

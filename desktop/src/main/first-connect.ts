@@ -5,7 +5,7 @@
 // nothing asked (the default choice of shared/default-choice.ts) or with the
 // plan "See the files" showed, takes one back with Undo, and at the end asks
 // the workspace's page for its sample tasks, the third handed to the first
-// tool connected that is an agent there, and gives the path to open. It is
+// tool connected that is an agent there, and opens the path returned. It is
 // Connect (connections.ts) with the choices made for the person; the Connect
 // window keeps every choice.
 //
@@ -134,16 +134,21 @@ export class FirstConnect {
    * first tool connected that is an agent there; gives the path to open. A
    * failure is said, and the step takes work again, so the end can be tried again.
    */
-  finish(): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+  finish(open: (path: string) => Promise<boolean>): Promise<{ ok: true } | Refused> {
     this.finishing = true;
     return this.inTurn(async () => {
       const shown = await this.workspaceShown();
       const outcome = shown
         ? await this.parts.ask(this.serverId, shown.workspace.id, this.samplesRequest())
         : ({ ok: false, message: "its window has not finished opening" } as const);
-      if (outcome.ok) return { ok: true, path: outcome.path ?? `/${encodeURIComponent(this.workspace)}` };
+      if (outcome.ok && (await open(outcome.path ?? `/${encodeURIComponent(this.workspace)}`))) return { ok: true };
       this.finishing = false;
-      return { ok: false, error: `Your workspace did not answer: ${outcome.message.replace(/\.$/, "")}. Try again.` };
+      return {
+        ok: false,
+        error: outcome.ok
+          ? "Could not open the page in your workspace. Try again."
+          : `Your workspace did not answer: ${outcome.message.replace(/\.$/, "")}. Try again.`,
+      };
     });
   }
 

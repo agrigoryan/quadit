@@ -41,7 +41,7 @@ export interface FirstRunParts {
   /** The full name of the person's account on this computer (account-name.ts). */
   accountName(): Promise<string>;
   list: Pick<ServerList, "setUpHere" | "add" | "localServer">;
-  windows: Pick<ServerWindows, "cover" | "uncover" | "show" | "showAfresh">;
+  windows: Pick<ServerWindows, "cover" | "uncover" | "openCoveredPath" | "showAfresh">;
   /** The tools step for the workspace `workspace` (its slug) of the server `serverId`. */
   toolsStep(serverId: string, workspace: string): FirstConnect;
 }
@@ -155,11 +155,10 @@ export class FirstRun {
     const run = this.run;
     const tools = run?.tools;
     if (!run || !tools) return OVER;
-    const done = await tools.step.finish();
-    if (!done.ok) return done;
-    if (this.run !== run) return OVER;
-    this.parts.windows.show(tools.step.serverId, done.path);
-    return { ok: true };
+    const done = await tools.step.finish(async (path) => {
+      return this.run === run && this.parts.windows.openCoveredPath(tools.step.serverId, path);
+    });
+    return this.run === run ? done : OVER;
   }
 
   /** The first run is over (the page went, or its window closed): its page goes, the window under it stays. */

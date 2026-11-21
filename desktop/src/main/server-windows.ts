@@ -237,6 +237,20 @@ export class ServerWindows {
     win.focus();
   }
 
+  /** Navigates the workspace that answered the tools step, while it is still under the cover. */
+  async openCoveredPath(serverId: string, path: string): Promise<boolean> {
+    const win = this.windows.get(serverId);
+    const server = this.store.get(serverId);
+    if (!win || this.covering?.win !== win || !server) return false;
+    const target = appPage(server.origin, path);
+    if (!target || !isOwnPage(win.webContents.getURL(), server.origin) || win.webContents.isLoadingMainFrame())
+      return false;
+    return this.pushPath(win.webContents, target).then(
+      (url) => url === target,
+      () => false,
+    );
+  }
+
   /**
    * Shows the server's window loading `path`, a page of the web app, anew,
    * never by moving the page that is there: after the app changed the
@@ -686,12 +700,16 @@ export class ServerWindows {
       this.load(server.id, { url });
       return;
     }
+    void this.pushPath(contents, url);
+  }
+
+  private pushPath(contents: WebContents, url: string): Promise<string> {
     // The web app routes with the History API: pushing the path and telling
     // its router keeps the page (and anything typed in it) instead of reloading.
     const { pathname, search, hash } = new URL(url);
     const path = JSON.stringify(pathname + search + hash);
-    void contents.executeJavaScript(
-      `history.pushState(null, "", ${path}); dispatchEvent(new PopStateEvent("popstate"));`,
+    return contents.executeJavaScript(
+      `history.pushState(null, "", ${path}); dispatchEvent(new PopStateEvent("popstate")); location.href;`,
     );
   }
 

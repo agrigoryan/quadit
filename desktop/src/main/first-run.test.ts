@@ -74,7 +74,10 @@ function harness({
         return serverId ? null : `waiting-${covers.length}`;
       },
       uncover: () => void said.push("uncover"),
-      show: (serverId, path) => void said.push(`show ${serverId} ${path ?? ""}`),
+      openCoveredPath: async (serverId, path) => {
+        said.push(`show ${serverId} ${path}`);
+        return true;
+      },
       showAfresh: (serverId, path) => void said.push(`afresh ${serverId} ${path}`),
     },
     toolsStep: (serverId, workspace) =>
