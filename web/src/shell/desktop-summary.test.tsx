@@ -7,7 +7,7 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentState } from "@/data/listening";
-import { clearStore, loadBootstrap, patchRow } from "@/data/store";
+import { clearStore, loadBootstrap, mergeRows, patchRow } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
 import type { QuaditDesktop } from "@/types/desktop";
 
@@ -134,6 +134,21 @@ describe("the summary", () => {
     const { result } = renderHook(() => useSummary());
     expect(result.current?.agents.map((a) => a.usable)).toEqual([true, true]);
     expect(result.current?.me.canCreateAgents).toBe(true);
+  });
+
+  it("offers a newly created agent before the next activity read, and drops suspended agents immediately", () => {
+    load("member");
+    const { result } = renderHook(() => useSummary());
+    act(() => {
+      mergeRows("members", [
+        { user_id: "a3", name: "Claude Code", handle: "claude-code", kind: "agent", responsible_id: "u1" } as Member,
+      ]);
+      patchRow("members", "a1", { suspended_at: 1 });
+    });
+    expect(result.current?.agents.map(({ handle, usable }) => [handle, usable])).toEqual([
+      ["claude-code", true],
+      ["codex", false],
+    ]);
   });
 
   it("offers only the projects I may make a task in", () => {

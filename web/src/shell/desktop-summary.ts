@@ -73,19 +73,21 @@ export function useSummary(): DesktopSummary | null {
       };
     });
 
-    const agents = Object.values(states ?? {})
+    // A new member is available to Connect before the throttled activity read catches up.
+    const agents = Object.values(members)
+      .filter((member) => member.kind === "agent" && !member.suspended_at)
+      .sort((a, b) => a.handle.localeCompare(b.handle))
       .slice(0, AGENTS_MAX)
-      .map((state) => {
-        const member = members[state.user_id];
+      .map((member) => {
+        const state = states?.[member.user_id];
         return {
-          id: state.user_id,
-          // The member's handle: /agents says it with its "@", the app's pages and requests without.
-          handle: member?.handle ?? state.handle.replace(/^@/, ""),
-          name: member?.name ?? state.handle,
-          state: state.state,
-          detail: detailOf(state),
-          path: state.state === "working" && state.task ? taskPath(slug, state.task) : `/${slug}/agents`,
-          usable: access.administer || member?.responsible_id === me.user_id,
+          id: member.user_id,
+          handle: member.handle,
+          name: member.name,
+          state: state?.state ?? "idle",
+          detail: state ? detailOf(state) : "",
+          path: state?.state === "working" && state.task ? taskPath(slug, state.task) : `/${slug}/agents`,
+          usable: access.administer || member.responsible_id === me.user_id,
         };
       });
 
