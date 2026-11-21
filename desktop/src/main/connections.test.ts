@@ -29,8 +29,9 @@ const ORIGIN = "https://q.example";
 
 /**
  * A quadit that answers what Connect runs: version, skill, login --path,
- * login URL - with the token on stdin, and --json me, which says the login
- * with token T is the agent @as-T.
+ * login URL - with the token on stdin (noting each login's arguments in
+ * PATH.logins), and --json me, which says the login with token T is the
+ * agent @as-T.
  */
 function standIn(path: string, defaultConfig: string) {
   writeFileSync(
@@ -49,6 +50,7 @@ case "$1" in
   login)
     if [ "$2" = "--path" ]; then echo "\${QUADIT_CONFIG:-$default}"; exit 0; fi
     [ "$3" = "-" ] || exit 2
+    echo "$@" >> '${path}.logins'
     read -r token
     config="\${QUADIT_CONFIG:-$default}"
     mkdir -p "$(dirname "$config")"
@@ -70,6 +72,7 @@ function setUp({
   moreAgents = [],
   tokensWait = Promise.resolve(),
   revokeRefused = "",
+  ownServer = false,
 }: {
   quaditOnPath?: boolean;
   bundled?: boolean;
@@ -85,6 +88,8 @@ function setUp({
   tokensWait?: Promise<void>;
   /** The workspace's page refuses to revoke a token, saying this. */
   revokeRefused?: string;
+  /** Whether the server "s1" is the one the app runs on this computer. */
+  ownServer?: boolean;
 } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
   const home = join(root, "home");
@@ -151,6 +156,7 @@ function setUp({
       },
     ],
     server: (id) => (id === "s1" ? { name: "Work", origin: ORIGIN } : undefined),
+    appFor: (id) => (ownServer && id === "s1" ? "/Applications/Quadit.app/Contents/MacOS/Quadit" : null),
     ask: async (_server, _workspace, request) => {
       asked.push(request);
       if (request.kind === "agent-token") await tokensWait;
@@ -607,6 +613,25 @@ posixOnly("Connected is proven (desktop contract §11)", () => {
     writeFileSync(join(root, "data", "connections.json"), JSON.stringify(before));
     expect(await connections.handshake("gemini")).toEqual({ state: "unknown" });
     expect(server.askedAbout).toEqual(["u2"]);
+  });
+});
+
+posixOnly("the app's own server's logins (desktop contract §11, amendment)", () => {
+  it("are marked with the app, the tool's own and the computer's default one it makes, so the command may start it", async () => {
+    const { connect, choice, root } = setUp({ ownServer: true });
+    await connect(choice("claude"));
+    await connect(choice("pi"));
+    const logins = readFileSync(join(root, "quadit-bundled.logins"), "utf8").trim().split("\n");
+    expect(logins).toEqual([
+      `login ${ORIGIN} - --app /Applications/Quadit.app/Contents/MacOS/Quadit`,
+      `login ${ORIGIN} - --app /Applications/Quadit.app/Contents/MacOS/Quadit`,
+    ]);
+  });
+
+  it("are the only ones marked: a login for any other server is not", async () => {
+    const { connect, choice, root } = setUp();
+    await connect(choice("claude"));
+    expect(readFileSync(join(root, "quadit-bundled.logins"), "utf8").trim()).toBe(`login ${ORIGIN} -`);
   });
 });
 

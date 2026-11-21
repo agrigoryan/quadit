@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -14,9 +14,46 @@ posixOnly("QuaditCli", () => {
     chmodSync(quadit, 0o755);
     const cli = new QuaditCli(null, async () => "", { home: "/nowhere", shell: "/bin/sh" });
     // Large enough that writing it outlasts the command: the write fails (EPIPE), which must not escape.
-    await expect(cli.login(quadit, "https://q.example", "qd_".padEnd(4_000_000, "x"), "/nowhere.json")).rejects.toThrow(
-      "quadit login: usage: quadit login URL TOKEN",
+    await expect(
+      cli.login(quadit, "https://q.example", "qd_".padEnd(4_000_000, "x"), "/nowhere.json", null),
+    ).rejects.toThrow("quadit login: usage: quadit login URL TOKEN");
+  });
+
+  /** A quadit that notes the arguments of each login, and refuses `--app` when it is `older`. */
+  function noting(older: boolean) {
+    const dir = mkdtempSync(join(tmpdir(), "quadit-desktop-cli-"));
+    const quadit = join(dir, "quadit");
+    const log = join(dir, "logins");
+    writeFileSync(
+      quadit,
+      `#!/bin/sh\n${older ? `case "$*" in *--app*) echo 'unknown flag: --app' >&2; exit 2 ;; esac\n` : ""}echo "$@" >> '${log}'\ncat > /dev/null\n`,
     );
+    chmodSync(quadit, 0o755);
+    return { quadit, logins: () => readFileSync(log, "utf8").trim().split("\n") };
+  }
+
+  it("marks a login for the app's own server with the app, the token still only on standard input", async () => {
+    const { quadit, logins } = noting(false);
+    const cli = new QuaditCli(null, async () => "", { home: "/nowhere", shell: "/bin/sh" });
+    await cli.login(
+      quadit,
+      "http://127.0.0.1:4780",
+      "qd_secret",
+      "/c.json",
+      "/Applications/Quadit.app/Contents/MacOS/Quadit",
+    );
+    await cli.login(quadit, "https://q.example", "qd_secret", "/c.json", null);
+    expect(logins()).toEqual([
+      "login http://127.0.0.1:4780 - --app /Applications/Quadit.app/Contents/MacOS/Quadit",
+      "login https://q.example -",
+    ]);
+  });
+
+  it("logs in without the mark where an older quadit refuses it, rather than failing", async () => {
+    const { quadit, logins } = noting(true);
+    const cli = new QuaditCli(null, async () => "", { home: "/nowhere", shell: "/bin/sh" });
+    await cli.login(quadit, "http://127.0.0.1:4780", "qd_secret", "/c.json", "/opt/Quadit/quadit-desktop");
+    expect(logins()).toEqual(["login http://127.0.0.1:4780 -"]);
   });
 });
 

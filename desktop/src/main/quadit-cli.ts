@@ -4,8 +4,9 @@
 // person may write to; without one, into a folder of their own,
 // ~/.local/bin, which one marked line in the profile their login shell
 // reads puts on the PATH. No step needs an administrator. The app runs only `quadit version`, `quadit skill`,
-// `quadit me`, `quadit login --path` and `quadit login URL -` with the
-// token on standard input, so that it never shows on a command line.
+// `quadit me`, `quadit login --path` and `quadit login URL -` (with
+// `--app PATH` for its own server's logins) with the token on standard
+// input, so that it never shows on a command line.
 
 import { execFile } from "node:child_process";
 import { accessSync, constants, existsSync, statSync } from "node:fs";
@@ -89,8 +90,25 @@ export class QuaditCli {
   }
 
   /** Checks `token` against the server at `origin` and saves both to `config`. */
-  async login(binary: string, origin: string, token: string, config: string): Promise<void> {
-    await run(binary, ["login", origin, "-"], { QUADIT_CONFIG: config }, token);
+  /**
+   * `quadit login ORIGIN -` into `config`, the token on standard input.
+   * `app` (the running app's executable) marks a login for the server the
+   * app runs on this computer, so that the command may start the app when
+   * that server is not running (desktop contract §11, amendment); null for
+   * any other server, whose login carries no mark. A quadit too old to know
+   * the mark logs in without it: no start on demand for that login, rather
+   * than no login.
+   */
+  async login(binary: string, origin: string, token: string, config: string, app: string | null): Promise<void> {
+    const env = { QUADIT_CONFIG: config };
+    if (app) {
+      const marked = await run(binary, ["login", origin, "-", "--app", app], env, token).then(
+        () => true,
+        () => false,
+      );
+      if (marked) return;
+    }
+    await run(binary, ["login", origin, "-"], env, token);
   }
 
   private linkInto(path: string[]): CliLook["linkInto"] {

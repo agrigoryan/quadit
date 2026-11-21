@@ -80,6 +80,12 @@ export interface ConnectionsParts {
   /** The workspaces the server windows show now. */
   summaries(): { serverId: string; summary: DesktopSummary; listening: boolean }[];
   server(serverId: string): { name: string; origin: string } | undefined;
+  /**
+   * The app to mark a login with (its executable), for the server the app
+   * runs on this computer, so that the quadit command may start the app
+   * when that server is not running; null for any other server.
+   */
+  appFor(serverId: string): string | null;
   /** Asks the page that speaks for a workspace (Requests.toWorkspace). */
   ask(serverId: string, workspaceId: string, request: DesktopRequest): Promise<DesktopOutcome>;
 }
@@ -445,7 +451,13 @@ export class Connections {
         const issued = await ask({ kind: "agent-token", agent: worksAs.id, label });
         if (!issued.ok || !issued.token) return { ok: false, error: issued.ok ? "No token was made." : issued.message };
         try {
-          await this.parts.cli.login(plan.login.binary, plan.origin, issued.token.secret, plan.login.config);
+          await this.parts.cli.login(
+            plan.login.binary,
+            plan.origin,
+            issued.token.secret,
+            plan.login.config,
+            this.parts.appFor(choice.serverId),
+          );
         } catch (err) {
           void ask({ kind: "revoke-token", token: issued.token.id });
           return { ok: false, error: (err as Error).message };
