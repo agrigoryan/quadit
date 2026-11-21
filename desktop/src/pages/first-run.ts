@@ -239,10 +239,7 @@ function showFound(result: FoundTools, onComputer: ToolView[]) {
     return card;
   });
   cardsBox.replaceChildren(...cards.map((card) => card.element));
-  element("found-lead").textContent =
-    onComputer.length === 1
-      ? "Quadit found one on this computer. Connected, it joins your workspace as a member."
-      : `Quadit found ${countWord(onComputer.length)} on this computer. Connected, each one joins your workspace as a member.`;
+  element("found-lead").textContent = `Quadit found ${countWord(onComputer.length)} on this computer.`;
   const others = element<HTMLParagraphElement>("others");
   const away = tools.filter((t) => !t.found);
   others.hidden = away.length === 0;
@@ -362,7 +359,7 @@ function renderMembers() {
   element("example-title").textContent = `Say hello and tell ${first} what you can do`;
   const firstAgent = [...connectedAs].find(([, agent]) => agent)?.[0];
   const connectedFirst = cards.find((c) => c.tool.id === firstAgent);
-  const shown = connectedFirst ?? cards[0];
+  const shown = connectedFirst ?? cards.find((card) => !card.isConnected);
   const agentName = shown?.tool.name ?? "Your agent";
   const filled = !!connectedFirst;
   const exampleAvatar = () =>

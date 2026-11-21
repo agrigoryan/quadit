@@ -169,9 +169,8 @@ export class ToolCard {
     const { tool, connected } = this;
     this.element.classList.toggle("done", connected);
     this.tileEl.classList.toggle("member", connected);
-    this.gives.textContent = connected
-      ? `${tool.name} can now take tasks, ask you questions and report back here.`
-      : `${tool.name} will be able to take tasks, ask you questions and report back here.`;
+    const where = tool.worksAs ? " using this computer’s login" : " here";
+    this.gives.textContent = `${tool.name} ${connected ? "can now" : "will be able to"} take tasks, ask you questions and report back${where}.`;
     this.diskText.textContent = diskLine(tool, this.addsCommand && !connected, connected);
     this.tryIt.hidden = !connected;
     if (connected) {
