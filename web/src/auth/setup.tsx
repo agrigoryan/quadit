@@ -8,6 +8,7 @@ import { FormField, useFieldErrors, useSubmit } from "@/ui/form";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { LoadGate } from "@/ui/load-gate";
+import { askForSamples, samplesPath } from "@/tasks/samples";
 
 /**
  * The first visit to a new install: make the owner and the first workspace.
@@ -33,6 +34,19 @@ export function SetupPage() {
   );
 }
 
+/**
+ * Where a new install opens: the task list of the sample tasks the set-up
+ * made, or My work when they cannot be found (the install is set up all the
+ * same).
+ */
+async function landing(slug: string): Promise<string> {
+  try {
+    return samplesPath(slug, await askForSamples(slug));
+  } catch {
+    return `/${slug}`;
+  }
+}
+
 function SetupForm() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ name: "", email: "", password: "", workspace_name: "" });
@@ -56,7 +70,7 @@ function SetupForm() {
     e.preventDefault();
     await run(async () => {
       const slug = await setUp(form);
-      void navigate(`/${slug}`, { replace: true });
+      void navigate(await landing(slug), { replace: true });
     });
   }
 

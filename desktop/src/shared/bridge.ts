@@ -59,7 +59,8 @@ export type DesktopRequest =
   | { kind: "capture"; project: string | null; what: "task" | "page"; title: string; body: string }
   | { kind: "agent"; create: { name: string; handle: string } }
   | { kind: "agent-token"; agent: string; label: string }
-  | { kind: "revoke-token"; token: string };
+  | { kind: "revoke-token"; token: string }
+  | { kind: "samples"; agent?: string };
 
 export type DesktopOutcome =
   | {

@@ -17,6 +17,7 @@ import { taskPath } from "@/nav/task-link";
 import { reading, replyPlace } from "@/pages/inbox-actions";
 import { type CreatedToken, tokensChanged } from "@/settings/ui/tokens";
 import { createTask } from "@/tasks/actions";
+import { addSamples, samplesPath } from "@/tasks/samples";
 import type { Changes } from "@/types/changes.gen";
 import type { Decision, DecisionOption, Notification } from "@/types/core";
 import type { DesktopAction, DesktopNotification, DesktopOutcome, DesktopRequest } from "@/types/desktop";
@@ -91,6 +92,8 @@ async function carryOut(request: DesktopRequest): Promise<DesktopOutcome> {
       await api.del(workspacePath(slug, `/tokens/${encodeURIComponent(request.token)}`));
       void tokensChanged(slug);
       return { ok: true };
+    case "samples":
+      return { ok: true, path: samplesPath(slug, await addSamples(request.agent)) };
   }
 }
 

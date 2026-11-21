@@ -57,7 +57,12 @@ export type DesktopRequest =
   /** Makes a token for an agent (by user id), named `label`, that does not expire. */
   | { kind: "agent-token"; agent: string; label: string }
   /** Revokes a token, by its id. */
-  | { kind: "revoke-token"; token: string };
+  | { kind: "revoke-token"; token: string }
+  /**
+   * The sample tasks: their task list's path comes back. The set-up made them;
+   * `agent` (an agent's user id) is given the third while it has nobody.
+   */
+  | { kind: "samples"; agent?: string };
 
 /** How a request went: what it made, or the server's refusal (at most 500 characters). */
 export type DesktopOutcome =

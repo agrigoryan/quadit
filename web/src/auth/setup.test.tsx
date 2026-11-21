@@ -2,7 +2,8 @@
 // The set-up page (auth/setup.tsx): the form on a new install, a plain
 // sentence instead on one the desktop app runs and sets up itself, nothing
 // but a wait until the sign-in options say which, a way to try again when
-// they cannot be read, and the sign-in page once the install is set up.
+// they cannot be read, the sign-in page once the install is set up, and
+// the sample tasks the set-up made once the form has set it up.
 
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -34,6 +35,8 @@ function show(server: FakeServer) {
       <Routes>
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/login" element={<p>the sign-in page</p>} />
+        <Route path="/:ws/p/:key/tasks" element={<p>the sample tasks</p>} />
+        <Route path="/:ws" element={<p>my work</p>} />
       </Routes>
     </MemoryRouter>,
     { wrapper: WithQuery },
@@ -78,6 +81,35 @@ describe("SetupPage", () => {
     server.get(CONFIG, config({ setup_by_app: true }));
     await userEvent.click(again);
     expect(await screen.findByText(byApp)).toBeTruthy();
+  });
+
+  describe("once the form has set the install up", () => {
+    async function setUp(server: FakeServer) {
+      server.get(CONFIG, config({ setup_by_app: false }));
+      server.post("/api/v1/auth/setup", { workspace: { slug: "games" } });
+      server.get("/api/v1/auth/me", { user: { id: "u1", name: "Aram" }, workspaces: [] });
+      show(server);
+      await userEvent.type(await screen.findByLabelText("Your name"), "Aram");
+      await userEvent.type(screen.getByLabelText("Email"), "aram@example.com");
+      await userEvent.type(screen.getByLabelText("Password"), "correct-horse-battery");
+      await userEvent.type(screen.getByLabelText("Workspace name"), "Games");
+      await userEvent.click(screen.getByRole("button", { name: "Create workspace" }));
+    }
+
+    it("opens the sample tasks it made", async () => {
+      const server = fakeServer();
+      server.post("/api/v1/w/games/samples", { project: { id: "p", key: "GS", name: "Getting started" } });
+      await setUp(server);
+      expect(await screen.findByText("the sample tasks")).toBeTruthy();
+      expect(server.requests).toContain("POST /api/v1/w/games/samples");
+    });
+
+    it("opens My work when they cannot be found", async () => {
+      const server = fakeServer();
+      server.post("/api/v1/w/games/samples", refuse(500, "something went wrong"));
+      await setUp(server);
+      expect(await screen.findByText("my work")).toBeTruthy();
+    });
   });
 
   it("is the sign-in page once the install is set up", async () => {

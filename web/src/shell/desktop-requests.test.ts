@@ -29,6 +29,7 @@ beforeEach(() => {
       return Promise.resolve({ results: batch.map((c) => ({ key: c.type === "task.create" ? "SVA-9" : undefined })) });
     }
     posts.push({ path, body });
+    if (path.endsWith("/samples")) return Promise.resolve({ project: { id: "gs", key: "GS", samples: ["t2"] } });
     return Promise.resolve({ token: "qd_secret", info: { id: "tok1", name: "Claude Code on mac" } });
   });
   vi.spyOn(api, "del").mockResolvedValue({ ok: true });
@@ -43,7 +44,10 @@ beforeEach(() => {
       { user_id: "u1", name: "Ann", handle: "ann", kind: "person" },
       { user_id: "a1", name: "Claude", handle: "claude", kind: "agent", responsible_id: "u1" },
     ] as Member[],
-    projects: [{ id: "p1", key: "SVA", name: "Samurai", rank: "a" }],
+    projects: [
+      { id: "p1", key: "SVA", name: "Samurai", rank: "a" },
+      { id: "gs", key: "GS", name: "Getting started", rank: "b", samples: ["t2"] },
+    ],
     statuses: [{ id: "s1", project_id: "p1", name: "Todo", category: "unstarted", is_default: true, rank: "a" }],
     tasks: [{ id: "t1", key: "SVA-5", title: "Jump feels floaty", project_id: "p1" }],
     decisions: [
@@ -162,5 +166,17 @@ describe("Connect", () => {
       ok: false,
       message: refuse,
     });
+  });
+});
+
+describe("the end of the app's first run", () => {
+  it("hands the sample tasks to the agent connected, and says where they are", async () => {
+    expect(await answer({ kind: "samples", agent: "a1" })).toEqual({ ok: true, path: "/acme/p/GS/tasks" });
+    expect(posts).toEqual([{ path: "/api/v1/w/acme/samples", body: { agent: "a1" } }]);
+  });
+
+  it("only asks where they are when no agent was connected", async () => {
+    expect(await answer({ kind: "samples" })).toEqual({ ok: true, path: "/acme/p/GS/tasks" });
+    expect(posts).toEqual([{ path: "/api/v1/w/acme/samples", body: {} }]);
   });
 });

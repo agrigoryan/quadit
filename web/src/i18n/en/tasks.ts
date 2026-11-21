@@ -233,4 +233,10 @@ export const tasks = {
   "taskCard.inTrash": "In the trash",
   "taskCard.archived": "Archived",
   "taskCard.notThere": "There is no such task, or it is not yours to see.",
+
+  "samples.note.label": "Sample tasks",
+  "samples.note.lead": "Three sample tasks to try Quadit with.",
+  "samples.note.agent":
+    "{key} is for {agent}: in {agent}, ask what is on your Quadit list, and watch it report back here.",
+  "samples.note.remove": "Remove sample tasks",
 } as const;

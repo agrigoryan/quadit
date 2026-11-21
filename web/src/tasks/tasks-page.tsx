@@ -2,14 +2,22 @@ import { useParams } from "react-router";
 import { useLookupEvenIfGone, useProjectByKey, useViews } from "@/data/selectors";
 import { NotFoundPage } from "@/ui/not-found";
 import { normalizeQuery } from "@/tasks/filters";
+import { SamplesNote } from "@/tasks/samples-note";
 import { TasksView } from "@/tasks/tasks-view";
 
-/** /:ws/p/:key/tasks and /:ws/p/:key/board */
+/** /:ws/p/:key/tasks and /:ws/p/:key/board; the project the sample tasks are in says so above them. */
 export function ProjectTasksPage({ layout }: { layout: "list" | "board" }) {
   const { key } = useParams();
   const project = useProjectByKey(key);
   if (!project) return <NotFoundPage />;
-  return <TasksView key={project.id} project={project} layout={layout} />;
+  return (
+    <div className="flex h-full flex-col">
+      <SamplesNote project={project} />
+      <div className="min-h-0 flex-1">
+        <TasksView key={project.id} project={project} layout={layout} />
+      </div>
+    </div>
+  );
 }
 
 /** /:ws/view/:slug — a saved view: its filters, grouping and layout restored. */

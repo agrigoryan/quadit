@@ -89,6 +89,7 @@ export const authStrings = {
   "auth.firstRun.lead": "Tasks live in projects. Make one to start adding work; statuses and labels come with it.",
   "auth.firstRun.memberLead": "This workspace has no projects yet. An admin or owner needs to create the first one.",
   "auth.firstRun.create": "Create a project",
+  "auth.firstRun.samples": "Try it with sample tasks",
 
   "auth.admin": "Admin",
 
