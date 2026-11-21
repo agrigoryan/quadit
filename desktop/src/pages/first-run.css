@@ -89,9 +89,11 @@ button {
   transform: translateX(-24px);
 }
 
-.step.entering {
-  opacity: 0;
-  transform: translateX(24px);
+@starting-style {
+  .tools-step {
+    opacity: 0;
+    transform: translateX(24px);
+  }
 }
 
 /* The progress dots: one per step, the current one long. */

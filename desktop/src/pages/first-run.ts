@@ -106,7 +106,7 @@ async function setUp() {
     return;
   }
   person = name;
-  await nextStep();
+  nextStep();
   void look();
 }
 
@@ -124,17 +124,15 @@ async function addServer(allowInsecure: boolean) {
 }
 
 /** From Welcome to the tools step: Welcome slides out to the left, the step in from the right. */
-async function nextStep() {
+function nextStep() {
   showDots(1);
-  if (!stillMotion()) {
-    welcome.classList.add("leaving");
-    await wait(STEP_MS);
-  }
-  welcome.hidden = true;
+  welcome.inert = true;
   toolsStep.hidden = false;
-  toolsStep.classList.add("entering");
-  // Let the step paint where it starts, then move it in.
-  requestAnimationFrame(() => requestAnimationFrame(() => toolsStep.classList.remove("entering")));
+  welcome.classList.add("leaving");
+  // Both steps move in the same paint. With reduced motion there is nothing to wait for.
+  void Promise.allSettled(welcome.getAnimations().map((animation) => animation.finished)).then(() => {
+    welcome.hidden = true;
+  });
   element<HTMLButtonElement>("continue").focus();
 }
 
