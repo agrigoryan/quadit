@@ -134,10 +134,10 @@ func TestConnectCodes(t *testing.T) {
 			give(other, theirs.Code, 200)
 		})
 
-		t.Run("a new code for the same agent and tool replaces the open one", func(t *testing.T) {
+		t.Run("a new code for the same agent and tool replaces the open one, whatever the case of its name", func(t *testing.T) {
 			first := s.makeCode(t, s.owner, "@other", "Claude Code")
 			elsewhere := s.makeCode(t, s.owner, "@other", "Gemini CLI")
-			second := s.makeCode(t, s.owner, "@other", "Claude Code")
+			second := s.makeCode(t, s.owner, "@other", "claude code")
 			if r := give(other, first.Code, 400); r.Error.Reason != "wrong" {
 				t.Fatalf("a replaced code is refused with %+v", r.Error)
 			}

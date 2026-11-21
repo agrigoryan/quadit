@@ -67,9 +67,10 @@ func normalCode(code string) string {
 }
 
 // handleCreateConnectCode makes a code for an agent and a tool, taking away
-// the open code of the same agent and tool, and every code of the agent
-// that ran out, in the same write: two made at once leave one open code,
-// and a code that cannot be made leaves the one before it.
+// the open code of the same agent and tool (its name in any case), and
+// every code of the agent that ran out, in the same write: two made at once
+// leave one open code, and a code that cannot be made leaves the one before
+// it.
 func (s *Server) handleCreateConnectCode(x *c) error {
 	var b struct {
 		Agent string `json:"agent"`
@@ -103,8 +104,17 @@ func (s *Server) handleCreateConnectCode(x *c) error {
 	row := core.ConnectCode{ID: id.New(), WorkspaceID: x.ws.ID, AgentID: agent.UserID, Tool: tool, CodeHash: auth.Hash(code), CreatedBy: x.member.UserID,
 		CreatedAt: now.UnixMilli(), ExpiresAt: now.Add(codeLife).UnixMilli()}
 	err = s.st.Write(x.ctx(), x.ws.ID, func(tx store.Tx) error {
-		if _, err := tx.Delete(x.ctx(), "connect_codes", store.Eq("agent_id", agent.UserID), store.Eq("tool", tool), store.Null("used_at")); err != nil {
+		// The same tool, however its name is written ("codex", "Codex").
+		var open []core.ConnectCode
+		if err := tx.List(x.ctx(), &open, store.Where(store.Eq("agent_id", agent.UserID), store.Null("used_at"))); err != nil {
 			return err
+		}
+		for _, code := range open {
+			if strings.EqualFold(code.Tool, tool) {
+				if _, err := tx.Delete(x.ctx(), "connect_codes", store.Eq("id", code.ID)); err != nil {
+					return err
+				}
+			}
 		}
 		if _, err := tx.Delete(x.ctx(), "connect_codes", store.Eq("agent_id", agent.UserID), store.Lt("expires_at", now.UnixMilli())); err != nil {
 			return err

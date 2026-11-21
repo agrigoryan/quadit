@@ -13,6 +13,16 @@ import (
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
 
+// listeningUntil is when a member's listener lease ends, as stored.
+func (s *site) listeningUntil(t *testing.T, st store.Store, handle string) int64 {
+	t.Helper()
+	var m core.Member
+	if err := st.Get(context.Background(), &m, store.Eq("handle", handle)); err != nil {
+		t.Fatal(err)
+	}
+	return m.ListeningUntil
+}
+
 // leaseOfAWaitOf is how long a lease lives past now for a wait of d.
 func leaseOfAWaitOf(d time.Duration) time.Duration { return d + 5*time.Minute }
 
@@ -85,7 +95,6 @@ func TestTheListener(t *testing.T) {
 			if r.Error.Reason != "listening_elsewhere" || !strings.Contains(r.Error.Message, "@coder is already listening from another session (last heard ") {
 				t.Fatalf("a second session is refused with %+v", r.Error)
 			}
-			s.call(t, nil, coder, "PUT", w+"/cursors/listen", M{"seq": first.Item.Seq}, 409, nil)
 		})
 
 		t.Run("the holder renews its lease and acknowledges with it", func(t *testing.T) {
@@ -131,23 +140,18 @@ func TestTheListener(t *testing.T) {
 		})
 
 		t.Run("the lease ends five minutes after the last wait, and then acknowledges nothing", func(t *testing.T) {
-			s.call(t, nil, coder, "GET", w+"/listen?wait=1&lease="+first.Lease, nil, 200, nil)
-			var m struct {
-				Members []struct {
-					Handle         string
-					ListeningUntil int64 `json:"listening_until"`
-				}
+			// A wait of twenty seconds that an item ends at once: the five minutes count from then, not from the
+			// twenty seconds the wait could have lasted.
+			s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Renew the certificate", "assignee": "@coder"})
+			var got listened
+			s.call(t, nil, coder, "GET", w+"/listen?wait=20&lease="+first.Lease, nil, 200, &got)
+			if got.Item == nil {
+				t.Fatalf("the wait answered %+v", got)
 			}
-			s.call(t, s.owner, "", "GET", w+"/list/members", nil, 200, &m)
-			var until int64
-			for _, member := range m.Members {
-				if member.Handle == "coder" {
-					until = member.ListeningUntil
-				}
-			}
-			if left := time.Until(time.UnixMilli(until)); left < 4*time.Minute || left > 5*time.Minute {
+			if left := time.Until(time.UnixMilli(s.listeningUntil(t, st, "coder"))); left < 4*time.Minute || left > 5*time.Minute {
 				t.Fatalf("after its wait the lease lives %s more, want five minutes", left)
 			}
+			s.call(t, nil, coder, "PUT", w+"/cursors/listen", M{"seq": got.Item.Seq, "lease": first.Lease}, 200, nil)
 			if _, err := st.Update(context.Background(), "members", map[string]any{"listening_until": time.Now().Add(-time.Second).UnixMilli()}, store.Eq("handle", "coder")); err != nil {
 				t.Fatal(err)
 			}
@@ -171,15 +175,6 @@ func TestTheListener(t *testing.T) {
 			s.call(t, s.owner, "", "GET", w+"/listen?wait=0", nil, 403, &r)
 			if !strings.Contains(r.Error.Message, "a person's, not an agent's") {
 				t.Fatalf("a person listening is told %q", r.Error.Message)
-			}
-		})
-
-		t.Run("a wait on the feed takes no lease and is not listening", func(t *testing.T) {
-			bot := s.agentToken(t, "bot")
-			var page map[string]any
-			s.call(t, nil, bot, "GET", w+"/events?cursor=listen&inbox=1&wait=1", nil, 200, &page)
-			if _, has := page["lease"]; has || s.listening(t, "bot") {
-				t.Fatalf("a wait on the feed took a lease: %v", page)
 			}
 		})
 
@@ -333,5 +328,135 @@ func TestAnAgentConnectsAndListensWithTheCommand(t *testing.T) {
 		if !s.listening(t, "coder") {
 			t.Fatal("the agent waiting with its lease does not show as listening")
 		}
+	})
+}
+
+// TestAListenerFromBeforeTheLeaseKeepsWorking: `quadit listen` as it was
+// before the lease (GET /events?cursor=listen&wait=, PUT /cursors/listen
+// {seq}, never a lease) takes no lease, is refused nothing, moves its
+// cursor, and counts as listening while its wait is held.
+func TestAListenerFromBeforeTheLeaseKeepsWorking(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		coder := s.agentToken(t, "coder")
+		s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys", "assignee": "@coder"})
+		// The requests exactly as that client sends them.
+		read := w + "/events?cursor=listen&inbox=1&wait=50&limit=1&types=notification.created&compact=1"
+		var page map[string]any
+		s.call(t, nil, coder, "GET", read, nil, 200, &page)
+		events, _ := page["events"].([]any)
+		if _, has := page["lease"]; has || len(events) != 1 {
+			t.Fatalf("the old companion's read answered %v", page)
+		}
+		if !s.listening(t, "coder") {
+			t.Fatal("the agent whose old companion waits does not show as listening")
+		}
+		seq := int64(page["seq"].(float64))
+		s.call(t, nil, coder, "PUT", w+"/cursors/listen", M{"seq": seq}, 200, nil)
+		var again map[string]any
+		s.call(t, nil, coder, "GET", w+"/events?cursor=listen&inbox=1&wait=1&limit=1&types=notification.created&compact=1", nil, 200, &again)
+		if more, _ := again["events"].([]any); len(more) != 0 {
+			t.Fatalf("after its acknowledgment the old companion read %v again", more)
+		}
+		// Beside a listener holding a lease, an acknowledgment with none, as a person giving up on an item by hand
+		// makes it, is let through too.
+		s.call(t, nil, coder, "GET", w+"/listen?wait=0", nil, 200, nil)
+		s.call(t, nil, coder, "PUT", w+"/cursors/listen", M{"seq": seq}, 200, nil)
+	})
+}
+
+// TestALeaseNobodyLearnedOrAWaitGivenUpOnEndsSoon: a lease taken by a wait
+// its client gave up on before it answered is gone at once, since nobody
+// knows its id; a lease renewed by a wait its client gave up on lives
+// thirty seconds more, not five minutes.
+func TestALeaseNobodyLearnedOrAWaitGivenUpOnEndsSoon(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		coder := s.agentToken(t, "coder")
+		giveUp := func(path string) {
+			t.Helper()
+			ctx, cancel := context.WithCancel(context.Background())
+			req, _ := http.NewRequestWithContext(ctx, "GET", s.url+path, nil)
+			req.Header.Set("Authorization", "Bearer "+coder)
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				if resp, err := http.DefaultClient.Do(req); err == nil {
+					resp.Body.Close()
+				}
+			}()
+			// Given up once the wait holds the lease for its twenty seconds.
+			for deadline := time.Now().Add(5 * time.Second); time.Until(time.UnixMilli(s.listeningUntil(t, st, "coder"))) < leaseOfAWaitOf(10*time.Second); time.Sleep(20 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatal("the wait never held the lease")
+				}
+			}
+			cancel()
+			<-done
+		}
+		waitFor := func(what string, ok func(m core.Member) bool) {
+			t.Helper()
+			for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+				var m core.Member
+				if err := st.Get(context.Background(), &m, store.Eq("handle", "coder")); err != nil {
+					t.Fatal(err)
+				}
+				if ok(m) {
+					return
+				}
+				if time.Now().After(deadline) {
+					t.Fatalf("%s: the member reads lease %q until %d", what, m.ListenLease, m.ListeningUntil)
+				}
+			}
+		}
+
+		giveUp(w + "/listen?wait=20")
+		waitFor("a lease nobody learned is gone", func(m core.Member) bool { return m.ListenLease == "" && m.ListeningUntil == 0 })
+		var held listened
+		s.call(t, nil, coder, "GET", w+"/listen?wait=0", nil, 200, &held)
+		giveUp(w + "/listen?wait=20&lease=" + held.Lease)
+		waitFor("a wait given up on leaves thirty seconds", func(m core.Member) bool {
+			left := time.Until(time.UnixMilli(m.ListeningUntil))
+			return m.ListenLease == held.Lease && left > 20*time.Second && left <= 30*time.Second
+		})
+	})
+}
+
+// TestTheFirstWaitStartsAtWhatIsRecentAndUnread: an agent with a history
+// does not have it replayed when it first listens: the cursor starts at
+// the oldest unread item of the last day (else at the present), and the
+// answer says how many older unread items were left alone.
+func TestTheFirstWaitStartsAtWhatIsRecentAndUnread(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		coder := s.agentToken(t, "coder")
+		s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Old work", "assignee": "@coder"})
+		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Older work", "assignee": "@coder"})
+		if _, err := st.Update(context.Background(), "notifications", map[string]any{"created_at": time.Now().Add(-48 * time.Hour).UnixMilli()}, store.Like("title", "OPS-%")); err != nil {
+			t.Fatal(err)
+		}
+		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "New work", "assignee": "@coder"})
+		var first struct {
+			listened
+			Skipped int
+		}
+		s.call(t, nil, coder, "GET", w+"/listen?wait=0", nil, 200, &first)
+		if first.Item == nil || first.Item.Task != "OPS-3" || first.Skipped != 2 {
+			t.Fatalf("the first wait answered %+v (item %+v), want OPS-3 with 2 older unread left alone", first, first.Item)
+		}
+
+		t.Run("with nothing recent it starts at the present", func(t *testing.T) {
+			ops := s.agentToken(t, "ops")
+			var page struct {
+				listened
+				Skipped int
+			}
+			s.call(t, nil, ops, "GET", w+"/listen?wait=0", nil, 200, &page)
+			if page.Item != nil || page.Skipped != 0 {
+				t.Fatalf("an agent with nothing waiting got %+v", page)
+			}
+		})
 	})
 }

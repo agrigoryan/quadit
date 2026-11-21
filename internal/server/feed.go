@@ -137,7 +137,11 @@ func (s *Server) handleReadFeed(x *c) error {
 		// was written in.
 		f.Tasks, f.ProjectIDs = &tf, nil
 	}
-	page, err := s.waitForEvents(x, f, min(x.intParam("wait", 0), maxFeedWait), v.Has("after"))
+	wait := min(x.intParam("wait", 0), maxFeedWait)
+	if cursor == core.ListenCursor && wait > 0 {
+		s.markOldListener(x, time.Duration(wait)*time.Second)
+	}
+	page, err := s.waitForEvents(x, f, wait, v.Has("after"))
 	if err != nil {
 		return err
 	}
@@ -217,10 +221,10 @@ func hasTaskFilter(q core.TaskQuery) bool {
 	return string(raw) != "{}"
 }
 
-// setCursor moves a cursor forward; a cursor never moves back. The cursor
-// "listen", or one moved with a lease, is moved only by the holder of the
-// listener's live lease, checked in the same write as the move, so a
-// takeover cannot land between the two (leaseLets).
+// setCursor moves a cursor forward; a cursor never moves back. A move made
+// with the listener's lease is made only while that lease is the live one,
+// checked in the same write as the move, so a takeover cannot land between
+// the two (leaseLets).
 func (s *Server) setCursor(x *c, name string, seq int64, lease string) error {
 	if err := s.checkCursorPosition(x, name, seq); err != nil {
 		return err
@@ -231,7 +235,7 @@ func (s *Server) setCursor(x *c, name string, seq int64, lease string) error {
 		return db.Advance(x.ctx(), core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: name, Seq: seq, UpdatedAt: time.Now().UnixMilli()},
 			"seq", "workspace_id", "user_id", "name")
 	}
-	if !leased(name, lease) {
+	if lease == "" {
 		return move(x.db)
 	}
 	return s.st.Write(x.ctx(), x.ws.ID, func(tx store.Tx) error {
@@ -246,18 +250,14 @@ func (s *Server) setCursor(x *c, name string, seq int64, lease string) error {
 	})
 }
 
-// leased reports whether a move of a cursor is the listener's, held to its
-// lease: the cursor "listen" always, and any other moved with a lease.
-func leased(name, lease string) bool { return name == core.ListenCursor || lease != "" }
-
 // checkCursorMove refuses what setCursor would refuse, without moving
 // anything: a name it cannot keep, a position that is not in the feed, or a
-// move of the listener's cursor without its live lease.
+// move made with a lease that is not the listener's live one.
 func (s *Server) checkCursorMove(x *c, name string, seq int64, lease string) error {
 	if err := s.checkCursorPosition(x, name, seq); err != nil {
 		return err
 	}
-	if !leased(name, lease) {
+	if lease == "" {
 		return nil
 	}
 	var m core.Member
