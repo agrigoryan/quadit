@@ -65,7 +65,7 @@ jobs:
       # against a copy of the releases laid out as GitHub serves them.
       - name: The install script
         run: |
-          shellcheck install.sh scripts/install-test.sh
+          shellcheck install.sh scripts/install-test.sh scripts/agent-listen-check.sh
           sh scripts/install-test.sh
 
   # The end-to-end suite (web/e2e): Chromium against the binary built here.
