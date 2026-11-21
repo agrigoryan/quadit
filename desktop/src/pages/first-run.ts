@@ -330,7 +330,7 @@ function renderMembers() {
               avatar(tool.initials, "agent", colourOf(tool.id)),
               tool.name,
               `Agent @${agent}`,
-              "Joined just now",
+              tool.worksAs ? "Connected" : "Joined just now",
               "ok",
             )
           : card.isConnected
@@ -348,7 +348,7 @@ function renderMembers() {
     }
   }
   list.replaceChildren(...rows);
-  const agents = [...connectedAs.values()].filter(Boolean).length;
+  const agents = new Set([...connectedAs.values()].filter(Boolean)).size;
   element("member-count").textContent =
     agents === 0 ? "1 person" : `1 person, ${agents} ${agents === 1 ? "agent" : "agents"}`;
 
@@ -357,10 +357,11 @@ function renderMembers() {
   example.hidden = state === "looking";
   const first = person.split(/\s+/)[0] || "you";
   element("example-title").textContent = `Say hello and tell ${first} what you can do`;
-  const firstAgent = [...connectedAs].find(([, agent]) => agent)?.[0];
-  const connectedFirst = cards.find((c) => c.tool.id === firstAgent);
+  const firstAgent = [...connectedAs].find(([, agent]) => agent);
+  const connectedFirst = cards.find((c) => c.tool.id === firstAgent?.[0]);
   const shown = connectedFirst ?? cards.find((card) => !card.isConnected);
-  const agentName = shown?.tool.name ?? "Your agent";
+  const agentName =
+    connectedFirst?.tool.worksAs && firstAgent ? `@${firstAgent[1]}` : (shown?.tool.name ?? "Your agent");
   const filled = !!connectedFirst;
   const exampleAvatar = () =>
     filled && shown
