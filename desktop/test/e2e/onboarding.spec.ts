@@ -1,10 +1,11 @@
 // The first run, as a person meets it (desktop contract §10): one window
 // from the first launch to the workspace. Welcome, a name, "Set up on this
 // computer", the tools step (looking, the tool found, what connecting it
-// changes, Connected and Undo), Continue, and the workspace on its sample
-// tasks; or no tool found; or "Connect to a server instead", as far as it
-// goes without a browser. Every state is saved as a picture in
-// onboarding-screens/ (desktop.ts, SCREENS), in the order a person sees them.
+// changes, set up and waiting for the tool, Undo), Continue, and the
+// workspace on its sample tasks; or no tool found; or "Connect to a server
+// instead", as far as it goes without a browser. Every state is saved as a
+// picture in onboarding-screens/ (desktop.ts, SCREENS), in the order a
+// person sees them.
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -115,7 +116,8 @@ test("the first run sets Quadit up on this computer in one window, connects the 
     await card.getByRole("button", { name: "Connect Claude Code" }).click();
     await expect(card.getByText(/^Connect to Quadit \S{6}$/)).toBeVisible({ timeout: 20_000 });
 
-    // Continue (Enter), which never waits for the tool to give its code back: the sample tasks, the third Claude Code's, and the first run goes, leaving the workspace.
+    // Continue (Enter), which never waits for the tool to give its code back: the sample tasks, the third Claude
+    // Code's, and the first run goes, leaving the workspace.
     await first.keyboard.press("Enter");
     await expect.poll(() => desktop.firstRunShown(), { timeout: 20_000 }).toBe(false);
     await expect(page.getByText(SAMPLES_NOTE)).toBeVisible({ timeout: 20_000 });
