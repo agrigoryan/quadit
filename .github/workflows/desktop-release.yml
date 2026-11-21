@@ -194,8 +194,11 @@ jobs:
       contents: write # the GitHub Release
       actions: write # starting the website's workflow
     steps:
+      # Only what the build jobs packaged: the run also holds the end-to-end
+      # suite's pictures, which are not part of a release.
       - uses: actions/download-artifact@v4
         with:
+          pattern: desktop-*-latest
           path: packages
           merge-multiple: true
       - name: Checksums
