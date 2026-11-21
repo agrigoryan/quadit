@@ -5,10 +5,11 @@ import { test } from "node:test";
 import { fill, newestDesktopRelease } from "./website-downloads.mjs";
 
 const asset = (name) => ({ name, browser_download_url: `https://example.test/dl/${name}` });
-const release = (tag, { prerelease = false, draft = false, names = [] } = {}) => ({
+const release = (tag, { prerelease = false, draft = false, names = [], published } = {}) => ({
   tag_name: tag,
   prerelease,
   draft,
+  published_at: published,
   html_url: `https://example.test/releases/${tag}`,
   assets: names.map(asset),
 });
@@ -21,6 +22,17 @@ test("the newest finished desktop release is chosen, a stable one before any pre
     release("desktop-v0.1.0"),
   ];
   assert.equal(newestDesktopRelease(releases).tag_name, "desktop-v0.2.0");
+});
+
+test("the newest is the release published last, whatever order GitHub lists them in", () => {
+  // GitHub's own list on 2026-11-21: beta.10 came after beta.9 and beta.8.
+  const releases = [
+    release("v0.3.0", { published: "2026-11-21T06:35:04Z" }),
+    release("desktop-v0.1.0-beta.9", { prerelease: true, published: "2026-11-21T17:10:09Z" }),
+    release("desktop-v0.1.0-beta.8", { prerelease: true, published: "2026-11-21T06:24:05Z" }),
+    release("desktop-v0.1.0-beta.10", { prerelease: true, published: "2026-11-21T23:32:29Z" }),
+  ];
+  assert.equal(newestDesktopRelease(releases).tag_name, "desktop-v0.1.0-beta.10");
 });
 
 test("with no stable desktop release, the newest pre-release is chosen; a draft or a server release never is", () => {

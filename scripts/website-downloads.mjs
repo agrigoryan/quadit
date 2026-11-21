@@ -18,9 +18,16 @@ import { fileURLToPath } from "node:url";
 
 const DESKTOP_TAG = "desktop-v";
 
-/** The release the site offers, of GitHub's list (newest first); null without one. */
+/**
+ * The release the site offers; null without one. The newest is the one
+ * published last: GitHub's list is not in that order (it put 0.1.0-beta.10
+ * after beta.8 and beta.9), so the order of the list is not trusted.
+ */
 export function newestDesktopRelease(releases) {
-  const finished = releases.filter((r) => r.tag_name.startsWith(DESKTOP_TAG) && !r.draft);
+  const published = (r) => Date.parse(r.published_at) || 0;
+  const finished = releases
+    .filter((r) => r.tag_name.startsWith(DESKTOP_TAG) && !r.draft)
+    .sort((a, b) => published(b) - published(a));
   return finished.find((r) => !r.prerelease) ?? finished[0] ?? null;
 }
 
