@@ -31,7 +31,7 @@ await Promise.all([
   build({
     ...common,
     entryPoints: [
-      "src/pages/welcome.ts",
+      "src/pages/first-run.ts",
       "src/pages/servers.ts",
       "src/pages/sign-in-bar.ts",
       "src/pages/connection-error.ts",
@@ -46,10 +46,12 @@ await Promise.all([
   }),
 ]);
 
-const pages = ["welcome", "servers", "sign-in-bar", "connection-error", "setup", "connect", "panel", "capture"];
-for (const file of [...pages.map((page) => `${page}.html`), "pages.css"])
+const pages = ["first-run", "servers", "sign-in-bar", "connection-error", "setup", "connect", "panel", "capture"];
+for (const file of [...pages.map((page) => `${page}.html`), "pages.css", "tools.css", "first-run.css"])
   cpSync(`src/pages/${file}`, `out/pages/${file}`);
 cpSync("assets/icon.png", "out/pages/icon.png");
+// The still of the app on the first run's Welcome: the website's, carried in the app (no network).
+cpSync("../website/video/hero-app-poster@2x.webp", "out/pages/hero-app-poster@2x.webp");
 
 // Every bundle must be whole: a relative require left in one (esbuild renames
 // require to require2 and so on inside a module it wraps) finds nothing in

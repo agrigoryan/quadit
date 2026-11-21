@@ -1,4 +1,4 @@
-// What the app's own bundled pages (Welcome, the server list, the sign-in
+// What the app's own bundled pages (the first run, the server list, the sign-in
 // bar, the connection error, setup, Connect, the menu-bar panel and quick capture)
 // may ask of the app, through the preload src/preload/pages.ts. The server's
 // web pages never see this: they get only the bridge of the contract.
@@ -72,10 +72,20 @@ export interface SetupState {
   signedIn: string[];
 }
 
-/** An agent tool found on this computer, as Welcome offers it: its name only. */
-export interface FoundToolView {
+/** An agent tool as the first run shows it: its name, its tile's letters, and whether it is on this computer. */
+export interface ToolView {
   id: string;
   name: string;
+  initials: string;
+  found: boolean;
+  /** Whether connecting gives it a quadit login of its own (else it uses this computer's: HarnessView's cliIdentity). */
+  ownLogin: boolean;
+}
+
+/** The agent tools as the first run finds them, and whether connecting one puts the quadit command on this computer too. */
+export interface FoundTools {
+  tools: ToolView[];
+  addsCommand: boolean;
 }
 
 export type CaptureWhat = "task" | "page";
@@ -94,6 +104,8 @@ export type ConnectMethod = "cli" | "mcp";
 export interface HarnessView {
   id: string;
   name: string;
+  /** The letters on its tile (the app shows no logos). */
+  initials: string;
   /** Its config folder or its command is on this computer. */
   installed: boolean;
   /** Whether it can connect through MCP. */
@@ -142,10 +154,36 @@ export interface ConnectChoice {
   allowUnattended: boolean;
 }
 
+/**
+ * What a file is to a plan, which says in plain words what it is for
+ * (shared/change-words.ts): the skill, the tool's own login, the computer's
+ * default login (which the tool works as), the tool's settings, the link that
+ * puts the quadit command on the PATH, the folder made for it, the line in
+ * the shell's profile.
+ */
+export type FileRole = "skill" | "login" | "shared-login" | "settings" | "command" | "folder" | "profile";
+
+/**
+ * What a plan does to a file: makes it, edits it, takes it away, or puts it
+ * back as it was; "shared": nothing, since another connected tool's
+ * connection did it already and shares it.
+ */
+export type FileChange = "new" | "edited" | "removed" | "restored" | "shared";
+
+export interface PlanFile {
+  path: string;
+  /** The path as a person writes it: ~ for the home folder. */
+  shown: string;
+  role: FileRole;
+  change: FileChange;
+  diff: string;
+  note?: string;
+}
+
 /** Every file a plan changes, as a diff, the folder its backups go to, and what the person should know first. */
 export interface PlanView {
   id: string;
-  files: { path: string; diff: string; note?: string }[];
+  files: PlanFile[];
   backupDir: string;
   warnings: string[];
 }
@@ -172,17 +210,31 @@ export interface PagesApi {
 
   localServer(): Promise<LocalServerView>;
   /**
-   * Sets Quadit up on this computer: starts the server here (or the one set
-   * up before), makes its owner, named `name`, and opens its window on their
-   * workspace, signed in; on one set up already, signs in instead. `tools`:
-   * the agent tools found here that Welcome offers to connect next (none:
-   * Welcome is done).
+   * The first run's Welcome (desktop contract §10): sets Quadit up on this
+   * computer, starting the server here (or the one set up before), making its
+   * owner, named `name`, and loading its workspace in the window the first run
+   * shows over; on one set up already, signs in instead. The first run goes on
+   * to its tools step.
    */
-  setUpHere(name: string): Promise<{ ok: true; tools: FoundToolView[] } | { ok: false; error: string }>;
-  /** Connects one of the tools setUpHere offered, with the first run's choices and nothing asked. */
-  connectFoundTool(id: string): Promise<{ ok: true } | { ok: false; error: string }>;
+  setUpHere(name: string): Promise<{ ok: true } | { ok: false; error: string }>;
+  /**
+   * The first run's other way: adds the server at `address` (as addServer),
+   * whose window, the one the first run showed over, opens on its sign-in
+   * page; that ends the first run.
+   */
+  connectServer(address: string, allowInsecure?: boolean): Promise<AddResult>;
+  /** The agent tools Connect knows, and which are on this computer; takes at least about a second. */
+  lookForTools(): Promise<FoundTools>;
+  /** Connects a tool lookForTools found, with the defaults and nothing asked. */
+  connectTool(id: string): Promise<{ ok: true } | { ok: false; error: string }>;
+  /** Takes back what connectTool did (its Undo). */
+  disconnectTool(id: string): Promise<{ ok: true } | { ok: false; error: string }>;
   /** What connecting one of those tools changes: the plan as it would be, or as it was carried out. */
-  foundToolChanges(id: string): Promise<Planned>;
+  toolChanges(id: string): Promise<Planned>;
+  /** Ends the tools step: makes the sample tasks and shows the workspace on them, under the first run. */
+  finishFirstRun(): Promise<void>;
+  /** Takes the first run away, showing the window under it; it never comes back by itself. */
+  endFirstRun(): Promise<void>;
   controlLocalServer(control: LocalControl): Promise<void>;
   /** Shows the local server's data folder, or its log, in the system's file manager. */
   showLocalServerFiles(what: "data" | "log"): Promise<void>;
@@ -199,7 +251,7 @@ export interface PagesApi {
   capture(c: CaptureTarget & { title: string; body: string }): Promise<DesktopOutcome>;
   lastCapture(): Promise<CaptureTarget | null>;
 
-  /** Shows Welcome, where Quadit is set up on this computer or a server is connected to. */
+  /** Shows the first run's Welcome, where Quadit is set up on this computer or a server is connected to. */
   showWelcome(): Promise<void>;
   /** The full name of the person's account on this computer, which Welcome offers as their name. */
   accountName(): Promise<string>;

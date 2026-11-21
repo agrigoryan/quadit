@@ -28,3 +28,17 @@ export function button(text: string, onClick: () => void, className = "", label 
   made.addEventListener("click", onClick);
   return made;
 }
+
+/** An icon of lines drawn in the text's colour (tools.css strokes it), from `paths` in a 24 by 24 box. */
+export function lineIcon(paths: string[]): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "line-icon");
+  for (const d of paths) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
+  return svg;
+}

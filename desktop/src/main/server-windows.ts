@@ -8,9 +8,19 @@
 // so its page keeps receiving the live feed and its notifications and badge
 // keep coming, the way chat apps behave. Quitting the app really closes it.
 //
+// The first run (first-run.ts) happens in one window from the first launch to
+// the workspace (desktop contract §10), before its server is known: it is
+// shown as an app page laid over a server window (cover). With no server yet,
+// the window is made for the server about to be added, with an id of its own,
+// and loads nothing; the server added next with that id (waitingId) takes it,
+// when the window's frame is the one that server's would have. Until then
+// nothing in it is a server's page, and its preload gives nothing.
+//
 // The rules every page of a server's window is held to:
 //   - its session is the partition "persist:server-<id>", shared with no other server;
 //   - Node is off, the renderer is sandboxed, contexts are isolated, web security is on;
+//   - a navigation of a window whose server is not known (yet, or any more)
+//     is stopped;
 //   - a navigation to another origin is stopped and that address goes to the
 //     system browser (http and https only); from the sign-in page it starts
 //     the browser sign-in instead, since providers refuse embedded windows;
@@ -32,8 +42,9 @@
 //   - a frame of a page stays on the server's own pages;
 //   - window.open of the same origin opens another window held to the same
 //     rules; anything else goes to the system browser;
-//   - only the server's own pages get the bridge, and each message on it is
-//     checked again here against the frame that sent it; what a page
+//   - only the server's own pages get the bridge (its preload asks here for
+//     its server's origin at each load), and each message on it is checked
+//     again here against the frame that sent it; what a page
 //     publishes and answers goes to Requests (requests.ts), and goes with
 //     the page; its ask to open Connect agents opens the app's own window,
 //     at most once a second (open-connect.ts).
@@ -61,18 +72,18 @@ import { HANDOFF_HEADER } from "@/main/handoff";
 import { appPage, browserAddress, isHandoffPage, isOwnPage } from "@/main/origins";
 import { type Fetch, fitOf } from "@/main/probe";
 import type { Requests } from "@/main/requests";
-import type { Server, ServerStore } from "@/main/servers";
-import { frameFor } from "@/main/window-frame";
+import { newServerId, type Server, type ServerStore } from "@/main/servers";
+import { FIRST_RUN_SPEAKS, type Frame, frameFor } from "@/main/window-frame";
 import {
   BRIDGE_BADGE,
   BRIDGE_LISTENING,
   BRIDGE_NOTIFY,
   BRIDGE_OPEN_CONNECT,
+  BRIDGE_ORIGIN,
   BRIDGE_OUTCOME,
   BRIDGE_PUBLISH,
   badgeOf,
   type DesktopRequest,
-  ORIGIN_SWITCH,
   summaryOf,
   VERSION_SWITCH,
 } from "@/shared/bridge";
@@ -143,6 +154,10 @@ export class ServerWindows {
   private loads: PendingLoads<string, Load, { ok: true } | { ok: false; reason: string }>;
   private appSignIn: AppSignIn;
   private quitting = false;
+  /** The window made for the server about to be added (cover), and the id that server is to have. */
+  private waiting: { id: string; win: BrowserWindow } | undefined;
+  /** The app's own page laid over a window (the first run's), and what to do when the person closes that window. */
+  private covering: { view: WebContentsView; win: BrowserWindow; closed: () => void } | undefined;
 
   constructor(
     private store: ServerStore,
@@ -163,6 +178,11 @@ export class ServerWindows {
     });
     ipcMain.on(BRIDGE_OUTCOME, (event, raw: unknown) => {
       if (this.bridgeSender(event)) setup.requests.answer(event.sender.id, raw);
+    });
+    // Asked by the preload at every page load, synchronously: the origin whose pages get the bridge in this window.
+    ipcMain.on(BRIDGE_ORIGIN, (event) => {
+      const serverId = this.owners.get(event.sender.id);
+      event.returnValue = (serverId && this.store.get(serverId)?.origin) || "";
     });
     const connectAsks = new OpenConnect((serverId) => setup.openConnect(serverId));
     ipcMain.on(BRIDGE_OPEN_CONNECT, (event) => connectAsks.asked(this.bridgeSender(event)?.id ?? null));
@@ -293,6 +313,65 @@ export class ServerWindows {
     return this.windows.get(serverId)?.isVisible() ?? false;
   }
 
+  /**
+   * Lays `view` (an app page) over the whole of a window, shown and in front,
+   * and keeps it there, sized with the window, until uncover: over the window
+   * of the server `serverId`, or, with null, over a window made for the server
+   * about to be added (waitingId). Gives the id of the server whose window it
+   * covers. Closing that window calls `closed` (the cover's page is over); a
+   * window still waiting for its server then goes. One cover at a time: a
+   * second covers nothing and shows the first.
+   */
+  cover(view: WebContentsView, serverId: string | null, closed: () => void): string {
+    const covered = this.covering;
+    if (covered && !covered.win.isDestroyed()) {
+      covered.win.show();
+      covered.win.focus();
+      return this.idOf(covered.win) ?? "";
+    }
+    const server = serverId ? this.store.get(serverId) : undefined;
+    let win: BrowserWindow;
+    let id: string;
+    if (server) {
+      id = server.id;
+      win = this.ensure(server, server.origin + "/", true);
+    } else {
+      id = newServerId();
+      win = this.make(id, "Quadit", frameFor(process.platform, FIRST_RUN_SPEAKS), true);
+      this.waiting = { id, win };
+    }
+    this.covering = { view, win, closed };
+    win.contentView.addChildView(view);
+    this.placeCover(win);
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+    view.webContents.focus();
+    return id;
+  }
+
+  /** The id the server about to be added is to have, to take the window made for it (cover); none when there is none. */
+  waitingId(): string | undefined {
+    return this.waiting && !this.waiting.win.isDestroyed() ? this.waiting.id : undefined;
+  }
+
+  /** Takes the cover away, showing the window under it; a window still waiting for its server goes with it. */
+  uncover() {
+    const covered = this.covering;
+    this.covering = undefined;
+    if (!covered) return;
+    if (!covered.win.isDestroyed()) {
+      covered.win.contentView.removeChildView(covered.view);
+      covered.win.webContents.focus();
+    }
+    covered.view.webContents.close();
+    const waiting = this.waiting;
+    if (waiting?.win === covered.win) {
+      this.waiting = undefined;
+      waiting.win.destroy();
+    }
+  }
+
   /** Closes a removed server's window and forgets what it kept: cookies, storage, its place on screen. */
   async forget(server: Server) {
     const win = this.windows.get(server.id);
@@ -350,57 +429,107 @@ export class ServerWindows {
     }
   }
 
+  /**
+   * The server's window, made when it has none, loading `firstUrl`: the window
+   * made for it before it was known (cover) when it has the frame this
+   * server's would have, a new one otherwise.
+   */
   private ensure(server: Server, firstUrl: string, shown: boolean): BrowserWindow {
     const known = this.windows.get(server.id);
     if (known) return known;
-    this.prepareSession(server);
     const frame = frameFor(process.platform, server);
+    const waiting = this.waiting;
+    let win: BrowserWindow;
+    if (
+      waiting?.id === server.id &&
+      !waiting.win.isDestroyed() &&
+      (this.strips.get(waiting.win) ?? 0) === frame.strip
+    ) {
+      this.waiting = undefined;
+      win = waiting.win;
+      win.setTitle(server.name);
+      if (shown) win.show();
+    } else win = this.make(server.id, server.name, frame, shown);
+    this.windows.set(server.id, win);
+    if (shown) this.store.change(server.id, { open: true });
+    this.load(server.id, { url: firstUrl });
+    return win;
+  }
+
+  /** A window for the server with the id `serverId` (added, or about to be), held to the rules at the top of this file. */
+  private make(serverId: string, title: string, frame: Frame, shown: boolean): BrowserWindow {
+    this.prepareSession(serverId);
     const win = new BrowserWindow({
-      name: windowName(server.id),
+      name: windowName(serverId),
       windowStatePersistence: true,
       width: 1280,
       height: 860,
       minWidth: 480,
       minHeight: 400,
-      title: server.name,
+      title,
       // The web app's dark --bg (its default theme), so the window is not white until its page paints.
       backgroundColor: "#131419",
       show: shown,
       ...frame.options,
-      webPreferences: this.preferencesFor(server),
+      webPreferences: this.preferencesFor(serverId),
     });
-    this.windows.set(server.id, win);
     if (frame.strip) this.strips.set(win, frame.strip);
-    this.guard(win.webContents, server.id);
+    this.guard(win.webContents, serverId);
     this.errors.watch(
       win,
-      () => this.store.get(server.id),
-      (url) => this.load(server.id, { url }),
+      () => this.store.get(serverId),
+      (url) => this.load(serverId, { url }),
     );
-    if (shown) this.store.change(server.id, { open: true });
 
     win.on("close", (event) => {
       if (this.quitting) return;
       event.preventDefault();
-      win.hide();
+      // The page over it is over: its owner takes it away (uncover), and with it a window no server took.
+      if (this.covering?.win === win) this.covering.closed();
+      if (win.isDestroyed()) return;
+      if (this.waiting?.win === win) {
+        this.waiting = undefined;
+        win.destroy();
+      } else win.hide();
     });
     win.on("show", () => {
-      this.store.change(server.id, { open: true });
+      this.store.change(serverId, { open: true });
       this.setup.changed();
     });
     win.on("hide", () => {
-      this.store.change(server.id, { open: false });
+      this.store.change(serverId, { open: false });
       this.setup.changed();
     });
-    win.on("focus", () => this.setup.changed());
-    win.on("resize", () => this.placeBar(win, server.id));
-    win.on("closed", () => {
-      if (this.windows.get(server.id) !== win) return;
-      this.windows.delete(server.id);
-      this.loads.forget(server.id);
+    win.on("focus", () => {
+      // The keys go to the page over the window, while there is one.
+      if (this.covering?.win === win) this.covering.view.webContents.focus();
+      this.setup.changed();
     });
-    this.load(server.id, { url: firstUrl });
+    win.on("resize", () => {
+      this.placeBar(win, serverId);
+      this.placeCover(win);
+    });
+    win.on("closed", () => {
+      if (this.covering?.win === win) this.covering = undefined;
+      if (this.windows.get(serverId) !== win) return;
+      this.windows.delete(serverId);
+      this.loads.forget(serverId);
+    });
     return win;
+  }
+
+  /** The cover fills the window it is over. */
+  private placeCover(win: BrowserWindow) {
+    if (this.covering?.win !== win || win.isDestroyed()) return;
+    const { width, height } = win.getContentBounds();
+    this.covering.view.setBounds({ x: 0, y: 0, width, height });
+  }
+
+  /** The id of the server a window is for, added or about to be. */
+  private idOf(win: BrowserWindow): string | undefined {
+    if (this.waiting?.win === win) return this.waiting.id;
+    for (const [id, known] of this.windows) if (known === win) return id;
+    return undefined;
   }
 
   /** Loads an address in a server's window once the server can be reached; a newer load asked meanwhile wins. */
@@ -426,8 +555,8 @@ export class ServerWindows {
   }
 
   /** The partition's user agent and permissions, set once per session. */
-  private prepareSession(server: Server) {
-    const own = session.fromPartition(partitionOf(server.id));
+  private prepareSession(serverId: string) {
+    const own = session.fromPartition(partitionOf(serverId));
     if (this.sessions.has(own)) return;
     this.sessions.add(own);
     own.setUserAgent(`${own.getUserAgent()} QuaditDesktop/${this.setup.version}`);
@@ -438,20 +567,20 @@ export class ServerWindows {
     // person chose to paste, as a paste event.
     const allowed = new Set(["clipboard-sanitized-write", "fullscreen", "notifications"]);
     own.setPermissionRequestHandler((contents, permission, decide, details) => {
-      const current = this.store.get(server.id);
+      const current = this.store.get(serverId);
       decide(
         !!current && allowed.has(permission) && isOwnPage(details.requestingUrl ?? contents.getURL(), current.origin),
       );
     });
     own.setPermissionCheckHandler((_contents, permission, requestingOrigin) => {
-      const current = this.store.get(server.id);
+      const current = this.store.get(serverId);
       return !!current && allowed.has(permission) && requestingOrigin === current.origin;
     });
   }
 
-  private preferencesFor(server: Server): WebPreferences {
+  private preferencesFor(serverId: string): WebPreferences {
     return {
-      partition: partitionOf(server.id),
+      partition: partitionOf(serverId),
       preload: this.setup.bridgePreload,
       contextIsolation: true,
       sandbox: true,
@@ -459,7 +588,7 @@ export class ServerWindows {
       webSecurity: true,
       webviewTag: false,
       spellcheck: true,
-      additionalArguments: [ORIGIN_SWITCH + server.origin, VERSION_SWITCH + this.setup.version],
+      additionalArguments: [VERSION_SWITCH + this.setup.version],
     };
   }
 
@@ -476,7 +605,7 @@ export class ServerWindows {
 
     const stopIfAway = (event: { preventDefault(): void }, url: string) => {
       const server = this.store.get(serverId);
-      if (!server) return;
+      if (!server) return event.preventDefault();
       // Only finishSignIn loads the hand-off's pages, and it is no navigation of the page's.
       if (isHandoffPage(url, server.origin)) return event.preventDefault();
       if (isOwnPage(url, server.origin)) return;
@@ -499,7 +628,7 @@ export class ServerWindows {
     contents.setWindowOpenHandler(({ url }) => {
       const server = this.store.get(serverId);
       if (server && isOwnPage(url, server.origin) && !isHandoffPage(url, server.origin)) {
-        return { action: "allow", overrideBrowserWindowOptions: { webPreferences: this.preferencesFor(server) } };
+        return { action: "allow", overrideBrowserWindowOptions: { webPreferences: this.preferencesFor(server.id) } };
       }
       if (server && !isHandoffPage(url, server.origin)) this.leave(contents, server, url);
       return { action: "deny" };

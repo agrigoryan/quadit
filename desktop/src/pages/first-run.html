@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'"
+    />
+    <title>Welcome to Quadit</title>
+    <link rel="stylesheet" href="tools.css" />
+    <link rel="stylesheet" href="first-run.css" />
+  </head>
+  <body>
+    <div class="window-strip"></div>
+
+    <main id="welcome" class="step welcome" aria-labelledby="welcome-title">
+      <section class="left">
+        <svg class="mark" width="52" height="52" viewBox="0 0 512 512" aria-hidden="true">
+          <rect width="512" height="512" rx="120" class="mark-bg" />
+          <g fill="none" class="mark-line" stroke-width="26">
+            <rect x="118" y="118" width="122" height="122" rx="30" />
+            <rect x="118" y="272" width="122" height="122" rx="30" />
+            <rect x="272" y="272" width="122" height="122" rx="30" />
+          </g>
+          <rect x="259" y="105" width="148" height="148" rx="36" class="mark-move" />
+        </svg>
+        <h1 id="welcome-title">Welcome to Quadit</h1>
+        <p class="lead">
+          Tasks, docs and decisions for you and your AI agents. Give them work, and they report back here.
+        </p>
+
+        <form id="here" novalidate aria-label="Set up on this computer" hidden>
+          <label class="field">
+            <span>Your name</span>
+            <input name="name" type="text" autocomplete="name" spellcheck="false" />
+          </label>
+          <div class="go-row">
+            <button id="go" type="submit" class="btn btn-move btn-lg">Set up on this computer</button>
+          </div>
+          <p id="fine" class="fine" aria-live="polite"></p>
+          <p class="other">
+            <button id="to-connect" type="button" class="btn-text">Connect to a server instead</button>
+          </p>
+        </form>
+
+        <form id="connect" novalidate aria-labelledby="connect-title" hidden>
+          <h2 id="connect-title">Connect to a server</h2>
+          <label class="field">
+            <span>Address</span>
+            <input name="address" type="text" inputmode="url" autocomplete="url" placeholder="quadit.example.com" />
+          </label>
+          <div class="go-row">
+            <button id="add" type="submit" class="btn btn-move btn-lg">Add server</button>
+          </div>
+          <p id="connect-fine" class="fine">
+            The address of the Quadit server you use. You sign in with your browser next.
+          </p>
+          <p id="connect-error" class="fine error" role="alert"></p>
+          <button id="add-insecure" type="button" class="btn btn-danger" hidden>Add without encryption</button>
+          <p class="other">
+            <button id="to-here" type="button" class="btn-text">Set up on this computer instead</button>
+          </p>
+        </form>
+      </section>
+
+      <figure class="preview" aria-hidden="true">
+        <div class="frame"><img src="hero-app-poster@2x.webp" alt="" /></div>
+      </figure>
+
+      <div class="dots-wrap"><ol class="dots" aria-label="Step 1 of 2"></ol></div>
+    </main>
+
+    <div id="tools-step" class="step tools-step" hidden>
+      <main class="connect" aria-labelledby="tools-title">
+        <section class="main">
+          <h1 id="tools-title">Connect your AI tools</h1>
+
+          <div id="looking">
+            <p class="looking-line" role="status"><span class="spinner on-dark"></span>Looking on this computer…</p>
+            <div class="tools ghosts" aria-hidden="true">
+              <div class="ghost">
+                <div class="t"></div>
+                <div class="ls"><i></i><i></i><i></i></div>
+              </div>
+              <div class="ghost">
+                <div class="t"></div>
+                <div class="ls"><i></i><i></i><i></i></div>
+              </div>
+              <div class="ghost">
+                <div class="t"></div>
+                <div class="ls"><i></i><i></i><i></i></div>
+              </div>
+            </div>
+            <p id="checking" class="checking" aria-hidden="true"></p>
+          </div>
+
+          <div id="found" hidden>
+            <p id="found-lead" class="lead"></p>
+            <div class="bar">
+              <span class="count"><span class="found-dot"></span><span id="count"></span></span>
+              <button id="connect-all" type="button" class="btn btn-line btn-sm"></button>
+            </div>
+            <div id="cards" class="tools"></div>
+            <p id="others" class="others"></p>
+          </div>
+
+          <div id="none" hidden>
+            <p class="lead">
+              No AI tools on this computer yet. Quadit works fine without them, and you can connect one whenever you
+              install it.
+            </p>
+            <div class="none">
+              <p>Quadit works with these tools. Once one is installed, connect it from the Agents page.</p>
+              <ul id="all-tools" class="grid"></ul>
+              <div class="none-row">
+                <button id="look-again" type="button" class="btn btn-line btn-sm">Look again</button>
+                <span>Installed one just now? Look again.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="stage" aria-label="What a connected tool is">
+          <div class="field-of-squares" aria-hidden="true"></div>
+          <div class="inner">
+            <p class="cap">
+              A connected tool is a <b>member</b> of your workspace, like a person. Give it a task: it works on it, asks
+              you when the call is yours, and reports back.
+            </p>
+            <div class="pane">
+              <div class="pane-h">Members <span id="member-count">1 person</span></div>
+              <ul id="members" class="members"></ul>
+            </div>
+            <div id="example" class="pane" hidden>
+              <div class="pane-h">A task, handed to an agent <span>For example</span></div>
+              <div class="task-card">
+                <p class="t1">
+                  <span class="status-ring"></span><span class="key">GS-3</span><span id="example-title"></span>
+                </p>
+                <p class="t2">
+                  Assignee <span id="example-avatar" class="slot"></span><span id="example-assignee"></span>
+                </p>
+              </div>
+              <ul id="feed" class="feed"></ul>
+            </div>
+          </div>
+        </aside>
+      </main>
+
+      <footer class="foot">
+        <div class="later">
+          <button id="skip" type="button" class="btn-text">Skip for now</button>
+          <span id="later"></span>
+        </div>
+        <ol class="dots" aria-label="Step 2 of 2"></ol>
+        <div class="go">
+          <span class="kbd-hint" aria-hidden="true"><kbd>Enter</kbd></span>
+          <button id="continue" type="button" class="btn btn-move btn-lg">Continue</button>
+        </div>
+      </footer>
+    </div>
+
+    <script src="first-run.js"></script>
+  </body>
+</html>

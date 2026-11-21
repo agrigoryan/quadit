@@ -2,8 +2,9 @@
 // (switches.ts), one running copy, the quadit:// scheme, and the parts
 // put together: the servers (servers.ts), their windows
 // (server-windows.ts), what the windows' pages publish and are asked
-// (requests.ts), the app's own pages (app-pages.ts: Welcome, the server
-// list, setup, Connect, the menu-bar panel, quick capture), the browser sign-in
+// (requests.ts), the first run (first-run.ts), the app's own pages
+// (app-pages.ts: the server list, setup, Connect, the menu-bar panel, quick
+// capture), the browser sign-in
 // (handoff.ts), the unread badge (unread.ts), the menu (menu.ts), the
 // update notice (updates.ts) and the server on this computer
 // (local-server.ts), which runs while the app does.
@@ -20,6 +21,7 @@ import { AppPages } from "@/main/app-pages";
 import { Capture } from "@/main/capture";
 import { ConnectPage } from "@/main/connect-page";
 import { FirstConnect } from "@/main/first-connect";
+import { FirstRun } from "@/main/first-run";
 import { Connections } from "@/main/connections";
 import { LocalServer, loopbackPorts } from "@/main/local-server";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
@@ -37,7 +39,6 @@ import { Setup } from "@/main/setup-page";
 import { refusedSwitches } from "@/main/switches";
 import { Unread } from "@/main/unread";
 import { isReleasePage, type Release, UpdateWatch } from "@/main/updates";
-import { Welcome } from "@/main/welcome-page";
 import { BRIDGE_REQUEST } from "@/shared/bridge";
 
 const WEBSITE = "https://agrigoryan.github.io/quadit/";
@@ -180,13 +181,15 @@ function start() {
     openConnect: () => connect.show(),
   });
   const run = promisify(execFile);
-  const welcome = new Welcome({
+  const firstRun = new FirstRun({
     pages,
     settings,
     list,
+    windows,
     firstConnect: new FirstConnect({
       connections,
       summaries: () => requests.summaries(),
+      ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
       sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
     }),
     accountName: () =>
@@ -233,7 +236,7 @@ function start() {
             openUpdate: (release) => void tellAboutUpdate(release),
             openWebsite: () => void shell.openExternal(WEBSITE),
             reportIssue: () => void shell.openExternal(ISSUES),
-            showWelcome: () => welcome.show(),
+            showWelcome: () => firstRun.show(),
             controlLocalServer: (control) => void list.control(control),
             showLocalServerFiles: (what) =>
               what === "log" ? shell.showItemInFolder(local.logFile) : void shell.openPath(local.dataDir),
@@ -257,8 +260,9 @@ function start() {
       // Up: what it speaks is asked now, and a window that found it down tries again.
       void checks.check(entry.id);
       windows.serverStarted(entry.id);
-      // Its set-up unfinished (the app quit during the first run, or an older version started it): Welcome sets it up.
-      void local.setupNeeded().then((needed) => needed && welcome.show());
+      // Its set-up unfinished (the app quit during the first run, or an older version started it): the first run sets
+      // it up, over its window.
+      void local.setupNeeded().then((needed) => needed && firstRun.show());
     }
   });
   refreshMenu();
@@ -314,7 +318,7 @@ function start() {
   const shown = windows.restore({ show: !atLogin });
   if (atLogin) {
     // Nothing to show.
-  } else if (!settings.get().setupDone && store.list().length === 0) welcome.show();
+  } else if (!settings.get().setupDone && store.list().length === 0) firstRun.show();
   else if (!shown) list.show();
   // Servers upgrade and downgrade while the app is away: ask each again.
   void checks.checkAll();

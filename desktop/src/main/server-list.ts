@@ -119,15 +119,17 @@ export class ServerList {
   /**
    * Sets Quadit up on this computer (desktop contract §7): starts the server
    * the app runs here (the one set up before, with its data, when there is
-   * one), adds it to the list, makes its owner `name` and their workspace
-   * through its window's own session, and opens that window on the
-   * workspace, signed in. On an install set up already it signs in instead,
-   * so trying again after a half-finished attempt works. Gives the server's
-   * id and the workspace made with the owner (its slug; null when the
-   * install was set up already).
+   * one), adds it to the list (with the id `id` when given, so that it takes
+   * the window made for it: ServerWindows.cover), makes its owner `name` and
+   * their workspace through its window's own session, and opens that window
+   * on the workspace, signed in. On an install set up already it signs in
+   * instead, so trying again after a half-finished attempt works. Gives the
+   * server's id and the workspace made with the owner (its slug; null when
+   * the install was set up already).
    */
   async setUpHere(
     name: string,
+    id?: string,
   ): Promise<{ ok: true; serverId: string; workspace: string | null } | { ok: false; error: string }> {
     const { local } = this.setup;
     let origin: string;
@@ -139,7 +141,7 @@ export class ServerList {
     // Saved before its owner is made: quit before that, the next start finds its set-up unfinished and offers
     // Welcome again (main.ts). It runs now: what it speaks is asked before its window is made, which takes its
     // frame from that (window-frame.ts).
-    const server = this.store.add(origin, LOCAL_NAME, { handoff: 0, inset: 0 });
+    const server = this.store.add(origin, LOCAL_NAME, { handoff: 0, inset: 0 }, id);
     await this.setup.checks.check(server.id);
     const owner = await local.setUpOwner(this.windows.fetcher(server.id), name.trim());
     if (!owner.ok) return owner;
@@ -184,7 +186,13 @@ export class ServerList {
     this.pages.changed();
   }
 
-  private async add(address: string, name: string, allowInsecure: boolean): Promise<AddResult> {
+  /**
+   * Adds the server at `address` (with the id `id` when given, so that it
+   * takes the window made for it: ServerWindows.cover) and shows its window;
+   * one at a plain http address beyond this computer and private networks
+   * only with `allowInsecure`.
+   */
+  async add(address: string, name: string, allowInsecure: boolean, id?: string): Promise<AddResult> {
     const origin = serverOrigin(address);
     if (!origin)
       return {
@@ -203,7 +211,7 @@ export class ServerList {
     }
     const answer = await probe(origin, this.setup.fetcher);
     if (!answer.reachable) return { ok: false, error: answer.reason };
-    const server = this.store.add(origin, name, answer);
+    const server = this.store.add(origin, name, answer, id);
     this.store.change(server.id, { version: answer.version });
     const path = this.destination?.origin === origin ? this.destination.path : undefined;
     if (path) this.destination = null;

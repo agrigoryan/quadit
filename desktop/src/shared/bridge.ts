@@ -60,6 +60,11 @@ export type DesktopRequest =
   | { kind: "agent"; create: { name: string; handle: string } }
   | { kind: "agent-token"; agent: string; label: string }
   | { kind: "revoke-token"; token: string }
+  /**
+   * The end of the first run (desktop contract §10): the workspace's sample
+   * tasks, the third handed to `agent` (a member id) when given; the outcome's
+   * path is the "Getting started" project's task list.
+   */
   | { kind: "samples"; agent?: string };
 
 export type DesktopOutcome =
@@ -103,6 +108,12 @@ export const BRIDGE_OUTCOME = "bridge:outcome";
 export const BRIDGE_LISTENING = "bridge:listening";
 /** Page to app: open the Connect agents window (no payload). */
 export const BRIDGE_OPEN_CONNECT = "bridge:open-connect";
+/**
+ * The preload to the app, synchronously: the origin of the server whose
+ * window it runs in ("" when none). Asked at each page load, so a window made
+ * before its server is known (the first run's) gets it once it is.
+ */
+export const BRIDGE_ORIGIN = "bridge:origin";
 
 const TITLE_MAX = 200;
 const BODY_MAX = 1000;
@@ -270,8 +281,7 @@ export function outcomeOf(raw: unknown): DesktopOutcome | null {
   });
 }
 
-/** The command-line switches through which a server window's preload learns its server's origin and the app version. */
-export const ORIGIN_SWITCH = "--quadit-origin=";
+/** The command-line switch through which a server window's preload learns the app version. */
 export const VERSION_SWITCH = "--quadit-version=";
 
 declare global {
