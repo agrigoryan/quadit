@@ -1,7 +1,10 @@
 // The quiet line under the comment box of a task assigned to an agent or
-// waiting on one: what will happen to what is written there. An agent that
-// is listening will see it; one that is not sees it when it is next asked
-// in its tool; one that has never connected is offered the way to connect.
+// waiting on one: what will happen to what is written there. A comment
+// reaches the inbox of the task's assignee and of whoever it waits on,
+// followers or not (the server's rule), so the line's promise holds: an
+// agent that is listening will see it; one that is not sees it when it is
+// next asked in its tool; one that has never connected is offered the way
+// to connect.
 
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
@@ -21,15 +24,16 @@ export function CommentReach({ task }: { task: Task }) {
 }
 
 function AgentReach({ agent }: { agent: Member }) {
-  const connection = useConnection()(agent);
+  const reach = useConnection()(agent);
   const settings = useSettingsBase();
-  if (!connection) return null;
+  if (!reach) return null;
+  const { connection, tool } = reach;
   const handle = agent.handle;
   return (
     <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-ink-3">
       {connection === "listening" && t("comment.reach.listening", { handle })}
-      {/* An agent connected by Connect is named after its tool. */}
-      {connection === "connected" && t("comment.reach.connected", { handle, tool: agent.name })}
+      {connection === "connected" &&
+        (tool ? t("comment.reach.connected", { handle, tool }) : t("comment.reach.connectedNoTool", { handle }))}
       {connection === "not_connected" && (
         <>
           <span>{t("comment.reach.notConnected", { handle })}</span>

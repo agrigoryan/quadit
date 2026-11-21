@@ -78,10 +78,14 @@ export type DesktopOutcome =
       /** A connect code made (connect-code): its id, to ask about it, and its six characters, shown once. */
       id?: string;
       code?: string;
-      /** An agent's state (agent-state): it proved it reached Quadit from its tool; its listener holds its lease; the code asked about was used. */
+      /**
+       * An agent's state (agent-state): it proved it reached Quadit from its tool; its listener holds its lease; the code
+       * asked about was used; or it is gone (replaced, or run out unused), and a new one is needed.
+       */
       connected?: boolean;
       listening?: boolean;
       codeUsed?: boolean;
+      codeGone?: boolean;
     }
   | { ok: false; message: string; path?: string };
 

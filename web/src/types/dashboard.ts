@@ -71,11 +71,16 @@ export interface AgentState {
   connected_at?: string;
   /** Its listener holds its lease (`quadit wait`, `quadit listen`), or a webhook pushes to it. */
   listening: boolean;
+  /** The tool of the last connect code it gave back ("Codex"), when it has. */
+  tool?: string;
   last_seen?: string;
   last_action?: string;
   open_tasks: number;
   waiting_on_it: number;
 }
+
+/** How far an agent is connected: GET /agents/connection, the cheap part of GET /agents. */
+export type AgentConnection = Pick<AgentState, "handle" | "user_id" | "connected_at" | "listening" | "tool">;
 
 export interface StatusCount {
   status: string;

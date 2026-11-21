@@ -13,6 +13,7 @@ import type { Dict } from "@/data/store";
 import type { AgentSession } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
 import { useLive, useNow } from "@/data/live";
+import { useFreshStates } from "@/data/listening";
 import type { AgentState } from "@/types/dashboard";
 import { isStranded } from "@/insights/ui/agent-state";
 import { PageBar } from "@/insights/ui/panel";
@@ -46,8 +47,9 @@ export function AgentsPage() {
   const can = useCan();
   const members = useMembers();
   const now = useNow(15_000);
-  // Read again while shown: a listener's lease ends without an event.
-  const live = useLive<{ agents: AgentState[] }>("/agents", { everyMs: 20_000 });
+  const live = useLive<{ agents: AgentState[] }>("/agents");
+  // How far each is connected is read again while shown: a listener's lease ends without an event.
+  const fresh = useFreshStates();
   const { sessions, error: sessionsError } = useSessions("limit=300", everySession);
   const claims = useClaims();
   const resources = useResources();
@@ -56,9 +58,9 @@ export function AgentsPage() {
 
   const states = useMemo(() => {
     const out: Dict<AgentState> = {};
-    for (const a of live.data?.agents ?? []) out[a.user_id] = a;
+    for (const a of live.data?.agents ?? []) out[a.user_id] = fresh(a);
     return out;
-  }, [live.data]);
+  }, [live.data, fresh]);
 
   const agents = useMemo(
     () =>

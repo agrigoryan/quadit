@@ -209,7 +209,7 @@ describe("a tool's card in the app's Connect", () => {
   const serve = (agents: unknown[], used: boolean) =>
     vi.spyOn(api, "get").mockImplementation((path: string) => {
       reads.push(path);
-      if (path.endsWith("/agents")) return Promise.resolve({ agents });
+      if (path.endsWith("/agents/connection")) return Promise.resolve({ agents });
       return Promise.resolve({ id: "cc1", used, expired: false });
     });
   beforeEach(() => {
@@ -234,6 +234,7 @@ describe("a tool's card in the app's Connect", () => {
       connected: false,
       listening: false,
       codeUsed: false,
+      codeGone: false,
     });
     serve([{ user_id: "a1", listening: false }], true);
     patchRow("members", "a1", { connected_at: 1700000000000 });
@@ -242,6 +243,7 @@ describe("a tool's card in the app's Connect", () => {
       connected: true,
       listening: false,
       codeUsed: true,
+      codeGone: false,
     });
   });
 
@@ -253,14 +255,15 @@ describe("a tool's card in the app's Connect", () => {
         connected: true,
         listening: true,
         codeUsed: false,
+        codeGone: false,
       });
     }
-    expect(reads).toEqual(["/api/v1/w/acme/agents"]);
+    expect(reads).toEqual(["/api/v1/w/acme/agents/connection"]);
   });
 
-  it("says a code replaced or cleared away since was not used", async () => {
+  it("says a code replaced or cleared away since is gone, unused", async () => {
     vi.spyOn(api, "get").mockImplementation((path: string) =>
-      path.endsWith("/agents")
+      path.endsWith("/agents/connection")
         ? Promise.resolve({ agents: [{ user_id: "a1", listening: false }] })
         : Promise.reject(new ApiError(404, { code: "not_found", message: "connect code not found" })),
     );
@@ -269,6 +272,7 @@ describe("a tool's card in the app's Connect", () => {
       connected: false,
       listening: false,
       codeUsed: false,
+      codeGone: true,
     });
   });
 

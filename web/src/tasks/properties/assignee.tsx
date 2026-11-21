@@ -66,8 +66,8 @@ function AssigneeRow(panel: PanelProps) {
 
 /** How far an agent assignee is connected: whether what is written on the task reaches it. */
 function AgentConnection({ agent }: { agent: Member }) {
-  const connection = useConnection()(agent);
-  return connection ? <ConnectionMark connection={connection} /> : null;
+  const reach = useConnection()(agent);
+  return reach ? <ConnectionMark connection={reach.connection} /> : null;
 }
 
 function AssigneePill({ project, value, onChange }: CreateProps) {

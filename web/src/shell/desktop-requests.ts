@@ -109,23 +109,31 @@ async function carryOut(request: DesktopRequest): Promise<DesktopOutcome> {
 
 /**
  * How far an agent is connected, for a card in the app that asks every
- * couple of seconds while it waits: the server's reading of the agents is
- * shared and at most a few seconds old; a code is one row to read.
+ * couple of seconds while it waits: the server's cheap reading of the
+ * agents is shared and at most a few seconds old; a code is one row to
+ * read. A code that no longer exists, or ran out unused, is gone: the card
+ * offers a new one.
  */
 async function agentState(agent: string, code: string | undefined): Promise<DesktopOutcome> {
   const { slug } = getState();
-  const [connection, codeUsed] = await Promise.all([
+  const [connection, codeState] = await Promise.all([
     readConnection(agent),
-    // A code replaced since, or one that ran out and was cleared away, was not used.
+    // A code replaced since, or one that ran out and was cleared away, is gone, unused.
     code
       ? readConnectCode(slug, code).then(
-          (state) => state.used,
-          (err: unknown) => (isNotFound(err) ? false : Promise.reject(err)),
+          (state) => ({ used: state.used, gone: state.expired && !state.used }),
+          (err: unknown) => (isNotFound(err) ? { used: false, gone: true } : Promise.reject(err)),
         )
-      : false,
+      : { used: false, gone: false },
   ]);
   if (!connection) return refused(t("desktop.gone"));
-  return { ok: true, connected: connection !== "not_connected", listening: connection === "listening", codeUsed };
+  return {
+    ok: true,
+    connected: connection !== "not_connected",
+    listening: connection === "listening",
+    codeUsed: codeState.used,
+    codeGone: codeState.gone,
+  };
 }
 
 /** Makes the task or the page quick capture asked for, and says where it is. */

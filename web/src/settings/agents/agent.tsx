@@ -16,7 +16,7 @@ import {
 } from "@/settings/agents/agent-form";
 import { StateBadge } from "@/settings/agents/agents";
 import { type AgentMember } from "@/settings/agents/data";
-import { connectionOf, useAgentStates } from "@/data/listening";
+import { connectionOf, useAgentStates, useFreshStates } from "@/data/listening";
 import { ConnectionMark } from "@/ui/connection-mark";
 import { isFinishedHelper, useHelperLabel } from "@/settings/agents/helper-agents";
 import { AgentConnectCode } from "@/settings/agents/connect-code";
@@ -58,6 +58,7 @@ function AgentBody({ agent }: { agent: AgentMember }) {
   const admin = can.administer;
   const navigate = useNavigate();
   const states = useAgentStates();
+  const fresh = useFreshStates();
   const knownResponsible = agent.responsible_id ?? "";
   const [draft, setDraft] = useState<AgentDraft>(() => draftOf(agent, knownResponsible));
   const [ask, setAsk] = useState<"suspend" | "remove" | null>(null);
@@ -112,7 +113,7 @@ function AgentBody({ agent }: { agent: AgentMember }) {
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>@{agent.handle}</span>
           <StateBadge state={state} />
-          {state && <ConnectionMark connection={connectionOf(agent, state)} withText />}
+          {state && <ConnectionMark connection={connectionOf(agent, fresh(state))} withText />}
           {isFinishedHelper(agent) ? (
             <Badge>{t("agents.finished")}</Badge>
           ) : agent.suspended_at ? (

@@ -9,6 +9,7 @@ import { useLookupEvenIfGone, useSlug, useTaskByKeyEvenIfGone } from "@/data/sel
 import type { Member } from "@/types/core";
 import { useMembersByHandle } from "@/insights/members-by-handle";
 import type { AgentState } from "@/types/dashboard";
+import { useFreshStates } from "@/data/listening";
 import { AgentStateChip, isStranded, NotListening } from "@/insights/ui/agent-state";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
 import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helper-agents";
@@ -79,8 +80,11 @@ function Row({
   );
 }
 
-export function AgentsPanel({ agents: all, className }: { agents: AgentState[]; className?: string }) {
+export function AgentsPanel({ agents: dashboard, className }: { agents: AgentState[]; className?: string }) {
   const slug = useSlug();
+  // Whether each listens is read again while the panel shows it: a listener's lease ends without an event.
+  const fresh = useFreshStates();
+  const all = dashboard.map(fresh);
   // The server names the agents; one since removed is still found by id.
   const members = useLookupEvenIfGone("members");
   const byHandle = useMembersByHandle();

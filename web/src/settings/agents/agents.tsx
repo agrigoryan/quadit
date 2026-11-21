@@ -7,7 +7,7 @@ import { useCan } from "@/data/access";
 import { useLookupEvenIfGone, useMembers } from "@/data/selectors";
 import { CreateAgentDialog } from "@/settings/agents/agent-create";
 import { type AgentMember } from "@/settings/agents/data";
-import { connectionOf, useAgentStates } from "@/data/listening";
+import { connectionOf, useAgentStates, useFreshStates } from "@/data/listening";
 import type { AgentState } from "@/types/dashboard";
 import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helper-agents";
 import { useSettingsBase } from "@/settings/base";
@@ -42,6 +42,7 @@ export function AgentsPage() {
   // Names of who answers for an agent and who made a helper, a removed one included.
   const members = useLookupEvenIfGone("members");
   const states = useAgentStates();
+  const fresh = useFreshStates();
   const [creating, setCreating] = useState(false);
   const [showFinished, setShowFinished] = useState(false);
   const helperLabel = useHelperLabel();
@@ -115,7 +116,7 @@ export function AgentsPage() {
                       <When ms={a.last_seen_at} />
                     </span>
                   </span>
-                  {state && !done && <ConnectionMark connection={connectionOf(a, state)} withText="wide" />}
+                  {state && !done && <ConnectionMark connection={connectionOf(a, fresh(state))} withText="wide" />}
                   <ChevronRight className="size-4 shrink-0 text-ink-3" aria-hidden />
                 </button>
               );

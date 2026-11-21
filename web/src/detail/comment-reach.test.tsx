@@ -31,9 +31,9 @@ function load(agent: Member) {
   });
 }
 
-/** What GET /agents answers about @codex. */
-function agents(listening: boolean) {
-  vi.spyOn(api, "get").mockResolvedValue({ agents: [{ user_id: "a1", handle: "@codex", state: "idle", listening }] });
+/** What GET /agents/connection answers about @codex: whether it listens, and the tool of its last connect code. */
+function agents(listening: boolean, tool?: string) {
+  vi.spyOn(api, "get").mockResolvedValue({ agents: [{ user_id: "a1", handle: "@codex", listening, tool }] });
 }
 
 function show(task: Task) {
@@ -63,12 +63,20 @@ describe("the line under the comment box", () => {
   });
 
   it("says when an agent that is not listening will see it, and what to say in its tool", async () => {
-    agents(false);
+    agents(false, "Codex");
     show({ ...base, assignee_id: "u1", waiting_on_id: "a1" });
     expect(
       await screen.findByText(
         "@codex is not listening. It will see this when you next ask it: in Codex, say “check Quadit”.",
       ),
+    ).toBeTruthy();
+  });
+
+  it("names no tool for an agent whose tool is not known", async () => {
+    agents(false);
+    show({ ...base, assignee_id: "a1" });
+    expect(
+      await screen.findByText("@codex is not listening. It will see this when you next ask it to check Quadit."),
     ).toBeTruthy();
   });
 
