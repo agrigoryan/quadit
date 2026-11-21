@@ -27,7 +27,8 @@ export interface OpenCode {
  * from inside this tool, not from wherever else the agent worked. No answer
  * changes nothing (a closed window, a lost connection, an older server that
  * says nothing of agents): a waiting card is never made connected for want
- * of one. A code gone or run out is none. Without one (and for a tool an
+ * of one, and a connected one stays so, but whether it listens is not known
+ * until an answer comes again. A code gone or run out is none. Without one (and for a tool an
  * older version of the app connected) it is connected only when the server
  * says the agent is; else it waits for a new code. Only a connection through
  * the quadit command waits for a code: by MCP alone there is no command to
@@ -44,6 +45,8 @@ export function handshakeOf(
   if (!answer.ok || typeof answer.connected !== "boolean") {
     if (open) return { state: "waiting", code: open.code };
     if (before?.state === "waiting") return { state: "waiting", code: null };
+    // Proven once, it stays connected; whether it listens is only known from an answer.
+    if (before?.state === "connected") return { state: "connected", listening: null };
     return before ?? { state: "unknown" };
   }
   if (answer.codeUsed === true) return { state: "connected", listening: answer.listening === true };

@@ -34,10 +34,13 @@ describe("handshakeOf", () => {
     });
   });
 
-  it("without an open code, keeps what it knew when no answer comes, and knows nothing more when it knew nothing", () => {
+  it("without an open code, keeps what it knew when no answer comes, but not whether it listens, and knows nothing more when it knew nothing", () => {
     const none = { methods: ["cli" as const], code: null };
-    const connected = { state: "connected" as const, listening: false };
-    expect(handshakeOf(none, NO_ANSWER, NOW, connected)).toEqual(connected);
+    for (const listening of [true, false, null])
+      expect(handshakeOf(none, NO_ANSWER, NOW, { state: "connected", listening })).toEqual({
+        state: "connected",
+        listening: null,
+      });
     expect(handshakeOf(none, NO_ANSWER, NOW, { state: "waiting", code: null })).toEqual({
       state: "waiting",
       code: null,

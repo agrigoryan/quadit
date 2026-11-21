@@ -162,7 +162,8 @@ export interface ConnectView {
  *              none (gone, run out, or the tool was connected by an older
  *              version of the app), for which a new one is to be made;
  *              `refused` is why the last code asked for was not made;
- *   connected  the server says it proved it, and whether it listens now;
+ *   connected  the server says it proved it, and whether it listens now
+ *              (null: cannot tell right now, no answer came since);
  *   unknown    set up; whether it reached Quadit is not known here: the
  *              server has not answered yet, or the tool works as a login
  *              this server does not know (another server's), which the app
@@ -170,7 +171,7 @@ export interface ConnectView {
  */
 export type Handshake =
   | { state: "waiting"; code: string | null; refused?: string }
-  | { state: "connected"; listening: boolean }
+  | { state: "connected"; listening: boolean | null }
   | { state: "unknown" };
 
 /** The window Connect agents is laid over: its server, and the workspace its page shows (null: none yet, or signed out). */

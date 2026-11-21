@@ -355,8 +355,9 @@ export class ToolCard {
     return [lead, say, wait];
   }
 
-  /** Whether the connected tool's agent listens, and, when it does not, how to have it listen. */
-  private listening(listening: boolean): HTMLElement {
+  /** Whether the connected tool's agent listens, and, when it does not, how to have it listen; null: no answer to tell. */
+  private listening(listening: boolean | null): HTMLElement {
+    if (listening === null) return make("p", "Cannot tell right now whether it is listening.", "listen");
     if (!listening) return make("p", `Not listening: in ${this.tool.name}, say “listen to Quadit”`, "listen off");
     const line = make("p", "", "listen on");
     line.append(make("span", "", "found-dot"), document.createTextNode("Listening"));

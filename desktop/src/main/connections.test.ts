@@ -553,16 +553,20 @@ posixOnly("Connected is proven (desktop contract §11)", () => {
     expect(await connections.handshake("claude")).toEqual({ state: "waiting", code: "ABCDE3" });
   });
 
-  it("never turns a waiting tool connected when no page answers, and keeps what it knew of a connected one", async () => {
+  it("never turns a waiting tool connected when no page answers, and keeps a connected one connected, not listening for ever", async () => {
     const { connections, connect, choice, server } = setUp();
     await connect(choice("claude"));
     server.answersState = false;
     expect(await connections.handshake("claude")).toEqual({ state: "waiting", code: "ABCDE2" });
     server.answersState = true;
+    // Giving the code back is what connects the agent, on the server too.
     server.used.add("c1");
+    server.connected.add("u2");
     server.listening.add("u2");
     expect(await connections.handshake("claude")).toEqual({ state: "connected", listening: true });
     server.answersState = false;
+    expect(await connections.handshake("claude")).toEqual({ state: "connected", listening: null });
+    server.answersState = true;
     expect(await connections.handshake("claude")).toEqual({ state: "connected", listening: true });
     expect(await connections.handshake("codex")).toBeNull();
     expect(await connections.newCode("codex")).toEqual({ ok: false, error: "Codex is not connected." });
