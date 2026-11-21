@@ -14,9 +14,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import type { Page } from "@playwright/test";
-import { type Desktop, expect, test } from "./desktop";
-
-const SCREENS = join(__dirname, "../../onboarding-screens");
+import { type Desktop, expect, SCREENS, test } from "./desktop";
 
 test.skip(process.platform !== "darwin", "only macOS has a window without a title bar");
 

@@ -15,6 +15,19 @@ export { expect } from "@playwright/test";
 
 const APP_DIR = join(__dirname, "../..");
 
+/**
+ * Where the suite saves the pictures the owner sees before a build, outside
+ * test-results (which Playwright empties at every run); desktop-ci keeps the
+ * folder on every run as the artifact desktop-onboarding-screens.
+ */
+export const SCREENS = join(__dirname, "../../onboarding-screens");
+
+/** Saves what `page` shows as `name` in SCREENS, as it is meant to look once a card or a sheet has finished fading in. */
+export async function screen(page: Page, name: string) {
+  mkdirSync(SCREENS, { recursive: true });
+  await page.screenshot({ path: join(SCREENS, name), animations: "disabled" });
+}
+
 /** The app's own version (package.json), which its pages are told through the bridge. */
 export const APP_VERSION: string = JSON.parse(readFileSync(join(APP_DIR, "package.json"), "utf8")).version;
 
@@ -211,6 +224,29 @@ export class Desktop {
           .find((w) => w.webContents.getURL().startsWith(wanted))
           ?.isVisible(),
       origin,
+    );
+  }
+
+  /** The addresses of the app's own pages laid over the window of the server at `origin` (the sign-in bar, Connect agents…), shown or not. */
+  async overlays(origin: string): Promise<string[]> {
+    return this.app.evaluate(({ BrowserWindow, WebContentsView }, wanted) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().startsWith(wanted));
+      return (win?.contentView.children ?? []).flatMap((view) =>
+        view instanceof WebContentsView ? [view.webContents.getURL()] : [],
+      );
+    }, origin);
+  }
+
+  /** Sets the size of the window of the server at `origin`, and gives its content's height. */
+  async resize(origin: string, width: number, height: number): Promise<number> {
+    return this.app.evaluate(
+      ({ BrowserWindow }, { wanted, width, height }) => {
+        const win = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().startsWith(wanted));
+        if (!win) throw new Error(`no window of ${wanted}`);
+        win.setSize(width, height);
+        return win.getContentBounds().height;
+      },
+      { wanted: origin, width, height },
     );
   }
 

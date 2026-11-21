@@ -4,24 +4,12 @@
 // changes, Connected and Undo), Continue, and the workspace on its sample
 // tasks; or no tool found; or "Connect to a server instead", as far as it
 // goes without a browser. Every state is saved as a picture in
-// onboarding-screens/ (outside test-results, which Playwright empties at
-// every run), in the order a person sees them; desktop-ci keeps the folder
-// on every run as the artifact desktop-onboarding-screens.
+// onboarding-screens/ (desktop.ts, SCREENS), in the order a person sees them.
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Page } from "@playwright/test";
-import { Desktop, expect, fakeComputer, slowToStart, test } from "./desktop";
-
-const SCREENS = join(__dirname, "../../onboarding-screens");
-
-/** Saves what `page` shows as `name` in the screens folder. The first run's page fills its window. */
-async function screen(page: Page, name: string) {
-  mkdirSync(SCREENS, { recursive: true });
-  // Capture the intended state even when a card or the files sheet has just started fading in.
-  await page.screenshot({ path: join(SCREENS, name), animations: "disabled" });
-}
+import { Desktop, expect, fakeComputer, screen, slowToStart, test } from "./desktop";
 
 /** The note the web app shows over the "Getting started" project's task list while its samples are there. */
 const SAMPLES_NOTE = "Three sample tasks to try Quadit with.";
@@ -98,14 +86,16 @@ test("the first run sets Quadit up on this computer in one window, connects the 
     await sheet.getByRole("button", { name: "Close" }).first().click();
     await expect(sheet).toBeHidden();
 
-    // Connected, with nothing asked: the command and its skill, as an agent of the tool's own name.
+    // Set up with nothing asked (the command and its skill, as an agent of the tool's own name), waiting for the tool
+    // to give its code back (desktop contract §11).
     await card.getByRole("button", { name: "Connect Claude Code" }).click();
-    await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 20_000 });
-    await expect(card.getByText("Try it:")).toBeVisible();
+    await expect(card.getByText("Set up on this Mac. Now open Claude Code and say:")).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByText(/^Connect to Quadit \S{6}$/)).toBeVisible();
+    await expect(card.getByText("Waiting for Claude Code…")).toBeVisible();
     await expect(first.getByText("Joined just now")).toBeVisible();
     await expect(first.getByText("Connect more later from the Agents page.")).toBeVisible();
     await expect(first.getByRole("button", { name: "Skip for now" })).toBeHidden();
-    await screen(first, "07-connected.png");
+    await screen(first, "07-set-up-waiting.png");
     expect(existsSync(skill)).toBe(true);
     const settings = JSON.parse(readFileSync(join(computer.home, ".claude", "settings.json"), "utf8")) as {
       env?: { QUADIT_CONFIG?: string };
@@ -123,9 +113,9 @@ test("the first run sets Quadit up on this computer in one window, connects the 
     expect(existsSync(skill)).toBe(false);
     expect(ledger().harnesses).toEqual({});
     await card.getByRole("button", { name: "Connect Claude Code" }).click();
-    await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByText(/^Connect to Quadit \S{6}$/)).toBeVisible({ timeout: 20_000 });
 
-    // Continue (Enter): the sample tasks, the third Claude Code's, and the first run goes, leaving the workspace.
+    // Continue (Enter), which never waits for the tool to give its code back: the sample tasks, the third Claude Code's, and the first run goes, leaving the workspace.
     await first.keyboard.press("Enter");
     await expect.poll(() => desktop.firstRunShown(), { timeout: 20_000 }).toBe(false);
     await expect(page.getByText(SAMPLES_NOTE)).toBeVisible({ timeout: 20_000 });
@@ -134,7 +124,7 @@ test("the first run sets Quadit up on this computer in one window, connects the 
     await screen(page, "08-workspace.png");
     // Never another window: the one it began in.
     expect(await desktop.shownWindows()).toEqual([windowId]);
-    // The Connect window does not open by itself.
+    // Connect agents does not open by itself.
     expect(desktop.app.windows().some((p) => p.url().includes("/connect.html"))).toBe(false);
   } finally {
     await desktop.close();
