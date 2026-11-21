@@ -55,6 +55,7 @@ func (s *Server) allRoutes() []route {
 		s.pictureRoutes(),        // picture.go
 		s.exportRoutes(),         // export.go
 		s.importRoutes(),         // importing.go
+		s.sampleRoutes(),         // samples.go
 		s.webhookRoutes(),        // dispatch.go
 		s.githubRoutes(),         // github.go
 		s.secretRoutes(),         // secrets.go

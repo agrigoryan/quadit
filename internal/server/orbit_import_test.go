@@ -155,8 +155,8 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 			}
 			Labels []struct{ Name, Color string }
 		}
-		s.call(t, s.owner, "", "GET", w+"/list/statuses", nil, 200, &lay)
-		s.call(t, s.owner, "", "GET", w+"/list/labels", nil, 200, &lay)
+		s.call(t, s.owner, "", "GET", w+"/list/statuses?project=SVA", nil, 200, &lay)
+		s.call(t, s.owner, "", "GET", w+"/list/labels?project=SVA", nil, 200, &lay)
 		sort.Slice(lay.Statuses, func(i, j int) bool { return lay.Statuses[i].Rank < lay.Statuses[j].Rank })
 		all, starts := "", ""
 		for _, st := range lay.Statuses {

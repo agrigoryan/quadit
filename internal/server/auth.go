@@ -246,7 +246,8 @@ func (s *Server) setUpWithPassword(ctx context.Context, b setupBody) (core.Works
 	if err := auth.CheckPasswordRules(b.Password); err != nil {
 		return ws, owner, &engine.Error{Code: engine.CodeInvalid, Field: "password", Message: err.Error()}
 	}
-	ws, owner, err := s.eng.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: b.Name, OwnerEmail: b.Email, WorkspaceSlug: b.WorkspaceSlug, WorkspaceName: b.WorkspaceName})
+	ws, owner, err := s.eng.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: b.Name, OwnerEmail: b.Email, WorkspaceSlug: b.WorkspaceSlug, WorkspaceName: b.WorkspaceName,
+		Samples: true})
 	if err != nil {
 		return ws, owner, err
 	}

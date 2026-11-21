@@ -4,6 +4,7 @@ api DELETE /api/v1/auth/passkeys/{id}
 api DELETE /api/v1/auth/sessions/{id}
 api DELETE /api/v1/push/subscriptions
 api DELETE /api/v1/w/{workspace}/invites/{id}
+api DELETE /api/v1/w/{workspace}/samples
 api DELETE /api/v1/w/{workspace}/tokens/{id}
 api GET /.well-known/oauth-authorization-server
 api GET /.well-known/oauth-protected-resource
@@ -109,6 +110,7 @@ api POST /api/v1/w/{workspace}/import
 api POST /api/v1/w/{workspace}/integrations/{id}/sync
 api POST /api/v1/w/{workspace}/invites
 api POST /api/v1/w/{workspace}/memory
+api POST /api/v1/w/{workspace}/samples
 api POST /api/v1/w/{workspace}/secrets/env
 api POST /api/v1/w/{workspace}/secrets/{name}/request
 api POST /api/v1/w/{workspace}/sources/{id}/sync
@@ -489,6 +491,9 @@ change rule.update arg active
 change rule.update arg id
 change rule.update arg match
 change rule.update arg name
+change samples.add
+change samples.add arg agent
+change samples.remove
 change secret.delete
 change secret.delete arg id
 change secret.send

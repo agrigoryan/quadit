@@ -255,27 +255,30 @@ func TestTheFormStillSetsUpWithAnEmail(t *testing.T) {
 	})
 }
 
-// TestTheAppsSetUpIsOneWrite: the owner, the workspace, the local owner and
-// daily backups are written together or not at all, and the session comes
-// after. A set-up whose settings cannot be written leaves the install as it
-// was, not set up, and trying again sets it up.
+// TestTheAppsSetUpIsOneWrite: the owner, the workspace, its sample tasks,
+// the local owner and daily backups are written together or not at all,
+// and the session comes after. A set-up whose settings or samples cannot be
+// written leaves the install as it was, not set up, and trying again sets
+// it up.
 func TestTheAppsSetUpIsOneWrite(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, plain store.Store) {
 		st := newFaultyStore(plain)
 		s := startSite(t, st, nil, func(cfg *server.Config) { cfg.AppKey = appKey })
 		body := M{"name": "Aram", "workspace_name": "Personal"}
 
-		st.faults.set("upsert settings")
 		app := theApp(appKey, "")
-		s.call(t, app, "", "POST", "/api/v1/auth/setup", body, 500, nil)
-		var options signInOptions
-		s.call(t, nil, "", "GET", "/api/v1/auth/config", nil, 200, &options)
-		if !options.SetupNeeded {
-			t.Fatal("a set-up that failed left the install set up")
+		for _, fault := range []string{"upsert settings", "insert tasks"} {
+			st.faults.set(fault)
+			s.call(t, app, "", "POST", "/api/v1/auth/setup", body, 500, nil)
+			var options signInOptions
+			s.call(t, nil, "", "GET", "/api/v1/auth/config", nil, 200, &options)
+			if !options.SetupNeeded {
+				t.Fatalf("a set-up that failed to %s left the install set up", fault)
+			}
+			s.call(t, app, "", "GET", "/api/v1/auth/me", nil, 401, nil)
+			st.faults.clear()
 		}
-		s.call(t, app, "", "GET", "/api/v1/auth/me", nil, 401, nil)
 
-		st.faults.clear()
 		s.call(t, app, "", "POST", "/api/v1/auth/setup", body, 201, nil)
 		s.call(t, theApp(appKey, ""), "", "POST", "/api/v1/auth/app-session", nil, 204, nil)
 	})

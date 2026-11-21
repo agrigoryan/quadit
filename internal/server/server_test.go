@@ -59,9 +59,19 @@ func newSiteWith(t *testing.T, st store.Store, configure func(*server.Config)) *
 func newSiteOf(t *testing.T, st store.Store, files blob.Store, configure func(*server.Config)) *site {
 	t.Helper()
 	s := startSite(t, st, files, configure)
+	s.setUp(t)
+	// The tests start from a workspace with nothing of their own in it: the
+	// sample tasks the set-up made go to the trash (samples_test.go has them).
+	s.call(t, s.owner, "", "DELETE", w+"/samples", nil, 204, nil)
+	return s
+}
+
+// setUp sets the install up with the form, as Aram, owner@example.com, with
+// the workspace Games, and signs s.owner in.
+func (s *site) setUp(t *testing.T) {
+	t.Helper()
 	s.call(t, s.owner, "", "POST", "/api/v1/auth/setup", map[string]any{"name": "Aram", "email": "owner@example.com",
 		"password": "correct-horse-battery", "workspace_name": "Games"}, 201, nil)
-	return s
 }
 
 // startSite is newSiteOf before the install is set up: s.owner is a
