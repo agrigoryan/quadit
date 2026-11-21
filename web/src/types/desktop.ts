@@ -59,8 +59,8 @@ export type DesktopRequest =
   /** Revokes a token, by its id. */
   | { kind: "revoke-token"; token: string }
   /**
-   * The sample tasks: their task list's path comes back. The set-up made them;
-   * `agent` (an agent's user id) is given the third while it has nobody.
+   * Where the sample tasks are: their task list's path, or the workspace's own when it has none (they are never
+   * made here). `agent` (an agent's user id) is given the third while it has nobody.
    */
   | { kind: "samples"; agent?: string };
 

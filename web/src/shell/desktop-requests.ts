@@ -17,7 +17,7 @@ import { taskPath } from "@/nav/task-link";
 import { reading, replyPlace } from "@/pages/inbox-actions";
 import { type CreatedToken, tokensChanged } from "@/settings/ui/tokens";
 import { createTask } from "@/tasks/actions";
-import { addSamples, samplesPath } from "@/tasks/samples";
+import { getSamplesProject, samplesPath } from "@/tasks/samples";
 import type { Changes } from "@/types/changes.gen";
 import type { Decision, DecisionOption, Notification } from "@/types/core";
 import type { DesktopAction, DesktopNotification, DesktopOutcome, DesktopRequest } from "@/types/desktop";
@@ -93,7 +93,7 @@ async function carryOut(request: DesktopRequest): Promise<DesktopOutcome> {
       void tokensChanged(slug);
       return { ok: true };
     case "samples":
-      return { ok: true, path: samplesPath(slug, await addSamples(request.agent)) };
+      return samplesForTheApp(request.agent);
   }
 }
 
@@ -117,6 +117,28 @@ async function capture({
   if (project) args.project = project.id;
   await mutate({ type: "doc.create", args }, undefined, { quiet: true });
   return { ok: true, path: docPath(slug, id, project) };
+}
+
+/**
+ * Says where the sample tasks are, giving the third to `agent` (an agent's
+ * user id) while it has nobody. It never makes them: an install the app
+ * opens again has had its own start already, and without samples the
+ * workspace itself is where to go.
+ */
+async function samplesForTheApp(agent: string | undefined): Promise<DesktopOutcome> {
+  const { slug } = getState();
+  const here = getSamplesProject();
+  if (!here) return { ok: true, path: `/${slug}` };
+  const { third } = here.left;
+  if (agent && third && !third.assignee_id) {
+    if (getRow("members", agent)?.kind !== "agent") return refused(t("desktop.gone"));
+    await mutate(
+      { type: "task.update", args: { id: third.id, assignee: agent } },
+      (tx) => tx.patch("tasks", third.id, { assignee_id: agent }),
+      { quiet: true },
+    );
+  }
+  return { ok: true, path: samplesPath(slug, here.project) };
 }
 
 /** Carries out a button the page handed the app (pickAction, readAction, replyBox). */

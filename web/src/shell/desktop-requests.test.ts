@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
-import { clearStore, getState, loadBootstrap } from "@/data/store";
+import { clearStore, getState, loadBootstrap, patchRow } from "@/data/store";
 import { clearUndo } from "@/data/undo";
 import { answer } from "@/shell/desktop-requests";
 import type { Member, User, Workspace } from "@/types/core";
@@ -29,7 +29,6 @@ beforeEach(() => {
       return Promise.resolve({ results: batch.map((c) => ({ key: c.type === "task.create" ? "SVA-9" : undefined })) });
     }
     posts.push({ path, body });
-    if (path.endsWith("/samples")) return Promise.resolve({ project: { id: "gs", key: "GS", samples: ["t2"] } });
     return Promise.resolve({ token: "qd_secret", info: { id: "tok1", name: "Claude Code on mac" } });
   });
   vi.spyOn(api, "del").mockResolvedValue({ ok: true });
@@ -46,10 +45,15 @@ beforeEach(() => {
     ] as Member[],
     projects: [
       { id: "p1", key: "SVA", name: "Samurai", rank: "a" },
-      { id: "gs", key: "GS", name: "Getting started", rank: "b", samples: ["t2"] },
+      { id: "gs", key: "GS", name: "Getting started", rank: "b", samples: ["g1", "g2", "g3"] },
     ],
     statuses: [{ id: "s1", project_id: "p1", name: "Todo", category: "unstarted", is_default: true, rank: "a" }],
-    tasks: [{ id: "t1", key: "SVA-5", title: "Jump feels floaty", project_id: "p1" }],
+    tasks: [
+      { id: "t1", key: "SVA-5", title: "Jump feels floaty", project_id: "p1" },
+      { id: "g1", key: "GS-1", title: "Open this task", project_id: "gs", assignee_id: "u1" },
+      { id: "g2", key: "GS-2", title: "Write a page", project_id: "gs", assignee_id: "u1" },
+      { id: "g3", key: "GS-3", title: "Say hello", project_id: "gs" },
+    ],
     decisions: [
       {
         id: "d1",
@@ -170,13 +174,29 @@ describe("Connect", () => {
 });
 
 describe("the end of the app's first run", () => {
-  it("hands the sample tasks to the agent connected, and says where they are", async () => {
+  it("gives the third sample to the agent connected, and says where the samples are", async () => {
     expect(await answer({ kind: "samples", agent: "a1" })).toEqual({ ok: true, path: "/acme/p/GS/tasks" });
-    expect(posts).toEqual([{ path: "/api/v1/w/acme/samples", body: { agent: "a1" } }]);
+    expect(sent()).toEqual([{ type: "task.update", args: { id: "g3", assignee: "a1" } }]);
+    expect(posts).toEqual([]);
   });
 
-  it("only asks where they are when no agent was connected", async () => {
+  it("only says where they are when no agent was connected, or the third has someone", async () => {
     expect(await answer({ kind: "samples" })).toEqual({ ok: true, path: "/acme/p/GS/tasks" });
-    expect(posts).toEqual([{ path: "/api/v1/w/acme/samples", body: {} }]);
+    patchRow("tasks", "g3", { assignee_id: "u1" });
+    expect(await answer({ kind: "samples", agent: "a1" })).toEqual({ ok: true, path: "/acme/p/GS/tasks" });
+    expect(sent()).toEqual([]);
+    expect(posts).toEqual([]);
+  });
+
+  it("makes no samples where there are none, and opens the workspace", async () => {
+    for (const id of ["g1", "g2", "g3"]) patchRow("tasks", id, { deleted_at: 9 });
+    expect(await answer({ kind: "samples", agent: "a1" })).toEqual({ ok: true, path: "/acme" });
+    expect(sent()).toEqual([]);
+    expect(posts).toEqual([]);
+  });
+
+  it("gives the third sample to an agent only", async () => {
+    expect(await answer({ kind: "samples", agent: "u1" })).toMatchObject({ ok: false });
+    expect(sent()).toEqual([]);
   });
 });
