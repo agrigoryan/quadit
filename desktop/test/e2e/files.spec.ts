@@ -41,4 +41,9 @@ test("an image pasted into the comment box comes along with the comment", async 
     box.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
   });
   await expect(page.getByRole("button", { name: "Remove screenshot.png" })).toBeVisible();
+  // Sent, the comment carries it: Send waits for the image's upload. The test ends only then: while an upload is
+  // under way the page holds on to itself (beforeunload, web/src/data/files.ts), and the app does not quit.
+  await comment.fill("Here it is");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect.poll(async () => await quadit(run, ["--json", "show", key])).toContain("screenshot.png");
 });

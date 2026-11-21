@@ -193,8 +193,9 @@ test("a card set up from the Agents page turns Connected when the agent gives it
     await expect(card.getByText(/Not listening/)).toBeHidden();
     await screen(connect, "14-connect-listening.png");
 
-    // Escape goes back to the Agents page that was there.
-    await connect.keyboard.press("Escape");
+    // Escape goes back to the Agents page that was there. Its key down takes the page away, so the key is only
+    // pressed down: the key up that press would send after it would find the page gone.
+    await connect.keyboard.down("Escape");
     await expect.poll(() => desktop.overlays(run.server)).not.toContainEqual(CONNECT);
     await expect(page).toHaveURL(/\/e2e\/agents/);
 
