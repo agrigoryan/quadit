@@ -1,7 +1,8 @@
 // The listener's commands: listen, the companion that runs a command for
 // each inbox item, and wait, which an agent in a chat runs to be handed the
-// next one. Both deliver from the cursor "listen", and the server lets one
-// session at a time hold its lease.
+// next one. Both read through GET /listen, which lets one session at a time
+// hold the agent's listener lease, and move the cursor only by
+// acknowledging an item with it.
 
 package cli
 
@@ -12,25 +13,29 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // listen is the companion: it holds a request open on the caller's inbox
 // and runs a command for each item, so an agent with nothing running can
-// still be woken. The item is passed in QUADIT_EVENT and on stdin.
+// still be woken. The item is passed in QUADIT_EVENT and on stdin, as the
+// feed writes it.
 //
 // Delivery is at least once. The cursor is moved past an item only after
 // its command ran and exited with 0; an item whose secrets could not be
 // had or whose command failed is tried again, after a pause that grows,
 // and the items after it wait for it. So a command may see an item again
-// (after a crash, or a failure after it did part of its work) and must be
-// safe to run twice; `quadit ack SEQ NAME` moves the cursor past an item
-// that should not be tried again.
+// (after a crash, a failure after it did part of its work, or a command
+// that ran past the lease) and must be safe to run twice; the command
+// listen prints beside a failure moves the cursor past an item that should
+// not be tried again.
 //
-// On the cursor "listen" it holds the listener's lease, and stops when
+// It holds the agent's listener lease, whatever its cursor, and stops when
 // another session holds it or takes it over.
 func (r *runner) listen(in input) error {
 	command, secrets, cursor := listenArgs(in.rest)
@@ -46,13 +51,7 @@ func (r *runner) listen(in input) error {
 	readPause, itemPause := firstPause, firstPause
 	lease := ""
 	for {
-		// One item at a time, so the page's position is that item's and
-		// acknowledging it passes over nothing that was not handled.
-		q := url.Values{"cursor": {cursor}, "inbox": {"1"}, "wait": {"50"}, "limit": {"1"}, "types": {"notification.created"}, "compact": {"1"}}
-		if lease != "" {
-			q.Set("lease", lease)
-		}
-		raw, err := r.c.JSON(r.ctx, "/events", q)
+		page, err := r.nextItem(cursor, lease, false, waitHold)
 		if err != nil {
 			if r.ctx.Err() != nil {
 				return r.ctx.Err()
@@ -68,34 +67,24 @@ func (r *runner) listen(in input) error {
 			continue
 		}
 		readPause = firstPause
-		var page struct {
-			Events []string `json:"events"`
-			Seq    int64    `json:"seq"`
-			Lease  string   `json:"lease"`
-		}
-		if err := json.Unmarshal(raw, &page); err != nil {
-			return err
-		}
 		lease = page.Lease
-		if len(page.Events) > 0 {
-			line := page.Events[0]
-			fmt.Fprintln(r.out, line)
-			if err := r.wake(command, secrets, line); err != nil {
-				if r.ctx.Err() != nil {
-					return r.ctx.Err()
-				}
-				fmt.Fprintf(r.out, "not handled, trying it again in %s: %v\n", itemPause, err)
-				fmt.Fprintf(r.out, "  to give up on it: %s\n", giveUp(cursor, page.Seq, lease))
-				if err := pause(r.ctx, itemPause); err != nil {
-					return err
-				}
-				itemPause = min(itemPause*2, maxItemPause)
-				continue
-			}
-			itemPause = firstPause
+		if page.Item == nil {
+			continue
 		}
-		// A page with no item still moves the cursor, past events that
-		// were not for this inbox, so the next read starts later.
+		fmt.Fprintln(r.out, page.Line)
+		if err := r.wake(command, secrets, page.Line); err != nil {
+			if r.ctx.Err() != nil {
+				return r.ctx.Err()
+			}
+			fmt.Fprintf(r.out, "not handled, trying it again in %s: %v\n", itemPause, err)
+			fmt.Fprintf(r.out, "  to give up on it: %s\n", giveUp(cursor, page.Seq, lease))
+			if err := pause(r.ctx, itemPause); err != nil {
+				return err
+			}
+			itemPause = min(itemPause*2, maxItemPause)
+			continue
+		}
+		itemPause = firstPause
 		if _, err := r.setCursor(cursor, page.Seq, lease); err != nil {
 			if r.ctx.Err() != nil {
 				return r.ctx.Err()
@@ -103,7 +92,7 @@ func (r *runner) listen(in input) error {
 			if lostTheLease(err) {
 				return err
 			}
-			fmt.Fprintln(r.out, "ack failed, the item may come again:", err)
+			fmt.Fprintln(r.out, "ack failed, the item will come again:", err)
 		}
 	}
 }
@@ -163,25 +152,35 @@ func (r *runner) wake(command, secrets []string, line string) error {
 }
 
 // giveUp is the command that moves the cursor past an item that should not
-// be tried again, with the lease the cursor "listen" is moved with.
+// be tried again, with the listener's lease.
 func giveUp(cursor string, seq int64, lease string) string {
-	command := fmt.Sprintf("quadit ack %d %s", seq, cursor)
-	if lease != "" {
-		command += " lease=" + lease
-	}
-	return command
+	return fmt.Sprintf("quadit ack %d %s lease=%s", seq, cursor, lease)
 }
 
-// lostTheLease reports whether the server refused a session the cursor
-// "listen" because another session holds its lease.
+// lostTheLease reports whether the server refused this session the
+// listener because another session holds its lease or took it over. A
+// lease that only ran out is not lost: the next wait takes it again.
 func lostTheLease(err error) bool {
 	var ae *APIError
 	return errors.As(err, &ae) && (ae.Reason == "listening_elsewhere" || ae.Reason == "lease_stale")
 }
 
 // waitHold is the longest the server holds one wait; a longer wait is
-// several, each renewing the lease.
-const waitHold = 50 * time.Second
+// several, each renewing the lease. A request may take holdSlack more than
+// its hold before it is given up.
+const (
+	waitHold  = 50 * time.Second
+	holdSlack = 10 * time.Second
+)
+
+// listened is one answer of GET /listen: the lease, and the item with its
+// feed position and its line in the feed, when one came.
+type listened struct {
+	Lease string      `json:"lease"`
+	Seq   int64       `json:"seq"`
+	Item  *listenItem `json:"item"`
+	Line  string      `json:"line"`
+}
 
 // listenItem is an inbox item as GET /listen answers it.
 type listenItem struct {
@@ -193,6 +192,30 @@ type listenItem struct {
 	Snippet string `json:"snippet"`
 	Page    string `json:"page"`
 	Thread  string `json:"thread"`
+}
+
+// nextItem asks for the next item on cursor, holding lease (or taking one,
+// from another session with take) for up to hold. The request is given up
+// a little after its hold, whatever the client's own time limit.
+func (r *runner) nextItem(cursor, lease string, take bool, hold time.Duration) (listened, error) {
+	q := url.Values{"wait": {strconv.Itoa(max(int(hold.Round(time.Second).Seconds()), 1))}}
+	if cursor != "listen" {
+		q.Set("cursor", cursor)
+	}
+	if lease != "" {
+		q.Set("lease", lease)
+	}
+	if take {
+		q.Set("take", "1")
+	}
+	ctx, cancel := context.WithTimeout(r.ctx, hold+holdSlack)
+	defer cancel()
+	var page listened
+	raw, err := r.c.JSON(ctx, "/listen", q)
+	if err != nil {
+		return page, err
+	}
+	return page, json.Unmarshal(raw, &page)
 }
 
 // wait blocks until the caller's next inbox item, for= seconds at most (50
@@ -224,18 +247,15 @@ type waitSpan struct{ total, hold time.Duration }
 // waitFor is wait, once its arguments are read: it holds lease (or takes
 // one, from another session with take) for span, and prints the record;
 // goOn is the command that waits again, without its lease.
+//
+// What it prints is run by an agent as written, so nothing the server sent
+// goes into it unless it has the form quadit gives it: a lease id, a task
+// key, a page id, a handle. The item's words are shown in quotes, without
+// what could end them or start a line.
 func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) error {
 	deadline := time.Now().Add(span.total)
 	for {
-		hold := min(span.hold, time.Until(deadline)).Round(time.Second)
-		q := url.Values{"wait": {strconv.Itoa(max(int(hold.Seconds()), 1))}}
-		if lease != "" {
-			q.Set("lease", lease)
-		}
-		if take {
-			q.Set("take", "1")
-		}
-		raw, err := r.c.JSON(r.ctx, "/listen", q)
+		page, err := r.nextItem("listen", lease, take, min(span.hold, time.Until(deadline)))
 		if err != nil {
 			var ae *APIError
 			if errors.As(err, &ae) && ae.Reason == "listening_elsewhere" {
@@ -243,18 +263,18 @@ func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) er
 			}
 			return err
 		}
-		var page struct {
-			Lease string      `json:"lease"`
-			Item  *listenItem `json:"item"`
-		}
-		if err := json.Unmarshal(raw, &page); err != nil {
-			return err
+		if !leaseForm.MatchString(page.Lease) {
+			return errors.New("the server sent a lease id quadit does not recognise, so nothing is printed to run")
 		}
 		lease, take = page.Lease, false
 		next := fmt.Sprintf("%s lease=%s", goOn, lease)
 		if item := page.Item; item != nil {
+			reading, err := item.reading()
+			if err != nil {
+				return err
+			}
 			fmt.Fprintln(r.out, item.line())
-			fmt.Fprintf(r.out, "%s   # read it\n", item.reading())
+			fmt.Fprintf(r.out, "%s   # read it\n", reading)
 			fmt.Fprintf(r.out, "quadit ack %d listen lease=%s   # once it is handled\n", item.Seq, lease)
 			fmt.Fprintf(r.out, "%s   # then go on listening\n", next)
 			return nil
@@ -267,33 +287,69 @@ func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) er
 	}
 }
 
+// The forms of what the server sends that wait puts into a command or the
+// item's line: a lease id (the server's alphabet without look-alikes), a
+// task key, a page id, a handle, a kind of item.
+var (
+	leaseForm  = regexp.MustCompile(`^[A-HJKMNP-Z2-9]{8}$`)
+	taskForm   = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,9}-[0-9]{1,9}$`)
+	pageForm   = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	handleForm = regexp.MustCompile(`^@[a-z0-9_-]{2,32}$`)
+	kindForm   = regexp.MustCompile(`^[a-z_]{1,32}$`)
+)
+
 // line is the item on one line: ITEM #SEQ KIND TASK-OR-PAGE from @WHO: "…".
+// A part not of its form is left out; the words are at most 200
+// characters, without control characters, and their double quotes made
+// single.
 func (item listenItem) line() string {
-	where := item.Task
-	if where == "" && item.Page != "" {
-		where = "page " + item.Page
+	parts := []string{"ITEM", "#" + strconv.FormatInt(item.Seq, 10)}
+	if kindForm.MatchString(item.Type) {
+		parts = append(parts, item.Type)
+	}
+	switch {
+	case taskForm.MatchString(item.Task):
+		parts = append(parts, item.Task)
+	case pageForm.MatchString(item.Page):
+		parts = append(parts, "page "+item.Page)
+	}
+	if handleForm.MatchString(item.By) {
+		parts = append(parts, "from "+item.By)
 	}
 	text := item.Snippet
 	if text == "" {
 		text = item.Title
 	}
-	if runes := []rune(strings.Join(strings.Fields(text), " ")); len(runes) > 200 {
-		text = string(runes[:200])
-	} else {
-		text = string(runes)
-	}
-	return strings.Join(strings.Fields(fmt.Sprintf("ITEM #%d %s %s from %s:", item.Seq, item.Type, where, item.By)), " ") + " " + strconv.Quote(text)
+	text = strings.Map(func(r rune) rune {
+		switch {
+		case r == '"':
+			return '\''
+		case unicode.IsControl(r) || unicode.Is(unicode.Zl, r) || unicode.Is(unicode.Zp, r):
+			return ' '
+		}
+		return r
+	}, text)
+	runes := []rune(strings.Join(strings.Fields(text), " "))
+	return strings.Join(parts, " ") + `: "` + string(runes[:min(len(runes), 200)]) + `"`
 }
 
-// reading is the command that reads what the item is about.
-func (item listenItem) reading() string {
+// reading is the command that reads what the item is about; it refuses an
+// item whose task or page is not of the form quadit gives them.
+func (item listenItem) reading() (string, error) {
 	switch {
 	case item.Task != "":
-		return "quadit show " + item.Task
-	case item.Page != "" && item.Thread != "":
-		return "quadit comments " + item.Page
+		if !taskForm.MatchString(item.Task) {
+			return "", fmt.Errorf("the server sent a task key quadit does not recognise (%q), so nothing is printed to run", item.Task)
+		}
+		return "quadit show " + item.Task, nil
 	case item.Page != "":
-		return "quadit doc " + item.Page
+		if !pageForm.MatchString(item.Page) {
+			return "", fmt.Errorf("the server sent a page id quadit does not recognise (%q), so nothing is printed to run", item.Page)
+		}
+		if item.Thread != "" {
+			return "quadit comments " + item.Page, nil
+		}
+		return "quadit doc " + item.Page, nil
 	}
-	return "quadit inbox"
+	return "quadit inbox", nil
 }

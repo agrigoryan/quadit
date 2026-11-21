@@ -34,7 +34,9 @@ func (r *runner) connect(in input) error {
 		fmt.Fprintf(r.out, "You are %s in %s. A code from the person proves the connection: quadit connect CODE\n", me.Handle, me.Workspace.Name)
 		return nil
 	}
-	raw, err := r.send(http.MethodPost, "/connect", nil, map[string]string{"code": strings.Join(in.pos, "")}, "application/json")
+	// As a person may have said it: in lower case, with spaces or a dash.
+	code := strings.ToUpper(strings.NewReplacer(" ", "", "-", "").Replace(strings.Join(in.pos, "")))
+	raw, err := r.send(http.MethodPost, "/connect", nil, map[string]string{"code": code}, "application/json")
 	if err != nil {
 		return err
 	}
