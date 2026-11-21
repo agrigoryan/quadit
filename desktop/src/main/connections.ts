@@ -28,7 +28,9 @@
 // (asked of the workspace's page, kept in the ledger so that its line can be
 // shown again), which the agent gives back from inside the tool to prove the
 // connection; where it stands is asked of the page again whenever the
-// person's page wants it (handshake.ts).
+// person's page wants it (handshake.ts). A server is only ever asked about
+// an agent of its own: a tool that works as a login of another server (the
+// computer's default one) has no code and is never asked about.
 
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -52,7 +54,7 @@ import {
 import { handshakeOf, type OpenCode } from "@/main/handshake";
 import { HARNESSES, type Harness } from "@/main/harnesses";
 import type { QuaditCli } from "@/main/quadit-cli";
-import type { DesktopOutcome, DesktopRequest, DesktopSummary } from "@/shared/bridge";
+import { type DesktopOutcome, type DesktopRequest, type DesktopSummary, isConnectCode } from "@/shared/bridge";
 import type {
   ConnectChoice,
   ConnectMethod,
@@ -91,7 +93,13 @@ interface Connection {
   edits: Applied[];
   /** The token behind the quadit login among the edits (its config file); revoked when that login is taken back. */
   token: { id: string; label: string; config: string; serverId: string; workspaceId: string } | null;
-  /** The connect code open for the agent in this tool, until it is given back; absent in ledgers from before codes. */
+  /**
+   * The agent of the connection's workspace the tool works as there, which
+   * alone is given codes and asked about; null when it works as a login of
+   * another server. Absent in ledgers from before it was kept (memberOfRecord).
+   */
+  member?: { id: string; handle: string } | null;
+  /** The connect code open for `member` in this tool, until it is given back; absent in ledgers from before codes. */
   code?: OpenCode | null;
   at: number;
 }
@@ -142,6 +150,10 @@ const MASKED_TOKEN = "qd_…";
 
 export class Connections {
   private plans = new Map<string, Plan>();
+  /** Where each tool stood at the server's last answer, which no answer leaves as it is (handshake.ts). */
+  private known = new Map<string, Handshake>();
+  /** Why the last code asked for a tool was not made, until one is. */
+  private codeRefused = new Map<string, string>();
   /**
    * Applies, one at a time whichever window asked: connections share files
    * (the skill, the default login, the command's link), so each is checked
@@ -470,10 +482,14 @@ export class Connections {
         agent: { id: worksAs.id, handle: worksAs.handle },
         edits: [...records, ...plan.shared],
         token,
+        member,
         code: code?.ok ? code.code : null,
         at: Date.now(),
       };
       this.saveLedger(ledger);
+      this.known.delete(harness.id);
+      if (code && !code.ok) this.codeRefused.set(harness.id, code.error);
+      else this.codeRefused.delete(harness.id);
       const hint = connectedHint(harness, choice.methods, worksAs.handle, agent?.handle ?? worksAs.handle);
       // The login PATH changed (a folder of the person's own, or the line that puts it there): open terminals keep the old one.
       const newPath = plan.applied.some((record) => record.kind === "line" || record.kind === "folder");
@@ -487,19 +503,24 @@ export class Connections {
 
   /**
    * Where a tool Connect set up stands with Quadit, asked of the page of the
-   * workspace it was connected to (handshake.ts); null when it is not set up.
-   * A code given back is spent: the ledger lets it go.
+   * workspace it was connected to about the agent it works as there
+   * (handshake.ts); null when it is not set up. A tool that works as a login
+   * of another server is never asked about: where it stands is not known
+   * here. A code given back, or gone, is let go.
    */
   async handshake(harnessId: string): Promise<Handshake | null> {
     const connection = this.ledger().harnesses[harnessId];
-    if (!connection) return null;
+    const harness = HARNESSES.find((h) => h.id === harnessId);
+    if (!connection || !harness) return null;
+    const member = memberOfRecord(connection, harness);
+    if (!member) return { state: "unknown" };
     const code = connection.code ?? null;
     const answer = await this.parts.ask(connection.serverId, connection.workspaceId, {
       kind: "agent-state",
-      agent: connection.agent.id,
+      agent: member.id,
       ...(code ? { code: code.id } : {}),
     });
-    if (code && answer.ok && answer.codeUsed === true) {
+    if (code && answer.ok && (answer.codeUsed === true || answer.codeGone === true)) {
       await this.inTurn(async () => {
         const ledger = this.ledger();
         const now = ledger.harnesses[harnessId];
@@ -508,17 +529,30 @@ export class Connections {
         this.saveLedger(ledger);
       });
     }
-    return handshakeOf({ methods: connection.methods, code }, answer, Date.now());
+    const now = handshakeOf({ methods: connection.methods, code }, answer, Date.now(), this.known.get(harnessId));
+    this.known.set(harnessId, now);
+    const refused = this.codeRefused.get(harnessId);
+    return now.state === "waiting" && now.code === null && refused ? { ...now, refused } : now;
   }
 
-  /** Makes a new connect code for a tool Connect set up (the one it had ran out, or it had none), replacing the old one. */
+  /** Makes a new connect code for a tool Connect set up (the one it had is gone or ran out, or it had none), replacing the old one. */
   newCode(harnessId: string): Promise<{ ok: true } | Refused> {
     return this.inTurn(async () => {
       const connection = this.ledger().harnesses[harnessId];
       const harness = HARNESSES.find((h) => h.id === harnessId);
       if (!connection || !harness) return { ok: false, error: `${harness?.name ?? "It"} is not connected.` };
-      const made = await this.makeCode(connection.serverId, connection.workspaceId, connection.agent.id, harness.name);
-      if (!made.ok) return made;
+      const member = memberOfRecord(connection, harness);
+      if (!member)
+        return {
+          ok: false,
+          error: `${harness.name} works as a login of another server: there is no code to make here.`,
+        };
+      const made = await this.makeCode(connection.serverId, connection.workspaceId, member.id, harness.name);
+      if (!made.ok) {
+        this.codeRefused.set(harnessId, made.error);
+        return made;
+      }
+      this.codeRefused.delete(harnessId);
       // Read again: what was asked of the page took a while.
       const ledger = this.ledger();
       const now = ledger.harnesses[harnessId];
@@ -529,7 +563,11 @@ export class Connections {
     });
   }
 
-  /** Asks the workspace's page for a connect code for `agent` (a member id) in the tool named `tool`. */
+  /**
+   * Asks the workspace's page for a connect code for `agent` (a member id)
+   * in the tool named `tool`. Only a code is taken (isConnectCode): the
+   * person pastes its line into their agent.
+   */
   private async makeCode(
     serverId: string,
     workspaceId: string,
@@ -538,7 +576,10 @@ export class Connections {
   ): Promise<{ ok: true; code: OpenCode } | Refused> {
     const made = await this.parts.ask(serverId, workspaceId, { kind: "connect-code", agent, tool });
     if (!made.ok) return { ok: false, error: made.message };
-    if (!made.id || !made.code) return { ok: false, error: "Your workspace made no code: update Quadit there." };
+    if (!made.id || made.code === undefined)
+      return { ok: false, error: "Your workspace made no code: update Quadit there." };
+    if (!isConnectCode(made.code))
+      return { ok: false, error: "Your workspace gave a code that is not one: try again." };
     return { ok: true, code: { id: made.id, code: made.code, at: Date.now() } };
   }
 
@@ -617,6 +658,8 @@ export class Connections {
       const ledger = this.ledger();
       delete ledger.harnesses[plan.harness.id];
       this.saveLedger(ledger);
+      this.known.delete(plan.harness.id);
+      this.codeRefused.delete(plan.harness.id);
       let unrevoked: Unrevoked | null = null;
       if (plan.revoke) {
         const revoked = await this.parts.ask(plan.revoke.serverId, plan.revoke.workspaceId, {
@@ -722,6 +765,17 @@ export class Connections {
     writeFileSync(next, JSON.stringify(ledger, null, 2), { mode: 0o600 });
     renameSync(next, this.ledgerFile);
   }
+}
+
+/**
+ * The agent of a connection's workspace its tool works as there. A ledger
+ * from before this was kept says it only for a tool with a login of its own
+ * (made for the agent chosen there); for one on the computer's default login,
+ * which may be another server's, it is not known, so none.
+ */
+function memberOfRecord(connection: Connection, harness: Harness): { id: string; handle: string } | null {
+  if (connection.member !== undefined) return connection.member;
+  return harness.env ? connection.agent : null;
 }
 
 /**

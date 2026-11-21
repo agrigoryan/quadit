@@ -154,20 +154,24 @@ export interface ConnectView {
 }
 
 /**
- * Where a connected tool stands with Quadit (desktop contract §11), as the
- * server says of the agent it works as:
+ * Where a tool Connect set up stands with Quadit (desktop contract §11), as
+ * the server says of the agent it works as (main/handshake.ts):
  *   waiting    set up on this computer, and the agent has not proven yet
  *              that it reached Quadit from inside the tool; `code` is the
  *              open connect code for it to give back, null when there is
- *              none (it ran out, or the tool was connected by an older
+ *              none (gone, run out, or the tool was connected by an older
  *              version of the app), for which a new one is to be made;
- *   connected  it proved it, and whether it listens now;
- *   unknown    the server could not say (an older one, no window shows the
- *              workspace, or the tool works as a login of another
- *              workspace): only what Connect wrote is known.
+ *              `refused` is why the last code asked for was not made;
+ *   connected  the server says it proved it, and whether it listens now;
+ *   unknown    set up; whether it reached Quadit is not known here: the
+ *              server has not answered yet, or the tool works as a login
+ *              this server does not know (another server's), which the app
+ *              never asks it about.
  */
 export type Handshake =
-  { state: "waiting"; code: string | null } | { state: "connected"; listening: boolean } | { state: "unknown" };
+  | { state: "waiting"; code: string | null; refused?: string }
+  | { state: "connected"; listening: boolean }
+  | { state: "unknown" };
 
 /** The window Connect agents is laid over: its server, and the workspace its page shows (null: none yet, or signed out). */
 export interface ConnectTarget {

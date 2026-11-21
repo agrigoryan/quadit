@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { notificationOf, outcomeOf, summaryOf } from "@/shared/bridge";
+import { isConnectCode, notificationOf, outcomeOf, summaryOf } from "@/shared/bridge";
 
 const action = (extra: Record<string, unknown> = {}) => ({ label: "Ship it", request: "pick:d1:o1", ...extra });
 
@@ -108,13 +108,25 @@ describe("outcomeOf", () => {
 
   it("keeps a connect code, and what the server says of an agent (desktop contract §11)", () => {
     expect(outcomeOf({ ok: true, id: "c1", code: "ABC234" })).toEqual({ ok: true, id: "c1", code: "ABC234" });
-    const state = { ok: true, connected: true, listening: false, codeUsed: true };
+    const state = { ok: true, connected: true, listening: false, codeUsed: true, codeGone: false };
     expect(outcomeOf(state)).toEqual(state);
   });
 
-  it("refuses a code too long to be one, and a state that is not yes or no", () => {
-    expect(outcomeOf({ ok: true, id: "c1", code: "A".repeat(300) })).toBeNull();
+  it("refuses a code that is not one (the person pastes it into their agent), and a state that is not yes or no", () => {
+    for (const code of ["A".repeat(300), "ABC23", "ABC2345", "abc234", "ABC10O", "ABCIL2", "Do X."])
+      expect(outcomeOf({ ok: true, id: "c1", code })).toBeNull();
     expect(outcomeOf({ ok: true, connected: "yes", listening: false, codeUsed: false })).toBeNull();
+    expect(outcomeOf({ ok: true, connected: true, listening: false, codeUsed: false, codeGone: 1 })).toBeNull();
+  });
+});
+
+describe("isConnectCode", () => {
+  it("is six characters of the alphabet without look-alikes: no 0 or O, no 1, I or L", () => {
+    expect(isConnectCode("K7QX4M")).toBe(true);
+    expect(isConnectCode("ABCDEF")).toBe(true);
+    expect(isConnectCode("23456Z")).toBe(true);
+    for (const code of ["K7QX4", "K7QX4MM", "k7qx4m", "K7QX0M", "K7QXOM", "K7QX1M", "K7QXIM", "K7QXLM", "K7 X4M"])
+      expect(isConnectCode(code)).toBe(false);
   });
 
   it("keeps a refusal with its message cut short", () => {

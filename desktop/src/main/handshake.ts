@@ -6,6 +6,7 @@
 // the agent (an agent-state request) into the card's state.
 
 import type { Answer } from "@/main/requests";
+import { isConnectCode } from "@/shared/bridge";
 import type { ConnectMethod, Handshake } from "@/shared/pages-api";
 
 /** How long a connect code is good for: the server keeps one open for seven days. */
@@ -20,22 +21,34 @@ export interface OpenCode {
 
 /**
  * Where a connection stands at `now`, from the server's answer about its
- * agent. With a code still open it is connected once that code was given
- * back: proof from inside this tool, not from wherever else the agent
- * worked. Without one (it ran out, or an older version of the app connected
- * the tool), once the server counts the agent connected. Only a connection
- * through the quadit command waits for a code: by MCP alone there is no
- * command to give one back with.
+ * agent; `before` is what the last answer made of it.
+ *
+ * With a code still open it waits until that code was given back: proof
+ * from inside this tool, not from wherever else the agent worked. No answer
+ * changes nothing (a closed window, a lost connection, an older server that
+ * says nothing of agents): a waiting card is never made connected for want
+ * of one. A code gone or run out is none. Without one (and for a tool an
+ * older version of the app connected) it is connected only when the server
+ * says the agent is; else it waits for a new code. Only a connection through
+ * the quadit command waits for a code: by MCP alone there is no command to
+ * give one back with.
  */
 export function handshakeOf(
   connection: { methods: ConnectMethod[]; code: OpenCode | null },
   answer: Answer,
   now: number,
+  before: Handshake | undefined,
 ): Handshake {
-  if (!answer.ok || typeof answer.connected !== "boolean") return { state: "unknown" };
-  const open = connection.code && now - connection.code.at < CODE_LIFE_MS ? connection.code : null;
-  if (answer.codeUsed === true || (!open && answer.connected))
-    return { state: "connected", listening: answer.listening === true };
+  const { code } = connection;
+  const open = code && now - code.at < CODE_LIFE_MS && isConnectCode(code.code) ? code : null;
+  if (!answer.ok || typeof answer.connected !== "boolean") {
+    if (open) return { state: "waiting", code: open.code };
+    if (before?.state === "waiting") return { state: "waiting", code: null };
+    return before ?? { state: "unknown" };
+  }
+  if (answer.codeUsed === true) return { state: "connected", listening: answer.listening === true };
+  if (open && answer.codeGone !== true) return { state: "waiting", code: open.code };
+  if (answer.connected) return { state: "connected", listening: answer.listening === true };
   if (!connection.methods.includes("cli")) return { state: "unknown" };
-  return { state: "waiting", code: open?.code ?? null };
+  return { state: "waiting", code: null };
 }

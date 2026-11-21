@@ -74,8 +74,9 @@ export type DesktopRequest =
   | { kind: "connect-code"; agent: string; tool: string }
   /**
    * What the server says of the agent `agent` (a member id): the outcome's
-   * `connected`, `listening`, and `codeUsed`, whether the code whose id is
-   * `code` was given back.
+   * `connected`, `listening`, and, of the code whose id is `code`,
+   * `codeUsed` (it was given back) and `codeGone` (it no longer exists, or
+   * ran out unused).
    */
   | { kind: "agent-state"; agent: string; code?: string };
 
@@ -85,13 +86,14 @@ export type DesktopOutcome =
       path?: string;
       agent?: { id: string; handle: string; name: string };
       token?: { id: string; secret: string };
-      /** A connect code (connect-code): its id, and the code itself, shown once. */
+      /** A connect code (connect-code): its id, and the code itself, shown once (isConnectCode). */
       id?: string;
       code?: string;
       /** An agent's state (agent-state). */
       connected?: boolean;
       listening?: boolean;
       codeUsed?: boolean;
+      codeGone?: boolean;
     }
   | { ok: false; message: string; path?: string };
 
@@ -147,8 +149,16 @@ const REQUEST_MAX = 500;
 const PLACEHOLDER_MAX = 80;
 const MESSAGE_MAX = 500;
 const SECRET_MAX = 500;
-/** A connect code is six characters; this leaves room for a longer one without taking a sentence. */
-const CODE_MAX = 32;
+
+/**
+ * Whether `raw` is a connect code (desktop contract §11): six characters of
+ * an alphabet without look-alikes (no 0 or O, no 1, I or L). Nothing else is
+ * shown as one: the person pastes its line into their agent, so a page must
+ * not be able to put words of its own there.
+ */
+export function isConnectCode(raw: unknown): raw is string {
+  return typeof raw === "string" && /^[A-HJKMNP-Z2-9]{6}$/.test(raw);
+}
 const NOTE_ACTIONS_MAX = 3;
 const WAITING_MAX = 20;
 const WAITING_ACTIONS_MAX = 6;
@@ -286,7 +296,7 @@ export function summaryOf(raw: unknown): DesktopSummary | null {
 /** `raw` as a page's answer to a request, as fresh plain data, or null when it is none. */
 export function outcomeOf(raw: unknown): DesktopOutcome | null {
   return kept((): DesktopOutcome => {
-    const { ok, path, message, agent, token, id, code, connected, listening, codeUsed } = record(raw);
+    const { ok, path, message, agent, token, id, code, connected, listening, codeUsed, codeGone } = record(raw);
     const where = optional(path, (v) => exact(v, PATH_MAX));
     if (ok === false) return defined({ ok, message: shown(message, MESSAGE_MAX), path: where });
     if (ok !== true) throw refused;
@@ -302,10 +312,14 @@ export function outcomeOf(raw: unknown): DesktopOutcome | null {
         return { id: exact(t.id, ID_MAX), secret: exact(t.secret, SECRET_MAX) };
       }),
       id: optional(id, (v) => exact(v, ID_MAX)),
-      code: optional(code, (v) => exact(v, CODE_MAX)),
+      code: optional(code, (v) => {
+        if (!isConnectCode(v)) throw refused;
+        return v;
+      }),
       connected: optional(connected, flag),
       listening: optional(listening, flag),
       codeUsed: optional(codeUsed, flag),
+      codeGone: optional(codeGone, flag),
     });
   });
 }
