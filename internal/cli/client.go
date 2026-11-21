@@ -38,12 +38,17 @@ type Client struct {
 	// Note is what the server had to say beside its last answer (a picture
 	// that stops before the page does, for one).
 	Note string
+	// app starts the desktop app when its server on this computer is not
+	// running; nil for a login the app did not make.
+	app *appStart
 }
 
-// savedConfig is the file `quadit login` writes.
+// savedConfig is the file `quadit login` writes. App is there when the
+// desktop app made the login for the server it runs (login --app).
 type savedConfig struct {
-	URL   string `json:"url"`
-	Token string `json:"token"`
+	URL   string    `json:"url"`
+	Token string    `json:"token"`
+	App   *appLogin `json:"app,omitempty"`
 }
 
 // configPath is where `quadit login` saves the server and token:
@@ -73,6 +78,9 @@ func NewClient() (*Client, error) {
 			}
 		}
 		c.URL, c.Token = sc.URL, sc.Token
+		if sc.App != nil {
+			c.app = &appStart{login: *sc.App, dir: filepath.Dir(configPath()), starter: systemStarter{}, within: appStartWithin, stderr: os.Stderr}
+		}
 	}
 	if c.URL == "" || c.Token == "" {
 		return nil, errors.New("not connected: set QUADIT_URL and QUADIT_TOKEN, or run: quadit login <url> <token>")
@@ -124,7 +132,9 @@ type apiRequest struct {
 // workspaceRequest sends a request inside the token's workspace and returns
 // the body of the answer. It is sent once: a request that cannot be sent
 // again safely is the caller's to try again (postChanges does, under the
-// change's id).
+// change's id). The one exception is a request the server could not take
+// because it was not running: it never arrived, so once the desktop app
+// that runs the server is started (appStart), it is sent again.
 func (c *Client) workspaceRequest(ctx context.Context, r apiRequest) ([]byte, error) {
 	u := c.URL + "/api/v1/w/-" + r.path
 	if strings.HasPrefix(r.path, "/api/") {
@@ -133,18 +143,37 @@ func (c *Client) workspaceRequest(ctx context.Context, r apiRequest) ([]byte, er
 	if len(r.query) > 0 {
 		u += "?" + r.query.Encode()
 	}
-	req, err := http.NewRequestWithContext(ctx, r.method, u, r.body)
-	if err != nil {
-		return nil, err
+	send := func() (*http.Response, error) {
+		req, err := http.NewRequestWithContext(ctx, r.method, u, r.body)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+		if r.contentType != "" {
+			req.Header.Set("Content-Type", r.contentType)
+		}
+		if r.accept != "" {
+			req.Header.Set("Accept", r.accept)
+		}
+		return c.HTTP.Do(req)
 	}
-	req.Header.Set("Authorization", "Bearer "+c.Token)
-	if r.contentType != "" {
-		req.Header.Set("Content-Type", r.contentType)
+	resp, err := send()
+	// A body that can be read again from its start can be sent again.
+	rewind, again := r.body.(io.Seeker)
+	if err != nil && c.app != nil && (r.body == nil || again) {
+		answers, note := c.app.revive(ctx, c.HTTP, c.URL, err)
+		if note != "" {
+			return nil, fmt.Errorf("cannot reach %s: %w\n  %s", c.URL, err, note)
+		}
+		if answers {
+			if again {
+				if _, err := rewind.Seek(0, io.SeekStart); err != nil {
+					return nil, err
+				}
+			}
+			resp, err = send()
+		}
 	}
-	if r.accept != "" {
-		req.Header.Set("Accept", r.accept)
-	}
-	resp, err := c.HTTP.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("cannot reach %s: %w%s", c.URL, err, keptOffTheNetwork())
 	}

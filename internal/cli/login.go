@@ -18,14 +18,21 @@ import (
 // login checks a server address and a token by asking who they are, and
 // saves them where NewClient reads them. A token of "-" is read from stdin,
 // so that it is not in the list of running processes. "login --path" prints
-// where the login is kept.
+// where the login is kept. "--app PATH" is for the desktop app, making a
+// login for the server it runs: PATH is its executable, which the command
+// starts when that server is not running (appstart.go). A login without it
+// has no such mark, even where the one before had.
 func login(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 1 && args[0] == "--path" {
 		fmt.Fprintln(stdout, configPath())
 		return 0
 	}
+	var app *appLogin
+	if len(args) == 4 && args[2] == "--app" {
+		app, args = &appLogin{Path: args[3]}, args[:2]
+	}
 	if len(args) != 2 {
-		fmt.Fprintln(stderr, "usage: quadit login URL TOKEN|-  or  quadit login --path")
+		fmt.Fprintln(stderr, "usage: quadit login URL TOKEN|- [--app PATH]  or  quadit login --path")
 		return 2
 	}
 	token := args[1]
@@ -58,7 +65,7 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout, stderr i
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
-	raw, _ := json.MarshalIndent(savedConfig{URL: c.URL, Token: c.Token}, "", "  ")
+	raw, _ := json.MarshalIndent(savedConfig{URL: c.URL, Token: c.Token, App: app}, "", "  ")
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
