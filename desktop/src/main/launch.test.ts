@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { coldStart, secondStart } from "@/main/launch";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ActivateAfterStart, coldStart, secondStart } from "@/main/launch";
 
 const APP = ["/Applications/Quadit.app/Contents/MacOS/Quadit"];
 
@@ -33,5 +33,24 @@ describe("secondStart", () => {
   it("started again by the person, shows the server list when no window is on screen, and else nothing", () => {
     expect(secondStart(APP, { windowShown: false })).toEqual({ kind: "list" });
     expect(secondStart(APP, { windowShown: true })).toEqual({ kind: "nothing" });
+  });
+});
+
+describe("ActivateAfterStart", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("takes no activate in the first 3 seconds after a --background start for the person's: that start's own opens no window", () => {
+    const activate = new ActivateAfterStart(true);
+    expect(activate.isThePersons()).toBe(false);
+    vi.advanceTimersByTime(2_999);
+    expect(activate.isThePersons()).toBe(false);
+    // Later, the Dock icon clicked is the person asking for a window.
+    vi.advanceTimersByTime(1);
+    expect(activate.isThePersons()).toBe(true);
+  });
+
+  it("takes every activate for the person's after any other start", () => {
+    expect(new ActivateAfterStart(false).isThePersons()).toBe(true);
   });
 });

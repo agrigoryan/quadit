@@ -350,9 +350,15 @@ test("started with --background by the quadit command, the app shows no window a
   }
   await expect.poll(() => answers(origin), { timeout: 15_000 }).toBe(false);
 
+  const started = Date.now();
   desktop = await Desktop.launch(data, run, ["--background"], { env });
   try {
     await expect.poll(() => answers(origin), { timeout: 30_000 }).toBe(true);
+    expect(await desktop.shownWindows()).toEqual([]);
+    // Nor a moment later: whatever macOS sends as it launches the app (activate) opens none. Waited out, and checked.
+    await new Promise((done) => setTimeout(done, Math.max(0, started + 4_000 - Date.now())));
+    // The server's own window is made hidden, as at login (it keeps its page's feed); nothing else is made, nothing shown.
+    expect(desktop.app.windows().some((page) => page.url().includes("/servers.html"))).toBe(false);
     expect(await desktop.shownWindows()).toEqual([]);
     // The person stops it from the menu: marked, so that the command starts nothing for it.
     await desktop.chooseMenuItem("local-stop");

@@ -28,7 +28,7 @@ import { Connections } from "@/main/connections";
 import { LocalServer, loopbackPorts } from "@/main/local-server";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
 import { SignInFlows } from "@/main/handoff";
-import { coldStart, secondStart } from "@/main/launch";
+import { ActivateAfterStart, coldStart, secondStart } from "@/main/launch";
 import { menuTemplate } from "@/main/menu";
 import { Panel } from "@/main/panel";
 import { loginShellPath, QuaditCli } from "@/main/quadit-cli";
@@ -331,7 +331,13 @@ function start() {
       if (list.localServer()) void local.startInBackground();
     } else if (asked.kind === "list") list.show();
   });
+  // Started at login (macOS), or in the background by the quadit command, the app opens no window: it is there
+  // for its server and its notifications. An `activate` its background start brings opens none either.
+  const atLogin = process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin;
+  const starting = coldStart(process.argv, { atLogin });
+  const activated = new ActivateAfterStart(starting.server === "background");
   app.on("activate", () => {
+    if (!activated.isThePersons()) return;
     if (!BrowserWindow.getAllWindows().some((win) => win.isVisible())) list.show();
   });
   app.on("before-quit", () => {
@@ -356,10 +362,6 @@ function start() {
   powerMonitor.on("resume", () => windows.wake());
   unread.start();
   capture.applyShortcut();
-  // Started at login (macOS), or in the background by the quadit command, the app opens no window: it is there
-  // for its server and its notifications.
-  const atLogin = process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin;
-  const starting = coldStart(process.argv, { atLogin });
   // Started before the windows are made, so that its window waits for it (whenReachable).
   if (list.localServer()) {
     if (starting.server === "start") local.start();

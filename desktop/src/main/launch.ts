@@ -39,3 +39,26 @@ export function secondStart(
   if (argv.includes(BACKGROUND_SWITCH)) return { kind: "background" };
   return windowShown ? { kind: "nothing" } : { kind: "list" };
 }
+
+/**
+ * How long after a --background start an `activate` (macOS) is taken for
+ * that start's own: macOS may send one as it launches the app, even started
+ * hidden by `open -g -j`, and Electron says launching is among what sends
+ * it. Three seconds outlasts a launch; a person clicking the Dock icon
+ * later still gets a window.
+ */
+const BACKGROUND_QUIET_MS = 3_000;
+
+/** Whether an `activate` is the person asking for a window, after a start that was `background` or not. */
+export class ActivateAfterStart {
+  private quietUntil: number;
+
+  constructor(background: boolean) {
+    this.quietUntil = background ? Date.now() + BACKGROUND_QUIET_MS : 0;
+  }
+
+  /** Whether the `activate` arriving now is the person's (to be answered with a window), not the background start's. */
+  isThePersons(): boolean {
+    return Date.now() >= this.quietUntil;
+  }
+}
