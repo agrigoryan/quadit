@@ -542,8 +542,8 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@aram",
-   "id": "<id #466>",
-   "seq": 170,
+   "id": "<id #467>",
+   "seq": 171,
    "snippet": "Said by mistake.",
    "task": "SVA-1",
    "title": "SVA-1 Boss design",
@@ -649,7 +649,7 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
 == unread inbox (8)
 #279 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)
 #273 <minute> @artist waiting_on: SVA-6 Review me — in your view "Art bugs"
-#170 <minute> @aram comment: SVA-1 Boss design — Said by mistake.
+#171 <minute> @aram comment: SVA-1 Boss design — Said by mistake.
 #162 <minute> @artist result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)
 #157 <minute> @aram mentioned: SVA-1 Boss design — @bea no rings please.  (comment <comment SVA-1 owner>, thread <comment SVA-1 owner>)
 #140 <minute> @aram decision_asked: SVA-2 Explosion effect — Which color?
@@ -686,8 +686,8 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@aram",
-   "id": "<id #466>",
-   "seq": 170,
+   "id": "<id #467>",
+   "seq": 171,
    "snippet": "Said by mistake.",
    "task": "SVA-1",
    "title": "SVA-1 Boss design",
@@ -778,8 +778,8 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@aram",
-   "id": "<id #466>",
-   "seq": 170,
+   "id": "<id #467>",
+   "seq": 171,
    "snippet": "Said by mistake.",
    "task": "SVA-1",
    "title": "SVA-1 Boss design",
@@ -845,7 +845,7 @@ seq: 280
 200
 #279 <minute> @artist comment: SVA-1 Boss design — Phase three is drawn.  (comment <comment SVA-1 for the webhook>, thread <comment SVA-1 for the webhook>)
 #273 <minute> @artist waiting_on: SVA-6 Review me — in your view "Art bugs"
-#170 <minute> @aram comment: SVA-1 Boss design — Said by mistake.
+#171 <minute> @aram comment: SVA-1 Boss design — Said by mistake.
 #162 <minute> @artist result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)
 #157 <minute> @aram mentioned: SVA-1 Boss design — @bea no rings please.  (comment <comment SVA-1 owner>, thread <comment SVA-1 owner>)
 #140 <minute> @aram decision_asked: SVA-2 Explosion effect — Which color?
@@ -4525,8 +4525,8 @@ seq: 280
      "created_at": 1700000000000,
      "entity_id": "<comment removed>",
      "entity_type": "comment",
-     "id": "<id #466>",
-     "seq": 170,
+     "id": "<id #467>",
+     "seq": 171,
      "snippet": "Said by mistake.",
      "task_id": "<task SVA-1>",
      "title": "SVA-1 Boss design",
@@ -4534,12 +4534,12 @@ seq: 280
      "user_id": "<@bea>"
     }
    },
-   "entity_id": "<id #466>",
+   "entity_id": "<id #467>",
    "entity_type": "notification",
    "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 170,
+   "seq": 171,
    "type": "notification.created"
   },
   {
@@ -4878,7 +4878,7 @@ seq: 280
 #161 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result
 #162 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)
 #169 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)
-#170 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.
+#171 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.
 #172 <minute> @aram comment.deleted SVA-1 moved to trash
 #173 <minute> @aram attachment.created SVA-1
 #175 <minute> @aram attachment.created SVA-1
@@ -8720,8 +8720,8 @@ doc  doc <id #198>  Vault — Third shelf.
      "created_at": 1700000000000,
      "entity_id": "<comment removed>",
      "entity_type": "comment",
-     "id": "<id #466>",
-     "seq": 170,
+     "id": "<id #467>",
+     "seq": 171,
      "snippet": "Said by mistake.",
      "task_id": "<task SVA-1>",
      "title": "SVA-1 Boss design",
@@ -8729,12 +8729,12 @@ doc  doc <id #198>  Vault — Third shelf.
      "user_id": "<@bea>"
     }
    },
-   "entity_id": "<id #466>",
+   "entity_id": "<id #467>",
    "entity_type": "notification",
    "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 170,
+   "seq": 171,
    "type": "notification.created"
   },
   {
@@ -11209,7 +11209,7 @@ doc  doc <id #198>  Vault — Third shelf.
 #161 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result
 #162 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)
 #169 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)
-#170 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.
+#171 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.
 #172 <minute> @aram comment.deleted SVA-1 moved to trash
 #173 <minute> @aram attachment.created SVA-1
 #175 <minute> @aram attachment.created SVA-1
@@ -11371,7 +11371,7 @@ seq: 280
   "#161 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#162 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#169 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
-  "#170 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.",
+  "#171 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.",
   "#172 <minute> @aram comment.deleted SVA-1 moved to trash",
   "#173 <minute> @aram attachment.created SVA-1",
   "#175 <minute> @aram attachment.created SVA-1",
@@ -11765,8 +11765,8 @@ seq: 280
      "created_at": 1700000000000,
      "entity_id": "<comment removed>",
      "entity_type": "comment",
-     "id": "<id #466>",
-     "seq": 170,
+     "id": "<id #467>",
+     "seq": 171,
      "snippet": "Said by mistake.",
      "task_id": "<task SVA-1>",
      "title": "SVA-1 Boss design",
@@ -11774,12 +11774,12 @@ seq: 280
      "user_id": "<@bea>"
     }
    },
-   "entity_id": "<id #466>",
+   "entity_id": "<id #467>",
    "entity_type": "notification",
    "project_id": "<project SVA>",
    "scope_id": "<task SVA-1>",
    "scope_type": "task",
-   "seq": 170,
+   "seq": 171,
    "type": "notification.created"
   },
   {
@@ -11966,7 +11966,7 @@ seq: 280
 #140 <minute> @aram inbox decision_asked: SVA-2 Explosion effect — Which color?
 #157 <minute> @aram inbox mentioned: SVA-1 Boss design — @bea no rings please.  (comment <comment SVA-1 owner>, thread <comment SVA-1 owner>)
 #162 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)
-#170 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.
+#171 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.
 #185 <minute> @bea doc.created "Bea's own"
 #237 <minute> @bea view.created "Bea's"
 #268 <minute> @bea watcher.created
@@ -12020,7 +12020,7 @@ seq: 280
   "#161 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#162 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#169 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
-  "#170 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.",
+  "#171 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.",
   "#172 <minute> @aram comment.deleted SVA-1 moved to trash",
   "#173 <minute> @aram attachment.created SVA-1",
   "#175 <minute> @aram attachment.created SVA-1",
@@ -12297,7 +12297,7 @@ seq: 280
   "#161 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#162 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#169 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
-  "#170 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.",
+  "#171 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.",
   "#172 <minute> @aram comment.deleted SVA-1 moved to trash",
   "#173 <minute> @aram attachment.created SVA-1",
   "#175 <minute> @aram attachment.created SVA-1",
@@ -12354,7 +12354,7 @@ seq: 280
   "#161 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#162 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#169 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
-  "#170 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.",
+  "#171 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.",
   "#172 <minute> @aram comment.deleted SVA-1 moved to trash",
   "#173 <minute> @aram attachment.created SVA-1",
   "#175 <minute> @aram attachment.created SVA-1",
@@ -12417,7 +12417,7 @@ seq: 280
   "#161 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#162 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#169 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
-  "#170 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.",
+  "#171 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.",
   "#172 <minute> @aram comment.deleted SVA-1 moved to trash",
   "#173 <minute> @aram attachment.created SVA-1",
   "#175 <minute> @aram attachment.created SVA-1",
@@ -12563,7 +12563,7 @@ seq: 280
   "#161 <minute> @artist task.updated SVA-1 waiting_on_note: answer: How many phases? -> review the result",
   "#162 <minute> @artist inbox result: SVA-1 Boss design — Drew the burst.  (comment <comment SVA-1 result>, thread <comment SVA-1 result>)",
   "#169 <minute> @aram comment SVA-1: Said by mistake.  (id=<comment removed>)",
-  "#170 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.",
+  "#171 <minute> @aram inbox comment: SVA-1 Boss design — Said by mistake.",
   "#172 <minute> @aram comment.deleted SVA-1 moved to trash",
   "#173 <minute> @aram attachment.created SVA-1",
   "#175 <minute> @aram attachment.created SVA-1",
@@ -13342,8 +13342,8 @@ seq: 280
    "created_at": 1700000000000,
    "entity_id": "<comment removed>",
    "entity_type": "comment",
-   "id": "<id #466>",
-   "seq": 170,
+   "id": "<id #467>",
+   "seq": 171,
    "snippet": "Said by mistake.",
    "task_id": "<task SVA-1>",
    "title": "SVA-1 Boss design",
@@ -14462,8 +14462,8 @@ seq: 280
    "created_at": 1700000000000,
    "entity_id": "<comment removed>",
    "entity_type": "comment",
-   "id": "<id #466>",
-   "seq": 170,
+   "id": "<id #467>",
+   "seq": 171,
    "snippet": "Said by mistake.",
    "task_id": "<task SVA-1>",
    "title": "SVA-1 Boss design",
@@ -15149,7 +15149,7 @@ seq: 280
    "title": "SVA-6 Review me"
   },
   {
-   "id": "<id #466>",
+   "id": "<id #467>",
    "title": "SVA-1 Boss design"
   },
   {
@@ -21285,6 +21285,25 @@ SVA Done: 1
 @artist  working on SVA-1  (nothing is listening for it)  open=1 queue=0
 @ops  working  (nothing is listening for it)  open=0 queue=0
 
+=== GET /api/v1/w/games/agents/connection
+200
+{
+ "agents": [
+  {
+   "connected_at": "<minute>",
+   "handle": "@artist",
+   "listening": false,
+   "user_id": "<@artist>"
+  },
+  {
+   "connected_at": "<minute>",
+   "handle": "@ops",
+   "listening": false,
+   "user_id": "<@ops>"
+  }
+ ]
+}
+
 === GET /api/v1/w/games/files/<file notes.txt>
 200
 {
@@ -21910,8 +21929,8 @@ data: {"actor_id":"<@artist>","at":1700000000000,"audience_id":"<@bea>","change_
 id: 169
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #186>","data":{"key":"SVA-1","row":{"author_id":"<@aram>","body":"Said by mistake.","created_at":1700000000000,"created_seq":169,"id":"<comment removed>","kind":"comment","subject_id":"<task SVA-1>","subject_type":"task","task_id":"<task SVA-1>","updated_seq":169}},"entity_id":"<comment removed>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":169,"type":"comment.created"}
 
-id: 170
-data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #186>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<comment removed>","entity_type":"comment","id":"<id #466>","seq":170,"snippet":"Said by mistake.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"comment","user_id":"<@bea>"}},"entity_id":"<id #466>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":170,"type":"notification.created"}
+id: 171
+data: {"actor_id":"<@aram>","at":1700000000000,"audience_id":"<@bea>","change_id":"<id #186>","data":{"row":{"actor_id":"<@aram>","created_at":1700000000000,"entity_id":"<comment removed>","entity_type":"comment","id":"<id #467>","seq":171,"snippet":"Said by mistake.","task_id":"<task SVA-1>","title":"SVA-1 Boss design","type":"comment","user_id":"<@bea>"}},"entity_id":"<id #467>","entity_type":"notification","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":171,"type":"notification.created"}
 
 id: 172
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #187>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<comment removed>","key":"SVA-1"},"entity_id":"<comment removed>","entity_type":"comment","project_id":"<project SVA>","scope_id":"<task SVA-1>","scope_type":"task","seq":172,"type":"comment.deleted"}

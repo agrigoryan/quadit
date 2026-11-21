@@ -1,13 +1,17 @@
 package server_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -139,6 +143,48 @@ func TestConnectCodes(t *testing.T) {
 			}
 			give(other, second.Code, 200)
 			give(other, elsewhere.Code, 200)
+		})
+
+		t.Run("two codes made at once for the same agent and tool leave one open", func(t *testing.T) {
+			var wg sync.WaitGroup
+			codes := make([]connectCode, 2)
+			statuses := make([]int, 2)
+			for i := range codes {
+				wg.Go(func() {
+					raw, _ := json.Marshal(M{"agent": "@other", "tool": "Copilot"})
+					req, _ := http.NewRequest("POST", s.url+w+"/connect-codes", bytes.NewReader(raw))
+					req.Header.Set("Content-Type", "application/json")
+					req.Header.Set("Origin", s.url)
+					resp, err := s.owner.Do(req)
+					if err != nil {
+						return
+					}
+					defer resp.Body.Close()
+					statuses[i] = resp.StatusCode
+					_ = json.NewDecoder(resp.Body).Decode(&codes[i]) // a failed read shows as a status other than 201
+				})
+			}
+			wg.Wait()
+			if statuses[0] != 201 || statuses[1] != 201 {
+				t.Fatalf("the two codes were answered %v", statuses)
+			}
+			n, err := st.Count(context.Background(), "connect_codes", store.Eq("tool", "Copilot"), store.Null("used_at"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if n != 1 {
+				t.Fatalf("two codes made at once left %d open", n)
+			}
+			// The one left is one of the two made, and works.
+			var left core.ConnectCode
+			if err := st.Get(context.Background(), &left, store.Eq("tool", "Copilot"), store.Null("used_at")); err != nil {
+				t.Fatal(err)
+			}
+			kept := codes[0].Code
+			if left.ID == codes[1].ID {
+				kept = codes[1].Code
+			}
+			give(other, kept, 200)
 		})
 
 		t.Run("an expired code is refused as expired", func(t *testing.T) {

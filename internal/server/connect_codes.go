@@ -66,9 +66,10 @@ func normalCode(code string) string {
 	return strings.ToUpper(strings.NewReplacer(" ", "", "-", "").Replace(strings.TrimSpace(code)))
 }
 
-// handleCreateConnectCode makes a code for an agent and a tool, after
-// taking away the open code of the same agent and tool, and every code of
-// the agent that ran out.
+// handleCreateConnectCode makes a code for an agent and a tool, taking away
+// the open code of the same agent and tool, and every code of the agent
+// that ran out, in the same write: two made at once leave one open code,
+// and a code that cannot be made leaves the one before it.
 func (s *Server) handleCreateConnectCode(x *c) error {
 	var b struct {
 		Agent string `json:"agent"`
@@ -98,16 +99,19 @@ func (s *Server) handleCreateConnectCode(x *c) error {
 		return err
 	}
 	now := time.Now()
-	if _, err := x.db.Delete(x.ctx(), "connect_codes", store.Eq("agent_id", agent.UserID), store.Eq("tool", tool), store.Null("used_at")); err != nil {
-		return err
-	}
-	if _, err := x.db.Delete(x.ctx(), "connect_codes", store.Eq("agent_id", agent.UserID), store.Lt("expires_at", now.UnixMilli())); err != nil {
-		return err
-	}
 	code := randomCode(codeLength)
 	row := core.ConnectCode{ID: id.New(), WorkspaceID: x.ws.ID, AgentID: agent.UserID, Tool: tool, CodeHash: auth.Hash(code), CreatedBy: x.member.UserID,
 		CreatedAt: now.UnixMilli(), ExpiresAt: now.Add(codeLife).UnixMilli()}
-	if err := x.db.Insert(x.ctx(), row); err != nil {
+	err = s.st.Write(x.ctx(), x.ws.ID, func(tx store.Tx) error {
+		if _, err := tx.Delete(x.ctx(), "connect_codes", store.Eq("agent_id", agent.UserID), store.Eq("tool", tool), store.Null("used_at")); err != nil {
+			return err
+		}
+		if _, err := tx.Delete(x.ctx(), "connect_codes", store.Eq("agent_id", agent.UserID), store.Lt("expires_at", now.UnixMilli())); err != nil {
+			return err
+		}
+		return tx.Insert(x.ctx(), row)
+	})
+	if err != nil {
 		return err
 	}
 	return x.json(201, map[string]any{"id": row.ID, "code": code, "agent": agent.UserID, "tool": tool, "expires_at": row.ExpiresAt})
@@ -130,8 +134,8 @@ func (s *Server) handleShowConnectCode(x *c) error {
 
 // handleConnectAgent takes a code back from the agent it was made for: one
 // that is open, has not run out and is the calling agent's is used up, and
-// the agent is connected, in one write. Every attempt counts toward the
-// agent's limit, so codes cannot be guessed.
+// the agent is connected, in one write that finds and checks the code too.
+// Every attempt counts toward the agent's limit, so codes cannot be guessed.
 func (s *Server) handleConnectAgent(x *c) error {
 	var b struct {
 		Code string `json:"code"`
@@ -150,26 +154,22 @@ func (s *Server) handleConnectAgent(x *c) error {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "code", Reason: reason, Message: fmt.Sprintf(format, a...)}
 	}
 	var row core.ConnectCode
-	there, err := store.Find(x.ctx(), x.db, &row, store.Eq("agent_id", x.member.UserID), store.Eq("code_hash", auth.Hash(code)))
-	if err != nil {
-		return err
-	}
-	switch {
-	case !there:
-		return refuse(reasonCodeWrong, "%q is not a connect code made for @%s; check it, or ask the person for a new one", code, x.member.Handle)
-	case row.UsedAt != 0:
-		return refuse(reasonCodeUsed, "connect code %s was already used; ask the person for a new one", code)
-	case row.ExpiresAt <= time.Now().UnixMilli():
-		return refuse(reasonCodeExpired, "connect code %s ran out on %s; ask the person for a new one", code, formatTime(row.ExpiresAt))
-	}
-	err = s.eng.System(x.ctx(), x.ws.ID, x.member.UserID, func(sys *engine.Sys) error {
-		// Used once: of two sessions giving it back at the same moment, one is told it was used.
-		n, err := sys.Tx().Update(x.ctx(), "connect_codes", map[string]any{"used_at": time.Now().UnixMilli()}, store.Eq("id", row.ID), store.Null("used_at"))
+	err := s.eng.System(x.ctx(), x.ws.ID, x.member.UserID, func(sys *engine.Sys) error {
+		there, err := store.Find(x.ctx(), sys.Tx(), &row, store.Eq("agent_id", x.member.UserID), store.Eq("code_hash", auth.Hash(code)))
 		if err != nil {
 			return err
 		}
-		if n == 0 {
+		now := time.Now()
+		switch {
+		case !there:
+			return refuse(reasonCodeWrong, "%q is not a connect code made for @%s; check it, or ask the person for a new one", code, x.member.Handle)
+		case row.UsedAt != 0:
 			return refuse(reasonCodeUsed, "connect code %s was already used; ask the person for a new one", code)
+		case row.ExpiresAt <= now.UnixMilli():
+			return refuse(reasonCodeExpired, "connect code %s ran out on %s; ask the person for a new one", code, formatTime(row.ExpiresAt))
+		}
+		if _, err := sys.Tx().Update(x.ctx(), "connect_codes", map[string]any{"used_at": now.UnixMilli()}, store.Eq("id", row.ID)); err != nil {
+			return err
 		}
 		return sys.Connected()
 	})

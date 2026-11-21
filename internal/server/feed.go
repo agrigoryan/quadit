@@ -20,7 +20,7 @@ import (
 
 // feedParams are the feed's own URL parameters; any other parameter is a
 // task filter, so the feed can be narrowed exactly like a task query.
-var feedParams = []string{"after", "cursor", "ack", "wait", "limit", "types", "task", "doc", "mine", "others", "compact", "inbox", "lease", "take"}
+var feedParams = []string{"after", "cursor", "ack", "wait", "limit", "types", "task", "doc", "mine", "others", "compact", "inbox", "lease"}
 
 // eventPage is one answer of the feed: the events, the position to read on
 // from, and whether more are already there.
@@ -28,7 +28,6 @@ type eventPage struct {
 	events []core.Event
 	seq    int64
 	more   bool
-	lease  string // the listener's lease the read held, if it was a wait on the cursor "listen"
 }
 
 // events writes a page of events in the form asked for: rows, or one line
@@ -65,18 +64,14 @@ func (x *c) events(page eventPage) error {
 
 // answer is the page as JSON, with its events in the form given.
 func (page eventPage) answer(events any) map[string]any {
-	out := map[string]any{"events": events, "seq": page.seq, "more": page.more}
-	if page.lease != "" {
-		out["lease"] = page.lease
-	}
-	return out
+	return map[string]any{"events": events, "seq": page.seq, "more": page.more}
 }
 
 // handleReadFeed reads the feed after a position. With wait=N the request is held
 // for up to N seconds until something matching arrives, so an agent waits
 // with one call instead of polling. With cursor=NAME the position is the one
-// the server keeps for the caller; ack=SEQ moves it first. A wait on the
-// cursor "listen" is the listener's, and holds its lease (listener.go).
+// the server keeps for the caller; ack=SEQ moves it first (with lease= for
+// a cursor the listener delivers from: listener.go).
 //
 // It sets the filter from the request (the position; others=, inbox=,
 // task=, doc=; any task filter, or mine=), then reads (waitForEvents).
@@ -142,21 +137,10 @@ func (s *Server) handleReadFeed(x *c) error {
 		// was written in.
 		f.Tasks, f.ProjectIDs = &tf, nil
 	}
-	wait := min(x.intParam("wait", 0), maxFeedWait)
-	lease := ""
-	if cursor == core.ListenCursor && wait > 0 {
-		// A wait on the listener's cursor is the listener's: it holds the lease.
-		var err error
-		if lease, err = s.holdLease(x, v.Get("lease"), truthyParam(v, "take"), time.Duration(wait)*time.Second); err != nil {
-			return err
-		}
-		defer s.endWait(x, lease)
-	}
-	page, err := s.waitForEvents(x, f, wait, v.Has("after"))
+	page, err := s.waitForEvents(x, f, min(x.intParam("wait", 0), maxFeedWait), v.Has("after"))
 	if err != nil {
 		return err
 	}
-	page.lease = lease
 	return x.events(page)
 }
 
@@ -234,28 +218,60 @@ func hasTaskFilter(q core.TaskQuery) bool {
 }
 
 // setCursor moves a cursor forward; a cursor never moves back. The cursor
-// "listen" is moved only with its lease (checkLease).
+// "listen", or one moved with a lease, is moved only by the holder of the
+// listener's live lease, checked in the same write as the move, so a
+// takeover cannot land between the two (leaseLets).
 func (s *Server) setCursor(x *c, name string, seq int64, lease string) error {
-	if err := s.checkCursorMove(x, name, seq, lease); err != nil {
+	if err := s.checkCursorPosition(x, name, seq); err != nil {
 		return err
 	}
 	// One conditional statement, so acknowledgments racing each other
 	// leave the cursor at the furthest, whichever lands last.
-	return x.db.Advance(x.ctx(), core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: name, Seq: seq, UpdatedAt: time.Now().UnixMilli()},
-		"seq", "workspace_id", "user_id", "name")
-}
-
-// checkCursorMove refuses what setCursor would refuse: a name it cannot
-// keep, a position that is not in the feed, or a move of the listener's
-// cursor without its lease.
-func (s *Server) checkCursorMove(x *c, name string, seq int64, lease string) error {
-	if len(name) == 0 || len(name) > 64 {
-		return errBad("a cursor name is 1 to 64 characters")
+	move := func(db store.DB) error {
+		return db.Advance(x.ctx(), core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: name, Seq: seq, UpdatedAt: time.Now().UnixMilli()},
+			"seq", "workspace_id", "user_id", "name")
 	}
-	if name == core.ListenCursor {
-		if err := s.checkLease(x, lease); err != nil {
+	if !leased(name, lease) {
+		return move(x.db)
+	}
+	return s.st.Write(x.ctx(), x.ws.ID, func(tx store.Tx) error {
+		var m core.Member
+		if err := tx.Get(x.ctx(), &m, store.Eq("user_id", x.member.UserID)); err != nil {
 			return err
 		}
+		if err := leaseLets(m, lease, time.Now()); err != nil {
+			return err
+		}
+		return move(tx)
+	})
+}
+
+// leased reports whether a move of a cursor is the listener's, held to its
+// lease: the cursor "listen" always, and any other moved with a lease.
+func leased(name, lease string) bool { return name == core.ListenCursor || lease != "" }
+
+// checkCursorMove refuses what setCursor would refuse, without moving
+// anything: a name it cannot keep, a position that is not in the feed, or a
+// move of the listener's cursor without its live lease.
+func (s *Server) checkCursorMove(x *c, name string, seq int64, lease string) error {
+	if err := s.checkCursorPosition(x, name, seq); err != nil {
+		return err
+	}
+	if !leased(name, lease) {
+		return nil
+	}
+	var m core.Member
+	if err := x.db.Get(x.ctx(), &m, store.Eq("user_id", x.member.UserID)); err != nil {
+		return err
+	}
+	return leaseLets(m, lease, time.Now())
+}
+
+// checkCursorPosition refuses a cursor name the server cannot keep, and a
+// position that is not in the feed.
+func (s *Server) checkCursorPosition(x *c, name string, seq int64) error {
+	if len(name) == 0 || len(name) > 64 {
+		return errBad("a cursor name is 1 to 64 characters")
 	}
 	// Nothing can be handled that has not happened: a position past the end
 	// of the feed would hide everything until the feed caught up with it.

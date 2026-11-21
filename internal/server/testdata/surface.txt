@@ -32,6 +32,7 @@ api GET /api/v1/openapi.json
 api GET /api/v1/push/key
 api GET /api/v1/version
 api GET /api/v1/w/{workspace}/agents
+api GET /api/v1/w/{workspace}/agents/connection
 api GET /api/v1/w/{workspace}/audit
 api GET /api/v1/w/{workspace}/bootstrap
 api GET /api/v1/w/{workspace}/connect-codes/{id}

@@ -16,8 +16,9 @@ import (
 func (s *Server) dashboardRoutes() []route {
 	return []route{
 		{"GET /api/v1/w/{ws}/dashboard", s.workspaceMember(s.handleShowDashboard), "Where everything stands: waiting on me, epics with progress, flow, agents, recent decisions, and for an admin of the whole workspace its health.", "project: key", "oversight"},
-		{"GET /api/v1/w/{ws}/cycles/{id}/chart", s.workspaceMember(s.handleShowCycleChart), "A cycle's scope against done, day by day.", "", "oversight"},                 // dashboard_cycle.go
-		{"GET /api/v1/w/{ws}/agents", s.workspaceMember(s.handleListAgents), "What every agent is doing now, and whether anything is listening for it.", "", "oversight"}, // dashboard_agents.go
+		{"GET /api/v1/w/{ws}/cycles/{id}/chart", s.workspaceMember(s.handleShowCycleChart), "A cycle's scope against done, day by day.", "", "oversight"},                                                                                                                                                                                                     // dashboard_cycle.go
+		{"GET /api/v1/w/{ws}/agents", s.workspaceMember(s.handleListAgents), "What every agent is doing now, and how far it is connected: connected_at, when it first proved it reached Quadit from its tool; listening, whether its listener holds its lease or a webhook pushes to it; tool, that of the last connect code it gave back.", "", "oversight"}, // dashboard_agents.go
+		{"GET /api/v1/w/{ws}/agents/connection", s.workspaceMember(s.handleListAgentConnections), "How far every agent is connected, the cheap part of GET agents: {agents: [{handle, user_id, connected_at, listening, tool}]}.", "", "oversight"},                                                                                                           // dashboard_agents.go
 	}
 }
 

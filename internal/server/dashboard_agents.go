@@ -1,4 +1,6 @@
-// Agents: what each is doing right now (/agents, and the dashboard's agents part).
+// Agents: what each is doing right now (/agents, and the dashboard's agents
+// part), and how far each is connected (/agents/connection, the cheap read
+// pages ask again while they show it).
 
 package server
 
@@ -27,9 +29,11 @@ type agentState struct {
 	WaitsOn string `json:"waits_on,omitempty"`
 	// ConnectedAt is when it first proved it reached Quadit from inside its
 	// tool (Member.ConnectedAt); empty: not connected yet. Listening: its
-	// listener holds its lease, or a webhook is heard (listener.go).
+	// listener holds its lease, or a webhook is heard (listener.go). Tool:
+	// the tool of the last connect code it gave back, when it has.
 	ConnectedAt string `json:"connected_at,omitempty"`
 	Listening   bool   `json:"listening"`
+	Tool        string `json:"tool,omitempty"`
 	LastSeen    string `json:"last_seen,omitempty"`
 	LastDid     string `json:"last_action,omitempty"`
 	Open        int    `json:"open_tasks"`
@@ -67,7 +71,7 @@ type agentWork struct {
 	tasks    []core.Task
 	keyOf    map[string]core.Task // the same tasks, by id
 	sessions []core.AgentSession
-	pushed   map[string]bool // members with a webhook that is being delivered
+	reach    agentReach
 	asked    []core.Decision
 	// keys are the keys of the projects the agents are seen in; nil when
 	// that is the whole workspace.
@@ -77,7 +81,7 @@ type agentWork struct {
 // agentWork reads it, for the open tasks given, in the projects given (or
 // the whole workspace).
 func (who *viewer) agentWork(ctx context.Context, tasks []core.Task, names *nameLookup, projects []string) (*agentWork, error) {
-	w := &agentWork{who: who, ctx: ctx, names: names, now: time.Now(), tasks: tasks, pushed: map[string]bool{}, keyOf: map[string]core.Task{}}
+	w := &agentWork{who: who, ctx: ctx, names: names, now: time.Now(), tasks: tasks, keyOf: map[string]core.Task{}}
 	if err := who.db.List(ctx, &w.sessions, store.Q{Where: []store.Cond{store.Eq("state", core.AgentSessionRunning), store.Gte("started_at", w.now.Add(-12*time.Hour).UnixMilli())},
 		Order: "-started_at,id"}); err != nil {
 		return nil, err
@@ -93,15 +97,9 @@ func (who *viewer) agentWork(ctx context.Context, tasks []core.Task, names *name
 			return nil, err
 		}
 	}
-	var hooks []core.Webhook
-	if err := who.db.List(ctx, &hooks, store.Where(store.Live, store.Eq("active", true), store.NotNull("user_id"))); err != nil {
+	var err error
+	if w.reach, err = who.agentReach(ctx); err != nil {
 		return nil, err
-	}
-	for _, hook := range hooks {
-		if hook.Failures >= 3 {
-			continue // it keeps failing: nothing is hearing these
-		}
-		w.pushed[hook.UserID] = true
 	}
 	for _, t := range tasks {
 		w.keyOf[t.ID] = t
@@ -152,8 +150,9 @@ func actsIn(action string, keys map[string]bool) bool {
 // session), has_work (something waits on it), waiting (all its open work
 // waits on others), or idle.
 func (w *agentWork) stateOf(m core.Member) agentState {
-	a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: formatTime(m.LastSeenAt), LastDid: w.lastAction(m),
-		ConnectedAt: formatTime(m.ConnectedAt), Listening: m.ListeningUntil > w.now.UnixMilli() || w.pushed[m.UserID]}
+	a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: formatTime(m.LastSeenAt), LastDid: w.lastAction(m)}
+	c := w.reach.of(m, w.now)
+	a.ConnectedAt, a.Listening, a.Tool = c.ConnectedAt, c.Listening, c.Tool
 
 	// The open tasks: what waits on it, what is its own, which of those wait
 	// on someone else, and the task it holds (which makes it working).
@@ -274,4 +273,72 @@ func (who *viewer) dashboardAgents(ctx context.Context, scope dashboardScope) ([
 		only = scope.covers.projects
 	}
 	return who.agentStates(ctx, open, scope.names, only)
+}
+
+// agentConnection is how far one agent is connected (agentState has the
+// same fields, with what it is doing).
+type agentConnection struct {
+	Handle      string `json:"handle"`
+	UserID      string `json:"user_id"`
+	ConnectedAt string `json:"connected_at,omitempty"`
+	Listening   bool   `json:"listening"`
+	Tool        string `json:"tool,omitempty"`
+}
+
+// agentReach is what says how far each agent is connected beside its own
+// row: who a working webhook pushes to, and the tool of the last connect
+// code each gave back.
+type agentReach struct {
+	pushed map[string]bool
+	tools  map[string]string
+}
+
+// agentReach reads it.
+func (who *viewer) agentReach(ctx context.Context) (agentReach, error) {
+	r := agentReach{pushed: map[string]bool{}, tools: map[string]string{}}
+	var hooks []core.Webhook
+	if err := who.db.List(ctx, &hooks, store.Where(store.Live, store.Eq("active", true), store.NotNull("user_id"))); err != nil {
+		return r, err
+	}
+	for _, hook := range hooks {
+		if hook.Failures >= 3 {
+			continue // it keeps failing: nothing is hearing these
+		}
+		r.pushed[hook.UserID] = true
+	}
+	var codes []core.ConnectCode
+	if err := who.db.List(ctx, &codes, store.Q{Where: []store.Cond{store.NotNull("used_at")}, Order: "-used_at"}); err != nil {
+		return r, err
+	}
+	for _, code := range codes {
+		if _, seen := r.tools[code.AgentID]; !seen {
+			r.tools[code.AgentID] = code.Tool
+		}
+	}
+	return r, nil
+}
+
+// of is how far agent m is connected at now.
+func (r agentReach) of(m core.Member, now time.Time) agentConnection {
+	return agentConnection{Handle: "@" + m.Handle, UserID: m.UserID, ConnectedAt: formatTime(m.ConnectedAt),
+		Listening: m.ListeningUntil > now.UnixMilli() || r.pushed[m.UserID], Tool: r.tools[m.UserID]}
+}
+
+// handleListAgentConnections is how far every agent is connected: the
+// cheap part of /agents, which pages read again while they show it.
+func (s *Server) handleListAgentConnections(x *c) error {
+	var members []core.Member
+	if err := x.db.List(x.ctx(), &members, store.Q{Where: []store.Cond{store.Eq("kind", core.KindAgent), store.Null("removed_at"), store.Null("suspended_at")}, Order: "handle"}); err != nil {
+		return err
+	}
+	reach, err := x.agentReach(x.ctx())
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	out := make([]agentConnection, len(members))
+	for i, m := range members {
+		out[i] = reach.of(m, now)
+	}
+	return x.ok(map[string]any{"agents": out})
 }

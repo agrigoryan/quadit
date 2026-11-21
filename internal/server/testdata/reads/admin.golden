@@ -32333,6 +32333,25 @@ OPS Done: 1
 @artist  working on SVA-1  (nothing is listening for it)  open=1 queue=0
 @ops  working  (nothing is listening for it)  open=1 queue=0
 
+=== GET /api/v1/w/games/agents/connection
+200
+{
+ "agents": [
+  {
+   "connected_at": "<minute>",
+   "handle": "@artist",
+   "listening": false,
+   "user_id": "<@artist>"
+  },
+  {
+   "connected_at": "<minute>",
+   "handle": "@ops",
+   "listening": false,
+   "user_id": "<@ops>"
+  }
+ ]
+}
+
 === GET /api/v1/w/games/files/<file notes.txt>
 200
 {
@@ -40526,7 +40545,7 @@ Nothing here needs this product to be read.
  {
   "actor_id": "<@aram>",
   "at": 1700000000000,
-  "audience_id": "<@bea>",
+  "audience_id": "<@artist>",
   "change_id": "<id #186>",
   "data": {
    "row": {
@@ -40540,7 +40559,7 @@ Nothing here needs this product to be read.
     "task_id": "<task SVA-1>",
     "title": "SVA-1 Boss design",
     "type": "comment",
-    "user_id": "<@bea>"
+    "user_id": "<@artist>"
    }
   },
   "entity_id": "<id #466>",
@@ -40554,7 +40573,7 @@ Nothing here needs this product to be read.
  {
   "actor_id": "<@aram>",
   "at": 1700000000000,
-  "audience_id": "<@artist>",
+  "audience_id": "<@bea>",
   "change_id": "<id #186>",
   "data": {
    "row": {
@@ -40568,7 +40587,7 @@ Nothing here needs this product to be read.
     "task_id": "<task SVA-1>",
     "title": "SVA-1 Boss design",
     "type": "comment",
-    "user_id": "<@artist>"
+    "user_id": "<@bea>"
    }
   },
   "entity_id": "<id #467>",
