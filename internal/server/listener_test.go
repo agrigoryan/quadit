@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -458,5 +459,83 @@ func TestTheFirstWaitStartsAtWhatIsRecentAndUnread(t *testing.T) {
 				t.Fatalf("an agent with nothing waiting got %+v", page)
 			}
 		})
+	})
+}
+
+// TestAnAcknowledgmentCannotSlipPastATakeover: a takeover that comes while
+// an acknowledgment with the old lease is being made either waits for it
+// or makes it refused: it never lands between the check of the lease and
+// the move of the cursor.
+func TestAnAcknowledgmentCannotSlipPastATakeover(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, plain store.Store) {
+		fs := newFaultyStore(plain)
+		s := newSite(t, fs)
+		coder := s.agentToken(t, "coder")
+		s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys", "assignee": "@coder"})
+		var held listened
+		s.call(t, nil, coder, "GET", w+"/listen?wait=0", nil, 200, &held)
+		var ws core.Workspace
+		if err := plain.Get(context.Background(), &ws, store.Eq("slug", "games")); err != nil {
+			t.Fatal(err)
+		}
+
+		// Just as the cursor is about to move, another session takes the lease over, written straight to the
+		// database; it is given a moment to land.
+		landed := false
+		fs.faults.arm(fault{op: "upsert", table: "cursors", times: 1, match: func(map[string]any, []store.Cond) bool {
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				_ = plain.Write(context.Background(), ws.ID, func(tx store.Tx) error { // an error leaves landed false, which the test then says
+					_, err := tx.Update(context.Background(), "members", map[string]any{"listen_lease": "TAKENXYZ", "listening_until": time.Now().Add(time.Hour).UnixMilli()},
+						store.Eq("handle", "coder"))
+					return err
+				})
+			}()
+			select {
+			case <-done:
+				landed = true
+			case <-time.After(500 * time.Millisecond):
+			}
+			return false // the move itself goes ahead
+		}})
+		req, _ := http.NewRequest(http.MethodPut, s.url+w+"/cursors/listen", strings.NewReader(`{"seq":`+strconv.FormatInt(held.Item.Seq, 10)+`,"lease":"`+held.Lease+`"}`))
+		req.Header.Set("Authorization", "Bearer "+coder)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if landed && resp.StatusCode == 200 {
+			t.Fatal("a takeover landed between the check of the old lease and the move of the cursor, and the move was made")
+		}
+	})
+}
+
+// TestALoginKeptToSomeProjectsDoesNotSkipTheAgentsOtherWork: the first
+// wait of a login kept to some projects starts the agent's cursor where
+// its whole inbox says, so a later listener that sees everything still
+// gets the unread work of the other projects.
+func TestALoginKeptToSomeProjectsDoesNotSkipTheAgentsOtherWork(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		coder := s.agentToken(t, "coder")
+		s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+		s.change(t, s.owner, "", "project.create", M{"key": "ART", "name": "Art"})
+		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys", "assignee": "@coder"})
+		var limited struct{ Token string }
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@coder", "projects": []string{"ART"}}, 201, &limited)
+		var first listened
+		s.call(t, nil, limited.Token, "GET", w+"/listen?wait=0", nil, 200, &first)
+		if first.Item != nil {
+			t.Fatalf("a login kept to ART was handed %+v", first.Item)
+		}
+		var full listened
+		s.call(t, nil, coder, "GET", w+"/listen?wait=0&take=1", nil, 200, &full)
+		if full.Item == nil || full.Item.Task != "OPS-1" {
+			t.Fatalf("the listener that sees everything got %+v after a login kept to ART listened first", full.Item)
+		}
 	})
 }

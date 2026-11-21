@@ -14,6 +14,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -77,8 +78,26 @@ func (s *Server) handleNextInboxItem(x *c) error {
 	if err != nil {
 		return err
 	}
-	answered := false
-	defer func() { s.endWait(x, lease, taken, answered) }()
+	// From here, however the request ends, the lease's life is set by
+	// whether its answer went out.
+	handedOver := false
+	defer func() { s.endWait(x, lease, taken, handedOver) }()
+	answer := func(out map[string]any) error {
+		if err := x.ok(out); err != nil {
+			return err
+		}
+		if f, ok := x.w.(http.Flusher); ok {
+			f.Flush()
+		}
+		// The caller still there once the answer is sent is the one that learned the lease.
+		handedOver = x.ctx().Err() == nil
+		return nil
+	}
+	if x.member.ConnectedAt == 0 {
+		if err := s.eng.System(x.ctx(), x.ws.ID, x.member.UserID, func(sys *engine.Sys) error { return sys.Connected() }); err != nil {
+			return err
+		}
+	}
 	start, skipped, err := s.listenStart(x, name)
 	if err != nil {
 		return err
@@ -94,8 +113,7 @@ func (s *Server) handleNextInboxItem(x *c) error {
 		out["skipped"] = skipped
 	}
 	if len(page.events) == 0 {
-		answered = true
-		return x.ok(out)
+		return answer(out)
 	}
 	// The wait may have slept through a takeover: the item is this
 	// session's only if the lease still is, as the write that took it
@@ -124,17 +142,18 @@ func (s *Server) handleNextInboxItem(x *c) error {
 	}
 	note.Seq = ev.Seq
 	out["seq"], out["item"], out["line"] = ev.Seq, x.inboxItem(x.ctx(), note, names), x.eventLine(x.ctx(), ev, names)
-	answered = true
-	return x.ok(out)
+	return answer(out)
 }
 
 // listenStart is where the listener reads on from in cursor name, and how
 // many unread items it leaves behind the first time. A cursor never moved
 // is set, once, to just before the oldest unread inbox item of the last
 // firstLook (the comment written a minute before the person said "listen"
-// is handled), else to the present (weeks of history are not replayed);
-// the unread items before it are counted, for the agent to say where they
-// are.
+// is handled), else to the present (weeks of history are not replayed).
+// The position is found in the agent's whole inbox, whatever this login
+// may see, since the cursor is the agent's: a login kept to some projects
+// does not set it past unread work in others. Only the count of what is
+// left behind is of what this login sees.
 func (s *Server) listenStart(x *c, name string) (start int64, skipped int, err error) {
 	ctx := x.ctx()
 	var cursor core.Cursor
@@ -147,13 +166,14 @@ func (s *Server) listenStart(x *c, name string) (start int64, skipped int, err e
 		return 0, 0, err
 	}
 	unread := []store.Cond{store.Null("read_at"), store.Null("archived_at")}
-	recent, err := x.ownNotes(ctx, append(unread, store.Gte("created_at", time.Now().Add(-firstLook).UnixMilli())), 0)
-	if err != nil {
+	var oldest []core.Notification
+	if err := x.db.List(ctx, &oldest, store.Q{Where: append([]store.Cond{store.Eq("user_id", x.member.UserID), store.Gte("created_at", time.Now().Add(-firstLook).UnixMilli())}, unread...),
+		Order: "seq", Limit: 1}); err != nil {
 		return 0, 0, err
 	}
 	start = ws.Seq
-	if n := len(recent); n > 0 {
-		start = recent[n-1].Seq - 1 // newest first: the last is the oldest
+	if len(oldest) > 0 {
+		start = oldest[0].Seq - 1
 	}
 	older, err := x.ownNotes(ctx, append(unread, store.Lte("seq", start)), 0)
 	if err != nil {
@@ -168,14 +188,15 @@ func (s *Server) listenStart(x *c, name string) (start int64, skipped int, err e
 // given, and returns its id and whether it is new (its holder does not know
 // it yet): the lease given is renewed while it lives, and a new one is
 // taken when none lives or, with take, from the session that holds it.
-// Another session's live lease refuses the wait. Taking a lease proves an
-// agent reached Quadit.
+// Another session's live lease refuses the wait. The write is not cut off
+// by the caller going away, so that when it answers, what it did is known.
 func (s *Server) holdLease(x *c, given string, take bool, wait time.Duration) (lease string, taken bool, err error) {
 	now := time.Now()
 	lease = given
-	err = s.st.Write(x.ctx(), x.ws.ID, func(tx store.Tx) error {
+	ctx := context.WithoutCancel(x.ctx())
+	err = s.st.Write(ctx, x.ws.ID, func(tx store.Tx) error {
 		var m core.Member
-		if err := tx.Get(x.ctx(), &m, store.Eq("user_id", x.member.UserID)); err != nil {
+		if err := tx.Get(ctx, &m, store.Eq("user_id", x.member.UserID)); err != nil {
 			return err
 		}
 		live := leaseLives(m, now)
@@ -186,31 +207,27 @@ func (s *Server) holdLease(x *c, given string, take bool, wait time.Duration) (l
 		case given == "" || given != m.ListenLease:
 			lease, taken = randomCode(leaseLength), true
 		}
-		_, err := tx.Update(x.ctx(), "members", map[string]any{"listen_lease": lease, "listening_until": now.Add(wait + leaseLife).UnixMilli(), "listen_heard_at": now.UnixMilli()},
+		_, err := tx.Update(ctx, "members", map[string]any{"listen_lease": lease, "listening_until": now.Add(wait + leaseLife).UnixMilli(), "listen_heard_at": now.UnixMilli()},
 			store.Eq("user_id", m.UserID))
 		return err
 	})
 	if err != nil {
 		return "", false, err
 	}
-	if x.member.ConnectedAt == 0 {
-		if err := s.eng.System(x.ctx(), x.ws.ID, x.member.UserID, func(sys *engine.Sys) error { return sys.Connected() }); err != nil {
-			return "", false, err
-		}
-	}
 	return lease, taken, nil
 }
 
 // endWait sets the lease's life when its holder's wait ends: leaseLife
-// after a wait that answered; nothing left of a lease taken by a wait that
-// did not answer, since its id never reached anyone; abandonedLife after a
-// wait the client gave up on, or that failed. It is best effort: the lease
-// then ends when the wait was to end, plus leaseLife, later than it should.
-func (s *Server) endWait(x *c, lease string, taken, answered bool) {
+// after a wait whose answer went out; nothing left of a lease taken by a
+// wait whose answer did not, since its id never reached anyone;
+// abandonedLife after a wait the client gave up on, or that failed. It is
+// best effort: the lease then ends when the wait was to end, plus
+// leaseLife, later than it should.
+func (s *Server) endWait(x *c, lease string, taken, handedOver bool) {
 	now := time.Now()
 	set := map[string]any{"listening_until": now.Add(abandonedLife).UnixMilli()}
 	switch {
-	case answered:
+	case handedOver:
 		set["listening_until"] = now.Add(leaseLife).UnixMilli()
 	case taken:
 		set = map[string]any{"listening_until": nil, "listen_lease": nil}

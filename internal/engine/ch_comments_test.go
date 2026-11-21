@@ -267,6 +267,15 @@ func TestACommentReachesWhomTheTaskIsWith(t *testing.T) {
 		if got := comments(coder); got != 1 {
 			t.Fatalf("the agent was told of its own comment: %d comment items", got)
 		}
+
+		t.Run("an agent's comment reaches only those who follow the task", func(t *testing.T) {
+			// bea, an agent assigned the task, stopped following it: coder's comment does not reach it, so two
+			// agents on one task do not answer each other for ever.
+			w.do(coder, "comment.create", M{"task": "OPS-1", "body": "Done with the keys."})
+			if got := comments(bea); got != 1 {
+				t.Fatalf("an agent's comment reached the assignee who does not follow the task: %d comment items", got)
+			}
+		})
 	})
 }
 

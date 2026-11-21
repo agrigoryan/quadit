@@ -178,12 +178,16 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 	if err := c.handOn(cm, t, a, note); err != nil {
 		return err
 	}
-	// A comment reaches whom the task is with, whether or not they follow
-	// it: its assignee and whoever it waits on. Then its followers.
+	// A person's comment reaches whom the task is with, whether or not they
+	// follow it: its assignee and whoever it waits on. An agent's reaches
+	// only its followers (and whom it mentions or hands the task to), so
+	// two agents on one task do not keep answering each other.
 	what := about{entity: "comment", id: cm.ID, text: cm.Body}
-	for _, with := range []string{t.AssigneeID, t.WaitingOnID} {
-		if err := c.notifyTask(with, note, t, what); err != nil {
-			return err
+	if c.actor.Kind != core.KindAgent {
+		for _, with := range []string{t.AssigneeID, t.WaitingOnID} {
+			if err := c.notifyTask(with, note, t, what); err != nil {
+				return err
+			}
 		}
 	}
 	if err := c.notifyWatchers(t, note, what); err != nil {

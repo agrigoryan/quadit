@@ -506,6 +506,7 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "id": "<id #477>",
    "seq": 275,
    "snippet": "in your view \"Ops infra\"",
@@ -516,6 +517,7 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "comment": "<comment OPS-1 ops>",
    "id": "<id #465>",
    "seq": 168,
@@ -540,6 +542,7 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "id": "<id #459>",
    "seq": 150,
    "snippet": "Which night?",
@@ -626,6 +629,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "id": "<id #477>",
    "seq": 275,
    "snippet": "in your view \"Ops infra\"",
@@ -636,6 +640,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "comment": "<comment OPS-1 ops>",
    "id": "<id #465>",
    "seq": 168,
@@ -660,6 +665,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "id": "<id #459>",
    "seq": 150,
    "snippet": "Which night?",
@@ -695,6 +701,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "id": "<id #477>",
    "seq": 275,
    "snippet": "in your view \"Ops infra\"",
@@ -705,6 +712,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "comment": "<comment OPS-1 ops>",
    "id": "<id #465>",
    "seq": 168,
@@ -729,6 +737,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "id": "<id #459>",
    "seq": 150,
    "snippet": "Which night?",
@@ -773,6 +782,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "id": "<id #477>",
    "seq": 275,
    "snippet": "in your view \"Ops infra\"",
@@ -783,6 +793,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "comment": "<comment OPS-1 ops>",
    "id": "<id #465>",
    "seq": 168,

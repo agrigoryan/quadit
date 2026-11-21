@@ -145,6 +145,7 @@ type inboxItem struct {
 	Seq     int64  `json:"seq"`
 	Type    string `json:"type"`
 	By      string `json:"by"`
+	ByAgent bool   `json:"by_agent,omitempty"` // whoever it is from is an agent
 	Task    string `json:"task,omitempty"`
 	Title   string `json:"title,omitempty"`
 	Snippet string `json:"snippet,omitempty"`
@@ -192,8 +193,8 @@ func (who *viewer) inboxItems(ctx context.Context, query inboxQuery) ([]inboxIte
 
 // inboxItem is one of the viewer's notifications as the inbox lists it.
 func (who *viewer) inboxItem(ctx context.Context, note core.Notification, names *nameLookup) inboxItem {
-	item := inboxItem{ID: note.ID, Seq: note.Seq, Type: note.Type, By: names.handle(note.ActorID), Title: note.Title, Snippet: note.Snippet, At: formatTime(note.CreatedAt), Read: note.ReadAt != 0,
-		noteRefs: who.refsOf(ctx, note)}
+	item := inboxItem{ID: note.ID, Seq: note.Seq, Type: note.Type, By: names.handle(note.ActorID), ByAgent: names.members[note.ActorID].Kind == core.KindAgent,
+		Title: note.Title, Snippet: note.Snippet, At: formatTime(note.CreatedAt), Read: note.ReadAt != 0, noteRefs: who.refsOf(ctx, note)}
 	if note.TaskID != "" {
 		item.Task, _, _ = strings.Cut(note.Title, " ") // a task's notification is titled with its key first
 	}

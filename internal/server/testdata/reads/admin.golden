@@ -567,6 +567,7 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "comment": "<comment SVA-1 for the webhook>",
    "id": "<id #157>",
    "seq": 278,
@@ -579,6 +580,7 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "id": "<id #158>",
    "seq": 272,
    "snippet": "in your view \"Art bugs\"",
@@ -589,6 +591,7 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "comment": "<comment OPS-1 ops>",
    "id": "<id #159>",
    "seq": 167,
@@ -601,6 +604,7 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "comment": "<comment SVA-1 result>",
    "id": "<id #160>",
    "seq": 160,
@@ -613,6 +617,7 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "id": "<id #161>",
    "seq": 143,
    "snippet": "Which vault?",
@@ -623,6 +628,7 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "id": "<id #162>",
    "seq": 137,
    "snippet": "How many phases?",
@@ -633,6 +639,7 @@ rule: Write short.
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "id": "<id #163>",
    "seq": 130,
    "snippet": "Which explosion?",
@@ -694,6 +701,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "comment": "<comment SVA-1 for the webhook>",
    "id": "<id #157>",
    "seq": 278,
@@ -706,6 +714,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "id": "<id #158>",
    "seq": 272,
    "snippet": "in your view \"Art bugs\"",
@@ -716,6 +725,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "comment": "<comment OPS-1 ops>",
    "id": "<id #159>",
    "seq": 167,
@@ -728,6 +738,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "comment": "<comment SVA-1 result>",
    "id": "<id #160>",
    "seq": 160,
@@ -740,6 +751,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "id": "<id #161>",
    "seq": 143,
    "snippet": "Which vault?",
@@ -750,6 +762,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "id": "<id #162>",
    "seq": 137,
    "snippet": "How many phases?",
@@ -760,6 +773,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "id": "<id #163>",
    "seq": 130,
    "snippet": "Which explosion?",
@@ -777,6 +791,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "comment": "<comment SVA-1 for the webhook>",
    "id": "<id #157>",
    "seq": 278,
@@ -789,6 +804,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "id": "<id #158>",
    "seq": 272,
    "snippet": "in your view \"Art bugs\"",
@@ -799,6 +815,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "comment": "<comment OPS-1 ops>",
    "id": "<id #159>",
    "seq": 167,
@@ -811,6 +828,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "comment": "<comment SVA-1 result>",
    "id": "<id #160>",
    "seq": 160,
@@ -823,6 +841,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@ops",
+   "by_agent": true,
    "id": "<id #161>",
    "seq": 143,
    "snippet": "Which vault?",
@@ -833,6 +852,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "id": "<id #162>",
    "seq": 137,
    "snippet": "How many phases?",
@@ -843,6 +863,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "id": "<id #163>",
    "seq": 130,
    "snippet": "Which explosion?",
@@ -870,6 +891,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "comment": "<comment SVA-1 for the webhook>",
    "id": "<id #157>",
    "seq": 278,
@@ -882,6 +904,7 @@ seq: 280
   {
    "at": "<minute>",
    "by": "@artist",
+   "by_agent": true,
    "id": "<id #158>",
    "seq": 272,
    "snippet": "in your view \"Art bugs\"",
