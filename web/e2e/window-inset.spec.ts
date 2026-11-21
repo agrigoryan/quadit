@@ -19,7 +19,7 @@ import { expect, test } from "./quadit";
  * desktop suite's macOS run; these are the app's intended ones.
  */
 const AREA = { left: 86, height: 44 };
-/** Where the three buttons are drawn in the pictures: macOS's, 14px wide and 20px apart, centred in the strip. */
+/** The three buttons as the pictures draw them, near enough to macOS's: 12px dots 20px apart, centred in the strip. */
 const BUTTONS = { x: 16, size: 12, step: 20, colours: ["#ff5f57", "#febc2e", "#28c840"] };
 
 const DESKTOP = { width: 1280, height: 860 };
