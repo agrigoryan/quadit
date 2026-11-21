@@ -65,7 +65,19 @@ export type DesktopRequest =
    * tasks, the third handed to `agent` (a member id) when given; the outcome's
    * path is the "Getting started" project's task list.
    */
-  | { kind: "samples"; agent?: string };
+  | { kind: "samples"; agent?: string }
+  /**
+   * A connect code for the agent `agent` (a member id) in the tool `tool`
+   * (its name, "Codex"), desktop contract §11: the outcome's `id` and
+   * `code`. A new code for the same agent and tool replaces the open one.
+   */
+  | { kind: "connect-code"; agent: string; tool: string }
+  /**
+   * What the server says of the agent `agent` (a member id): the outcome's
+   * `connected`, `listening`, and `codeUsed`, whether the code whose id is
+   * `code` was given back.
+   */
+  | { kind: "agent-state"; agent: string; code?: string };
 
 export type DesktopOutcome =
   | {
@@ -73,6 +85,13 @@ export type DesktopOutcome =
       path?: string;
       agent?: { id: string; handle: string; name: string };
       token?: { id: string; secret: string };
+      /** A connect code (connect-code): its id, and the code itself, shown once. */
+      id?: string;
+      code?: string;
+      /** An agent's state (agent-state). */
+      connected?: boolean;
+      listening?: boolean;
+      codeUsed?: boolean;
     }
   | { ok: false; message: string; path?: string };
 
@@ -92,7 +111,10 @@ export interface QuaditDesktop {
   publish(summary: DesktopSummary | null): void;
   /** The one handler for requests the person made in the app; gives the function that stops it. */
   onRequest(handler: (request: DesktopRequest) => Promise<DesktopOutcome>): () => void;
-  /** Opens the app's Connect agents window for this server. Present only where the app can connect tools (not on Windows). */
+  /**
+   * Opens the app's Connect agents page over this page's window, for its
+   * server and workspace. Present only where the app can connect tools (not on Windows).
+   */
   openConnect?(): void;
 }
 
@@ -106,7 +128,7 @@ export const BRIDGE_REQUEST = "bridge:request";
 export const BRIDGE_OUTCOME = "bridge:outcome";
 /** Page to app: whether the page has a request handler now. */
 export const BRIDGE_LISTENING = "bridge:listening";
-/** Page to app: open the Connect agents window (no payload). */
+/** Page to app: open the Connect agents page over this window (no payload). */
 export const BRIDGE_OPEN_CONNECT = "bridge:open-connect";
 /**
  * The preload to the app, synchronously: the origin of the server whose
@@ -125,6 +147,8 @@ const REQUEST_MAX = 500;
 const PLACEHOLDER_MAX = 80;
 const MESSAGE_MAX = 500;
 const SECRET_MAX = 500;
+/** A connect code is six characters; this leaves room for a longer one without taking a sentence. */
+const CODE_MAX = 32;
 const NOTE_ACTIONS_MAX = 3;
 const WAITING_MAX = 20;
 const WAITING_ACTIONS_MAX = 6;
@@ -262,7 +286,7 @@ export function summaryOf(raw: unknown): DesktopSummary | null {
 /** `raw` as a page's answer to a request, as fresh plain data, or null when it is none. */
 export function outcomeOf(raw: unknown): DesktopOutcome | null {
   return kept((): DesktopOutcome => {
-    const { ok, path, message, agent, token } = record(raw);
+    const { ok, path, message, agent, token, id, code, connected, listening, codeUsed } = record(raw);
     const where = optional(path, (v) => exact(v, PATH_MAX));
     if (ok === false) return defined({ ok, message: shown(message, MESSAGE_MAX), path: where });
     if (ok !== true) throw refused;
@@ -277,6 +301,11 @@ export function outcomeOf(raw: unknown): DesktopOutcome | null {
         const t = record(v);
         return { id: exact(t.id, ID_MAX), secret: exact(t.secret, SECRET_MAX) };
       }),
+      id: optional(id, (v) => exact(v, ID_MAX)),
+      code: optional(code, (v) => exact(v, CODE_MAX)),
+      connected: optional(connected, flag),
+      listening: optional(listening, flag),
+      codeUsed: optional(codeUsed, flag),
     });
   });
 }

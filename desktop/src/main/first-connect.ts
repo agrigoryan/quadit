@@ -6,8 +6,10 @@
 // plan "See the files" showed, takes one back with Undo, and at the end asks
 // the workspace's page for its sample tasks, the third handed to the first
 // tool connected that is an agent there, and opens the path returned. It is
-// Connect (connections.ts) with the choices made for the person; the Connect
-// window keeps every choice.
+// Connect (connections.ts) with the choices made for the person; Connect
+// agents keeps every choice. Where a connected tool stands with Quadit (its
+// connect code given back or not: desktop contract §11) its card asks of
+// Connect itself (connect-page.ts), and the end never waits for it.
 //
 // One is made for each run of the first run (first-run.ts), so that work a
 // closed run started never touches a later one. What it does is done one
@@ -74,6 +76,7 @@ export class FirstConnect {
         found: h.installed,
         ownLogin: h.cliIdentity === "own",
         worksAs: h.cliIdentity === "default" ? defaultLoginWords(defaultLogin) : null,
+        listenVerified: h.listenVerified,
       }));
     this.offered = tools.filter((t) => t.found);
     return { tools, addsCommand: !cli.found && cli.linkInto !== null };

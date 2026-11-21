@@ -22,6 +22,13 @@
 // written. A change several connections need (the shared skill file, the
 // default login, the link with its folder and profile line) is made once,
 // shared, and taken back with the last of them.
+//
+// Written is not connected (desktop contract §11): a tool connected through
+// the quadit command, as an agent of the workspace, gets a connect code
+// (asked of the workspace's page, kept in the ledger so that its line can be
+// shown again), which the agent gives back from inside the tool to prove the
+// connection; where it stands is asked of the page again whenever the
+// person's page wants it (handshake.ts).
 
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -42,6 +49,7 @@ import {
   targetOf,
   writeEdits,
 } from "@/main/config-edits";
+import { handshakeOf, type OpenCode } from "@/main/handshake";
 import { HARNESSES, type Harness } from "@/main/harnesses";
 import type { QuaditCli } from "@/main/quadit-cli";
 import type { DesktopOutcome, DesktopRequest, DesktopSummary } from "@/shared/bridge";
@@ -53,6 +61,7 @@ import type {
   PlanFile,
   Planned,
   Disconnected,
+  Handshake,
   PlanView,
   Refused,
   Unrevoked,
@@ -82,6 +91,8 @@ interface Connection {
   edits: Applied[];
   /** The token behind the quadit login among the edits (its config file); revoked when that login is taken back. */
   token: { id: string; label: string; config: string; serverId: string; workspaceId: string } | null;
+  /** The connect code open for the agent in this tool, until it is given back; absent in ledgers from before codes. */
+  code?: OpenCode | null;
   at: number;
 }
 
@@ -177,6 +188,7 @@ export class Connections {
           installed: this.installed(harness, look.path),
           mcp: !!harness.mcp,
           cliIdentity: harness.env ? "own" : "default",
+          listenVerified: harness.listenVerified,
           connected: connection
             ? {
                 methods: connection.methods,
@@ -438,6 +450,13 @@ export class Connections {
       const link = plan.applied.find((record) => record.kind === "link");
       if (link) this.parts.cli.linked(link.path);
 
+      // The agent of this workspace the tool works as can prove the connection from inside it, given a code.
+      const member = choiceHolds ? agent && { id: agent.id, handle: agent.handle } : this.memberOf(plan, worksAs);
+      const code =
+        member && choice.methods.includes("cli")
+          ? await this.makeCode(choice.serverId, choice.workspaceId, member.id, harness.name)
+          : null;
+
       const records = plan.applied.map((record) =>
         record.kind === "file"
           ? { ...record, sha256: sha256(readText(record.path) ?? ""), backup: backups.get(record.path) ?? null }
@@ -451,6 +470,7 @@ export class Connections {
         agent: { id: worksAs.id, handle: worksAs.handle },
         edits: [...records, ...plan.shared],
         token,
+        code: code?.ok ? code.code : null,
         at: Date.now(),
       };
       this.saveLedger(ledger);
@@ -460,9 +480,66 @@ export class Connections {
       return {
         ok: true,
         hint: newPath ? `${hint} Terminals opened from now on find quadit; reopen any that are open now.` : hint,
-        agent: choiceHolds ? agent && { id: agent.id, handle: agent.handle } : this.memberOf(plan, worksAs),
+        agent: member,
       };
     });
+  }
+
+  /**
+   * Where a tool Connect set up stands with Quadit, asked of the page of the
+   * workspace it was connected to (handshake.ts); null when it is not set up.
+   * A code given back is spent: the ledger lets it go.
+   */
+  async handshake(harnessId: string): Promise<Handshake | null> {
+    const connection = this.ledger().harnesses[harnessId];
+    if (!connection) return null;
+    const code = connection.code ?? null;
+    const answer = await this.parts.ask(connection.serverId, connection.workspaceId, {
+      kind: "agent-state",
+      agent: connection.agent.id,
+      ...(code ? { code: code.id } : {}),
+    });
+    if (code && answer.ok && answer.codeUsed === true) {
+      await this.inTurn(async () => {
+        const ledger = this.ledger();
+        const now = ledger.harnesses[harnessId];
+        if (now?.code?.id !== code.id) return;
+        now.code = null;
+        this.saveLedger(ledger);
+      });
+    }
+    return handshakeOf({ methods: connection.methods, code }, answer, Date.now());
+  }
+
+  /** Makes a new connect code for a tool Connect set up (the one it had ran out, or it had none), replacing the old one. */
+  newCode(harnessId: string): Promise<{ ok: true } | Refused> {
+    return this.inTurn(async () => {
+      const connection = this.ledger().harnesses[harnessId];
+      const harness = HARNESSES.find((h) => h.id === harnessId);
+      if (!connection || !harness) return { ok: false, error: `${harness?.name ?? "It"} is not connected.` };
+      const made = await this.makeCode(connection.serverId, connection.workspaceId, connection.agent.id, harness.name);
+      if (!made.ok) return made;
+      // Read again: what was asked of the page took a while.
+      const ledger = this.ledger();
+      const now = ledger.harnesses[harnessId];
+      if (!now) return { ok: false, error: `${harness.name} is not connected.` };
+      now.code = made.code;
+      this.saveLedger(ledger);
+      return { ok: true };
+    });
+  }
+
+  /** Asks the workspace's page for a connect code for `agent` (a member id) in the tool named `tool`. */
+  private async makeCode(
+    serverId: string,
+    workspaceId: string,
+    agent: string,
+    tool: string,
+  ): Promise<{ ok: true; code: OpenCode } | Refused> {
+    const made = await this.parts.ask(serverId, workspaceId, { kind: "connect-code", agent, tool });
+    if (!made.ok) return { ok: false, error: made.message };
+    if (!made.id || !made.code) return { ok: false, error: "Your workspace made no code: update Quadit there." };
+    return { ok: true, code: { id: made.id, code: made.code, at: Date.now() } };
   }
 
   /**

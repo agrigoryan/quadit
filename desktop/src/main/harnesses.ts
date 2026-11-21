@@ -29,6 +29,13 @@ export interface Harness {
   /** The skills folder it reads, under the home folder. */
   skills: string;
   /**
+   * Whether an agent in it was seen to listen (desktop contract §11: the
+   * skills pass, scripts/agent-listen-check.sh, docs/agents.md's table):
+   * it held its waits and answered what came in. A tool not verified says
+   * so on its card.
+   */
+  listenVerified: boolean;
+  /**
    * The changes that set QUADIT_CONFIG=`config` for the commands its agent
    * runs. Only where its setting for that is documented and was seen to
    * reach those commands; without one, the quadit command in it works as
@@ -53,6 +60,7 @@ export const HARNESSES: readonly Harness[] = [
     command: "claude",
     trace: ".claude",
     skills: ".claude/skills",
+    listenVerified: true,
     env: (home, config) => [
       { kind: "json", path: join(home, ".claude", "settings.json"), keyPath: ["env", "QUADIT_CONFIG"], value: config },
     ],
@@ -95,6 +103,7 @@ export const HARNESSES: readonly Harness[] = [
     command: "codex",
     trace: ".codex",
     skills: ".agents/skills",
+    listenVerified: true,
     env: (home, config) => [
       {
         kind: "toml",
@@ -130,6 +139,7 @@ export const HARNESSES: readonly Harness[] = [
     command: "gemini",
     trace: ".gemini/settings.json",
     skills: ".agents/skills",
+    listenVerified: false,
     mcp: {
       changes: (home, url, unattended) => [
         {
@@ -151,6 +161,7 @@ export const HARNESSES: readonly Harness[] = [
     command: "agy",
     trace: ".gemini/antigravity-cli",
     skills: ".gemini/config/skills",
+    listenVerified: true,
     mcp: {
       changes: (home, url) => [
         {
@@ -170,6 +181,7 @@ export const HARNESSES: readonly Harness[] = [
     command: "cursor-agent",
     trace: ".cursor",
     skills: ".agents/skills",
+    listenVerified: false,
     mcp: {
       changes: (home, url) => [
         { kind: "json", path: join(home, ".cursor", "mcp.json"), keyPath: ["mcpServers", "quadit"], value: { url } },
@@ -184,6 +196,7 @@ export const HARNESSES: readonly Harness[] = [
     command: "opencode",
     trace: ".config/opencode",
     skills: ".agents/skills",
+    listenVerified: false,
     mcp: {
       changes: (home, url) => [
         { kind: "json", path: opencodeConfig(home), keyPath: ["mcp", "quadit"], value: { type: "remote", url } },
@@ -191,7 +204,7 @@ export const HARNESSES: readonly Harness[] = [
       signIn: "In a terminal, run: opencode mcp auth quadit",
     },
   },
-  { id: "pi", name: "pi", initials: "pi", command: "pi", trace: ".pi", skills: ".agents/skills" },
+  { id: "pi", name: "pi", initials: "pi", command: "pi", trace: ".pi", skills: ".agents/skills", listenVerified: false },
   {
     id: "copilot",
     name: "GitHub Copilot CLI",
@@ -199,6 +212,7 @@ export const HARNESSES: readonly Harness[] = [
     command: "copilot",
     trace: ".copilot",
     skills: ".agents/skills",
+    listenVerified: false,
   },
 ];
 

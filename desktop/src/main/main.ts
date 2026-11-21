@@ -3,19 +3,19 @@
 // put together: the servers (servers.ts), their windows
 // (server-windows.ts), what the windows' pages publish and are asked
 // (requests.ts), the first run (first-run.ts), the app's own pages
-// (app-pages.ts: the server list, setup, Connect, the menu-bar panel, quick
-// capture), the browser sign-in
+// (app-pages.ts: the server list, setup, Connect agents, the menu-bar panel,
+// quick capture), the browser sign-in
 // (handoff.ts), the unread badge (unread.ts), the menu (menu.ts), the
 // update notice (updates.ts) and the server on this computer
 // (local-server.ts), which runs while the app does.
 
 import { execFile, spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir, hostname, userInfo } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import { app, BrowserWindow, dialog, Menu, net, powerMonitor, shell, webContents } from "electron";
+import { app, BrowserWindow, clipboard, dialog, Menu, net, powerMonitor, shell, webContents } from "electron";
 import { accountName } from "@/main/account-name";
 import { AppPages } from "@/main/app-pages";
 import { Capture } from "@/main/capture";
@@ -171,14 +171,40 @@ function start() {
     server: (id) => store.get(id),
     ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
   });
-  const connect = new ConnectPage(pages, connections);
+  const connect = new ConnectPage({
+    pages,
+    connections,
+    windows,
+    target: (serverId) => {
+      const server = store.get(serverId);
+      const page = windows.pageOf(serverId);
+      if (!server) return null;
+      return { serverId, serverName: server.name, summary: page === undefined ? null : requests.summaryOf(page) };
+    },
+    copy: (text) => clipboard.writeText(text),
+    showBackups: async () => {
+      mkdirSync(connections.backupsDir, { recursive: true });
+      await shell.openPath(connections.backupsDir);
+    },
+  });
+  // The menu's Connect Agents… and setup's: over the server window in front, else one on screen, else the
+  // server on this computer's, else the first server's, made and shown; with no server, the list to add one.
+  const openConnect = () => {
+    const server =
+      windows.focused() ??
+      store.list().find((s) => windows.isShown(s.id)) ??
+      list.localServer() ??
+      store.list()[0];
+    if (server) connect.show(server.id);
+    else list.show();
+  };
   const setup = new Setup({
     pages,
     settings,
     shortcut: () => capture.shortcut(),
     applyShortcut: () => capture.applyShortcut(),
     signedIn: () => [...new Set([...unread.showing(), ...requests.summaries().map((s) => s.serverId)])],
-    openConnect: () => connect.show(),
+    openConnect,
   });
   const run = promisify(execFile);
   const firstRun = new FirstRun({
@@ -234,7 +260,7 @@ function start() {
           {
             showServerList: () => list.show(),
             showSetup: () => setup.show(),
-            showConnect: () => connect.show(),
+            showConnect: openConnect,
             quickCapture: () => capture.toggle(),
             togglePanel: () => panel.toggle(unread.trayBounds()),
             openServer: (id) => windows.show(id),

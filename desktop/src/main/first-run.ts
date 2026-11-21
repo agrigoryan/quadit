@@ -110,7 +110,15 @@ export class FirstRun {
     this.run = run;
     // Over the window of the server the tools step is owed to, or of the server on this computer when it is in the
     // list (its set-up unfinished), else over a window made for the server the person is about to set up or add.
-    run.donor = windows.cover(view, owed?.serverId ?? list.localServer()?.id ?? null, () => this.closed(run));
+    const covered = windows.cover(view, owed?.serverId ?? list.localServer()?.id ?? null, () => this.closed(run));
+    // That window shows another of the app's pages (Connect agents), now in front: the first run is not shown, and
+    // not over either, so it is still owed.
+    if (!covered) {
+      this.run = undefined;
+      windows.uncover(view);
+      return;
+    }
+    run.donor = covered.donor;
   }
 
   /**
@@ -170,7 +178,7 @@ export class FirstRun {
   private closed(run: Run | undefined) {
     if (!run || this.run !== run) return;
     this.run = undefined;
-    this.parts.windows.uncover();
+    this.parts.windows.uncover(run.view);
     this.parts.settings.change({ setupDone: true, pendingFirstRun: null });
   }
 

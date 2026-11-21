@@ -8,13 +8,15 @@
 // so its page keeps receiving the live feed and its notifications and badge
 // keep coming, the way chat apps behave. Quitting the app really closes it.
 //
-// The first run (first-run.ts) happens in one window from the first launch to
-// the workspace (desktop contract §10), before its server is known: it is
-// shown as an app page laid over a server window (cover). With no server yet,
-// the window is made for the server about to be added, with an id of its own,
-// and loads nothing; the server added with that id (cover gives it) takes it,
-// when the window's frame is the one that server's would have. Until then
-// nothing in it is a server's page, and its preload gives nothing.
+// The app's own pages that belong to a window are laid over it (cover), in a
+// view of their own: the first run (first-run.ts, desktop contract §10) and
+// Connect agents (connect-page.ts, §11). The first run happens in one window
+// from the first launch to the workspace, before its server is known. With
+// no server yet, the window is made for the server about to be added, with
+// an id of its own, and loads nothing; the server added with that id (cover
+// gives it) takes it, when the window's frame is the one that server's would
+// have. Until then nothing in it is a server's page, and its preload gives
+// nothing.
 //
 // The rules every page of a server's window is held to:
 //   - its session is the partition "persist:server-<id>", shared with no other server;
@@ -46,8 +48,8 @@
 //     its server's origin at each load), and each message on it is checked
 //     again here against the frame that sent it; what a page
 //     publishes and answers goes to Requests (requests.ts), and goes with
-//     the page; its ask to open Connect agents opens the app's own window,
-//     at most once a second (open-connect.ts).
+//     the page; its ask to open Connect agents lays that app page over its
+//     window, at most once a second (open-connect.ts).
 
 import {
   BrowserWindow,
@@ -92,6 +94,12 @@ import {
 const SIGN_IN_PATH = "/login";
 const BAR_HEIGHT = 52;
 
+/** An app page laid over a window (cover), and what to do when the person closes that window. */
+interface Cover {
+  view: WebContentsView;
+  closed: () => void;
+}
+
 /** A load of a server's window: the address, the headers it carries, and what to do once it has loaded. */
 interface Load {
   url: string;
@@ -133,7 +141,7 @@ export interface WindowsSetup {
   signInWithoutForm(serverId: string, fetch: Fetch): Promise<boolean>;
   /** Whether a server's window, its session reached through `fetch`, is signed in, where the app can ask (as for signInWithoutForm). */
   isSignedIn(serverId: string, fetch: Fetch): Promise<boolean>;
-  /** Opens (or focuses) the Connect agents window for a server: its page asked (open-connect.ts). */
+  /** Lays Connect agents over a server's window: its page asked (open-connect.ts). */
   openConnect(serverId: string): void;
 }
 
@@ -156,8 +164,8 @@ export class ServerWindows {
   private quitting = false;
   /** The window made for the server about to be added (cover), and the id that server is to have. */
   private waiting: { id: string; win: BrowserWindow } | undefined;
-  /** The app's own page laid over a window (the first run's), and what to do when the person closes that window. */
-  private covering: { view: WebContentsView; win: BrowserWindow; closed: () => void } | undefined;
+  /** The app's own page laid over each window that has one (cover). */
+  private covers = new Map<BrowserWindow, Cover>();
 
   constructor(
     private store: ServerStore,
@@ -241,7 +249,7 @@ export class ServerWindows {
   async openCoveredPath(serverId: string, path: string): Promise<boolean> {
     const win = this.windows.get(serverId);
     const server = this.store.get(serverId);
-    if (!win || this.covering?.win !== win || !server) return false;
+    if (!win || !this.covers.has(win) || !server) return false;
     const target = appPage(server.origin, path);
     if (!target || !isOwnPage(win.webContents.getURL(), server.origin) || win.webContents.isLoadingMainFrame())
       return false;
@@ -327,40 +335,51 @@ export class ServerWindows {
     return this.windows.get(serverId)?.isVisible() ?? false;
   }
 
+  /** The web contents id of a server's window's own page (what it publishes is known by it: requests.ts); undefined without a window. */
+  pageOf(serverId: string): number | undefined {
+    return this.windows.get(serverId)?.webContents.id;
+  }
+
   /**
    * Lays `view` (an app page) over the whole of a window, shown and in front,
    * and keeps it there, sized with the window, until uncover: over the window
-   * of the server `serverId`, or, with null, over a window made for the server
-   * about to be added. Gives the id a server added now is to have to take the
-   * window covered: the one made for it; null over an existing server's
-   * window, whose id stays that server's. Closing that window calls `closed` (the cover's page is over); a
-   * window still waiting for its server then goes. One cover at a time: a
-   * second covers nothing and shows the first.
+   * of the server `serverId`, made when it has none, or, with null, over a
+   * window made for the server about to be added. Gives the id a server added
+   * now is to have to take the window covered (`donor`): the one made for
+   * it; null over an existing server's window, whose id stays that server's.
+   * Laid again, the view's window comes to the front and the same is given.
+   * A window holds one cover: over one another view covers, or for a server
+   * that is not added, nothing is laid, that window (if any) comes to the
+   * front with its cover, and the answer is undefined. Closing the window
+   * calls `closed` (the cover's page is over); a window still waiting for
+   * its server then goes.
    */
-  cover(view: WebContentsView, serverId: string | null, closed: () => void): string | null {
-    const covered = this.covering;
-    if (covered && !covered.win.isDestroyed()) {
-      covered.win.show();
-      covered.win.focus();
-      return this.waiting?.win === covered.win ? this.waiting.id : null;
+  cover(view: WebContentsView, serverId: string | null, closed: () => void): { donor: string | null } | undefined {
+    const laid = this.coverOf(view);
+    if (laid) {
+      this.toFront(laid);
+      return { donor: this.waiting?.win === laid ? this.waiting.id : null };
     }
     const server = serverId ? this.store.get(serverId) : undefined;
+    if (serverId && !server) return undefined;
     let win: BrowserWindow;
-    let id: string | null = null;
+    let donor: string | null = null;
     if (server) win = this.ensure(server, server.origin + "/", true);
     else {
-      id = newServerId();
-      win = this.make(id, "Quadit", frameFor(process.platform, FIRST_RUN_SPEAKS), true);
-      this.waiting = { id, win };
+      donor = newServerId();
+      win = this.make(donor, "Quadit", frameFor(process.platform, FIRST_RUN_SPEAKS), true);
+      this.waiting = { id: donor, win };
     }
-    this.covering = { view, win, closed };
+    if (this.covers.has(win)) {
+      this.toFront(win);
+      return undefined;
+    }
+    this.covers.set(win, { view, closed });
     win.contentView.addChildView(view);
     this.placeCover(win);
-    if (win.isMinimized()) win.restore();
-    win.show();
-    win.focus();
+    this.toFront(win);
     view.webContents.focus();
-    return id;
+    return { donor };
   }
 
   /** Reserves the id for a probed remote. A different frame needs its own native window name during the swap. */
@@ -371,26 +390,44 @@ export class ServerWindows {
     return waiting.id;
   }
 
-  /** Takes the cover away, showing the window under it; a window still waiting for its server goes with it. */
-  uncover() {
-    const covered = this.covering;
-    this.covering = undefined;
-    if (!covered) return;
-    if (!covered.win.isDestroyed()) {
-      covered.win.contentView.removeChildView(covered.view);
-      covered.win.webContents.focus();
+  /**
+   * Takes the cover `view` away, showing the page under it with the keys
+   * back on it, and closes the view; a window still waiting for its server
+   * goes with it.
+   */
+  uncover(view: WebContentsView) {
+    const win = this.coverOf(view);
+    if (win) {
+      this.covers.delete(win);
+      if (!win.isDestroyed()) {
+        win.contentView.removeChildView(view);
+        win.webContents.focus();
+      }
+      if (this.waiting?.win === win) {
+        this.waiting = undefined;
+        win.destroy();
+      }
     }
-    covered.view.webContents.close();
-    const waiting = this.waiting;
-    if (waiting?.win === covered.win) {
-      this.waiting = undefined;
-      waiting.win.destroy();
-    }
+    if (!view.webContents.isDestroyed()) view.webContents.close();
+  }
+
+  /** The window `view` covers, if it covers one. */
+  private coverOf(view: WebContentsView): BrowserWindow | undefined {
+    for (const [win, cover] of this.covers) if (cover.view === view) return win;
+    return undefined;
+  }
+
+  private toFront(win: BrowserWindow) {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
   }
 
   /** Closes a removed server's window and forgets what it kept: cookies, storage, its place on screen. */
   async forget(server: Server) {
     const win = this.windows.get(server.id);
+    // The page over it is over, as when the person closes the window.
+    if (win) this.covers.get(win)?.closed();
     this.windows.delete(server.id);
     this.bars.delete(server.id);
     this.gate.forget(server.id);
@@ -479,8 +516,11 @@ export class ServerWindows {
     // already own this name: then Electron needs the old window destroyed before it will make the new one.
     const prepared = oldId === server.id ? undefined : this.make(server.id, server.name, frame, false);
     prepared?.setBounds(bounds);
-    const cover = this.covering?.win === waiting ? this.covering : undefined;
-    if (cover) waiting.contentView.removeChildView(cover.view);
+    const cover = this.covers.get(waiting);
+    if (cover) {
+      waiting.contentView.removeChildView(cover.view);
+      this.covers.delete(waiting);
+    }
     this.waiting = undefined;
     waiting.destroy();
 
@@ -489,7 +529,7 @@ export class ServerWindows {
     if (oldId && oldId !== server.id) BrowserWindow.clearPersistedState(windowName(oldId));
     if (cover) {
       win.contentView.addChildView(cover.view);
-      this.covering = { ...cover, win };
+      this.covers.set(win, cover);
       this.placeCover(win);
     }
     win.show();
@@ -525,7 +565,7 @@ export class ServerWindows {
       if (this.quitting) return;
       event.preventDefault();
       // The page over it is over: its owner takes it away (uncover), and with it a window no server took.
-      if (this.covering?.win === win) this.covering.closed();
+      this.covers.get(win)?.closed();
       if (win.isDestroyed()) return;
       if (this.waiting?.win === win) {
         this.waiting = undefined;
@@ -542,7 +582,7 @@ export class ServerWindows {
     });
     win.on("focus", () => {
       // The keys go to the page over the window, while there is one.
-      if (this.covering?.win === win) this.covering.view.webContents.focus();
+      this.covers.get(win)?.view.webContents.focus();
       this.setup.changed();
     });
     win.on("resize", () => {
@@ -550,7 +590,7 @@ export class ServerWindows {
       this.placeCover(win);
     });
     win.on("closed", () => {
-      if (this.covering?.win === win) this.covering = undefined;
+      this.covers.delete(win);
       if (this.windows.get(serverId) !== win) return;
       this.windows.delete(serverId);
       this.loads.forget(serverId);
@@ -560,9 +600,10 @@ export class ServerWindows {
 
   /** The cover fills the window it is over. */
   private placeCover(win: BrowserWindow) {
-    if (this.covering?.win !== win || win.isDestroyed()) return;
+    const cover = this.covers.get(win);
+    if (!cover || win.isDestroyed()) return;
     const { width, height } = win.getContentBounds();
-    this.covering.view.setBounds({ x: 0, y: 0, width, height });
+    cover.view.setBounds({ x: 0, y: 0, width, height });
   }
 
   /** Loads an address in a server's window once the server can be reached; a newer load asked meanwhile wins. */

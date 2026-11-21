@@ -1,5 +1,5 @@
 // What the app's own bundled pages (the first run, the server list, the sign-in
-// bar, the connection error, setup, Connect, the menu-bar panel and quick capture)
+// bar, the connection error, setup, Connect agents, the menu-bar panel and quick capture)
 // may ask of the app, through the preload src/preload/pages.ts. The server's
 // web pages never see this: they get only the bridge of the contract.
 
@@ -86,6 +86,8 @@ export interface ToolView {
    * https://q.example"); connecting makes no agent for it. Null otherwise.
    */
   worksAs: string | null;
+  /** Whether an agent in it was seen to listen (main/harnesses.ts); its card says so when not. */
+  listenVerified: boolean;
 }
 
 /** The agent tools as the first run finds them, and whether connecting one puts the quadit command on this computer too. */
@@ -122,6 +124,8 @@ export interface HarnessView {
    * see); "default", the computer's default login.
    */
   cliIdentity: "own" | "default";
+  /** Whether an agent in it was seen to listen (main/harnesses.ts). */
+  listenVerified: boolean;
   connected: { methods: ConnectMethod[]; server: string; workspace: string; agent: string } | null;
 }
 
@@ -147,6 +151,31 @@ export interface ConnectView {
   defaultLogin: { server: string | null; agent: string | null } | null;
   /** The Quadit plugin for Claude Code is installed: its MCP entry needs QUADIT_URL and QUADIT_TOKEN. */
   claudePlugin: boolean;
+}
+
+/**
+ * Where a connected tool stands with Quadit (desktop contract §11), as the
+ * server says of the agent it works as:
+ *   waiting    set up on this computer, and the agent has not proven yet
+ *              that it reached Quadit from inside the tool; `code` is the
+ *              open connect code for it to give back, null when there is
+ *              none (it ran out, or the tool was connected by an older
+ *              version of the app), for which a new one is to be made;
+ *   connected  it proved it, and whether it listens now;
+ *   unknown    the server could not say (an older one, no window shows the
+ *              workspace, or the tool works as a login of another
+ *              workspace): only what Connect wrote is known.
+ */
+export type Handshake =
+  | { state: "waiting"; code: string | null }
+  | { state: "connected"; listening: boolean }
+  | { state: "unknown" };
+
+/** The window Connect agents is laid over: its server, and the workspace its page shows (null: none yet, or signed out). */
+export interface ConnectTarget {
+  serverId: string;
+  serverName: string;
+  summary: DesktopSummary | null;
 }
 
 export interface ConnectChoice {
@@ -301,8 +330,19 @@ export interface PagesApi {
   testNotification(): Promise<void>;
   /** Opens the system's notification settings; false where the app knows none to open. */
   openNotificationSettings(): Promise<boolean>;
+  /** Opens Connect agents over a server's window (the one in front, else one of the app's servers). */
   openConnect(): Promise<void>;
 
+  /** The window this Connect agents page is laid over; null for any other page. */
+  connectTarget(): Promise<ConnectTarget | null>;
+  /** Takes this Connect agents page away, showing the page under it ("Done", Escape). */
+  closeConnect(): Promise<void>;
+  /** Where a tool Connect has set up stands with Quadit; null when it is not set up. */
+  toolHandshake(id: string): Promise<Handshake | null>;
+  /** Makes a new connect code for a tool Connect has set up, replacing the one it had. */
+  newConnectCode(id: string): Promise<{ ok: true } | Refused>;
+  /** Puts `text` on the clipboard (a connect code's line). */
+  copyText(text: string): Promise<void>;
   connectState(): Promise<ConnectView>;
   planConnect(c: ConnectChoice): Promise<Planned>;
   /** `stale`: the plan is gone or a file changed since: look again. */

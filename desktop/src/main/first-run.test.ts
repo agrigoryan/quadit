@@ -27,15 +27,19 @@ function held<T>(): { promise: Promise<T>; settle(value: T): void } {
  * gives and adds with what `add` gives; the windows record what they are
  * asked, a cover over no server giving the id "waiting-<n>"; the tools step
  * finds no tool, and the workspace's page answers the samples with `answer`.
+ * The window of the server `covered`, when given, has another of the app's
+ * pages over it: nothing more covers it.
  */
 function harness({
   setUp = () => Promise.resolve<SetUp>({ ok: false, error: "not asked for" }),
   add = () => Promise.resolve<AddResult>({ ok: false, error: "not asked for" }),
   answer = SAMPLES,
+  covered,
 }: {
   setUp?: () => Promise<SetUp>;
   add?: () => Promise<AddResult>;
   answer?: DesktopOutcome;
+  covered?: () => string;
 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "quadit-desktop-first-run-"));
   const settings = new Settings(join(dir, "settings.json"));
@@ -69,9 +73,13 @@ function harness({
     },
     windows: {
       cover: (_view, serverId, closed) => {
+        if (serverId && serverId === covered?.()) {
+          said.push(`front ${serverId}`);
+          return undefined;
+        }
         covers.push({ serverId, closed });
         said.push(`cover ${serverId ?? "new"}`);
-        return serverId ? null : `waiting-${covers.length}`;
+        return { donor: serverId ? null : `waiting-${covers.length}` };
       },
       uncover: () => void said.push("uncover"),
       openCoveredPath: async (serverId, path) => {
@@ -199,6 +207,20 @@ describe("FirstRun", () => {
     expect(said).toEqual([`cover ${server.id}`]);
     expect(await call("firstRunStep")).toEqual({ step: "tools", person: "Lou" });
     expect(await call("lookForTools")).toEqual({ tools: [], addsCommand: false });
+  });
+
+  it("is not shown over a window another of the app's pages covers, and stays owed for the next showing", () => {
+    let id = "";
+    const { firstRun, settings, store, said } = harness({ covered: () => id });
+    const server = store.add("http://127.0.0.1:4780", "This computer", { handoff: 1, inset: 1 });
+    id = server.id;
+    settings.change({ pendingFirstRun: { serverId: server.id, workspace: "personal", person: "Lou" } });
+    firstRun.show();
+    expect(said).toEqual([`front ${server.id}`, "uncover"]);
+    expect(settings.get().pendingFirstRun).not.toBeNull();
+    id = "";
+    firstRun.show();
+    expect(said.at(-1)).toBe(`cover ${server.id}`);
   });
 
   it("gives away no id of a server already there: a server added over its window gets one of its own", async () => {

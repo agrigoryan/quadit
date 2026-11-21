@@ -106,6 +106,17 @@ describe("outcomeOf", () => {
     expect(outcomeOf({ ok: true })).toEqual({ ok: true });
   });
 
+  it("keeps a connect code, and what the server says of an agent (desktop contract §11)", () => {
+    expect(outcomeOf({ ok: true, id: "c1", code: "ABC234" })).toEqual({ ok: true, id: "c1", code: "ABC234" });
+    const state = { ok: true, connected: true, listening: false, codeUsed: true };
+    expect(outcomeOf(state)).toEqual(state);
+  });
+
+  it("refuses a code too long to be one, and a state that is not yes or no", () => {
+    expect(outcomeOf({ ok: true, id: "c1", code: "A".repeat(300) })).toBeNull();
+    expect(outcomeOf({ ok: true, connected: "yes", listening: false, codeUsed: false })).toBeNull();
+  });
+
   it("keeps a refusal with its message cut short", () => {
     expect(outcomeOf({ ok: false, message: "m".repeat(900), path: "/acme" })).toEqual({
       ok: false,

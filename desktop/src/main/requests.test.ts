@@ -56,6 +56,19 @@ describe("Requests", () => {
     await expect(answer).resolves.toEqual({ ok: true, path: "/acme/t/SVA-1" });
   });
 
+  it("says which workspace one page shows, until it takes it back or goes", () => {
+    const { requests, page } = setUp();
+    page(1, "s1", "acme");
+    page(2, "s1", "games");
+    expect(requests.summaryOf(1)?.workspace.id).toBe("acme");
+    expect(requests.summaryOf(2)?.workspace.id).toBe("games");
+    expect(requests.summaryOf(3)).toBeNull();
+    requests.publish(1, "s1", null);
+    expect(requests.summaryOf(1)).toBeNull();
+    requests.forget(2);
+    expect(requests.summaryOf(2)).toBeNull();
+  });
+
   it("answers no when nobody published the workspace, the page does not listen, or went away", async () => {
     const { requests, page, alive } = setUp();
     await expect(requests.toWorkspace("s1", "acme", { kind: "revoke-token", token: "t" })).resolves.toMatchObject({

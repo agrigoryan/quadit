@@ -97,6 +97,15 @@ function setUp({
   if (quaditOnPath) copyFileSync(script, join(bin, "quadit"));
   const asked: DesktopRequest[] = [];
   let tokens = 0;
+  // What the server knows of the connect codes it made, and of the agents it counts connected and listening.
+  const server = {
+    makesCodes: true,
+    answersState: true,
+    codes: 0,
+    used: new Set<string>(),
+    connected: new Set<string>(),
+    listening: new Set<string>(),
+  };
   const connections = new Connections({
     home,
     dataDir: join(root, "data"),
@@ -146,6 +155,21 @@ function setUp({
       if (request.kind === "agent") {
         return { ok: true, agent: { id: "u9", handle: request.create.handle, name: request.create.name } };
       }
+      if (request.kind === "connect-code") {
+        if (!server.makesCodes) return { ok: true };
+        server.codes++;
+        return { ok: true, id: `c${server.codes}`, code: `CODE${server.codes}` };
+      }
+      if (request.kind === "agent-state") {
+        if (!server.answersState)
+          return { ok: false, message: "No window of that server can do this now.", unanswered: true };
+        return {
+          ok: true,
+          connected: server.connected.has(request.agent),
+          listening: server.listening.has(request.agent),
+          codeUsed: request.code !== undefined && server.used.has(request.code),
+        };
+      }
       return { ok: true };
     },
   });
@@ -175,7 +199,7 @@ function setUp({
   const read = (path: string) => readFileSync(join(home, path), "utf8");
   const json = (path: string) => JSON.parse(read(path)) as Record<string, unknown>;
   const ledger = () => readFileSync(join(root, "data", "connections.json"), "utf8");
-  return { root, home, bin, configDir, connections, asked, choice, connect, disconnect, read, json, ledger };
+  return { root, home, bin, configDir, connections, asked, server, choice, connect, disconnect, read, json, ledger };
 }
 
 posixOnly("Connect plans", () => {
@@ -343,7 +367,10 @@ posixOnly("Connect and Disconnect", () => {
       allowUnattended: true,
     });
     expect(hint).toContain("@coder");
-    expect(asked).toEqual([{ kind: "agent-token", agent: "u2", label: "Claude Code on mac" }]);
+    expect(asked).toEqual([
+      { kind: "agent-token", agent: "u2", label: "Claude Code on mac" },
+      { kind: "connect-code", agent: "u2", tool: "Claude Code" },
+    ]);
     const config = join(configDir, "claude.json");
     expect(JSON.parse(readFileSync(config, "utf8"))).toEqual({ url: ORIGIN, token: "qd_secret1" });
     expect(statSync(config).mode & 0o777).toBe(0o600);
@@ -449,6 +476,7 @@ posixOnly("Connect and Disconnect", () => {
     expect(asked).toEqual([
       { kind: "agent", create: { name: "Codex", handle: "codex" } },
       { kind: "agent-token", agent: "u9", label: "Codex on mac" },
+      { kind: "connect-code", agent: "u9", tool: "Codex" },
     ]);
   });
 
@@ -464,6 +492,64 @@ posixOnly("Connect and Disconnect", () => {
       stale: true,
     });
     expect(await connections.applyConnect(planned.plan.id)).toMatchObject({ ok: false });
+  });
+});
+
+posixOnly("Connected is proven (desktop contract §11)", () => {
+  it("makes a connect code for the agent and the tool, shows it until the agent gives it back, and then it is spent", async () => {
+    const { connections, connect, choice, server, ledger } = setUp();
+    await connect(choice("claude"));
+    // The app keeps the code, so that its line can be shown again.
+    expect(JSON.parse(ledger()).harnesses.claude.code).toMatchObject({ id: "c1", code: "CODE1" });
+    expect(await connections.handshake("claude")).toEqual({ state: "waiting", code: "CODE1" });
+
+    server.used.add("c1");
+    server.connected.add("u2");
+    expect(await connections.handshake("claude")).toEqual({ state: "connected", listening: false });
+    expect(JSON.parse(ledger()).harnesses.claude.code).toBeNull();
+    server.listening.add("u2");
+    expect(await connections.handshake("claude")).toEqual({ state: "connected", listening: true });
+  });
+
+  it("goes by the server's word for a tool set up without a code, and gives it one when asked, replacing any other", async () => {
+    const { connections, connect, choice, server, asked } = setUp();
+    // An older server makes no codes; its answer about the agent comes later.
+    server.makesCodes = false;
+    await connect(choice("codex"));
+    expect(await connections.handshake("codex")).toEqual({ state: "waiting", code: null });
+
+    server.makesCodes = true;
+    expect(await connections.newCode("codex")).toEqual({ ok: true });
+    expect(asked.at(-1)).toEqual({ kind: "connect-code", agent: "u2", tool: "Codex" });
+    expect(await connections.handshake("codex")).toEqual({ state: "waiting", code: "CODE1" });
+    expect(await connections.newCode("codex")).toEqual({ ok: true });
+    expect(await connections.handshake("codex")).toEqual({ state: "waiting", code: "CODE2" });
+
+    // Connected, by an older version or by another way, it is the agent the server counts that tells.
+    server.connected.add("u2");
+    expect(await connections.handshake("codex")).toEqual({ state: "waiting", code: "CODE2" });
+    server.used.add("c2");
+    expect(await connections.handshake("codex")).toEqual({ state: "connected", listening: false });
+  });
+
+  it("knows only what it wrote when no page answers for the workspace, and nothing of a tool it has not set up", async () => {
+    const { connections, connect, choice, server } = setUp();
+    await connect(choice("claude"));
+    server.answersState = false;
+    expect(await connections.handshake("claude")).toEqual({ state: "unknown" });
+    expect(await connections.handshake("codex")).toBeNull();
+    expect(await connections.newCode("codex")).toEqual({ ok: false, error: "Codex is not connected." });
+  });
+
+  it("says why a new code was not made", async () => {
+    const { connections, connect, choice, server } = setUp();
+    await connect(choice("claude"));
+    server.makesCodes = false;
+    expect(await connections.newCode("claude")).toEqual({
+      ok: false,
+      error: "Your workspace made no code: update Quadit there.",
+    });
+    expect(await connections.handshake("claude")).toEqual({ state: "waiting", code: "CODE1" });
   });
 });
 
@@ -508,7 +594,8 @@ posixOnly("the default login", () => {
       ok: true,
       agent: { id: "id-qd_mine", handle: "as-qd_mine" },
     });
-    expect(member.asked).toEqual([]);
+    // That agent can prove the connection from inside the tool: it gets a code.
+    expect(member.asked).toEqual([{ kind: "connect-code", agent: "id-qd_mine", tool: "Cursor" }]);
 
     // A login for another server, or for someone not an agent here, is the tool's, but not an agent of this workspace.
     const elsewhere = setUp();

@@ -20,6 +20,7 @@ function harness(id: string, name: string, extra: Partial<HarnessView> = {}): Ha
     installed: false,
     mcp: true,
     cliIdentity: "own",
+    listenVerified: true,
     connected: null,
     ...extra,
   };
@@ -146,7 +147,7 @@ function setUp({
 }
 
 describe("FirstConnect", () => {
-  it("finds every tool Connect knows, saying which are on this computer and whom a tool on this computer's login works as, but leaves alone those connected before", async () => {
+  it("finds every tool Connect knows, saying which are on this computer, whom a tool on this computer's login works as and whether its listening was verified, but leaves alone those connected before", async () => {
     const { first } = setUp({
       harnesses: [
         harness("claude", "Claude Code", { installed: true }),
@@ -154,14 +155,30 @@ describe("FirstConnect", () => {
           installed: true,
           connected: { methods: ["cli"], server: "x", workspace: "y", agent: "@codex" },
         }),
-        harness("pi", "pi", { cliIdentity: "default" }),
+        harness("pi", "pi", { cliIdentity: "default", listenVerified: false }),
       ],
       defaultLogin: { server: "https://q.example", agent: "@ann" },
     });
     expect(await first.look()).toEqual({
       tools: [
-        { id: "claude", name: "Claude Code", initials: "Cl", found: true, ownLogin: true, worksAs: null },
-        { id: "pi", name: "pi", initials: "pi", found: false, ownLogin: false, worksAs: "@ann on https://q.example" },
+        {
+          id: "claude",
+          name: "Claude Code",
+          initials: "Cl",
+          found: true,
+          ownLogin: true,
+          worksAs: null,
+          listenVerified: true,
+        },
+        {
+          id: "pi",
+          name: "pi",
+          initials: "pi",
+          found: false,
+          ownLogin: false,
+          worksAs: "@ann on https://q.example",
+          listenVerified: false,
+        },
       ],
       addsCommand: false,
     });

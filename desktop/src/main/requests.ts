@@ -1,5 +1,5 @@
 // Requests: how something the person did in the app's own UI (a button on a
-// native notification, the panel, quick capture, Connect) reaches the
+// native notification, the panel, quick capture, Connect agents) reaches the
 // server's page that is to do it. The app never calls a server's API itself:
 // a server's page does every write through its own path, and only when the
 // app asks it to here.
@@ -95,6 +95,11 @@ export class Requests {
       .flatMap((page) =>
         page.summary ? [{ serverId: page.serverId, summary: page.summary, listening: page.listening }] : [],
       );
+  }
+
+  /** The workspace one page shows, as it published it; null when it shows none, or is not known. */
+  summaryOf(page: number): DesktopSummary | null {
+    return this.pages.get(page)?.summary ?? null;
   }
 
   /** Asks the page that speaks for a workspace of a server. */
