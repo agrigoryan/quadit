@@ -20,16 +20,20 @@ type agentState struct {
 	UserID string `json:"user_id"`
 	// State: working, waiting (all its open work waits on someone else),
 	// has_work (something waits on it and it is not working), idle.
-	State     string `json:"state"`
-	Task      string `json:"task,omitempty"`
-	Doing     string `json:"doing,omitempty"`
-	Since     string `json:"since,omitempty"`
-	WaitsOn   string `json:"waits_on,omitempty"`
-	Listening bool   `json:"listening"`
-	LastSeen  string `json:"last_seen,omitempty"`
-	LastDid   string `json:"last_action,omitempty"`
-	Open      int    `json:"open_tasks"`
-	Queue     int    `json:"waiting_on_it"`
+	State   string `json:"state"`
+	Task    string `json:"task,omitempty"`
+	Doing   string `json:"doing,omitempty"`
+	Since   string `json:"since,omitempty"`
+	WaitsOn string `json:"waits_on,omitempty"`
+	// ConnectedAt is when it first proved it reached Quadit from inside its
+	// tool (Member.ConnectedAt); empty: not connected yet. Listening: its
+	// listener holds its lease, or a webhook is heard (listener.go).
+	ConnectedAt string `json:"connected_at,omitempty"`
+	Listening   bool   `json:"listening"`
+	LastSeen    string `json:"last_seen,omitempty"`
+	LastDid     string `json:"last_action,omitempty"`
+	Open        int    `json:"open_tasks"`
+	Queue       int    `json:"waiting_on_it"`
 }
 
 // agentStates says what every agent is doing right now. With projects,
@@ -149,7 +153,7 @@ func actsIn(action string, keys map[string]bool) bool {
 // waits on others), or idle.
 func (w *agentWork) stateOf(m core.Member) agentState {
 	a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: formatTime(m.LastSeenAt), LastDid: w.lastAction(m),
-		Listening: m.ListeningUntil > w.now.UnixMilli() || w.pushed[m.UserID]}
+		ConnectedAt: formatTime(m.ConnectedAt), Listening: m.ListeningUntil > w.now.UnixMilli() || w.pushed[m.UserID]}
 
 	// The open tasks: what waits on it, what is its own, which of those wait
 	// on someone else, and the task it holds (which makes it working).
@@ -242,7 +246,11 @@ func (s *Server) handleListAgents(x *c) error {
 			if a.WaitsOn != "" {
 				line += " on " + a.WaitsOn
 			}
-			if !a.Listening {
+			switch {
+			case a.Listening:
+			case a.ConnectedAt == "":
+				line += "  (not connected yet)"
+			default:
 				line += "  (nothing is listening for it)"
 			}
 			return line + fmt.Sprintf("  open=%d queue=%d", a.Open, a.Queue)

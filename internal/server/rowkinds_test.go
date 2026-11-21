@@ -9,18 +9,19 @@ import (
 // notRowKinds are the tables of a workspace that are not a kind of row in
 // rowKinds, each with where its rows are read instead.
 var notRowKinds = map[string]string{
-	"tasks":        "the task reads, and page by page in the starting copy and the export",
-	"events":       "the feed, and page by page in the export",
-	"api_tokens":   "GET /tokens, to the member they are for and to admins",
-	"task_labels":  "part of its task",
-	"doc_versions": "GET /docs/{id}/versions, with the page",
-	"db_views":     "GET /docs/{id}, with the database",
-	"doc_sources":  "GET /sources",
-	"changes":      "never read out: the engine's record of what it applied",
-	"cursors":      "GET /cursors/{name}, each member's own",
-	"refs":         "with the task or the page that is mentioned",
-	"doc_presence": "POST /docs/{id}/presence, with the page",
-	"task_keys":    "never read out: the keys a task had before it moved",
+	"tasks":         "the task reads, and page by page in the starting copy and the export",
+	"events":        "the feed, and page by page in the export",
+	"api_tokens":    "GET /tokens, to the member they are for and to admins",
+	"connect_codes": "GET /connect-codes/{id}, to the person who made the code",
+	"task_labels":   "part of its task",
+	"doc_versions":  "GET /docs/{id}/versions, with the page",
+	"db_views":      "GET /docs/{id}, with the database",
+	"doc_sources":   "GET /sources",
+	"changes":       "never read out: the engine's record of what it applied",
+	"cursors":       "GET /cursors/{name}, each member's own",
+	"refs":          "with the task or the page that is mentioned",
+	"doc_presence":  "POST /docs/{id}/presence, with the page",
+	"task_keys":     "never read out: the keys a task had before it moved",
 }
 
 // TestEveryWorkspaceTableIsARowKindOrSaysWhereItIsRead holds the list of

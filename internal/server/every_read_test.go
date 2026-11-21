@@ -734,6 +734,7 @@ func (rw *richWorkspace) reads() []read {
 	add(inWS("/files/{id}", "/files/"+id("project SVA"))...)
 	add(read{route: "GET /f/{id}/{name...}", path: "/f/" + id("project SVA") + "/x.txt"})
 	add(inWS("/tokens", "/tokens")...)
+	add(inWS("/connect-codes/{id}", "/connect-codes/"+id("project SVA"))...)
 	add(inWS("/secrets", "/secrets", "/secrets?format=text")...)
 	add(inWS("/invites", "/invites")...)
 	add(inWS("/integrations/{id}/webhook", "/integrations/"+id("integration github")+"/webhook", "/integrations/"+id("integration OPS")+"/webhook", "/integrations/"+id("project SVA")+"/webhook")...)
@@ -746,6 +747,7 @@ var notRecorded = map[string]string{
 	"GET /api/v1/w/{ws}/render":        "takes a picture with a browser, which a test run does not have; what it may show is decided by taskByRef and docByID, which the task and page reads record",
 	"GET /api/v1/w/{ws}/events/stream": "recorded by its own reader (stream), which stops at the last event instead of waiting",
 	"GET /api/v1/w/{ws}/export":        "recorded by its own reader (export), which unpacks the archive",
+	"GET /api/v1/w/{ws}/listen":        "takes the listener's lease, whose id is new each time; the items it answers are the caller's inbox in the feed, recorded by /events?inbox=1, and TestTheListener checks it",
 	"GET /licenses":                    "the same text for everyone, signed in or not, and checked by TestTheLicensesAreServed",
 }
 

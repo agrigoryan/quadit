@@ -259,6 +259,13 @@ func (b *batch) apply(ch Change) (*Result, error) {
 	if err := h.fn(c); err != nil {
 		return nil, err
 	}
+	// An agent's change is made with its own credential: it has reached
+	// Quadit from wherever it runs. Once said, the rest of the batch need
+	// not say it again.
+	if err := c.markConnected(b.member); err != nil {
+		return nil, err
+	}
+	b.member.ConnectedAt = c.at
 	return b.remember(c, ch, hash)
 }
 

@@ -145,13 +145,25 @@ type Member struct {
 	Scope       *Scope `json:"scope,omitempty" db:"scope,json"`
 	// HandoffLimit is how many times an agent may pass work on to another
 	// agent in a week (Monday to Monday, UTC); 0 is no limit.
-	HandoffLimit   int    `json:"handoff_limit,omitempty" db:"handoff_limit,null"`
-	LastSeenAt     int64  `json:"last_seen_at,omitempty" db:"last_seen_at,null"`
-	LastAction     string `json:"last_action,omitempty" db:"last_action"`
-	ListeningUntil int64  `json:"listening_until,omitempty" db:"listening_until,null"` // an agent's companion is waiting for its inbox until then
-	CreatedAt      int64  `json:"created_at" db:"created_at"`
-	UpdatedSeq     int64  `json:"updated_seq" db:"updated_seq"`
-	SuspendedAt    int64  `json:"suspended_at,omitempty" db:"suspended_at,null"`
+	HandoffLimit int    `json:"handoff_limit,omitempty" db:"handoff_limit,null"`
+	LastSeenAt   int64  `json:"last_seen_at,omitempty" db:"last_seen_at,null"`
+	LastAction   string `json:"last_action,omitempty" db:"last_action"`
+	// ListeningUntil is when the lease of the member's listener ends (the
+	// one session that delivers its inbox from the cursor ListenCursor):
+	// the member counts as listening until then. ListenLease is that
+	// lease's id, which the session gives with each wait and acknowledgment,
+	// and ListenHeardAt when it last waited. The lease is no one else's
+	// business, so it is not in the row others read.
+	ListeningUntil int64  `json:"listening_until,omitempty" db:"listening_until,null"`
+	ListenLease    string `json:"-" db:"listen_lease,null"`
+	ListenHeardAt  int64  `json:"-" db:"listen_heard_at,null"`
+	// ConnectedAt is when an agent first proved it reached Quadit from
+	// inside its tool: a connect code given back, a change made with its
+	// own credential, or its listener's first lease. A read proves nothing.
+	ConnectedAt int64 `json:"connected_at,omitempty" db:"connected_at,null"`
+	CreatedAt   int64 `json:"created_at" db:"created_at"`
+	UpdatedSeq  int64 `json:"updated_seq" db:"updated_seq"`
+	SuspendedAt int64 `json:"suspended_at,omitempty" db:"suspended_at,null"`
 	// DelegatedBy and DelegatedTask mark a sub-agent: the agent that made
 	// it and the task it was made for. It ends when that task does.
 	DelegatedBy   string `json:"delegated_by,omitempty" db:"delegated_by,null"`
@@ -189,6 +201,25 @@ type APIToken struct {
 	LastUsedAt  int64  `json:"last_used_at,omitempty" db:"last_used_at,null"`
 	RevokedAt   int64  `json:"revoked_at,omitempty" db:"revoked_at,null"`
 }
+
+// ConnectCode is a code a person makes for one agent and one tool, which
+// the agent gives back from inside that tool to prove it reached Quadit
+// from there. Only its hash is kept; it is good once, until ExpiresAt.
+type ConnectCode struct {
+	ID          string `json:"id" db:"id"`
+	WorkspaceID string `json:"-" db:"workspace_id"`
+	AgentID     string `json:"agent_id" db:"agent_id"`
+	Tool        string `json:"tool" db:"tool"` // the tool's name as the person sees it ("Codex")
+	CodeHash    string `json:"-" db:"code_hash"`
+	CreatedBy   string `json:"created_by" db:"created_by"`
+	CreatedAt   int64  `json:"created_at" db:"created_at"`
+	ExpiresAt   int64  `json:"expires_at" db:"expires_at"`
+	UsedAt      int64  `json:"used_at,omitempty" db:"used_at,null"`
+}
+
+// ListenCursor is the cursor an agent's inbox is delivered from, by `quadit
+// wait` and `quadit listen`; one session at a time holds its lease.
+const ListenCursor = "listen"
 
 // ProjectSettings are a project's switches.
 type ProjectSettings struct {

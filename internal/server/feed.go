@@ -20,7 +20,7 @@ import (
 
 // feedParams are the feed's own URL parameters; any other parameter is a
 // task filter, so the feed can be narrowed exactly like a task query.
-var feedParams = []string{"after", "cursor", "ack", "wait", "limit", "types", "task", "doc", "mine", "others", "compact", "inbox"}
+var feedParams = []string{"after", "cursor", "ack", "wait", "limit", "types", "task", "doc", "mine", "others", "compact", "inbox", "lease", "take"}
 
 // eventPage is one answer of the feed: the events, the position to read on
 // from, and whether more are already there.
@@ -28,6 +28,7 @@ type eventPage struct {
 	events []core.Event
 	seq    int64
 	more   bool
+	lease  string // the listener's lease the read held, if it was a wait on the cursor "listen"
 }
 
 // events writes a page of events in the form asked for: rows, or one line
@@ -38,7 +39,7 @@ func (x *c) events(page eventPage) error {
 		if evs == nil {
 			evs = []core.Event{}
 		}
-		return x.ok(map[string]any{"events": evs, "seq": page.seq, "more": page.more})
+		return x.ok(page.answer(evs))
 	}
 	names, err := x.names(x.ctx())
 	if err != nil {
@@ -49,7 +50,7 @@ func (x *c) events(page eventPage) error {
 		eventLines[i] = x.eventLine(x.ctx(), ev, names)
 	}
 	if !x.wantText() {
-		return x.ok(map[string]any{"events": eventLines, "seq": page.seq, "more": page.more})
+		return x.ok(page.answer(eventLines))
 	}
 	out := strings.Join(eventLines, "\n")
 	if out != "" {
@@ -62,16 +63,23 @@ func (x *c) events(page eventPage) error {
 	return x.text(out + "\n")
 }
 
+// answer is the page as JSON, with its events in the form given.
+func (page eventPage) answer(events any) map[string]any {
+	out := map[string]any{"events": events, "seq": page.seq, "more": page.more}
+	if page.lease != "" {
+		out["lease"] = page.lease
+	}
+	return out
+}
+
 // handleReadFeed reads the feed after a position. With wait=N the request is held
 // for up to N seconds until something matching arrives, so an agent waits
 // with one call instead of polling. With cursor=NAME the position is the one
-// the server keeps for the caller; ack=SEQ moves it first.
+// the server keeps for the caller; ack=SEQ moves it first. A wait on the
+// cursor "listen" is the listener's, and holds its lease (listener.go).
 //
-// It first sets the filter from the request (the position; others=, inbox=,
-// task=, doc=; any task filter, or mine=), then reads in rounds: each round
-// checks the caller's access is unchanged, reads, and answers when there is
-// something, when it was not asked to wait, or when the wait is over;
-// otherwise it sleeps until the feed moves.
+// It sets the filter from the request (the position; others=, inbox=,
+// task=, doc=; any task filter, or mine=), then reads (waitForEvents).
 func (s *Server) handleReadFeed(x *c) error {
 	ctx := x.ctx()
 	v := x.r.URL.Query()
@@ -80,7 +88,7 @@ func (s *Server) handleReadFeed(x *c) error {
 	cursor := v.Get("cursor")
 	if cursor != "" {
 		if ack := x.intParam("ack", 0); ack > 0 {
-			if err := s.setCursor(x, cursor, int64(ack)); err != nil {
+			if err := s.setCursor(x, cursor, int64(ack), v.Get("lease")); err != nil {
 				return err
 			}
 		}
@@ -134,33 +142,54 @@ func (s *Server) handleReadFeed(x *c) error {
 		// was written in.
 		f.Tasks, f.ProjectIDs = &tf, nil
 	}
-	// The rounds.
 	wait := min(x.intParam("wait", 0), maxFeedWait)
-	deadline := time.Now().Add(time.Duration(wait) * time.Second)
-	if wait > 0 {
-		s.listening(x, wait+5)
+	lease := ""
+	if cursor == core.ListenCursor && wait > 0 {
+		// A wait on the listener's cursor is the listener's: it holds the lease.
+		var err error
+		if lease, err = s.holdLease(x, v.Get("lease"), truthyParam(v, "take"), time.Duration(wait)*time.Second); err != nil {
+			return err
+		}
+		defer s.endWait(x, lease)
 	}
+	page, err := s.waitForEvents(x, f, wait, v.Has("after"))
+	if err != nil {
+		return err
+	}
+	page.lease = lease
+	return x.events(page)
+}
+
+// waitForEvents reads the feed with f in rounds, and answers the first round
+// that finds something, or the empty page once wait seconds are over (at
+// once when wait is 0). Each round after the first checks that the caller
+// may still see what the request was opened to see; between rounds it
+// sleeps until the feed moves. With checkAfter, an f.After past the end of
+// the feed is refused.
+func (s *Server) waitForEvents(x *c, f store.EventFilter, wait int, checkAfter bool) (eventPage, error) {
+	ctx := x.ctx()
+	deadline := time.Now().Add(time.Duration(wait) * time.Second)
 	opened, _ := s.recheckAccess(x)
 	for round := 0; ; round++ {
 		if round > 0 {
 			// The request has been held: before answering, check that the
 			// caller may still see what it was opened to see.
 			if now, ok := s.recheckAccess(x); !ok {
-				return errUnauthorized("your access ended while this request was waiting")
+				return eventPage{}, errUnauthorized("your access ended while this request was waiting")
 			} else if now != opened {
-				return &httpError{Status: http.StatusConflict, Code: "access_changed", Message: "what you may see changed while this request was waiting; ask again"}
+				return eventPage{}, &httpError{Status: http.StatusConflict, Code: "access_changed", Message: "what you may see changed while this request was waiting; ask again"}
 			}
 		}
 		var ws core.Workspace
 		if err := s.st.Get(ctx, &ws, store.Eq("id", x.ws.ID)); err != nil {
-			return err
+			return eventPage{}, err
 		}
-		if round == 0 && v.Has("after") && f.After > ws.Seq {
-			return &engine.Error{Code: engine.CodeInvalid, Field: "after", Message: fmt.Sprintf("after=%d is past the end of the feed, which stands at %d; read from there, or from 0 for everything", f.After, ws.Seq)}
+		if round == 0 && checkAfter && f.After > ws.Seq {
+			return eventPage{}, &engine.Error{Code: engine.CodeInvalid, Field: "after", Message: fmt.Sprintf("after=%d is past the end of the feed, which stands at %d; read from there, or from 0 for everything", f.After, ws.Seq)}
 		}
 		evs, err := x.readFeed(ctx, f)
 		if err != nil {
-			return err
+			return eventPage{}, err
 		}
 		if len(evs) > 0 || wait == 0 || !time.Now().Before(deadline) {
 			seq, more := max(ws.Seq, f.After), len(evs) == f.Limit
@@ -169,7 +198,7 @@ func (s *Server) handleReadFeed(x *c) error {
 			} else if n := len(evs); n > 0 && evs[n-1].Seq > seq {
 				seq = evs[n-1].Seq
 			}
-			return x.events(eventPage{events: evs, seq: seq, more: more})
+			return eventPage{events: evs, seq: seq, more: more}, nil
 		}
 		// Nothing yet. Events up to ws.Seq did not match, so skip past them
 		// and sleep until the feed moves.
@@ -180,7 +209,7 @@ func (s *Server) handleReadFeed(x *c) error {
 		release()
 		cancel()
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return eventPage{}, ctx.Err()
 		}
 		select {
 		case <-s.quit:
@@ -204,20 +233,10 @@ func hasTaskFilter(q core.TaskQuery) bool {
 	return string(raw) != "{}"
 }
 
-// listening marks a member as having something waiting on the feed, which
-// is what "is this agent running?" shows. It is best effort: a sign of life
-// that is written again on the next wait, so a failed write is only logged.
-func (s *Server) listening(x *c, seconds int) {
-	until := time.Now().Add(time.Duration(seconds) * time.Second).UnixMilli()
-	set := map[string]any{"listening_until": until, "last_seen_at": time.Now().UnixMilli()}
-	if _, err := x.db.Update(context.WithoutCancel(x.ctx()), "members", set, store.Eq("user_id", x.member.UserID)); err != nil {
-		s.log.Warn("listening not noted", "member", x.member.UserID, "err", err)
-	}
-}
-
-// setCursor moves a cursor forward; a cursor never moves back.
-func (s *Server) setCursor(x *c, name string, seq int64) error {
-	if err := s.checkCursorMove(x, name, seq); err != nil {
+// setCursor moves a cursor forward; a cursor never moves back. The cursor
+// "listen" is moved only with its lease (checkLease).
+func (s *Server) setCursor(x *c, name string, seq int64, lease string) error {
+	if err := s.checkCursorMove(x, name, seq, lease); err != nil {
 		return err
 	}
 	// One conditional statement, so acknowledgments racing each other
@@ -227,10 +246,16 @@ func (s *Server) setCursor(x *c, name string, seq int64) error {
 }
 
 // checkCursorMove refuses what setCursor would refuse: a name it cannot
-// keep, or a position that is not in the feed.
-func (s *Server) checkCursorMove(x *c, name string, seq int64) error {
+// keep, a position that is not in the feed, or a move of the listener's
+// cursor without its lease.
+func (s *Server) checkCursorMove(x *c, name string, seq int64, lease string) error {
 	if len(name) == 0 || len(name) > 64 {
 		return errBad("a cursor name is 1 to 64 characters")
+	}
+	if name == core.ListenCursor {
+		if err := s.checkLease(x, lease); err != nil {
+			return err
+		}
 	}
 	// Nothing can be handled that has not happened: a position past the end
 	// of the feed would hide everything until the feed caught up with it.
@@ -259,21 +284,23 @@ func (s *Server) handleShowFeedCursor(x *c) error {
 
 // handleMoveFeedCursor marks everything up to seq as handled. dry_run=1
 // checks the move and says where the cursor would stand, without moving it.
+// The cursor "listen" is moved with its lease, given in the body.
 func (s *Server) handleMoveFeedCursor(x *c) error {
 	var body struct {
-		Seq int64 `json:"seq"`
+		Seq   int64  `json:"seq"`
+		Lease string `json:"lease"`
 	}
 	if err := x.body(&body); err != nil {
 		return err
 	}
 	name := x.r.PathValue("name")
 	if !truthyParam(x.r.URL.Query(), "dry_run") {
-		if err := s.setCursor(x, name, body.Seq); err != nil {
+		if err := s.setCursor(x, name, body.Seq, body.Lease); err != nil {
 			return err
 		}
 		return s.handleShowFeedCursor(x)
 	}
-	if err := s.checkCursorMove(x, name, body.Seq); err != nil {
+	if err := s.checkCursorMove(x, name, body.Seq, body.Lease); err != nil {
 		return err
 	}
 	var cursor core.Cursor
@@ -375,9 +402,6 @@ func (s *Server) handleStreamFeed(x *c) error {
 				continue
 			}
 		}
-		if x.member.Kind == core.KindAgent {
-			s.listening(x, streamListening)
-		}
 		woke := make(chan bool, 1)
 		wctx, cancel := context.WithCancel(ctx)
 		go func() { woke <- s.hub.WaitSince(wctx, x.ws.ID, max(after, mark), pokes) }()
@@ -398,13 +422,11 @@ func (s *Server) handleStreamFeed(x *c) error {
 
 // The live stream sends streamBatch events at a time, a heartbeat every
 // streamBeat, and tells a client more than streamReplay events behind to
-// start over. An agent with a stream open counts as listening for
-// streamListening seconds at a time.
+// start over.
 const (
-	streamBatch     = 500
-	streamBeat      = 25 * time.Second
-	streamReplay    = 5000
-	streamListening = 40
+	streamBatch  = 500
+	streamBeat   = 25 * time.Second
+	streamReplay = 5000
 )
 
 // recheckAccess says whether the caller of a held connection may still be here,

@@ -50,6 +50,7 @@ var tables = []*Table{
 	table[core.User]("users", "user", global),
 	table[core.Member]("members", "member", inWorkspace),
 	table[core.APIToken]("api_tokens", "token", inWorkspace),
+	table[core.ConnectCode]("connect_codes", "connect code", inWorkspace),
 	table[core.Project]("projects", "project", inWorkspace),
 	table[core.Status]("statuses", "status", inWorkspace),
 	table[core.Label]("labels", "label", inWorkspace),

@@ -185,14 +185,19 @@ func (who *viewer) inboxItems(ctx context.Context, query inboxQuery) ([]inboxIte
 	}
 	out := make([]inboxItem, len(notes))
 	for i, note := range notes {
-		item := inboxItem{ID: note.ID, Seq: note.Seq, Type: note.Type, By: names.handle(note.ActorID), Title: note.Title, Snippet: note.Snippet, At: formatTime(note.CreatedAt), Read: note.ReadAt != 0,
-			noteRefs: who.refsOf(ctx, note)}
-		if note.TaskID != "" {
-			item.Task, _, _ = strings.Cut(note.Title, " ") // a task's notification is titled with its key first
-		}
-		out[i] = item
+		out[i] = who.inboxItem(ctx, note, names)
 	}
 	return out, nil
+}
+
+// inboxItem is one of the viewer's notifications as the inbox lists it.
+func (who *viewer) inboxItem(ctx context.Context, note core.Notification, names *nameLookup) inboxItem {
+	item := inboxItem{ID: note.ID, Seq: note.Seq, Type: note.Type, By: names.handle(note.ActorID), Title: note.Title, Snippet: note.Snippet, At: formatTime(note.CreatedAt), Read: note.ReadAt != 0,
+		noteRefs: who.refsOf(ctx, note)}
+	if note.TaskID != "" {
+		item.Task, _, _ = strings.Cut(note.Title, " ") // a task's notification is titled with its key first
+	}
+	return item
 }
 
 // ownNotes reads the viewer's own notifications that conds select, newest
