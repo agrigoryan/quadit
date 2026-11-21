@@ -257,11 +257,23 @@ test("a server elsewhere that knows nothing of a window without a title bar take
   try {
     const first = await desktop.firstRun();
     await expect.poll(() => desktop.shownWindows()).toHaveLength(1);
-    const before = await desktop.app.evaluate(({ BaseWindow }) =>
-      BaseWindow.getAllWindows()
-        .find((w) => w.isVisible())
-        ?.getBounds(),
-    );
+    // A final count alone misses a second window briefly shown beside Welcome.
+    const counts = await desktop.app.evaluateHandle(({ app, BaseWindow }) => {
+      const shown: number[] = [];
+      const record = () => shown.push(BaseWindow.getAllWindows().filter((w) => w.isVisible()).length);
+      app.on("browser-window-created", (_event, win) => {
+        record();
+        win.on("show", record);
+      });
+      return shown;
+    });
+    const before = await desktop.app.evaluate(({ BaseWindow }) => {
+      const win = BaseWindow.getAllWindows().find((w) => w.isVisible());
+      if (!win) throw new Error("Welcome has no visible window");
+      const { x, y } = win.getBounds();
+      win.setBounds({ x: x + 16, y: y + 16, width: 900, height: 640 });
+      return win.getBounds();
+    });
     await first.getByRole("button", { name: "Connect to a server instead" }).click();
     // The hand-off stand-in answers its version without inset, as a server from before it does.
     await first.getByLabel("Address").fill(run.fake);
@@ -276,6 +288,9 @@ test("a server elsewhere that knows nothing of a window without a title bar take
         .map((w) => ({ bounds: w.getBounds(), content: w.getContentBounds() })),
     );
     expect(shown).toHaveLength(1);
+    const during = await counts.jsonValue();
+    if (process.platform === "darwin") expect(during).toContain(1);
+    expect(Math.max(1, ...during)).toBe(1);
     expect(shown[0]?.bounds).toEqual(before);
     if (process.platform === "darwin") expect(shown[0]?.content.height).toBeLessThan(shown[0]?.bounds.height ?? 0);
   } finally {

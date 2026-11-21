@@ -441,29 +441,31 @@ export class ServerWindows {
       win = waiting;
       win.setTitle(server.name);
       if (shown) win.show();
-    } else if (waiting) {
-      win = this.make(server.id, server.name, frame, false);
-      this.replaceWaiting(waiting, win);
-    } else win = this.make(server.id, server.name, frame, shown);
+    } else if (waiting) win = this.replaceWaiting(waiting, server, frame);
+    else win = this.make(server.id, server.name, frame, shown);
     this.windows.set(server.id, win);
     if (shown) this.store.change(server.id, { open: true });
     this.load(server.id, { url: firstUrl });
     return win;
   }
 
-  /** Puts `win` where the window made before its server was known is, with its cover, shows it, and closes that one. */
-  private replaceWaiting(waiting: BrowserWindow, win: BrowserWindow) {
-    win.setBounds(waiting.getBounds());
-    const covered = this.covering;
-    if (covered?.win === waiting) {
-      waiting.contentView.removeChildView(covered.view);
-      win.contentView.addChildView(covered.view);
-      this.covering = { ...covered, win };
+  /** Reuses the window's persisted name, which Electron releases only after that window is destroyed. */
+  private replaceWaiting(waiting: BrowserWindow, server: Server, frame: Frame): BrowserWindow {
+    const bounds = waiting.getBounds();
+    const cover = this.covering?.win === waiting ? this.covering : undefined;
+    if (cover) waiting.contentView.removeChildView(cover.view);
+    this.waiting = undefined;
+    waiting.destroy();
+
+    const win = this.make(server.id, server.name, frame, false);
+    win.setBounds(bounds);
+    if (cover) {
+      win.contentView.addChildView(cover.view);
+      this.covering = { ...cover, win };
       this.placeCover(win);
     }
     win.show();
-    this.waiting = undefined;
-    waiting.destroy();
+    return win;
   }
 
   /** A window for the server with the id `serverId` (added, or about to be), held to the rules at the top of this file. */
