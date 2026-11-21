@@ -7,9 +7,12 @@
 // whose plan the sheet shows before anything is written, and, once a tool is
 // connected, where and as whom. Disconnect shows what taking it back does
 // first. "Done" and Escape take the page away, showing the one under it.
+// Opened by a server's page rather than by the person, it says which server
+// asked, and takes no input for its first moment on screen (hold-input.ts).
 
 import { button, element, make, separated } from "@/pages/dom";
 import { openSheet } from "@/pages/files-sheet";
+import { letInputIn } from "@/pages/hold-input";
 import { tile, ToolCard } from "@/pages/tool-card";
 import { defaultChoice, handleOf } from "@/shared/default-choice";
 import { defaultLoginWords } from "@/shared/change-words";
@@ -40,6 +43,8 @@ let defaultLogin: ConnectView["defaultLogin"] = null;
 const takenBack = new Map<string, Disconnected>();
 /** What the cards' options do when the workspace shown changes (its agents are offered); made anew with the cards. */
 let workspaceChanged: (() => void)[] = [];
+/** Whether the page has shown its cards yet: input is let in once it has. */
+let shownOnce = false;
 
 /** The workspace to connect to, once the window's page shows one. */
 function chosen(): { serverId: string; summary: NonNullable<ConnectTarget["summary"]> } | undefined {
@@ -329,6 +334,10 @@ async function render() {
   workspaceChanged = [];
   cardsBox.replaceChildren(...here.map((h) => toolCard(h, addsCommand, known.get(h.id) ?? null).element));
   await showTarget();
+  if (!shownOnce) {
+    shownOnce = true;
+    letInputIn(element("connect"), target?.openedByPage ?? false);
+  }
   // With none found here, the list of tools that are not waits, folded.
   const noneFound = view.supported && here.length === 0;
   element("none-found").hidden = !noneFound;
@@ -352,6 +361,9 @@ async function showTarget() {
   target = await api.connectTarget();
   const at = chosen();
   element("where").textContent = at ? `For ${at.summary.workspace.name} on ${target?.serverName ?? ""}.` : "";
+  const openedBy = element("opened-by");
+  openedBy.hidden = !target?.openedByPage;
+  openedBy.textContent = target?.openedByPage ? `Opened by ${target.serverName}` : "";
   element("no-workspace").hidden = !!at;
   for (const changed of workspaceChanged) changed();
 }

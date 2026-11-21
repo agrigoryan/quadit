@@ -12,11 +12,13 @@
   </head>
   <body>
     <div class="window-strip"></div>
-    <main class="page connect" aria-labelledby="connect-title">
+    <!-- Inert until the page has shown what it shows (src/pages/hold-input.ts). -->
+    <main id="connect" class="page connect" aria-labelledby="connect-title" inert>
       <header class="connect-head">
         <h1 id="connect-title">Connect agents</h1>
         <button id="done" type="button" class="btn btn-line btn-sm">Done</button>
       </header>
+      <p id="opened-by" class="opened-by" hidden></p>
       <p id="where" class="hint"></p>
       <p class="hint">
         Connect an AI tool to work in Quadit. You can see every file it changes first, and Disconnect takes it back.

@@ -146,7 +146,7 @@ function start() {
     changed: () => refreshMenu(),
     whenReachable: (serverId) =>
       serverId === list.localServer()?.id ? local.whenRunning() : Promise.resolve({ ok: true as const }),
-    openConnect: (serverId) => connect.show(serverId),
+    openConnect: (serverId) => connect.asked(serverId),
     signInWithoutForm: (serverId, fetch) =>
       serverId === list.localServer()?.id ? local.signInOwner(fetch) : Promise.resolve(false),
     isSignedIn: (serverId, fetch) =>

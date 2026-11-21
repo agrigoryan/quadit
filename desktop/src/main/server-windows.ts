@@ -141,7 +141,7 @@ export interface WindowsSetup {
   signInWithoutForm(serverId: string, fetch: Fetch): Promise<boolean>;
   /** Whether a server's window, its session reached through `fetch`, is signed in, where the app can ask (as for signInWithoutForm). */
   isSignedIn(serverId: string, fetch: Fetch): Promise<boolean>;
-  /** Lays Connect agents over a server's window: its page asked (open-connect.ts). */
+  /** A server's page asked for Connect agents over its window (open-connect.ts); connect-page.ts decides. */
   openConnect(serverId: string): void;
 }
 
@@ -325,7 +325,7 @@ export class ServerWindows {
   }
 
   /** Whether a window of the server is in front of the person: focused, shown and not minimized. */
-  private inFront(serverId: string): boolean {
+  inFront(serverId: string): boolean {
     const win = BrowserWindow.getFocusedWindow();
     return !!win && win.isVisible() && !win.isMinimized() && this.owners.get(win.webContents.id) === serverId;
   }
@@ -333,6 +333,12 @@ export class ServerWindows {
   /** Whether a server's window is shown now. */
   isShown(serverId: string): boolean {
     return this.windows.get(serverId)?.isVisible() ?? false;
+  }
+
+  /** Whether one of the app's pages covers the server's window (cover). */
+  isCovered(serverId: string): boolean {
+    const win = this.windows.get(serverId);
+    return !!win && this.covers.has(win);
   }
 
   /** The web contents id of a server's window's own page (what it publishes is known by it: requests.ts); undefined without a window. */

@@ -174,11 +174,16 @@ export type Handshake =
   | { state: "connected"; listening: boolean | null }
   | { state: "unknown" };
 
-/** The window Connect agents is laid over: its server, and the workspace its page shows (null: none yet, or signed out). */
+/**
+ * The window Connect agents is laid over: its server, the workspace its page
+ * shows (null: none yet, or signed out), and whether that server's page
+ * asked for Connect (`openedByPage`), not the person.
+ */
 export interface ConnectTarget {
   serverId: string;
   serverName: string;
   summary: DesktopSummary | null;
+  openedByPage: boolean;
 }
 
 export interface ConnectChoice {

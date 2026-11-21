@@ -6,6 +6,16 @@
 // window the first run covers, it lays nothing: the first run, in front, has
 // its own tools step.
 //
+// A server's page may ask for it too (its "Connect a tool on this
+// computer"), and a server elsewhere is not to be trusted: it could time the
+// ask so that a click the person meant for its page lands on a card's
+// one-click Connect, which writes files here and signs a tool in to it. So a
+// page's ask is taken only while its window is in front of the person and
+// nothing of the app's covers it, never within ten seconds of the person
+// leaving Connect there; and Connect opened so says which server asked and
+// takes no input for its first moment on screen (src/pages/hold-input.ts).
+// The person's own ways (the menu, setup) always open it.
+//
 // It is an app page in a view of its own, in the app's session: it gets the
 // pages API and never the bridge, and the server's page under it, in its own
 // web contents and partition, never gets the pages API.
@@ -33,23 +43,29 @@ export interface ConnectPageParts {
     | "handshake"
     | "newCode"
   >;
-  windows: Pick<ServerWindows, "cover" | "uncover">;
+  windows: Pick<ServerWindows, "cover" | "uncover" | "isCovered" | "inFront">;
   /** What a server's window shows: its server, and the workspace its page published; null for a server not added. */
-  target(serverId: string): ConnectTarget | null;
+  target(serverId: string): Omit<ConnectTarget, "openedByPage"> | null;
   /** Puts text on the clipboard. */
   copy(text: string): Promise<void>;
   /** Shows the folder of the backups Connect keeps. */
   showBackups(): Promise<void>;
 }
 
-/** Connect agents over one server's window. */
+/** For how long a server's page may not open Connect again after the person left it over that page's window. */
+const QUIET_AFTER_LEAVING_MS = 10_000;
+
+/** Connect agents over one server's window; `byPage`: the server's page asked for it, not the person. */
 interface Shown {
   view: WebContentsView;
   serverId: string;
+  byPage: boolean;
 }
 
 export class ConnectPage {
   private shown: Shown | undefined;
+  /** When the person last left Connect over each server's window (ms), from which its page must wait. */
+  private left = new Map<string, number>();
 
   constructor(private parts: ConnectPageParts) {
     const { pages, connections } = parts;
@@ -57,11 +73,12 @@ export class ConnectPage {
     pages.answer({
       connectTarget: (sender) => {
         const shown = own(sender);
-        return shown ? parts.target(shown.serverId) : null;
+        const target = shown && parts.target(shown.serverId);
+        return target ? { ...target, openedByPage: shown.byPage } : null;
       },
       closeConnect: (sender) => {
         const shown = own(sender);
-        if (shown) this.close(shown);
+        if (shown) this.close(shown, { left: true });
       },
       connectState: () => connections.state(),
       planConnect: (_sender, choice) => connections.planConnect(choiceOf(choice)),
@@ -76,27 +93,50 @@ export class ConnectPage {
     });
   }
 
-  /** Lays Connect agents over the window of the server `serverId` (made and shown when it is not), in front. */
+  /** The person asked: lays Connect agents over the window of the server `serverId` (made and shown when it is not), in front. */
   show(serverId: string) {
-    const { pages, windows } = this.parts;
     const shown = this.shown;
     if (shown?.serverId === serverId) {
-      windows.cover(shown.view, serverId, () => this.close(shown));
+      this.parts.windows.cover(shown.view, serverId, () => this.close(shown, { left: true }));
       return;
     }
-    if (shown) this.close(shown);
-    const next: Shown = { view: pages.view("connect.html"), serverId };
-    if (!windows.cover(next.view, serverId, () => this.close(next))) {
+    this.open(serverId, false);
+  }
+
+  /**
+   * The server's own page asked (open-connect.ts lets one ask a second
+   * through): laid over its window only while that window is in front and
+   * nothing of the app's covers it, and not within QUIET_AFTER_LEAVING_MS of
+   * the person leaving Connect there. Asked again while there, nothing changes.
+   */
+  asked(serverId: string) {
+    const { windows } = this.parts;
+    if (this.shown?.serverId === serverId || !windows.inFront(serverId) || windows.isCovered(serverId)) return;
+    if (Date.now() - (this.left.get(serverId) ?? Number.NEGATIVE_INFINITY) < QUIET_AFTER_LEAVING_MS) return;
+    this.open(serverId, true);
+  }
+
+  /** Lays a new Connect over the window of `serverId`, the one shown elsewhere going first. */
+  private open(serverId: string, byPage: boolean) {
+    const { pages, windows } = this.parts;
+    if (this.shown) this.close(this.shown, { left: false });
+    const next: Shown = { view: pages.view("connect.html"), serverId, byPage };
+    if (!windows.cover(next.view, serverId, () => this.close(next, { left: true }))) {
       windows.uncover(next.view);
       return;
     }
     this.shown = next;
   }
 
-  /** Takes `shown` away when it is the one shown: the window's page shows again, and a plan under review is dropped. */
-  private close(shown: Shown) {
+  /**
+   * Takes `shown` away when it is the one shown: the window's page shows
+   * again, and a plan under review is dropped. `left`: the person left it
+   * (Done, Escape, closing the window), not moved it to another window.
+   */
+  private close(shown: Shown, { left }: { left: boolean }) {
     if (this.shown !== shown) return;
     this.shown = undefined;
+    if (left) this.left.set(shown.serverId, Date.now());
     this.parts.windows.uncover(shown.view);
     this.parts.connections.dropPlans();
   }

@@ -70,6 +70,11 @@ test("the first run sets Quadit up on this computer in one window, connects the 
     // has that API and never the bridge.
     expect(await page.evaluate(() => ["quaditDesktop" in window, "quaditPages" in window])).toEqual([true, false]);
     expect(await first.evaluate(() => ["quaditDesktop" in window, "quaditPages" in window])).toEqual([false, true]);
+    // The workspace's page under the first run cannot lay Connect agents over it.
+    await page.evaluate(() => window.quaditDesktop?.openConnect?.());
+    // Nothing is to come: waited out, and checked.
+    await page.waitForTimeout(1_000);
+    expect(desktop.app.windows().some((p) => p.url().includes("/connect.html"))).toBe(false);
 
     // What connecting changes, in plain words, before anything is changed.
     const skill = join(computer.home, ".claude", "skills", "quadit", "SKILL.md");

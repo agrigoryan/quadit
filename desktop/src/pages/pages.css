@@ -416,6 +416,13 @@ body.panel main {
   font-size: 22px;
 }
 
+/* Which server's page asked for Connect agents: said plainly, before anything else on the page. */
+.opened-by {
+  margin: 10px 0 0;
+  color: var(--warn);
+  font-weight: 600;
+}
+
 .options select,
 .options input[type="text"] {
   padding: 6px 8px;

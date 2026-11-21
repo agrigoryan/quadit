@@ -1,5 +1,5 @@
 import type { WebContents, WebContentsView } from "electron";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PageHandlers } from "@/main/app-pages";
 import { ConnectPage } from "@/main/connect-page";
 import type { ConnectTarget } from "@/shared/pages-api";
@@ -7,9 +7,10 @@ import type { ConnectTarget } from "@/shared/pages-api";
 /**
  * Connect agents over stand-ins: each view is `{ webContents: { id } }`; the
  * windows record what they are asked, and the window of the server
- * `covered`, when given, has another of the app's pages over it already.
+ * `covered`, when given, has another of the app's pages over it already;
+ * the windows of the servers in `front` are in front of the person.
  */
-function harness({ covered = "" }: { covered?: string } = {}) {
+function harness({ covered = "", front = new Set<string>() }: { covered?: string; front?: Set<string> } = {}) {
   let handlers: Partial<PageHandlers> = {};
   const said: string[] = [];
   const closers = new Map<number, () => void>();
@@ -34,8 +35,14 @@ function harness({ covered = "" }: { covered?: string } = {}) {
         return { donor: null };
       },
       uncover: (view) => void said.push(`uncover ${viewId(view)}`),
+      isCovered: (serverId) => serverId === covered,
+      inFront: (serverId) => front.has(serverId),
     },
-    target: (serverId): ConnectTarget => ({ serverId, serverName: `Server ${serverId}`, summary: null }),
+    target: (serverId): Omit<ConnectTarget, "openedByPage"> => ({
+      serverId,
+      serverName: `Server ${serverId}`,
+      summary: null,
+    }),
     copy: async () => {},
     showBackups: async () => {},
   });
@@ -52,7 +59,12 @@ describe("ConnectPage", () => {
   it("lays Connect agents over the window of the server asked for, and Done takes it away and the plan under review", async () => {
     const { connect, said, call } = harness();
     connect.show("s1");
-    expect(await call(1, "connectTarget")).toEqual({ serverId: "s1", serverName: "Server s1", summary: null });
+    expect(await call(1, "connectTarget")).toEqual({
+      serverId: "s1",
+      serverName: "Server s1",
+      summary: null,
+      openedByPage: false,
+    });
     await call(1, "closeConnect");
     expect(said).toEqual(["cover s1 with 1", "uncover 1", "drop plans"]);
     // Gone, it is over no window.
@@ -88,5 +100,57 @@ describe("ConnectPage", () => {
     expect(await call(7, "connectTarget")).toBeNull();
     await call(7, "closeConnect");
     expect(said).toEqual(["cover s1 with 1"]);
+  });
+});
+
+describe("ConnectPage, asked by a server's page", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("opens only over that page's window while it is in front, and tells its page that a server's page asked", async () => {
+    const front = new Set<string>();
+    const { connect, said, call } = harness({ front });
+    connect.asked("s1");
+    expect(said).toEqual([]);
+    front.add("s1");
+    connect.asked("s1");
+    expect(said).toEqual(["cover s1 with 1"]);
+    expect(await call(1, "connectTarget")).toMatchObject({ serverName: "Server s1", openedByPage: true });
+    // Asked again while it is there: nothing more.
+    connect.asked("s1");
+    expect(said).toEqual(["cover s1 with 1"]);
+  });
+
+  it("cannot open it again for ten seconds after the person left it, whichever way it was opened; the menu always can", async () => {
+    const { connect, said, call } = harness({ front: new Set(["s1"]) });
+    connect.show("s1");
+    await call(1, "closeConnect");
+    vi.advanceTimersByTime(9_999);
+    connect.asked("s1");
+    expect(said).toEqual(["cover s1 with 1", "uncover 1", "drop plans"]);
+    connect.show("s1");
+    expect(said.at(-1)).toBe("cover s1 with 2");
+    expect(await call(2, "connectTarget")).toMatchObject({ openedByPage: false });
+    await call(2, "closeConnect");
+    vi.advanceTimersByTime(10_000);
+    connect.asked("s1");
+    expect(said.at(-1)).toBe("cover s1 with 3");
+  });
+
+  it("counts moving to another window as not leaving, and closing the window as leaving", () => {
+    const { connect, said, closers } = harness({ front: new Set(["s1", "s2"]) });
+    connect.show("s1");
+    connect.show("s2");
+    connect.asked("s1");
+    expect(said.at(-1)).toBe("cover s1 with 3");
+    closers.get(3)?.();
+    connect.asked("s1");
+    expect(said.slice(-2)).toEqual(["uncover 3", "drop plans"]);
+  });
+
+  it("never opens while the first run covers the window, nor brings that window forward", () => {
+    const { connect, said } = harness({ covered: "s1", front: new Set(["s1"]) });
+    connect.asked("s1");
+    expect(said).toEqual([]);
   });
 });

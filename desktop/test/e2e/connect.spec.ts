@@ -73,6 +73,9 @@ test("Connect agents opens over the server's window from the menu, sets Claude C
     expect(await desktop.isShown(run.server)).toBe(true);
     await expect(connect.getByText(/quadit 9\.9\.9 is on your PATH/)).toBeVisible();
     await expect(connect.getByText(/^For E2E on /)).toBeVisible();
+    // The person opened it: no server's name on it, and it takes input at once.
+    await expect(connect.getByText(/^Opened by /)).toBeHidden();
+    await expect(connect.locator("#connect")).toHaveJSProperty("inert", false);
     // Each side keeps its own: the server's page never gets the app pages' API, nor Connect the bridge.
     expect(await page.evaluate(() => ["quaditDesktop" in window, "quaditPages" in window])).toEqual([true, false]);
     expect(await connect.evaluate(() => ["quaditDesktop" in window, "quaditPages" in window])).toEqual([false, true]);
@@ -166,6 +169,9 @@ test("a card set up from the Agents page turns Connected when the agent gives it
       page.getByRole("button", { name: "Connect a tool on this computer" }).first().click(),
     );
     const card = connect.getByRole("article", { name: "Claude Code" });
+    // A server's page asked: it says which, and takes input only after its first moment on screen.
+    await expect(connect.getByText(/^Opened by /)).toBeVisible();
+    await expect(connect.locator("#connect")).toHaveJSProperty("inert", false);
     await card.getByRole("button", { name: "Connect Claude Code" }).click();
 
     const line = card.getByText(/^Connect to Quadit \S{6}$/);
@@ -191,6 +197,15 @@ test("a card set up from the Agents page turns Connected when the agent gives it
     await connect.keyboard.press("Escape");
     await expect.poll(() => desktop.overlays(run.server)).not.toContainEqual(CONNECT);
     await expect(page).toHaveURL(/\/e2e\/agents/);
+
+    // Left so, the page cannot open it again for ten seconds (past the once-a-second limit on its asks); the menu can.
+    await page.getByRole("button", { name: "Connect a tool on this computer" }).first().click();
+    // Nothing is to come: waited out over more than the limit, and checked.
+    await page.waitForTimeout(1_500);
+    expect(await desktop.overlays(run.server)).not.toContainEqual(CONNECT);
+    await desktop.chooseMenuItem("connect");
+    const again = await desktop.appPage("connect.html");
+    await expect(again.getByText(/^Opened by /)).toBeHidden();
   } finally {
     listener?.kill();
     await desktop.close();
