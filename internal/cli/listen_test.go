@@ -296,7 +296,7 @@ func TestWaitPrintsNothingToRunThatTheServerCouldHaveWritten(t *testing.T) {
 	for what, srv := range refused {
 		t.Run(what+" not of its form is refused", func(t *testing.T) {
 			out, err := wait(t, srv)
-			if err == nil || !strings.Contains(err.Error(), "quadit does not recognise") || out != "" {
+			if err == nil || !strings.Contains(err.Error(), "quadit does not recognize") || out != "" {
 				t.Fatalf("wait printed %q and ended with %v", out, err)
 			}
 		})

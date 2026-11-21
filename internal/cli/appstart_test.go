@@ -27,9 +27,9 @@ type fakeStarter struct {
 	already bool
 }
 
-func (f *fakeStarter) running() bool { return f.already }
+func (f *fakeStarter) running(context.Context) bool { return f.already }
 
-func (f *fakeStarter) start(appLogin) error {
+func (f *fakeStarter) start(context.Context, appLogin) error {
 	f.starts++
 	if f.fail != nil {
 		return f.fail

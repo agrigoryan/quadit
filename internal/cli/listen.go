@@ -316,7 +316,7 @@ func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) er
 			return err
 		}
 		if !leaseForm.MatchString(page.Lease) {
-			return errors.New("the server sent a lease id quadit does not recognise, so nothing is printed to run")
+			return errors.New("the server sent a lease id quadit does not recognize, so nothing is printed to run")
 		}
 		lease, take = page.Lease, false
 		next := fmt.Sprintf("%s lease=%s", goOn, lease)
@@ -394,12 +394,12 @@ func (item listenItem) reading() (string, error) {
 	switch {
 	case item.Task != "":
 		if !taskForm.MatchString(item.Task) {
-			return "", fmt.Errorf("the server sent a task key quadit does not recognise (%q), so nothing is printed to run", item.Task)
+			return "", fmt.Errorf("the server sent a task key quadit does not recognize (%q), so nothing is printed to run", item.Task)
 		}
 		return "quadit show " + item.Task, nil
 	case item.Page != "":
 		if !pageForm.MatchString(item.Page) {
-			return "", fmt.Errorf("the server sent a page id quadit does not recognise (%q), so nothing is printed to run", item.Page)
+			return "", fmt.Errorf("the server sent a page id quadit does not recognize (%q), so nothing is printed to run", item.Page)
 		}
 		if item.Thread != "" {
 			return "quadit comments " + item.Page, nil

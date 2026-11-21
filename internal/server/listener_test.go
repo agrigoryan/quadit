@@ -202,7 +202,7 @@ func TestAWaitThatSleptThroughATakeoverHandsNothingOver(t *testing.T) {
 
 		blocked := make(chan int, 1)
 		go func() {
-			req, _ := http.NewRequest("GET", s.url+w+"/listen?wait=20&lease="+first.Lease, nil)
+			req, _ := http.NewRequest(http.MethodGet, s.url+w+"/listen?wait=20&lease="+first.Lease, nil)
 			req.Header.Set("Authorization", "Bearer "+coder)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
@@ -377,7 +377,7 @@ func TestALeaseNobodyLearnedOrAWaitGivenUpOnEndsSoon(t *testing.T) {
 		giveUp := func(path string) {
 			t.Helper()
 			ctx, cancel := context.WithCancel(context.Background())
-			req, _ := http.NewRequestWithContext(ctx, "GET", s.url+path, nil)
+			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, s.url+path, nil)
 			req.Header.Set("Authorization", "Bearer "+coder)
 			done := make(chan struct{})
 			go func() {

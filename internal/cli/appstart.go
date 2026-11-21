@@ -50,8 +50,8 @@ const (
 // window forward, without telling it anything. The real one runs the
 // system's commands; tests give one of their own.
 type appStarter interface {
-	running() bool
-	start(app appLogin) error
+	running(ctx context.Context) bool
+	start(ctx context.Context, app appLogin) error
 }
 
 // systemStarter starts the app with the command appCommand gives, never
@@ -63,12 +63,12 @@ type systemStarter struct{}
 // and finds the app wherever its bundle is and whatever it is called). On
 // Linux a second start of the app hands its arguments to the first, so it
 // is always started.
-func (systemStarter) running() bool {
+func (systemStarter) running(ctx context.Context) bool {
 	if runtime.GOOS != "darwin" {
 		return false
 	}
 	argv := runningCommand()
-	out, err := exec.Command(argv[0], argv[1:]...).Output() //nolint:gosec // a fixed argument list
+	out, err := exec.CommandContext(ctx, argv[0], argv[1:]...).Output() //nolint:gosec // a fixed argument list
 	return err == nil && appFound(out)
 }
 
@@ -78,12 +78,13 @@ func runningCommand() []string { return []string{"lsappinfo", "find", "bundleid=
 
 func appFound(out []byte) bool { return strings.Contains(string(out), "ASN:") }
 
-func (systemStarter) start(app appLogin) error {
+func (systemStarter) start(ctx context.Context, app appLogin) error {
 	argv, err := appCommand(runtime.GOOS, app)
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(argv[0], argv[1:]...) //nolint:gosec // the argument list of appCommand: a fixed command, or the app's own path as the app recorded it
+	// Detached from the command's end: the app goes on running after it.
+	cmd := exec.CommandContext(context.WithoutCancel(ctx), argv[0], argv[1:]...) //nolint:gosec // the argument list of appCommand: a fixed command, or the app's own path as the app recorded it
 	if runtime.GOOS == "darwin" {
 		return cmd.Run() // open hands the app to the system and returns; its failure is the app not being there
 	}
@@ -139,10 +140,10 @@ func (a *appStart) revive(ctx context.Context, client *http.Client, base string,
 		return false, appStoppedNote
 	}
 	// An app that runs already is only waited for: its server may be on its way.
-	running := a.starter.running()
+	running := a.starter.running(ctx)
 	failed := appSilent
 	if !running {
-		if err := a.starter.start(a.login); err != nil {
+		if err := a.starter.start(ctx, a.login); err != nil {
 			return false, appNotStarted
 		}
 		failed = appNotStarted

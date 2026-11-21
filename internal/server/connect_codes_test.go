@@ -152,7 +152,7 @@ func TestConnectCodes(t *testing.T) {
 			for i := range codes {
 				wg.Go(func() {
 					raw, _ := json.Marshal(M{"agent": "@other", "tool": "Copilot"})
-					req, _ := http.NewRequest("POST", s.url+w+"/connect-codes", bytes.NewReader(raw))
+					req, _ := http.NewRequest(http.MethodPost, s.url+w+"/connect-codes", bytes.NewReader(raw))
 					req.Header.Set("Content-Type", "application/json")
 					req.Header.Set("Origin", s.url)
 					resp, err := s.owner.Do(req)
