@@ -59,10 +59,11 @@ export class ServerStore {
 
   /**
    * Adds the server at `origin`, which `speaks` what its version answer said, with the id `id` when given (one made
-   * by newServerId for a window made before its server was known: server-windows.ts), a new one otherwise. One
-   * already there with that origin is kept (its id and session) and renamed when a name is given.
+   * by newServerId for a window made before its server was known: server-windows.ts) and no other server has it, a
+   * new one otherwise: two servers never share an id, which their sessions and windows hang off. One already there
+   * with that origin is kept (its id and session) and renamed when a name is given.
    */
-  add(origin: string, name: string, speaks: Speaks, id = newServerId()): Server {
+  add(origin: string, name: string, speaks: Speaks, id?: string): Server {
     const known = this.byOrigin(origin);
     const named = name.trim() || new URL(origin).host;
     const { handoff, inset } = speaks;
@@ -71,7 +72,7 @@ export class ServerStore {
       return this.get(known.id) ?? known;
     }
     const server: Server = {
-      id,
+      id: id && !this.get(id) ? id : newServerId(),
       name: named,
       origin,
       open: false,

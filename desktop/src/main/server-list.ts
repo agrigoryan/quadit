@@ -120,12 +120,13 @@ export class ServerList {
    * Sets Quadit up on this computer (desktop contract §7): starts the server
    * the app runs here (the one set up before, with its data, when there is
    * one), adds it to the list (with the id `id` when given, so that it takes
-   * the window made for it: ServerWindows.cover), makes its owner `name` and
-   * their workspace through its window's own session, and opens that window
-   * on the workspace, signed in. On an install set up already it signs in
-   * instead, so trying again after a half-finished attempt works. Gives the
-   * server's id and the workspace made with the owner (its slug; null when
-   * the install was set up already).
+   * the window made for it: ServerWindows.cover; an id another server has is
+   * not taken), and makes its owner `name` and their workspace through its
+   * window's own session, which is then signed in. On an install set up
+   * already it signs in instead, so trying again after a half-finished
+   * attempt works. Gives the server's id and the workspace made with the
+   * owner (its slug; null when the install was set up already). It shows no
+   * window: what is shown once it is done is its caller's to say (first-run.ts).
    */
   async setUpHere(
     name: string,
@@ -145,8 +146,6 @@ export class ServerList {
     await this.setup.checks.check(server.id);
     const owner = await local.setUpOwner(this.windows.fetcher(server.id), name.trim());
     if (!owner.ok) return owner;
-    // Its window may be open already, on the web app's page saying the app sets it up: it starts over, signed in.
-    this.windows.showAfresh(server.id, owner.workspace ? `/${encodeURIComponent(owner.workspace)}` : "/");
     return { ok: true, serverId: server.id, workspace: owner.workspace };
   }
 

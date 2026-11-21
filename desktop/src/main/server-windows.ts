@@ -317,25 +317,24 @@ export class ServerWindows {
    * Lays `view` (an app page) over the whole of a window, shown and in front,
    * and keeps it there, sized with the window, until uncover: over the window
    * of the server `serverId`, or, with null, over a window made for the server
-   * about to be added. Gives the id of the server whose window it covers: a
-   * server added with that id takes the window made for it. Closing that window calls `closed` (the cover's page is over); a
+   * about to be added. Gives the id a server added now is to have to take the
+   * window covered: the one made for it; null over an existing server's
+   * window, whose id stays that server's. Closing that window calls `closed` (the cover's page is over); a
    * window still waiting for its server then goes. One cover at a time: a
    * second covers nothing and shows the first.
    */
-  cover(view: WebContentsView, serverId: string | null, closed: () => void): string {
+  cover(view: WebContentsView, serverId: string | null, closed: () => void): string | null {
     const covered = this.covering;
     if (covered && !covered.win.isDestroyed()) {
       covered.win.show();
       covered.win.focus();
-      return this.idOf(covered.win) ?? "";
+      return this.waiting?.win === covered.win ? this.waiting.id : null;
     }
     const server = serverId ? this.store.get(serverId) : undefined;
     let win: BrowserWindow;
-    let id: string;
-    if (server) {
-      id = server.id;
-      win = this.ensure(server, server.origin + "/", true);
-    } else {
+    let id: string | null = null;
+    if (server) win = this.ensure(server, server.origin + "/", true);
+    else {
       id = newServerId();
       win = this.make(id, "Quadit", frameFor(process.platform, FIRST_RUN_SPEAKS), true);
       this.waiting = { id, win };
@@ -427,28 +426,44 @@ export class ServerWindows {
   /**
    * The server's window, made when it has none, loading `firstUrl`: the window
    * made for it before it was known (cover) when it has the frame this
-   * server's would have, a new one otherwise.
+   * server's would have. Otherwise a new one; when it is that window's
+   * server, the new one is made hidden where that window is and takes its
+   * place, with what covers it, at once: never two windows on screen.
    */
   private ensure(server: Server, firstUrl: string, shown: boolean): BrowserWindow {
     const known = this.windows.get(server.id);
     if (known) return known;
     const frame = frameFor(process.platform, server);
-    const waiting = this.waiting;
+    const waiting = this.waiting?.id === server.id && !this.waiting.win.isDestroyed() ? this.waiting.win : undefined;
     let win: BrowserWindow;
-    if (
-      waiting?.id === server.id &&
-      !waiting.win.isDestroyed() &&
-      (this.strips.get(waiting.win) ?? 0) === frame.strip
-    ) {
+    if (waiting && (this.strips.get(waiting) ?? 0) === frame.strip) {
       this.waiting = undefined;
-      win = waiting.win;
+      win = waiting;
       win.setTitle(server.name);
       if (shown) win.show();
+    } else if (waiting) {
+      win = this.make(server.id, server.name, frame, false);
+      this.replaceWaiting(waiting, win);
     } else win = this.make(server.id, server.name, frame, shown);
     this.windows.set(server.id, win);
     if (shown) this.store.change(server.id, { open: true });
     this.load(server.id, { url: firstUrl });
     return win;
+  }
+
+  /** Puts `win` where the window made before its server was known is, with its cover, shows it, and closes that one. */
+  private replaceWaiting(waiting: BrowserWindow, win: BrowserWindow) {
+    win.setBounds(waiting.getBounds());
+    const covered = this.covering;
+    if (covered?.win === waiting) {
+      waiting.contentView.removeChildView(covered.view);
+      win.contentView.addChildView(covered.view);
+      this.covering = { ...covered, win };
+      this.placeCover(win);
+    }
+    win.show();
+    this.waiting = undefined;
+    waiting.destroy();
   }
 
   /** A window for the server with the id `serverId` (added, or about to be), held to the rules at the top of this file. */
@@ -518,13 +533,6 @@ export class ServerWindows {
     if (this.covering?.win !== win || win.isDestroyed()) return;
     const { width, height } = win.getContentBounds();
     this.covering.view.setBounds({ x: 0, y: 0, width, height });
-  }
-
-  /** The id of the server a window is for, added or about to be. */
-  private idOf(win: BrowserWindow): string | undefined {
-    if (this.waiting?.win === win) return this.waiting.id;
-    for (const [id, known] of this.windows) if (known === win) return id;
-    return undefined;
   }
 
   /** Loads an address in a server's window once the server can be reached; a newer load asked meanwhile wins. */

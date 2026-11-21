@@ -85,7 +85,7 @@ function setUp(owner: Owner[], startError?: string) {
 }
 
 describe("ServerList.setUpHere", () => {
-  it("adds the server on this computer, makes its owner through its window's own session, and opens that window on the workspace", async () => {
+  it("adds the server on this computer and makes its owner through its window's own session, showing no window itself", async () => {
     const { list, store, shown, ownerAsked, windowFetches } = setUp([{ ok: true, workspace: "personal" }]);
     const done = await list.setUpHere("Lou Local");
     const server = store.byOrigin(ORIGIN);
@@ -93,18 +93,27 @@ describe("ServerList.setUpHere", () => {
     expect(server?.name).toBe(LOCAL_NAME);
     expect(list.localServer()?.id).toBe(server?.id);
     expect(ownerAsked).toEqual([{ fetch: windowFetches.get(server?.id ?? ""), name: "Lou Local" }]);
-    expect(shown).toEqual([{ serverId: server?.id, path: "/personal", inset: 1 }]);
+    // What it speaks was asked before anything is shown, so that its window takes its frame from it.
+    expect(shown).toEqual([]);
     expect(server).toMatchObject({ handoff: 1, version: "9.9.9" });
   });
 
-  it("says which workspace it made with the owner, and none when it signed in to an install set up before, which opens on its own first page", async () => {
-    const { list, shown } = setUp([
+  it("says which workspace it made with the owner, and none when it signed in to an install set up before", async () => {
+    const { list } = setUp([
       { ok: true, workspace: "personal" },
       { ok: true, workspace: null },
     ]);
     expect(await list.setUpHere("Lou Local")).toMatchObject({ workspace: "personal" });
     expect(await list.setUpHere("Lou Local")).toMatchObject({ workspace: null });
-    expect(shown.map((open) => open.path)).toEqual(["/personal", "/"]);
+  });
+
+  it("keeps the id it is given for a window made for it, but never one another server has", async () => {
+    const { list, store } = setUp([{ ok: true, workspace: "personal" }]);
+    const elsewhere = store.add("https://q.example", "Work", { handoff: 1, inset: 1 });
+    const done = await list.setUpHere("Lou Local", elsewhere.id);
+    expect(done).toMatchObject({ ok: true });
+    expect(done.ok && done.serverId).not.toBe(elsewhere.id);
+    expect(store.get(elsewhere.id)?.origin).toBe("https://q.example");
   });
 
   it("says why when it could not, without opening a window", async () => {

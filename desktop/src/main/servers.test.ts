@@ -39,6 +39,15 @@ describe("ServerStore", () => {
     expect(newServerId()).not.toBe(newServerId());
   });
 
+  it("never gives a new origin the id of a server already there", () => {
+    const store = new ServerStore(file());
+    const local = store.add("http://127.0.0.1:4780", "This computer", { handoff: 1, inset: 1 });
+    const remote = store.add("https://quadit.example.com", "", { handoff: 1, inset: 1 }, local.id);
+    expect(remote.id).not.toBe(local.id);
+    expect(store.get(local.id)?.origin).toBe("http://127.0.0.1:4780");
+    expect(store.list()).toHaveLength(2);
+  });
+
   it("keeps one entry per origin, with its id, renamed only when a name is given", () => {
     const store = new ServerStore(file());
     const first = store.add("https://quadit.example.com", "Work", { handoff: 0, inset: 0 });
