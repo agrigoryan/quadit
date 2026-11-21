@@ -409,13 +409,22 @@ button.undo:hover:not(:disabled) {
   margin-top: 8px;
 }
 
+/* What the person should know after taking a connection back: a token to revoke by hand. */
+.card-note {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.card-note:empty {
+  display: none;
+}
+
 /* The sheet of what connecting changes. */
 
-.scrim {
-  position: fixed;
-  inset: 0;
+.sheet::backdrop {
   background: var(--overlay);
-  z-index: 20;
   animation: fade 200ms var(--ease);
 }
 
@@ -425,21 +434,28 @@ button.undo:hover:not(:disabled) {
   }
 }
 
-.sheet {
+/* A modal dialog, held to the window's right edge, its full height. */
+dialog.sheet {
   position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  height: 100%;
+  max-height: none;
   width: min(500px, 100%);
-  z-index: 30;
+  max-width: none;
   background: var(--surface);
   color: var(--ink);
   box-shadow: var(--shadow-panel);
-  display: flex;
-  flex-direction: column;
   font-size: 14px;
   line-height: 1.5;
   animation: slide-in 240ms var(--ease);
+}
+
+dialog.sheet[open] {
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes slide-in {
@@ -711,7 +727,7 @@ button.x .line-icon {
 @media (prefers-reduced-motion: reduce) {
   .tool,
   .connected,
-  .scrim,
+  .sheet::backdrop,
   .sheet,
   .spinner {
     animation: none;

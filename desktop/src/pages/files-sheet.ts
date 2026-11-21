@@ -1,4 +1,4 @@
-// "See the files" (desktop contract §10): a side sheet over the page saying
+// "See the files" (desktop contract §10): a side sheet over the page, a modal dialog, saying
 // what connecting (or disconnecting) a tool changes. Each file in plain words
 // first (shared/change-words.ts: what it is, a sentence, the path in small
 // type, what happens to it), then the copy kept and the way back, and the
@@ -9,16 +9,20 @@
 import { button, lineIcon, make } from "@/pages/dom";
 import { tile } from "@/pages/tool-card";
 import { fileWords, filesSummary, sheetIntro } from "@/shared/change-words";
-import type { PlanFile, Planned } from "@/shared/pages-api";
+import type { PlanFile, Planned, PlanView, Refused } from "@/shared/pages-api";
 
 export interface SheetSetup {
   tool: { name: string; initials: string };
   /** "connect": what connecting changes; "disconnect": what taking it back does. */
   kind: "connect" | "disconnect";
-  /** The plan to show, fetched once the sheet is open. */
-  plan: Promise<Planned>;
-  /** The sheet's main button ("Connect Claude Code"), or none (connected already). */
-  action?: { label: string; run(planId: string): Promise<{ ok: true } | { ok: false; error: string }> };
+  /** Fetches the plan to show: once the sheet is open, and again when the one shown is out of date. */
+  plan(): Promise<Planned>;
+  /**
+   * The sheet's main button ("Connect Claude Code"), which carries out the
+   * plan shown (its id), or none (connected already). Refused as `stale`, the
+   * sheet fetches the plan again and says why, for the person to look again.
+   */
+  action?: { label: string; run(planId: string): Promise<{ ok: true } | Refused> };
   /** The sheet closed, by any of its ways. */
   closed?(): void;
 }
@@ -26,16 +30,16 @@ export interface SheetSetup {
 /** The sheet open now, so that a second replaces it. */
 let open: { close(): void } | null = null;
 
-/** Opens the sheet over the page. */
+/**
+ * Opens the sheet over the page, as a modal dialog: while it is open, the
+ * page behind it takes no clicks and no keys, and focus stays in it.
+ */
 export function openSheet(setup: SheetSetup) {
   open?.close();
   const { tool, kind } = setup;
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-  const scrim = make("div", "", "scrim");
-  const sheet = make("aside", "", "sheet");
-  sheet.setAttribute("role", "dialog");
-  sheet.setAttribute("aria-modal", "true");
+  const sheet = make("dialog", "", "sheet");
   sheet.setAttribute("aria-labelledby", "sheet-title");
 
   const head = make("div", "", "sheet-h");
@@ -53,39 +57,52 @@ export function openSheet(setup: SheetSetup) {
   const error = make("p", "", "card-error");
   error.setAttribute("role", "alert");
   const closeAtFoot = button("Close", () => close(), "btn btn-line");
-  foot.append(error, closeAtFoot);
+  const go = button("", () => void carryOut(), "btn btn-move");
+  go.hidden = true;
+  foot.append(error, closeAtFoot, go);
   sheet.append(head, body, foot);
+
+  /** The plan shown now, which the main button carries out. */
+  let shown: string | null = null;
 
   const close = () => {
     if (open !== handle) return;
     open = null;
-    document.removeEventListener("keydown", onKey);
-    scrim.remove();
+    sheet.close();
     sheet.remove();
     opener?.focus();
     setup.closed?.();
   };
-  const onKey = (event: KeyboardEvent) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      close();
-    }
-  };
   const handle = { close };
   open = handle;
-  scrim.addEventListener("click", close);
-  document.addEventListener("keydown", onKey);
-  document.body.append(scrim, sheet);
+  // Escape: closed the sheet's own way, so that it says so.
+  sheet.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    close();
+  });
+  // A click outside the sheet (on its backdrop) lands on the dialog itself.
+  sheet.addEventListener("click", (event) => {
+    if (event.target === sheet) close();
+  });
+  document.body.append(sheet);
+  sheet.showModal();
   closeButton.focus();
 
-  void setup.plan.then((planned) => {
+  const load = async () => {
+    shown = null;
+    go.hidden = true;
+    summary.textContent = "Looking…";
+    const planned = await setup.plan();
     if (open !== handle) return;
     if (!planned.ok) {
       summary.textContent = "";
       body.replaceChildren(make("p", planned.error, "card-error"));
       return;
     }
-    const { plan } = planned;
+    showPlan(planned.plan);
+  };
+
+  const showPlan = (plan: PlanView) => {
     summary.textContent = filesSummary(plan.files);
     const files = make("div", "", "files");
     files.append(...plan.files.map((file) => fileRow(file, tool.name)));
@@ -96,7 +113,7 @@ export function openSheet(setup: SheetSetup) {
         "span",
         kind === "connect"
           ? "Quadit copies each file before it changes it. Undo puts every file back the way it was."
-          : "Quadit copies each file before it changes it, again.",
+          : "Quadit copies each file before it changes it.",
       ),
     );
     const warnings = plan.warnings.map((warning) => make("p", warning, "warning"));
@@ -116,23 +133,30 @@ export function openSheet(setup: SheetSetup) {
       safety,
       exact,
     );
+    if (!setup.action) return;
+    shown = plan.id;
+    go.textContent = setup.action.label;
+    go.hidden = false;
+  };
+
+  /** The main button: carries out the plan shown; one out of date is fetched again, with why. */
+  const carryOut = async () => {
     const { action } = setup;
-    if (!action) return;
-    const go = button(
-      action.label,
-      () => {
-        error.textContent = "";
-        go.disabled = true;
-        void action.run(plan.id).then((done) => {
-          go.disabled = false;
-          if (done.ok) close();
-          else error.textContent = done.error;
-        });
-      },
-      "btn btn-move",
-    );
-    foot.append(go);
-  });
+    if (!action || !shown) return;
+    error.textContent = "";
+    go.disabled = true;
+    const done = await action.run(shown);
+    go.disabled = false;
+    if (open !== handle) return;
+    if (done.ok) {
+      close();
+      return;
+    }
+    if (done.stale) await load();
+    error.textContent = done.error;
+  };
+
+  void load();
 }
 
 /** A file as the person reads it first: what it is and is for, its path, and what happens to it. */
