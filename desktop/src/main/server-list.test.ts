@@ -32,6 +32,7 @@ function setUp(owner: Owner[], startError?: string) {
       : new Response(null, { status: 404 });
   const windows = {
     show: () => {},
+    idForWelcomeServer: (id: string | undefined) => id,
     // The page starts over: the app changed the window's session under it.
     // What the server speaks as its window is made, which takes its frame from it.
     showAfresh: (serverId: string, path: string) =>

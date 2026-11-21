@@ -36,7 +36,10 @@ type Local = Pick<
 >;
 
 /** What the list needs of the servers' windows. */
-type Windows = Pick<ServerWindows, "show" | "showAfresh" | "fetcher" | "forget" | "dismissBar" | "retryFrom">;
+type Windows = Pick<
+  ServerWindows,
+  "show" | "showAfresh" | "idForWelcomeServer" | "fetcher" | "forget" | "dismissBar" | "retryFrom"
+>;
 
 export interface ServerListSetup {
   /** The network the probes of servers being added go through (Electron's net.fetch). */
@@ -210,7 +213,7 @@ export class ServerList {
     }
     const answer = await probe(origin, this.setup.fetcher);
     if (!answer.reachable) return { ok: false, error: answer.reason };
-    const server = this.store.add(origin, name, answer, id);
+    const server = this.store.add(origin, name, answer, this.windows.idForWelcomeServer(id, answer));
     this.store.change(server.id, { version: answer.version });
     const path = this.destination?.origin === origin ? this.destination.path : undefined;
     if (path) this.destination = null;

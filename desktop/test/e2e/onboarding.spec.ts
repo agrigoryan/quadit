@@ -322,7 +322,7 @@ test("a server elsewhere that knows nothing of a window without a title bar take
     );
     expect(shown).toHaveLength(1);
     const during = await counts.jsonValue();
-    if (process.platform === "darwin") expect(during).toContain(1);
+    if (process.platform === "darwin") expect(during).toEqual([1, 1]);
     expect(Math.max(1, ...during)).toBe(1);
     expect(shown[0]?.bounds).toEqual(before);
     if (process.platform === "darwin") expect(shown[0]?.content.height).toBeLessThan(shown[0]?.bounds.height ?? 0);

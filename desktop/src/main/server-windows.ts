@@ -363,6 +363,14 @@ export class ServerWindows {
     return id;
   }
 
+  /** Reserves the id for a probed remote. A different frame needs its own native window name during the swap. */
+  idForWelcomeServer(id: string | undefined, speaks: Pick<Server, "inset">): string | undefined {
+    const waiting = this.waiting;
+    if (!waiting || waiting.id !== id) return undefined;
+    if ((this.strips.get(waiting.win) ?? 0) !== frameFor(process.platform, speaks).strip) waiting.id = newServerId();
+    return waiting.id;
+  }
+
   /** Takes the cover away, showing the window under it; a window still waiting for its server goes with it. */
   uncover() {
     const covered = this.covering;
@@ -463,16 +471,22 @@ export class ServerWindows {
     return win;
   }
 
-  /** Reuses the window's persisted name, which Electron releases only after that window is destroyed. */
+  /** Prepares the framed window behind Welcome, then transfers the cover and reveals it at the same bounds. */
   private replaceWaiting(waiting: BrowserWindow, server: Server, frame: Frame): BrowserWindow {
     const bounds = waiting.getBounds();
+    const oldId = this.owners.get(waiting.webContents.id);
+    // A remote was probed before its id was reserved. A local install was saved before its probe and might
+    // already own this name: then Electron needs the old window destroyed before it will make the new one.
+    const prepared = oldId === server.id ? undefined : this.make(server.id, server.name, frame, false);
+    prepared?.setBounds(bounds);
     const cover = this.covering?.win === waiting ? this.covering : undefined;
     if (cover) waiting.contentView.removeChildView(cover.view);
     this.waiting = undefined;
     waiting.destroy();
 
-    const win = this.make(server.id, server.name, frame, false);
-    win.setBounds(bounds);
+    const win = prepared ?? this.make(server.id, server.name, frame, false);
+    if (!prepared) win.setBounds(bounds);
+    if (oldId && oldId !== server.id) BrowserWindow.clearPersistedState(windowName(oldId));
     if (cover) {
       win.contentView.addChildView(cover.view);
       this.covering = { ...cover, win };
