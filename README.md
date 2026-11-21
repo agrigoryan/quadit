@@ -64,7 +64,7 @@ docker run -d --name quadit -p 4780:4780 -v quadit-data:/data \
 On Debian, Ubuntu, Fedora or RHEL, the `.deb` and `.rpm` packages from [Releases](https://github.com/agrigoryan/quadit/releases) install `quadit` and a systemd service ([details](docs/install.md#linux-packages)):
 
 ```bash
-sudo apt install ./quadit_0.2.0_amd64.deb && sudo systemctl enable --now quadit
+sudo apt install ./quadit_0.3.0_amd64.deb && sudo systemctl enable --now quadit
 ```
 
 Or download an archive for your platform from [Releases](https://github.com/agrigoryan/quadit/releases) (Linux and macOS, x86-64 and ARM64; `checksums.txt` beside them), or build from source with Go, Node.js 24 and pnpm:
@@ -102,7 +102,7 @@ Quadit does not update itself; update it the way you installed it. Releases foll
 
 | Installed with | Update |
 | --- | --- |
-| Install script | Run it again; `curl … \| QUADIT_VERSION=v0.2.0 sh` installs a given version |
+| Install script | Run it again; `curl … \| QUADIT_VERSION=v0.3.0 sh` installs a given version |
 | Homebrew | `brew upgrade quadit` |
 | Docker | `docker compose pull && docker compose up -d`, or pull `ghcr.io/agrigoryan/quadit:latest` and recreate the container. Tags `X.Y.Z`, `X.Y`, `X` and `latest` |
 | `.deb` / `.rpm` | Install the newer package; the service restarts on it |

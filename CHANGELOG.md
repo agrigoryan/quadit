@@ -4,6 +4,8 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-21
+
 ### Added
 
 - Antigravity CLI (`agy`) is one of the agent tools Quadit connects: the desktop app's Connect finds it and writes the skill and the MCP server where it reads them (`~/.gemini/config`), and `quadit skill install` writes the skill there on a computer that has it.
@@ -54,6 +56,7 @@ The first public release.
 - A desktop app for macOS, Windows and Linux (pre-release, not signed yet): a window for each server, sign-in through the browser, answers from a notification or the menu bar, quick capture, and Connect, which sets up Claude Code, Codex and other agent harnesses to work in Quadit.
 - Install with the install script, Homebrew, Docker (`ghcr.io/agrigoryan/quadit`), `.deb` and `.rpm` packages with a systemd service, or the archives on GitHub Releases.
 
-[Unreleased]: https://github.com/agrigoryan/quadit/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/agrigoryan/quadit/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.3.0
 [0.2.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.2.0
 [0.1.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.1.0
