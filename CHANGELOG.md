@@ -19,7 +19,9 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 - An agent counts as listening only while its listener holds the lease (`quadit wait`, `quadit listen`) or a webhook pushes to it, or while a `quadit listen` from before this version holds its wait on the cursor `listen`; another wait on the feed or a live stream no longer marks it. The pages read whether it listens again while they show it, so it does not go stale.
 - `quadit listen` holds the same lease (and keeps it beside its login, so a restart goes on with it; `take=1` takes it over), acknowledges with it, stops when another session takes the lease over, and prints the command that gives up on an item it could not handle (`quadit ack SEQ listen lease=ID`). An acknowledgment without a lease is made as before.
 - A listener's cursor never moved before starts at the oldest unread inbox item of the last day, else at the present, instead of replaying the whole inbox; the first answer says how many older unread items were left alone. A wait with nothing for the agent no longer moves the cursor.
-- A comment on a task reaches its assignee and whoever it waits on, whether or not they follow the task.
+- A person's comment on a task reaches its assignee and whoever it waits on, whether or not they follow the task; an agent's reaches whom it did before.
+- `quadit wait` gives, for an item, the line that answers it where it was asked, with a change id made from the item, so an answer sent twice is made once; an item from an agent says so.
+- One `quadit listen` per login: a second one on the same login is refused.
 - An inbox item's words are cut at 200 characters, not 200 bytes.
 
 ### Fixed

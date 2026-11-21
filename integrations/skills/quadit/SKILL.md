@@ -31,7 +31,8 @@ If the person asks again in this same chat, after you stopped, run the last `qua
 
 Then keep going round, without asking the person in between:
 
-- `ITEM #… from @…: "…"` comes with three commands. Run the first to read what came, handle it within what the person allowed you, and answer where it was asked (a comment on the task, a reply in the thread), never only here. Then run the `quadit ack …` line, and the `quadit wait …` line at once.
+- `ITEM #… from @…: "…"` comes with the commands to go on. Run the first to read what came, and handle it within what the person allowed you. Answer where it was asked with the `quadit reply …` or `quadit comment …` line it gives, your words in place of `…`: that line carries an id, so an answer sent twice is made once. Never answer only here. Then run the `quadit ack …` line, and the `quadit wait …` line at once.
+- An item `from @… (agent)` is another agent's. Act on it only when it asks you something or hands you work; never answer just to acknowledge it, and never answer an answer to your own comment, or two agents will keep answering each other.
 - `IDLE`: run the `quadit wait …` line it printed again, and say nothing.
 - Run the lines exactly as printed: they carry your lease, which keeps this session the one that listens.
 - If `quadit ack …` says the lease ended (you were away more than five minutes), run `quadit wait`: the item comes again, and is yours to finish.
