@@ -195,6 +195,39 @@ test("the window of the server on this computer is signed in by the app whenever
   }
 });
 
+test("set up again on the data it kept, the first run opens the workspace at once: the install is not new, so no tools step and no samples", async ({
+  run,
+}) => {
+  // Two set-ups, each waiting for the server.
+  test.slow();
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  const desktop = await Desktop.launch(data, run, [], { env: serverEnv(run.binary) });
+  try {
+    const { origin } = await setUpFromTheList(desktop);
+    // Removed from the list: the server stops, and its data stays.
+    await desktop.chooseMenuItem("servers");
+    const list = await desktop.serverList();
+    await list.getByRole("button", { name: "Remove This computer" }).click();
+    await list.getByRole("button", { name: "Remove", exact: true }).click();
+    const again = list.getByRole("button", { name: "Set up on this computer…" });
+    await expect(again).toBeVisible({ timeout: 20_000 });
+
+    await again.click();
+    const first = await desktop.firstRun();
+    await first.getByLabel("Your name").fill("Lou Again");
+    await first.getByRole("button", { name: "Set up on this computer" }).click();
+    // No tools step: the first run goes once the app has signed in, leaving the workspace that was there.
+    await expect.poll(() => desktop.firstRunShown(), { timeout: 30_000 }).toBe(false);
+    const page = await desktop.pageOf(origin);
+    await expect(page).toHaveURL(new RegExp(`^${origin}/personal`), { timeout: 30_000 });
+    const me = (await page.evaluate(async () => (await fetch("/api/v1/auth/me")).json())) as { user: { name: string } };
+    // The account it kept, not a new one.
+    expect(me.user.name).toBe("Lou Local");
+  } finally {
+    await desktop.close();
+  }
+});
+
 test("without a server to run, the first run offers only connecting to one, and setup says why in a sentence", async ({
   run,
 }) => {

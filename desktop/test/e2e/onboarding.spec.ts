@@ -153,13 +153,15 @@ test("the first run sets Quadit up on this computer in one window, connects the 
   }
 });
 
-test("set up on a computer where no agent tool is found, the tools step says so calmly, and Skip lands on the sample tasks", async ({
+test("set up on a computer where no agent tool is found, the tools step says so calmly, comes back after a quit, and Skip lands on the sample tasks", async ({
   run,
 }) => {
+  // Two starts of the app, each waiting for its server.
+  test.slow();
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   const computer = fakeComputer({ claudeCode: false });
   const env = { QUADIT_DESKTOP_QUADIT: run.binary, HOME: computer.home, SHELL: computer.shell };
-  const desktop = await Desktop.launch(data, run, [], { env, firstStart: true });
+  let desktop = await Desktop.launch(data, run, [], { env, firstStart: true });
   try {
     const first = await desktop.firstRun();
     await first.getByLabel("Your name").fill("Lou Local");
@@ -173,6 +175,21 @@ test("set up on a computer where no agent tool is found, the tools step says so 
     // Looking again finds nothing new, and says so the same way.
     await first.getByRole("button", { name: "Look again" }).click();
     await expect(first.getByRole("button", { name: "Look again" })).toBeVisible();
+  } finally {
+    // Quit during the tools step: the account is made, and the step is owed.
+    await desktop.close();
+  }
+
+  desktop = await Desktop.launch(data, run, [], { env });
+  try {
+    // The next start resumes it, over the workspace's window, for the name given: not Welcome again.
+    const first = await desktop.firstRun();
+    await expect(first.getByRole("heading", { level: 1, name: "Connect your AI tools" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(first.getByText("No AI tools on this computer yet.", { exact: false })).toBeVisible();
+    await expect(first.getByText("Lou Local")).toBeVisible();
+    await expect(first.getByRole("heading", { level: 1, name: "Welcome to Quadit" })).toBeHidden();
 
     await first.getByRole("button", { name: "Skip for now" }).click();
     await expect.poll(() => desktop.firstRunShown(), { timeout: 20_000 }).toBe(false);
@@ -181,6 +198,15 @@ test("set up on a computer where no agent tool is found, the tools step says so 
     await expect(page.getByText(SAMPLES_NOTE)).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Create your first project")).toHaveCount(0);
     expect(desktop.app.windows().some((p) => p.url().includes("/connect.html"))).toBe(false);
+  } finally {
+    await desktop.close();
+  }
+
+  // Skipped, it is over: the next start opens the workspace alone.
+  desktop = await Desktop.launch(data, run, [], { env });
+  try {
+    await desktop.pageOf(await desktop.localOrigin());
+    expect(desktop.firstRunShown()).toBe(false);
   } finally {
     await desktop.close();
   }
@@ -218,6 +244,40 @@ test("the first run connects to a server elsewhere, whose sign-in page its windo
     await expect.poll(async () => (await desktop.recorded()).opened.length).toBe(1);
     const sent = new URL((await desktop.recorded()).opened[0] ?? "");
     expect(sent.origin + sent.pathname).toBe(`${run.direct}/desktop/connect`);
+  } finally {
+    await desktop.close();
+  }
+});
+
+test("a server elsewhere that knows nothing of a window without a title bar takes the first run's place in a window of its own, never beside it", async ({
+  run,
+}) => {
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  const desktop = await Desktop.launch(data, run, [], { env: { QUADIT_DESKTOP_QUADIT: run.binary }, firstStart: true });
+  try {
+    const first = await desktop.firstRun();
+    await expect.poll(() => desktop.shownWindows()).toHaveLength(1);
+    const before = await desktop.app.evaluate(({ BaseWindow }) =>
+      BaseWindow.getAllWindows()
+        .find((w) => w.isVisible())
+        ?.getBounds(),
+    );
+    await first.getByRole("button", { name: "Connect to a server instead" }).click();
+    // The hand-off stand-in answers its version without inset, as a server from before it does.
+    await first.getByLabel("Address").fill(run.fake);
+    await first.getByRole("button", { name: "Add server" }).click();
+    const page = await desktop.pageOf(run.fake);
+    await expect(page).toHaveURL(/\/login/);
+    await expect.poll(() => desktop.firstRunShown()).toBe(false);
+    // One window on screen, where the first run's was; on macOS it has its title bar.
+    const shown = await desktop.app.evaluate(({ BaseWindow }) =>
+      BaseWindow.getAllWindows()
+        .filter((w) => w.isVisible())
+        .map((w) => ({ bounds: w.getBounds(), content: w.getContentBounds() })),
+    );
+    expect(shown).toHaveLength(1);
+    expect(shown[0]?.bounds).toEqual(before);
+    if (process.platform === "darwin") expect(shown[0]?.content.height).toBeLessThan(shown[0]?.bounds.height ?? 0);
   } finally {
     await desktop.close();
   }
