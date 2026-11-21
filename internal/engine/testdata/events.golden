@@ -167,37 +167,57 @@ template.deleted {"changes":{"deleted_at":{"from":null,"to":1768986137000}},"id"
 view.deleted {"changes":{"deleted_at":{"from":null,"to":1768986138000}},"id":"#28"}
 preference.deleted {"changes":{"deleted_at":{"from":null,"to":1768986139000}},"id":"#29"}
 rule.deleted {"changes":{"deleted_at":{"from":null,"to":1768986140000}},"id":"#56"}
-project.deleted {"changes":{"deleted_at":{"from":null,"to":1768986141000}},"id":"#14","key":"OPS"}
-task.created {"row":{"id":"#84","project_id":"#5","number":5,"key":"SVA-5","title":"Restored","status_id":"#7","priority":0,"rank":"00000003y8","created_by":"#3","created_at":1768986142000,"updated_at":1768986142000,"created_seq":171,"updated_seq":171,"activity_seq":171}}
-task.created {"row":{"id":"#85","project_id":"#5","number":6,"key":"SVA-6","title":"Thrown away","status_id":"#7","priority":0,"rank":"00000004qo","created_by":"#3","created_at":1768986143000,"updated_at":1768986143000,"created_seq":172,"updated_seq":172,"activity_seq":172}}
-task.updated {"changes":{"deleted_at":{"from":0,"to":1768986144000}},"deleted":true,"id":"#85","key":"SVA-6"}
-task.restored {"from_backup":true,"key":"SVA-5","row":{"id":"#84","project_id":"#5","number":5,"key":"SVA-5","title":"Restored","status_id":"#7","priority":0,"rank":"00000003y8","created_by":"#3","created_at":1768986142000,"updated_at":1768986142000,"created_seq":171,"updated_seq":174,"activity_seq":174}}
-doc.restored {"from_backup":true,"row":{"id":"#66","kind":"page","title":"The plan","project_id":"#14","rank":"00000000sg","created_by":"#3","created_at":1768986097000,"updated_by":"#3","updated_at":1768986115000,"created_seq":117,"updated_seq":175,"content_seq":176}}
-doc.edited {"blocks":[{"id":"#65","doc_id":"#66","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":176},{"id":"#67","doc_id":"#66","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":176}],"changes":{"content_seq":{"from":null,"to":176}},"deleted":["#69","#71"],"from_backup":true,"id":"#66"}
-task.deleted {"gone":true,"id":"#85"}
+project.created {"row":{"id":"#84","workspace_id":"#1","key":"GS","name":"Getting started","rank":"r","created_by":"#3","created_at":1768986141000,"updated_seq":170}}
+status.created {"row":{"id":"#85","project_id":"#84","name":"Backlog","color":"#9ca3af","category":"backlog","rank":"00000000sg","updated_seq":171}}
+status.created {"row":{"id":"#86","project_id":"#84","name":"Todo","color":"#6b7280","category":"unstarted","rank":"00000001kw","is_default":true,"updated_seq":172}}
+status.created {"row":{"id":"#87","project_id":"#84","name":"In Progress","color":"#f59e0b","category":"started","rank":"00000002dc","updated_seq":173}}
+status.created {"row":{"id":"#88","project_id":"#84","name":"Waiting","color":"#8b5cf6","category":"waiting","rank":"000000035s","updated_seq":174}}
+status.created {"row":{"id":"#89","project_id":"#84","name":"Done","color":"#10b981","category":"done","rank":"00000003y8","updated_seq":175}}
+status.created {"row":{"id":"#90","project_id":"#84","name":"Canceled","color":"#ef4444","category":"canceled","rank":"00000004qo","updated_seq":176}}
+label.created {"row":{"id":"#91","project_id":"#84","name":"Sample","color":"#8b5cf6","updated_seq":177}}
+task.created {"row":{"id":"#92","project_id":"#84","number":1,"key":"GS-1","title":"Open this task and leave a comment","status_id":"#86","priority":0,"assignee_id":"#3","label_ids":["#91"],"rank":"00000000sg","created_by":"#3","created_at":1768986141000,"updated_at":1768986141000,"created_seq":178,"updated_seq":178,"activity_seq":178}}
+task.created {"row":{"id":"#93","project_id":"#84","number":2,"key":"GS-2","title":"Write a page in Docs about what you are working on","status_id":"#86","priority":0,"assignee_id":"#3","label_ids":["#91"],"rank":"00000001kw","created_by":"#3","created_at":1768986141000,"updated_at":1768986141000,"created_seq":179,"updated_seq":179,"activity_seq":179}}
+task.created {"row":{"id":"#94","project_id":"#84","number":3,"key":"GS-3","title":"Say hello and tell Aram what you can do","status_id":"#86","priority":0,"assignee_id":"#2","asked_by":"#3","label_ids":["#91"],"rank":"00000002dc","created_by":"#3","created_at":1768986141000,"updated_at":1768986141000,"created_seq":180,"updated_seq":180,"activity_seq":180}}
+notification.created {"row":{"id":"#95","user_id":"#2","seq":181,"type":"assigned","actor_id":"#3","task_id":"#94","entity_type":"task","entity_id":"#94","title":"GS-3 Say hello and tell Aram what you can do","created_at":1768986141000}}
+project.updated {"changes":{"samples":{"from":null,"to":["#92","#93","#94"]}},"id":"#84"}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1768986142000}},"deleted":true,"id":"#92","key":"GS-1"}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1768986142000}},"deleted":true,"id":"#93","key":"GS-2"}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1768986142000}},"deleted":true,"id":"#94","key":"GS-3"}
+project.deleted {"changes":{"deleted_at":{"from":null,"to":1768986142000}},"id":"#84","key":"GS"}
+project.deleted {"changes":{"deleted_at":{"from":null,"to":1768986143000}},"id":"#14","key":"OPS"}
+task.created {"row":{"id":"#96","project_id":"#5","number":5,"key":"SVA-5","title":"Restored","status_id":"#7","priority":0,"rank":"00000003y8","created_by":"#3","created_at":1768986144000,"updated_at":1768986144000,"created_seq":188,"updated_seq":188,"activity_seq":188}}
+task.created {"row":{"id":"#97","project_id":"#5","number":6,"key":"SVA-6","title":"Thrown away","status_id":"#7","priority":0,"rank":"00000004qo","created_by":"#3","created_at":1768986145000,"updated_at":1768986145000,"created_seq":189,"updated_seq":189,"activity_seq":189}}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1768986146000}},"deleted":true,"id":"#97","key":"SVA-6"}
+task.restored {"from_backup":true,"key":"SVA-5","row":{"id":"#96","project_id":"#5","number":5,"key":"SVA-5","title":"Restored","status_id":"#7","priority":0,"rank":"00000003y8","created_by":"#3","created_at":1768986144000,"updated_at":1768986144000,"created_seq":188,"updated_seq":191,"activity_seq":191}}
+doc.restored {"from_backup":true,"row":{"id":"#66","kind":"page","title":"The plan","project_id":"#14","rank":"00000000sg","created_by":"#3","created_at":1768986097000,"updated_by":"#3","updated_at":1768986115000,"created_seq":117,"updated_seq":192,"content_seq":193}}
+doc.edited {"blocks":[{"id":"#65","doc_id":"#66","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":193},{"id":"#67","doc_id":"#66","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":117,"updated_seq":193}],"changes":{"content_seq":{"from":null,"to":193}},"deleted":["#69","#71"],"from_backup":true,"id":"#66"}
+task.deleted {"gone":true,"id":"#92"}
+task.deleted {"gone":true,"id":"#93"}
+task.deleted {"gone":true,"id":"#94"}
+task.deleted {"gone":true,"id":"#97"}
 doc.deleted {"gone":true,"id":"#76"}
-notification.updated {"changes":{"archived_at":{"from":null,"to":1774170150000},"read_at":{"from":null,"to":1774170150000}},"ids":["#31","#33","#41","#49","#51","#52","#61"]}
+notification.updated {"changes":{"archived_at":{"from":null,"to":1774170152000},"read_at":{"from":null,"to":1774170152000}},"ids":["#31","#33","#41","#49","#51","#52","#61"]}
 notification.updated {"changes":{"archived_at":{"from":null,"to":0}},"ids":["#31","#33","#41","#49","#51","#52","#61"]}
-epic.created {"row":{"id":"#86","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170152000,"updated_at":1774170152000,"updated_seq":181}}
-milestone.created {"row":{"id":"#87","epic_id":"#86","name":"Beta","rank":"00000000sg","created_at":1774170153000,"updated_seq":182}}
-cycle.created {"row":{"id":"#88","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170154000,"updated_seq":183}}
-epic.deleted {"changes":{"deleted_at":{"from":null,"to":1774170155000}},"id":"#86"}
-milestone.deleted {"changes":{"deleted_at":{"from":null,"to":1774170156000}},"id":"#87"}
-cycle.deleted {"changes":{"deleted_at":{"from":null,"to":1774170157000}},"id":"#88"}
-epic.restored {"row":{"id":"#86","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170152000,"updated_at":1774170152000,"updated_seq":187}}
-milestone.restored {"row":{"id":"#87","epic_id":"#86","name":"Beta","rank":"00000000sg","created_at":1774170153000,"updated_seq":188}}
-cycle.restored {"row":{"id":"#88","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170154000,"updated_seq":189}}
-task.created {"row":{"id":"#89","project_id":"#5","number":7,"key":"SVA-7","title":"Made by mistake","status_id":"#7","priority":0,"assignee_id":"#2","asked_by":"#3","rank":"00000005j4","created_by":"#3","created_at":1774170161000,"updated_at":1774170161000,"created_seq":190,"updated_seq":190,"activity_seq":190}}
-notification.created {"row":{"id":"#90","user_id":"#2","seq":191,"type":"assigned","actor_id":"#3","task_id":"#89","entity_type":"task","entity_id":"#89","title":"SVA-7 Made by mistake","created_at":1774170161000}}
-notification.deleted {"gone":true,"id":"#90","undoes":"#91"}
-task.updated {"changes":{"deleted_at":{"from":0,"to":1774170162000}},"deleted":true,"id":"#89","key":"SVA-7","undoes":"#91"}
-doc.created {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has three phases."}],"created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":194}],"row":{"id":"#93","kind":"page","title":"Notes","rank":"y","created_by":"#3","created_at":1774170163000,"updated_by":"#3","updated_at":1774170163000,"created_seq":194,"updated_seq":194,"content_seq":194}}
-comment.created {"row":{"id":"#94","doc_id":"#93","subject_type":"doc_block","subject_id":"#92","kind":"comment","author_id":"#3","body":"Four?","quote":"three phases","created_at":1774170164000,"created_seq":195,"updated_seq":195}}
-doc.edited {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has "},{"type":"text","text":"three phases","styles":{"comment":"#94"}},{"type":"text","text":"."}],"created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":196}],"changes":{"content_seq":{"from":null,"to":196}},"deleted":null,"id":"#93"}
-comment.updated {"changes":{"detached_at":{"from":0,"to":1774170165000},"subject_id":{"from":"#92","to":"#93"},"subject_type":{"from":"doc_block","to":"doc"}},"id":"#94","key":""}
-doc.edited {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":"The boss is gone.","created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":198}],"changes":{"content_seq":{"from":null,"to":198},"updated_at":{"from":null,"to":1774170165000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#93"}
-comment.updated {"changes":{"detached_at":{"from":1774170165000,"to":0},"subject_id":{"from":"#93","to":"#92"},"subject_type":{"from":"doc","to":"doc_block"}},"id":"#94","key":""}
-doc.edited {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has "},{"type":"text","text":"three phases","styles":{"comment":"#94"}},{"type":"text","text":"."}],"created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":200}],"changes":{"content_seq":{"from":null,"to":200},"updated_at":{"from":null,"to":1774170166000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#93"}
-comment.deleted {"changes":{"deleted_at":{"from":null,"to":1774170167000}},"id":"#94","key":""}
-doc.edited {"blocks":[{"id":"#92","doc_id":"#93","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has three phases."}],"created_by":"#3","updated_by":"#3","created_seq":194,"updated_seq":202}],"changes":{"content_seq":{"from":null,"to":202}},"deleted":null,"id":"#93"}
+epic.created {"row":{"id":"#98","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170154000,"updated_at":1774170154000,"updated_seq":201}}
+milestone.created {"row":{"id":"#99","epic_id":"#98","name":"Beta","rank":"00000000sg","created_at":1774170155000,"updated_seq":202}}
+cycle.created {"row":{"id":"#100","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170156000,"updated_seq":203}}
+epic.deleted {"changes":{"deleted_at":{"from":null,"to":1774170157000}},"id":"#98"}
+milestone.deleted {"changes":{"deleted_at":{"from":null,"to":1774170158000}},"id":"#99"}
+cycle.deleted {"changes":{"deleted_at":{"from":null,"to":1774170159000}},"id":"#100"}
+epic.restored {"row":{"id":"#98","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170154000,"updated_at":1774170154000,"updated_seq":207}}
+milestone.restored {"row":{"id":"#99","epic_id":"#98","name":"Beta","rank":"00000000sg","created_at":1774170155000,"updated_seq":208}}
+cycle.restored {"row":{"id":"#100","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170156000,"updated_seq":209}}
+task.created {"row":{"id":"#101","project_id":"#5","number":7,"key":"SVA-7","title":"Made by mistake","status_id":"#7","priority":0,"assignee_id":"#2","asked_by":"#3","rank":"00000005j4","created_by":"#3","created_at":1774170163000,"updated_at":1774170163000,"created_seq":210,"updated_seq":210,"activity_seq":210}}
+notification.created {"row":{"id":"#102","user_id":"#2","seq":211,"type":"assigned","actor_id":"#3","task_id":"#101","entity_type":"task","entity_id":"#101","title":"SVA-7 Made by mistake","created_at":1774170163000}}
+notification.deleted {"gone":true,"id":"#102","undoes":"#103"}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1774170164000}},"deleted":true,"id":"#101","key":"SVA-7","undoes":"#103"}
+doc.created {"blocks":[{"id":"#104","doc_id":"#105","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has three phases."}],"created_by":"#3","updated_by":"#3","created_seq":214,"updated_seq":214}],"row":{"id":"#105","kind":"page","title":"Notes","rank":"y","created_by":"#3","created_at":1774170165000,"updated_by":"#3","updated_at":1774170165000,"created_seq":214,"updated_seq":214,"content_seq":214}}
+comment.created {"row":{"id":"#106","doc_id":"#105","subject_type":"doc_block","subject_id":"#104","kind":"comment","author_id":"#3","body":"Four?","quote":"three phases","created_at":1774170166000,"created_seq":215,"updated_seq":215}}
+doc.edited {"blocks":[{"id":"#104","doc_id":"#105","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has "},{"type":"text","text":"three phases","styles":{"comment":"#106"}},{"type":"text","text":"."}],"created_by":"#3","updated_by":"#3","created_seq":214,"updated_seq":216}],"changes":{"content_seq":{"from":null,"to":216}},"deleted":null,"id":"#105"}
+comment.updated {"changes":{"detached_at":{"from":0,"to":1774170167000},"subject_id":{"from":"#104","to":"#105"},"subject_type":{"from":"doc_block","to":"doc"}},"id":"#106","key":""}
+doc.edited {"blocks":[{"id":"#104","doc_id":"#105","rank":"00000000sg","type":"paragraph","content":"The boss is gone.","created_by":"#3","updated_by":"#3","created_seq":214,"updated_seq":218}],"changes":{"content_seq":{"from":null,"to":218},"updated_at":{"from":null,"to":1774170167000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#105"}
+comment.updated {"changes":{"detached_at":{"from":1774170167000,"to":0},"subject_id":{"from":"#105","to":"#104"},"subject_type":{"from":"doc","to":"doc_block"}},"id":"#106","key":""}
+doc.edited {"blocks":[{"id":"#104","doc_id":"#105","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has "},{"type":"text","text":"three phases","styles":{"comment":"#106"}},{"type":"text","text":"."}],"created_by":"#3","updated_by":"#3","created_seq":214,"updated_seq":220}],"changes":{"content_seq":{"from":null,"to":220},"updated_at":{"from":null,"to":1774170168000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#105"}
+comment.deleted {"changes":{"deleted_at":{"from":null,"to":1774170169000}},"id":"#106","key":""}
+doc.edited {"blocks":[{"id":"#104","doc_id":"#105","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has three phases."}],"created_by":"#3","updated_by":"#3","created_seq":214,"updated_seq":222}],"changes":{"content_seq":{"from":null,"to":222}},"deleted":null,"id":"#105"}
 workspace.deleted {"gone":true,"id":"#1","slug":"events"}

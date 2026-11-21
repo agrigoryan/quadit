@@ -108,6 +108,8 @@ export type Project = {
   lead_id?: string;
   rank?: string;
   settings?: { cycles?: boolean; cycle_days?: number; estimates?: boolean };
+  /** The ids of the sample tasks the project was made with, in order (tasks/samples.ts). */
+  samples?: string[];
   created_by: string;
   created_at: number;
   updated_seq: number;

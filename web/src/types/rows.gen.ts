@@ -494,6 +494,7 @@ export interface Project {
   lead_id?: string;
   rank?: string;
   settings?: ProjectSettings;
+  samples?: string[];
   created_by: string;
   created_at: number;
   updated_seq: number;

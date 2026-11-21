@@ -384,6 +384,9 @@ preference.delete -id others wrong: invalid [id] id is required
 rule.delete {}: invalid [id] id is required
 rule.delete -id: invalid [id] id is required
 rule.delete -id others wrong: invalid [id] id is required
+samples.add {}: ok
+samples.add -agent: ok
+samples.remove {}: ok
 project.delete {}: invalid [project] a project is required: give its key (SVA) or id
 project.delete -id: invalid [project] a project is required: give its key (SVA) or id
 project.delete -id others wrong: invalid [project] a project is required: give its key (SVA) or id

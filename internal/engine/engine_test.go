@@ -561,8 +561,11 @@ func TestCatalog(t *testing.T) {
 	if len(cat) < 80 {
 		t.Fatalf("catalog has %d change types", len(cat))
 	}
+	// samples.remove takes nothing: it removes the workspace's samples,
+	// wherever they are.
+	takesNothing := map[string]bool{"samples.remove": true}
 	for _, ci := range cat {
-		if len(ci.Args) == 0 {
+		if len(ci.Args) == 0 && !takesNothing[ci.Type] {
 			t.Errorf("%s has no described arguments: register it with its own argument struct, register[A] in register.go, whose fields have json tags", ci.Type)
 		}
 	}

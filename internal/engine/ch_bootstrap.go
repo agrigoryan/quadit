@@ -4,6 +4,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -23,6 +24,10 @@ type BootstrapArgs struct {
 	OwnerHandle   string
 	WorkspaceSlug string
 	WorkspaceName string
+	// Samples starts the workspace with the samples (samples.add, made by
+	// the owner, the third for nobody): an install's first workspace has
+	// them, one made later starts empty.
+	Samples bool
 	// Also, when set, writes more in the same transaction once the
 	// workspace and its owner are made: what must not be there without
 	// them, nor they without it. Its error undoes all of it.
@@ -33,15 +38,21 @@ type BootstrapArgs struct {
 // if they do not exist yet. It is how a new install, or a new workspace on
 // one, starts.
 func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace, core.User, error) {
-	var ws core.Workspace
 	var owner core.User
 	at := e.now().UnixMilli()
 	if !validSlug(a.WorkspaceSlug) {
-		return ws, owner, invalid("workspace_slug", "a slug is 2 to 40 lower-case letters, digits or dashes")
+		return core.Workspace{}, owner, invalid("workspace_slug", "a slug is 2 to 40 lower-case letters, digits or dashes")
 	}
-	err := e.st.Atomic(ctx, func(db store.DB) error {
+	ws := core.Workspace{ID: id.New(), Slug: a.WorkspaceSlug, Name: strings.TrimSpace(a.WorkspaceName), CreatedAt: at, UpdatedAt: at}
+	if ws.Name == "" {
+		ws.Name = ws.Slug
+	}
+	var seq int64
+	written := false // the workspace is in, and what goes with it is being written
+	err := e.st.CreateWorkspace(ctx, ws, func(tx store.Tx) error {
+		written = true
 		var err error
-		if owner, err = ownerFor(ctx, db, a, at); err != nil {
+		if owner, err = ownerFor(ctx, tx, a, at); err != nil {
 			return err
 		}
 		if owner.Kind != core.KindPerson {
@@ -54,25 +65,31 @@ func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace
 		if err := checkHandle(handle); err != nil {
 			return err
 		}
-		ws = core.Workspace{ID: id.New(), Slug: a.WorkspaceSlug, Name: strings.TrimSpace(a.WorkspaceName), CreatedAt: at, UpdatedAt: at}
-		if ws.Name == "" {
-			ws.Name = ws.Slug
-		}
-		if err := db.Insert(ctx, ws); err != nil {
-			if errors.Is(err, store.ErrConflict) {
-				return &Error{Code: CodeConflict, Field: "slug", Message: "a workspace with the address \"" + ws.Slug + "\" already exists; choose another"}
-			}
-			return err
-		}
-		if err := db.Insert(ctx, core.Member{WorkspaceID: ws.ID, UserID: owner.ID, Role: core.RoleOwner, Handle: handle,
+		if err := tx.Insert(ctx, core.Member{WorkspaceID: ws.ID, UserID: owner.ID, Role: core.RoleOwner, Handle: handle,
 			Kind: owner.Kind, Name: owner.Name, Avatar: owner.Avatar, CreatedAt: at}); err != nil {
 			return err
 		}
+		if a.Samples {
+			run, err := e.startBatch(ctx, newMemoTx(tx), Actor{UserID: owner.ID})
+			if err != nil {
+				return err
+			}
+			if _, err := run.apply(Change{ID: id.New(), Type: "samples.add", Args: json.RawMessage(`{}`)}); err != nil {
+				return err
+			}
+		}
+		seq = tx.Seq()
 		if a.Also == nil {
 			return nil
 		}
-		return a.Also(ctx, db, owner)
+		return a.Also(ctx, tx, owner)
 	})
+	if !written && errors.Is(err, store.ErrConflict) {
+		return ws, owner, &Error{Code: CodeConflict, Field: "slug", Message: "a workspace with the address \"" + ws.Slug + "\" already exists; choose another"}
+	}
+	if err == nil && e.OnCommit != nil {
+		e.OnCommit(ws.ID, seq)
+	}
 	return ws, owner, err
 }
 

@@ -335,6 +335,8 @@ func eventScenario(t *testing.T, st store.Store, quiet bool) (evs []core.Event, 
 	do("view.delete", M{"id": view})
 	do("preference.delete", M{"id": pref})
 	do("rule.delete", M{"id": rule})
+	do("samples.add", M{"agent": "@artist"})
+	do("samples.remove", M{})
 	do("project.delete", M{"id": "OPS"})
 
 	// Upkeep: what a restore announces, and the trash emptied, with a task

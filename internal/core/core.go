@@ -200,25 +200,29 @@ type ProjectSettings struct {
 
 // Project holds tasks under one key (SVA), with its own workflow.
 type Project struct {
-	ID           string           `json:"id" db:"id"`
-	WorkspaceID  string           `json:"workspace_id" db:"workspace_id"`
-	Key          string           `json:"key" db:"key"`
-	Name         string           `json:"name" db:"name"`
-	Description  string           `json:"description,omitempty" db:"description"`
-	Icon         string           `json:"icon,omitempty" db:"icon"`
-	Color        string           `json:"color,omitempty" db:"color"`
-	LeadID       string           `json:"lead_id,omitempty" db:"lead_id,null"`
-	Rank         string           `json:"rank,omitempty" db:"rank"`
-	Settings     *ProjectSettings `json:"settings,omitempty" db:"settings,json"`
-	TaskCounter  int              `json:"-" db:"task_counter"`  // the last task number given
-	CycleCounter int              `json:"-" db:"cycle_counter"` // the last cycle number given
-	CreatedBy    string           `json:"created_by" db:"created_by"`
-	CreatedAt    int64            `json:"created_at" db:"created_at"`
-	UpdatedAt    int64            `json:"-" db:"updated_at"`
-	CreatedSeq   int64            `json:"-" db:"created_seq"`
-	UpdatedSeq   int64            `json:"updated_seq" db:"updated_seq"`
-	ArchivedAt   int64            `json:"archived_at,omitempty" db:"archived_at,null"`
-	DeletedAt    int64            `json:"deleted_at,omitempty" db:"deleted_at,null"`
+	ID          string           `json:"id" db:"id"`
+	WorkspaceID string           `json:"workspace_id" db:"workspace_id"`
+	Key         string           `json:"key" db:"key"`
+	Name        string           `json:"name" db:"name"`
+	Description string           `json:"description,omitempty" db:"description"`
+	Icon        string           `json:"icon,omitempty" db:"icon"`
+	Color       string           `json:"color,omitempty" db:"color"`
+	LeadID      string           `json:"lead_id,omitempty" db:"lead_id,null"`
+	Rank        string           `json:"rank,omitempty" db:"rank"`
+	Settings    *ProjectSettings `json:"settings,omitempty" db:"settings,json"`
+	// Samples are the ids of the sample tasks the project was made with
+	// (samples.add), in order; empty for any other project. They are how
+	// the samples are found again, whatever has been done to them since.
+	Samples      []string `json:"samples,omitempty" db:"samples,json"`
+	TaskCounter  int      `json:"-" db:"task_counter"`  // the last task number given
+	CycleCounter int      `json:"-" db:"cycle_counter"` // the last cycle number given
+	CreatedBy    string   `json:"created_by" db:"created_by"`
+	CreatedAt    int64    `json:"created_at" db:"created_at"`
+	UpdatedAt    int64    `json:"-" db:"updated_at"`
+	CreatedSeq   int64    `json:"-" db:"created_seq"`
+	UpdatedSeq   int64    `json:"updated_seq" db:"updated_seq"`
+	ArchivedAt   int64    `json:"archived_at,omitempty" db:"archived_at,null"`
+	DeletedAt    int64    `json:"deleted_at,omitempty" db:"deleted_at,null"`
 }
 
 // Status is one step of a project's workflow, in one of the fixed

@@ -445,6 +445,10 @@ export interface Changes {
     match?: RuleMatch | null;
     action?: RuleAction | null;
   };
+  "samples.add": {
+    agent?: string;
+  };
+  "samples.remove": Record<string, never>;
   "secret.delete": {
     id: string;
   };

@@ -320,6 +320,8 @@ func missingScenario(t *testing.T, st store.Store) *probes {
 	do("view.delete", M{"id": view})
 	do("preference.delete", M{"id": pref})
 	do("rule.delete", M{"id": rule.ID})
+	do("samples.add", M{"agent": "@artist"})
+	do("samples.remove", M{})
 	do("project.delete", M{"id": "OPS"})
 	do("workspace.delete", M{"confirm": ws.Slug})
 
