@@ -114,6 +114,8 @@ invalid: project SVA has no status "In Progres"
 
 Fix the call and send it again. `--dry-run` checks a write without making it. `quadit changes` lists every change type and its arguments; `quadit do TYPE '{"…": …}'` sends any of them.
 
+`cannot reach …` is not a refusal: the command never got to the server. When you run commands in a sandbox without network (Codex's, unless the person changed it), that is why, even for a server on this computer: ask the person to let `quadit` run outside the sandbox, then run the same command again.
+
 ## Rules of the road
 
 - Do not work on a task someone else holds; `quadit take` will tell you who has it.

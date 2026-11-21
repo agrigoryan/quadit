@@ -146,7 +146,7 @@ func (c *Client) workspaceRequest(ctx context.Context, r apiRequest) ([]byte, er
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("cannot reach %s: %w", c.URL, err)
+		return nil, fmt.Errorf("cannot reach %s: %w%s", c.URL, err, keptOffTheNetwork())
 	}
 	raw, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
@@ -331,4 +331,19 @@ func (c *Client) UploadAs(ctx context.Context, id, path string) (fileID, fileURL
 		}
 	}
 	return meta.ID, meta.URL, nil
+}
+
+// keptOffTheNetwork is what to do about a request that could not be sent
+// when the program running quadit keeps its commands off the network: a
+// second line for the error, or nothing. Codex runs commands in a sandbox
+// without network unless told otherwise, this computer's own addresses
+// included, and says so in their environment
+// (CODEX_SANDBOX_NETWORK_DISABLED=1). The agent reading the error can ask
+// the person to let this one command out, which is all it takes.
+func keptOffTheNetwork() string {
+	if os.Getenv("CODEX_SANDBOX_NETWORK_DISABLED") != "1" {
+		return ""
+	}
+	return "\n  This command runs in Codex's sandbox, which has no network, not even to this computer." +
+		" Run it again outside the sandbox: ask the person for that permission, saying quadit needs to reach Quadit."
 }

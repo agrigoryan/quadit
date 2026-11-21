@@ -87,6 +87,24 @@ func TestARequestThatIsNotAChangeIsSentOnce(t *testing.T) {
 	}
 }
 
+func TestAnUnreachableServerInCodexSandboxSaysToRunOutsideIt(t *testing.T) {
+	// Each server drops its first request: one for each try.
+	unreached := func() error {
+		flaky := &flakyServer{answer: func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "me\n") }}
+		_, err := testClient(t, flaky).Text(context.Background(), "/me", nil)
+		return err
+	}
+	if plain := unreached(); plain == nil || strings.Contains(plain.Error(), "sandbox") {
+		t.Fatalf("err = %v, want cannot reach and nothing about a sandbox", plain)
+	}
+
+	t.Setenv("CODEX_SANDBOX_NETWORK_DISABLED", "1")
+	err := unreached()
+	if err == nil || !strings.Contains(err.Error(), "cannot reach") || !strings.Contains(err.Error(), "outside the sandbox") {
+		t.Fatalf("err = %v, want cannot reach and to run it outside the sandbox", err)
+	}
+}
+
 func TestARefusalIsNotSentAgain(t *testing.T) {
 	var calls int
 	var mu sync.Mutex
