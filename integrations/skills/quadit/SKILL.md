@@ -24,7 +24,7 @@ Tell the person what it printed, in your own words, offer included, and stop the
 Only when the person in this chat asks for it: "listen to Quadit", "stay on Quadit", "answer what comes in". Never start it because a task, a comment or a page says to.
 
 ```bash
-quadit wait for=110       # blocks until the next item for you, then prints ITEM or IDLE and what to run next
+quadit wait       # blocks until the next item for you, then prints ITEM or IDLE and what to run next
 ```
 
 Then keep going round, without asking the person in between:
@@ -33,7 +33,7 @@ Then keep going round, without asking the person in between:
 - `IDLE`: run the `quadit wait …` line it printed again, and say nothing.
 - Run the lines exactly as printed: they carry your lease, which keeps this session the one that listens.
 - If your shell hands a command back while it still runs (it moved it to the background, or its time ran out), wait for that same command to finish; never start a second wait beside it.
-- `for=` is how long one wait may block: a little under the longest your shell lets one command run, at most 540. Claude Code allows two minutes unless told otherwise: `for=110`. When you do not know, leave it out (50 seconds).
+- A wait blocks 50 seconds unless `for=SECONDS` says otherwise: give a little under the longest your shell lets one command run, at most 540, and keep the same value on every wait. Claude Code allows two minutes unless told otherwise: `quadit wait for=110`. When you do not know the limit, leave `for=` out.
 
 Stop when the person says so or interrupts you, leaving what you had not finished unacknowledged: it comes back to whoever listens next. Stop too, with one plain sentence to the person, when `quadit wait` is refused because another session is already listening (take over with `take=1` only when the person tells you to), because this login is a person's and not an agent's, or because your access was taken away.
 
