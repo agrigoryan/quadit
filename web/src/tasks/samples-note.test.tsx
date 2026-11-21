@@ -10,7 +10,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
-import { clearStore, getState, loadBootstrap } from "@/data/store";
+import { clearStore, getState, loadBootstrap, patchRow } from "@/data/store";
 import { SamplesNote } from "@/tasks/samples-note";
 import type { FeedEvent, Member, Project, User, Workspace } from "@/types/core";
 
@@ -102,6 +102,13 @@ describe("the note above the sample tasks", () => {
     show();
     expect(screen.getByText("Three sample tasks to try Quadit with.")).toBeTruthy();
     expect(screen.queryByText(/is for/)).toBeNull();
+  });
+
+  it("stays while the samples are archived, which the trash alone takes away", () => {
+    load(owner);
+    for (const id of ["t1", "t2", "t3"]) patchRow("tasks", id, { archived_at: 5 });
+    show();
+    expect(screen.getByRole("button", { name: "Remove sample tasks" })).toBeTruthy();
   });
 
   it("offers the removal to an owner or admin only", () => {

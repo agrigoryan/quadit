@@ -21,7 +21,8 @@ const event = (seq: number, over: Partial<FeedEvent>): FeedEvent => ({
   ...over,
 });
 const project = { id: "p", key: "GS", name: "Getting started", samples: ["t1", "t2", "t3"] } as Project;
-const task = (id: string, key: string, assignee?: string) => ({ id, key, assignee_id: assignee }) as Task;
+const task = (id: string, key: string, assignee?: string, more: Partial<Task> = {}) =>
+  ({ id, key, project_id: "p", assignee_id: assignee, ...more }) as Task;
 const members: Dict<Member> = {
   u1: { user_id: "u1", kind: "person", name: "Maya" } as Member,
   cc: { user_id: "cc", kind: "agent", name: "Claude Code" } as Member,
@@ -32,6 +33,7 @@ describe("what is left of the samples", () => {
     const tasks = { t1: task("t1", "GS-1", "u1"), t2: task("t2", "GS-2", "u1"), t3: task("t3", "GS-3", "cc") };
     expect(samplesLeft(project, tasks, members)).toEqual({
       tasks: [tasks.t1, tasks.t2, tasks.t3],
+      third: tasks.t3,
       forAgent: { key: "GS-3", agent: "Claude Code" },
     });
   });
@@ -40,11 +42,20 @@ describe("what is left of the samples", () => {
     const one = { t1: task("t1", "GS-1", "u1") };
     expect(samplesLeft(project, { ...one, t3: task("t3", "GS-3", "u1") }, members)?.forAgent).toBeUndefined();
     expect(samplesLeft(project, { ...one, t3: task("t3", "GS-3") }, members)?.forAgent).toBeUndefined();
-    expect(samplesLeft(project, one, members)).toEqual({ tasks: [one.t1], forAgent: undefined });
+    expect(samplesLeft(project, one, members)).toEqual({ tasks: [one.t1], third: undefined, forAgent: undefined });
+  });
+
+  it("counts an archived sample, and neither one in the trash nor one moved to another project", () => {
+    const tasks = {
+      t1: task("t1", "GS-1", "u1", { archived_at: 5 }),
+      t2: task("t2", "GS-2", "u1", { deleted_at: 6 }),
+      t3: task("t3", "SVA-9", "cc", { project_id: "q" }),
+    };
+    expect(samplesLeft(project, tasks, members)).toEqual({ tasks: [tasks.t1], third: undefined, forAgent: undefined });
   });
 
   it("is nothing once every sample is in the trash, or for a project made without them", () => {
-    expect(samplesLeft(project, {}, members)).toBeNull();
+    expect(samplesLeft(project, { t1: task("t1", "GS-1", "u1", { deleted_at: 6 }) }, members)).toBeNull();
     expect(samplesLeft({ ...project, samples: undefined }, { t1: task("t1", "GS-1") }, members)).toBeNull();
   });
 });
@@ -66,12 +77,12 @@ describe("asking for the samples", () => {
     vi.restoreAllMocks();
   });
 
-  it("sends the agent, and gives the project once the feed has brought its samples", async () => {
+  it("gives the project once the feed has brought its samples", async () => {
     const post = vi.spyOn(api, "post").mockResolvedValue({ project });
     let given: Project | undefined;
-    void addSamples("cc").then((p) => (given = p));
+    void addSamples().then((p) => (given = p));
     await vi.advanceTimersByTimeAsync(0);
-    expect(post).toHaveBeenCalledWith("/api/v1/w/acme/samples", { agent: "cc" });
+    expect(post).toHaveBeenCalledWith("/api/v1/w/acme/samples", {});
     expect(given).toBeUndefined();
 
     const created = event(11, {

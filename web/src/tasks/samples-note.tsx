@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useCan } from "@/data/access";
 import { mutate } from "@/data/mutate";
-import { getRow, useLookup, useSlug } from "@/data/selectors";
+import { getRow, useLookup, useLookupEvenIfGone, useSlug } from "@/data/selectors";
 import { t } from "@/lib/i18n";
 import { samplesLeft } from "@/tasks/samples";
 import type { Project } from "@/types/core";
@@ -14,7 +14,8 @@ import { Button } from "@/ui/button";
  * an agent, and a button that removes them (the trash is the undo).
  */
 export function SamplesNote({ project }: { project: Project }) {
-  const tasks = useLookup("tasks");
+  // Archived samples are there still: only the trash takes them away.
+  const tasks = useLookupEvenIfGone("tasks");
   const members = useLookup("members");
   const can = useCan();
   const slug = useSlug();
