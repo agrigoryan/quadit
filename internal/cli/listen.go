@@ -36,11 +36,13 @@ import (
 // not be tried again.
 //
 // It holds the agent's listener lease, whatever its cursor, and stops when
-// another session holds it or takes it over.
+// another session holds it or takes it over; take=1 takes it over. The
+// lease's id is kept beside the login file, so a companion stopped or
+// restarted goes on with the lease it held.
 func (r *runner) listen(in input) error {
-	command, secrets, cursor := listenArgs(in.rest)
+	command, secrets, cursor, take := listenArgs(in.rest)
 	if len(command) == 0 {
-		return errors.New("usage: quadit listen [cursor=NAME] --exec COMMAND [ARG ...]")
+		return errors.New("usage: quadit listen [cursor=NAME] [take=1] --exec COMMAND [ARG ...]")
 	}
 	fmt.Fprintf(r.out, "listening as cursor %q; running %q for each inbox item\n", cursor, strings.Join(command, " "))
 	const (
@@ -49,9 +51,9 @@ func (r *runner) listen(in input) error {
 		maxItemPause = 5 * time.Minute  // an item's command keeps failing
 	)
 	readPause, itemPause := firstPause, firstPause
-	lease := ""
+	lease := keptLease()
 	for {
-		page, err := r.nextItem(cursor, lease, false, waitHold)
+		page, err := r.nextItem(cursor, lease, take, waitHold)
 		if err != nil {
 			if r.ctx.Err() != nil {
 				return r.ctx.Err()
@@ -67,7 +69,11 @@ func (r *runner) listen(in input) error {
 			continue
 		}
 		readPause = firstPause
-		lease = page.Lease
+		if page.Lease != lease {
+			keepLease(page.Lease)
+		}
+		lease, take = page.Lease, false
+		r.sayLeftAlone(page.Skipped)
 		if page.Item == nil {
 			continue
 		}
@@ -110,12 +116,14 @@ func pause(ctx context.Context, d time.Duration) error {
 }
 
 // listenArgs reads what listen was given: the command after --exec, the
-// secrets it gets, and the cursor that remembers how far the inbox was
-// handled.
-func listenArgs(args []string) (command, secrets []string, cursor string) {
+// secrets it gets, the cursor that remembers how far the inbox was
+// handled, and whether to take the lease over (take=1).
+func listenArgs(args []string) (command, secrets []string, cursor string, take bool) {
 	cursor = "listen"
 	for i := 0; i < len(args); i++ {
 		switch {
+		case args[i] == "take=1" || args[i] == "take=true":
+			take = true
 		case args[i] == "--secret" && i+1 < len(args):
 			secrets = append(secrets, args[i+1])
 			i++
@@ -174,12 +182,55 @@ const (
 )
 
 // listened is one answer of GET /listen: the lease, and the item with its
-// feed position and its line in the feed, when one came.
+// feed position and its line in the feed, when one came; and, the first
+// time, how many older unread items were left alone.
 type listened struct {
-	Lease string      `json:"lease"`
-	Seq   int64       `json:"seq"`
-	Item  *listenItem `json:"item"`
-	Line  string      `json:"line"`
+	Lease   string      `json:"lease"`
+	Seq     int64       `json:"seq"`
+	Item    *listenItem `json:"item"`
+	Line    string      `json:"line"`
+	Skipped int         `json:"skipped"`
+}
+
+// leftAlone says where the older unread items a first wait left alone are.
+func leftAlone(n int) string {
+	if n == 1 {
+		return "# 1 older unread item was left alone: quadit inbox lists it"
+	}
+	return fmt.Sprintf("# %d older unread items were left alone: quadit inbox lists them", n)
+}
+
+// sayLeftAlone says, after a record, where the older unread items a first
+// wait left alone are; nothing when there are none.
+func (r *runner) sayLeftAlone(n int) {
+	if n > 0 {
+		fmt.Fprintln(r.out, leftAlone(n))
+	}
+}
+
+// leasePath is where listen keeps its lease's id: beside the login file.
+func leasePath() string { return configPath() + ".lease" }
+
+// keptLease is the lease id listen kept, or "" for none (or one not of the
+// form a lease id has).
+func keptLease() string {
+	raw, err := os.ReadFile(leasePath())
+	if err != nil {
+		return ""
+	}
+	if id := strings.TrimSpace(string(raw)); leaseForm.MatchString(id) {
+		return id
+	}
+	return ""
+}
+
+// keepLease keeps a lease id for the next start of listen. Best effort: a
+// listen that cannot keep it takes a new one when it starts again, after
+// the old one ran out.
+func keepLease(id string) {
+	if err := os.WriteFile(leasePath(), []byte(id+"\n"), 0o600); err != nil {
+		fmt.Fprintln(os.Stderr, "the listener's lease could not be kept for the next start:", err)
+	}
 }
 
 // listenItem is an inbox item as GET /listen answers it.
@@ -254,6 +305,7 @@ type waitSpan struct{ total, hold time.Duration }
 // what could end them or start a line.
 func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) error {
 	deadline := time.Now().Add(span.total)
+	skipped := 0
 	for {
 		page, err := r.nextItem("listen", lease, take, min(span.hold, time.Until(deadline)))
 		if err != nil {
@@ -268,6 +320,7 @@ func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) er
 		}
 		lease, take = page.Lease, false
 		next := fmt.Sprintf("%s lease=%s", goOn, lease)
+		skipped += page.Skipped
 		if item := page.Item; item != nil {
 			reading, err := item.reading()
 			if err != nil {
@@ -277,11 +330,13 @@ func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) er
 			fmt.Fprintf(r.out, "%s   # read it\n", reading)
 			fmt.Fprintf(r.out, "quadit ack %d listen lease=%s   # once it is handled\n", item.Seq, lease)
 			fmt.Fprintf(r.out, "%s   # then go on listening\n", next)
+			r.sayLeftAlone(skipped)
 			return nil
 		}
 		if !time.Now().Before(deadline.Add(-time.Second / 2)) {
 			fmt.Fprintln(r.out, "IDLE")
 			fmt.Fprintf(r.out, "%s   # go on listening\n", next)
+			r.sayLeftAlone(skipped)
 			return nil
 		}
 	}
