@@ -84,7 +84,9 @@ func (systemStarter) running(ctx context.Context) bool {
 
 // runningCommand asks macOS for a running application of the app's bundle
 // id; appFound reads its answer, which names the application, or is empty.
-func runningCommand() []string { return []string{"/usr/bin/lsappinfo", "find", "bundleid=" + appBundleID} }
+func runningCommand() []string {
+	return []string{"/usr/bin/lsappinfo", "find", "bundleid=" + appBundleID}
+}
 
 func appFound(out []byte) bool { return strings.Contains(string(out), "ASN:") }
 

@@ -520,7 +520,7 @@ func TestAnAcknowledgmentCannotSlipPastATakeover(t *testing.T) {
 			t.Fatal(err)
 		}
 		resp.Body.Close()
-		if landed && resp.StatusCode == 200 {
+		if landed && resp.StatusCode == http.StatusOK {
 			t.Fatal("a takeover landed between the check of the old lease and the move of the cursor, and the move was made")
 		}
 	})
