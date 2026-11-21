@@ -153,6 +153,9 @@ func TestListenAcknowledgesOnlyWhatItsCommandHandled(t *testing.T) {
 			t.Fatalf("the acks went back: %v", acks)
 		}
 	}
+	if !strings.Contains(out.String(), "to give up on it: quadit ack 5 listen lease=L1") {
+		t.Fatalf("listen did not say how to give up on the item it could not handle:\n%s", out)
+	}
 	if strings.Count(out.String(), "not handled") != 2 {
 		t.Fatalf("listen did not say, twice, that an item was not handled and would be tried again:\n%s", out)
 	}

@@ -85,6 +85,7 @@ func (r *runner) listen(in input) error {
 					return r.ctx.Err()
 				}
 				fmt.Fprintf(r.out, "not handled, trying it again in %s: %v\n", itemPause, err)
+				fmt.Fprintf(r.out, "  to give up on it: %s\n", giveUp(cursor, page.Seq, lease))
 				if err := pause(r.ctx, itemPause); err != nil {
 					return err
 				}
@@ -159,6 +160,16 @@ func (r *runner) wake(command, secrets []string, line string) error {
 		return fmt.Errorf("the command failed: %w", runErr)
 	}
 	return nil
+}
+
+// giveUp is the command that moves the cursor past an item that should not
+// be tried again, with the lease the cursor "listen" is moved with.
+func giveUp(cursor string, seq int64, lease string) string {
+	command := fmt.Sprintf("quadit ack %d %s", seq, cursor)
+	if lease != "" {
+		command += " lease=" + lease
+	}
+	return command
 }
 
 // lostTheLease reports whether the server refused a session the cursor
