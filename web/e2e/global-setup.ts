@@ -1,8 +1,8 @@
 // Starts one Quadit server for the whole run: the binary `make build` made,
 // on a free port, with a new empty data directory. It walks the first-run
-// page once to make the owner and the workspace, keeps that signed-in
-// browser state for the tests, makes an agent and an API token for each of
-// them, and hands all of it to the tests through QUADIT_E2E (see
+// page once to make the owner and the workspace, removes the sample tasks
+// the set-up made, keeps that signed-in browser state for the tests, makes
+// an agent and an API token for each of them, and hands all of it to the tests through QUADIT_E2E (see
 // e2e/quadit.ts). The function it returns stops the server, leaves its log
 // beside the test results and removes the directory.
 
@@ -39,6 +39,10 @@ async function firstRun(url: string, dir: string, headless: boolean): Promise<Ru
     await expect(page).toHaveURL(new RegExp(`/${WORKSPACE.slug}(/|$)`));
     const storageState = join(dir, "owner.json");
     await page.context().storageState({ path: storageState });
+    // The tests start from a workspace with nothing in it but what they make: the sample tasks the set-up
+    // made go to the trash (samples.spec.ts has them, on a server of its own).
+    const removed = await page.request.delete(`/api/v1/w/${WORKSPACE.slug}/samples`, { headers: fromOwnPage(url) });
+    if (!removed.ok()) throw new Error(`samples: ${removed.status()} ${await removed.text()}`);
     const made = await page.request.post(`/api/v1/w/${WORKSPACE.slug}/tokens`, {
       data: { name: "e2e" },
       headers: fromOwnPage(url),

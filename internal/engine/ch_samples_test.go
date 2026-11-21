@@ -74,7 +74,7 @@ func TestSamplesAddMakesGettingStarted(t *testing.T) {
 				t.Errorf("sample %d is %s %q for %q, want %s %q for %q", i+1, got.Key, got.Title, got.AssigneeID, wt.key, wt.title, wt.assignee)
 			}
 			if names := w.labelNames(got); !slices.Equal(names, []string{"Sample"}) {
-				t.Errorf("%s is labelled %v", got.Key, names)
+				t.Errorf("%s has the labels %v", got.Key, names)
 			}
 		}
 		if n := w.inbox(coder); len(n) != 1 || n[0].Type != core.NoteAssigned {

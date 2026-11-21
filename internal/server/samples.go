@@ -20,7 +20,7 @@ import (
 // sampleRoutes are the routes of the sample tasks.
 func (s *Server) sampleRoutes() []route {
 	return []route{
-		{"POST /api/v1/w/{ws}/samples", s.workspaceMember(s.handleAddSamples), "Sample tasks to try Quadit with: a project \"Getting started\" (key GS, or the next free one) with three tasks labelled Sample, the first two for the caller and the third for the agent named in the body {agent} (an agent member's id or @handle), or for nobody. Answers 201 with {project}. While the samples are there it makes nothing and answers 200 with the same project, after giving the third task to the agent named when that task is still there and has nobody. Owners and admins.", "", "write"},
+		{"POST /api/v1/w/{ws}/samples", s.workspaceMember(s.handleAddSamples), "Sample tasks to try Quadit with: a project \"Getting started\" (key GS, or the next free one) with three tasks marked by the label Sample, the first two for the caller and the third for the agent named in the body {agent} (an agent member's id or @handle), or for nobody. Answers 201 with {project}. While the samples are there it makes nothing and answers 200 with the same project, after giving the third task to the agent named when that task is still there and has nobody. Owners and admins.", "", "write"},
 		{"DELETE /api/v1/w/{ws}/samples", s.workspaceMember(s.handleRemoveSamples), "Sends the sample tasks that are left to the trash, as deleting them would, and their project with them when nothing else is in it. Owners and admins.", "", "write"},
 	}
 }
