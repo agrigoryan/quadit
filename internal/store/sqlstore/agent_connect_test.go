@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
@@ -15,7 +16,8 @@ import (
 // TestUpgradeCountsAnAgentThatMadeAChangeAsConnected: an agent that made a
 // change before version 22 had reached Quadit from its tool, so the upgrade
 // counts it as connected since its first change. One that never made a
-// change is not connected yet, and a person is neither.
+// change is not connected yet, and a person is neither. What a wait on the
+// feed marked as listening before is not a listener's lease, and goes.
 func TestUpgradeCountsAnAgentThatMadeAChangeAsConnected(t *testing.T) {
 	for _, d := range []sqlstore.Dialect{sqlstore.SQLite, sqlstore.Postgres} {
 		t.Run(d.Name, func(t *testing.T) {
@@ -40,6 +42,9 @@ func TestUpgradeCountsAnAgentThatMadeAChangeAsConnected(t *testing.T) {
 			idle := do(owner.ID, "agent.create", map[string]any{"name": "Idle", "handle": "idle"})
 			do(worker, "task.create", map[string]any{"project": "OPS", "title": "Rotate keys"})
 			db := st.In(ws.ID)
+			if _, err := db.Update(ctx, "members", map[string]any{"listening_until": time.Now().Add(time.Hour).UnixMilli()}, store.Eq("user_id", worker)); err != nil {
+				t.Fatal(err)
+			}
 			var first core.AppliedChange
 			if err := db.Get(ctx, &first, store.Eq("actor_id", worker)); err != nil {
 				t.Fatal(err)
@@ -53,6 +58,9 @@ func TestUpgradeCountsAnAgentThatMadeAChangeAsConnected(t *testing.T) {
 				}
 				if m.ConnectedAt != want {
 					t.Errorf("@%s is connected at %d, want %d", m.Handle, m.ConnectedAt, want)
+				}
+				if m.ListeningUntil != 0 {
+					t.Errorf("@%s is still marked listening until %d", m.Handle, m.ListeningUntil)
 				}
 			}
 		})
