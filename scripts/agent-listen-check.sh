@@ -27,6 +27,34 @@
 # bare `quadit`. The wrapper logs each call (WORK/calls.log): that is how the
 # waits are seen and timed.
 #
+# The tool is given the skill of the quadit under test, never whatever older
+# one the person's home folder holds, and the home folder is not written:
+# the skill goes into the folder the tool runs in (WORK/cwd, made a git
+# repository so it is a project root), at the project-level places the tools
+# read, .agents/skills/quadit and .claude/skills/quadit. Project skills win
+# over the user's in the tools that say how they rank them; elsewhere both
+# may be loaded. So the verdict asks for proof that the new skill was
+# followed: `quadit connect CODE` and `quadit wait` in the call log, neither
+# of which an older skill knows.
+#
+# What the tools' documentation says about reading these (looked up
+# 2026-11-21, not tried here; check a tool's version before a run):
+#   codex          .agents/skills in every folder from the working one up to
+#                  the repository root (developers.openai.com/codex/skills).
+#   claude         .claude/skills in the starting folder and its parents up
+#                  to the repository root (code.claude.com/docs/en/skills);
+#                  nothing says whether `claude -p` differs.
+#   agy            <workspace root>/.agents/skills and its parents up to the
+#                  repository root (antigravity.google/docs/skills).
+#   gemini         .agents/skills (or .gemini/skills) of the current folder,
+#                  ranked above the user's (geminicli.com/docs/cli/skills);
+#                  run headless in a folder it does not trust it stops or
+#                  restricts itself, so the command below trusts this one
+#                  (GEMINI_CLI_TRUST_WORKSPACE; sources disagree on the name).
+#   cursor-agent   .agents/skills or .cursor/skills anywhere in the
+#                  repository (cursor.com/docs/skills); a forum report, still
+#                  open, says headless runs (-p) may not load project skills.
+#
 # Adjusting it per tool:
 #   AGENT_CHECK_COMMAND  the one-prompt command, as a shell line that gets the
 #                        prompt in "$1" and runs in WORK/cwd, e.g.
@@ -38,7 +66,7 @@
 #   AGENT_CHECK_ANSWER   seconds an answer may take (default 300)
 #   QUADIT_BIN           the quadit to test (default ./bin/quadit)
 #
-# Needs bash, curl and python3. Exits 0 when every check passed.
+# Needs bash, curl, python3, git and shasum. Exits 0 when every check passed.
 
 # Some functions are only called through others (the trap, passed, until_true).
 # shellcheck disable=SC2329
@@ -62,7 +90,7 @@ case $tool in
 codex) default_command='codex exec --skip-git-repo-check -s workspace-write -c sandbox_workspace_write.network_access=true "$1"' ;;
 claude) default_command='claude -p --output-format json --allowedTools "Bash($AGENT_CHECK_WRAPPER:*)" "$1"' ;;
 agy) default_command='agy -p "$1"' ;;
-gemini) default_command='gemini -p "$1"' ;;
+gemini) default_command='GEMINI_CLI_TRUST_WORKSPACE=true gemini -p "$1"' ;;
 cursor-agent) default_command='cursor-agent -p --force "$1"' ;;
 *) default_command="" ;;
 esac
@@ -72,6 +100,9 @@ command=${AGENT_CHECK_COMMAND:-$default_command}
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/agent-listen-check.XXXXXX")
 mkdir -p "$work/bin" "$work/cwd"
+# The project the tool runs in, with the skill under test where the tools read a project's skills.
+git -C "$work/cwd" init -q
+"$real" skill install "$work/cwd/.agents/skills" "$work/cwd/.claude/skills" >"$work/skills.txt"
 server="" sessions=()
 cleanup() {
 	for pid in "${sessions[@]}"; do kill -TERM -- "-$pid" 2>/dev/null || :; done
@@ -161,7 +192,8 @@ echo "server: $url (workspace $slug), agent @$handle"
 echo "1. Connect to Quadit"
 code=$(api POST /connect-codes "{\"agent\":\"@$handle\",\"tool\":\"$tool\"}" | field code)
 run connect "Connect to Quadit $code" || :
-check "the agent gave its code back" "$(calls connect | grep -q " connect $code" && echo 0 || echo 1)"
+check "the agent gave its code back with quadit connect $code" "$(calls connect | grep -q " connect $code" && echo 0 || echo 1)" \
+	"the tool did not follow the new skill (no quadit connect $code seen); it may have read an older skill from the home folder"
 check "the agent is connected" "$([ "$(agents)" = "connected not-listening" ] && echo 0 || echo 1)" "$(agents)"
 check "no wait was started" "$(calls connect | grep -Eq " (wait|listen)( |$)" && echo 1 || echo 0)"
 
@@ -175,7 +207,9 @@ set +m
 check "the agent shows as listening" "$(passed until_true 180 listens)" "$(agents)"
 # The assignment is the first item: it is handled (or not) before the comments.
 sleep "$idle"
-check "an empty wait passed" "$(calls listen | grep " wait" | grep -q "=> IDLE" && echo 0 || echo 1)"
+check "the agent listens with quadit wait" "$(calls listen | grep -q "s wait" && echo 0 || echo 1)" \
+	"the tool did not follow the new skill (no quadit wait seen); it may have read an older skill from the home folder"
+check "an empty wait passed" "$(calls listen | grep "s wait" | grep -q "=> IDLE" && echo 0 || echo 1)"
 # Answers counted are the agent's comments on the task; one to the assignment itself would be counted too, so
 # they are counted from what is there before each comment.
 base=$(answers "$key")
@@ -217,6 +251,8 @@ check "after stop, the third comment got no answer" "$([ "$(answers "$key")" = $
 echo "waits of the listening session (seconds, what came):"
 grep " end listen status=[0-9]* [0-9]*s wait" "$work/calls.log" | awk '{for (i = 1; i < NF; i++) if ($i == "=>") { print "  " $5, $(i + 1); break }}' || :
 echo "listening session: $(grep -c " start listen wait" "$work/calls.log" || :) waits, $(awk '$3=="listen"{if(!f)f=$1;l=$1}END{print l-f}' "$work/calls.log")s from its first call to its last"
+echo "the skill the tool was given (the tested quadit's own, sha256 $("$real" skill | shasum -a 256 | cut -c 1-12)):"
+sed -n 's/^installed //p' "$work/skills.txt" | while read -r file; do echo "  $file  sha256 $(shasum -a 256 "$file" | cut -c 1-12)"; done
 echo "tokens, as the tool printed them:"
 grep -ihE "tokens?[ _]?(used|usage)|\"(input|output)_tokens\"" "$work/connect.log" "$work/listen.log" "$work/second.log" | sed 's/^/  /' | head -n 20 || echo "  (the tool printed none)"
 [ "$failed" = 0 ] && echo "all checks passed" || echo "some checks failed"
