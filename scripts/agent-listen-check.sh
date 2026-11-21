@@ -29,14 +29,15 @@
 #     whose settings can set QUADIT_CONFIG for every command and which
 #     strips variables named like a token, the default command also sets
 #     QUADIT_CONFIG through Codex's own -c;
-#   - before a run it looks (reading only whether an entry named quadit is
-#     there, never what it holds) at the tool's known MCP settings, and
-#     refuses to run while the tool has a quadit MCP server, which could be
-#     used instead of the command (AGENT_CHECK_ALLOW_MCP=1 runs anyway).
+#   - before a run it reads the tool's known MCP settings and refuses to run
+#     while any MCP entry there mentions Quadit, in its name, its address or
+#     its command, in any case: one could be used instead of the command
+#     (AGENT_CHECK_ALLOW_MCP=1 runs anyway). It prints only the entry's name.
 # What a script cannot prove: that the tool has no other way to the
-# person's server (an MCP server set where this does not look, a plugin, a
-# path to another quadit written somewhere it reads), or that the agent did
-# not reach it with a command of its own making. The wrapper logs each call
+# person's server (an MCP entry in a file this does not know of, or one that
+# reaches Quadit by an address that does not name it, a plugin, a path to
+# another quadit written somewhere it reads), or that the agent did not
+# reach it with a command of its own making. The wrapper logs each call
 # it gets (WORK/calls.log, with when it started and ended): calls made
 # around it are not seen.
 #
@@ -112,7 +113,7 @@ command=${AGENT_CHECK_COMMAND:-$default_command}
 [ -n "$command" ] || { echo "no one-prompt command for $tool: set AGENT_CHECK_COMMAND" >&2; exit 2; }
 [ -x "$real" ] || { echo "no quadit at $real: run make server, or set QUADIT_BIN" >&2; exit 2; }
 
-# The tool's known MCP settings, and how an entry named quadit looks in each.
+# The tool's known MCP settings, and their kind.
 mcp_settings() {
 	case $tool in
 	claude) printf '%s\n' "$HOME/.claude.json json" "$HOME/.claude/settings.json json" ;;
@@ -122,15 +123,32 @@ mcp_settings() {
 	cursor-agent) printf '%s\n' "$HOME/.cursor/mcp.json json" ;;
 	esac
 }
+# quadit_mcp FILE KIND: the names of the MCP entries of a settings file that mention Quadit anywhere (name, address,
+# command, arguments), in any case; MCP entries are those under any key named mcpServers, mcp_servers or mcp.
+quadit_mcp() { python3 -c 'import json,sys,tomllib
+path, kind = sys.argv[1], sys.argv[2]
+with open(path, "rb") as f:
+    doc = tomllib.load(f) if kind == "toml" else json.load(f)
+found = []
+def walk(v):
+    if isinstance(v, dict):
+        for k, entries in v.items():
+            if k in ("mcpServers", "mcp_servers", "mcp") and isinstance(entries, dict):
+                for name, entry in entries.items():
+                    if "quadit" in (name + json.dumps(entry, default=str)).lower():
+                        found.append(name)
+            walk(entries)
+    elif isinstance(v, list):
+        for item in v:
+            walk(item)
+walk(doc)
+print(" ".join(sorted(set(found))))' "$1" "$2"; }
 if [ "${AGENT_CHECK_ALLOW_MCP:-}" != 1 ]; then
 	while read -r file kind; do
 		[ -n "$file" ] && [ -f "$file" ] || continue
-		case $kind in
-		json) pattern='"quadit"[[:space:]]*:' ;;
-		toml) pattern='^\[mcp_servers\.quadit\]' ;;
-		esac
-		if grep -Eq "$pattern" "$file"; then
-			echo "$tool has a Quadit MCP server in $file, which it could use instead of the quadit command, and so reach your own Quadit." >&2
+		names=$(quadit_mcp "$file" "$kind") || { echo "$file could not be read to look for a Quadit MCP server; run with AGENT_CHECK_ALLOW_MCP=1 to go on anyway." >&2; exit 2; }
+		if [ -n "$names" ]; then
+			echo "$tool has an MCP server that mentions Quadit in $file ($names), which it could use instead of the quadit command, and so reach your own Quadit." >&2
 			echo "Turn it off for this check, or run with AGENT_CHECK_ALLOW_MCP=1 if you know it cannot reach it." >&2
 			exit 2
 		fi
@@ -215,10 +233,14 @@ started() { grep " start $1 " "$work/calls.log" || :; }
 agents() { api GET /agents | python3 -c 'import json,sys
 a=[a for a in json.load(sys.stdin)["agents"] if a["handle"]==sys.argv[1]][0]
 print(("connected" if a.get("connected_at") else "not-connected")+" "+("listening" if a["listening"] else "not-listening"))' "@$handle"; }
-# replies AFTER [BEFORE]: how many comments the agent made on the task after feed position AFTER (and before BEFORE).
-replies() { person --json show "$key" | python3 -c 'import json,sys
-after, before = int(sys.argv[2]), int(sys.argv[3]) if len(sys.argv) > 3 else 1 << 62
-print(sum(c["by"] == sys.argv[1] and after < c["seq"] < before for c in json.load(sys.stdin).get("comments") or []))' "@$handle" "$@"; }
+# replies AFTER BEFORE [WORD ...]: how many comments the agent under test made on the task under test, on it or in a
+# thread of it, after feed position AFTER and before BEFORE (0: no end); with WORDs, only those holding one of them
+# as a word (the answer the question asks for).
+replies() { person --json show "$key" | python3 -c 'import json,re,sys
+who, after, before, words = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]) or 1 << 62, sys.argv[4:]
+def answers(body):
+    return not words or any(re.search(r"\b" + re.escape(w) + r"\b", body, re.I) for w in words)
+print(sum(c["by"] == who and after < c["seq"] < before and answers(c.get("body", "")) for c in json.load(sys.stdin).get("comments") or []))' "@$handle" "$@"; }
 # say TEXT: the person comments on the task; prints the comment's feed position.
 say() { person --json comment "$key" "$1" | field seq; }
 # tokens_now: the last running total of tokens the tool printed in the listening session's log, or nothing.
@@ -250,7 +272,7 @@ until_true() { # until_true SECONDS COMMAND...: polls once a second
 	until "$@"; do [ "$SECONDS" -lt "$end" ] || return 1; sleep 1; done
 }
 listens() { [ "$(agents)" = "connected listening" ]; }
-answered() { [ "$(replies "$1")" -ge 1 ]; }
+answered() { [ "$(replies "$@")" -ge 1 ]; }
 passed() { if "$@"; then echo 0; else echo 1; fi; }
 
 echo "tool: $tool"
@@ -287,12 +309,14 @@ sleep "$idle"
 idle_to=$(date +%s) tokens_to=$(tokens_now)
 check "a stretch with nothing arriving passed in a wait" "$(passed held_through "$idle_from" "$idle_to")"
 first=$(say "@$handle what do 2 and 2 make? Answer here in a comment.")
-check "the first comment was answered" "$(passed until_true "$answer_time" answered "$first")" "$(replies "$first") answers after it"
+check "the first comment was answered" "$(passed until_true "$answer_time" answered "$first" 0 4 four)" "$(replies "$first" 0) answers after it"
 second=$(say "@$handle and 3 and 3? Answer here in a comment.")
-check "the second comment was answered" "$(passed until_true "$answer_time" answered "$second")" "$(replies "$second") answers after it"
+check "the second comment was answered" "$(passed until_true "$answer_time" answered "$second" 0 6 six)" "$(replies "$second" 0) answers after it"
 sleep 30
-check "the first comment got exactly one answer" "$([ "$(replies "$first" "$second")" = 1 ] && echo 0 || echo 1)" "$(replies "$first" "$second") answers"
-check "the second comment got exactly one answer" "$([ "$(replies "$second")" = 1 ] && echo 0 || echo 1)" "$(replies "$second") answers"
+check "the first comment got exactly one answer, saying 4" "$([ "$(replies "$first" "$second")" = 1 ] && [ "$(replies "$first" "$second" 4 four)" = 1 ] && echo 0 || echo 1)" \
+	"$(replies "$first" "$second") comments by @$handle between it and the second"
+check "the second comment got exactly one answer, saying 6" "$([ "$(replies "$second" 0)" = 1 ] && [ "$(replies "$second" 0 6 six)" = 1 ] && echo 0 || echo 1)" \
+	"$(replies "$second" 0) comments by @$handle after it"
 
 # A second session told to listen is refused while the first listens.
 echo "   a second session"
@@ -320,7 +344,7 @@ sleep 10
 kill -TERM -- "-$listen_pid" 2>/dev/null || :
 third=$(say "@$handle and 4 and 4? Answer here in a comment.")
 sleep 90
-check "after stop, the third comment got no answer" "$([ "$(replies "$third")" = 0 ] && echo 0 || echo 1)" "$(replies "$third") answers"
+check "after stop, the third comment got no answer" "$([ "$(replies "$third" 0)" = 0 ] && echo 0 || echo 1)" "$(replies "$third" 0) answers"
 
 echo "waits of the listening session (seconds, what came):"
 grep -E " end listen pid=[0-9]+ status=[0-9]+ [0-9]+s wait" "$work/calls.log" | awk '{for (i = 1; i < NF; i++) if ($i == "=>") { print "  " $6, $(i + 1); break }}' || :
