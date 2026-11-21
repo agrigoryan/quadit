@@ -103,8 +103,9 @@ for v in $(env | sed -n 's/^\(QUADIT_[A-Z_]*\)=.*/\1/p'); do unset "$v"; done
 # shellcheck disable=SC2016
 case $tool in
 codex) default_command='codex exec --skip-git-repo-check -s workspace-write -c sandbox_workspace_write.network_access=true -c "shell_environment_policy.set={QUADIT_CONFIG=\"$AGENT_CHECK_LOGIN\"}" "$1"' ;;
-claude) default_command='claude -p --output-format json --allowedTools "Bash($AGENT_CHECK_WRAPPER:*)" "$1"' ;;
-agy) default_command='agy -p "$1"' ;;
+# The prompt comes before --allowedTools, which takes every word after it as a tool.
+claude) default_command='claude -p "$1" --output-format json --allowedTools "Bash($AGENT_CHECK_WRAPPER:*)" "Bash(quadit:*)"' ;;
+agy) default_command='agy -p "$1" --dangerously-skip-permissions' ;;
 gemini) default_command='GEMINI_CLI_TRUST_WORKSPACE=true gemini -p "$1"' ;;
 cursor-agent) default_command='cursor-agent -p --force "$1"' ;;
 *) default_command="" ;;
@@ -128,7 +129,9 @@ mcp_settings() {
 quadit_mcp() { python3 -c 'import json,sys,tomllib
 path, kind = sys.argv[1], sys.argv[2]
 with open(path, "rb") as f:
-    doc = tomllib.load(f) if kind == "toml" else json.load(f)
+    text = f.read()
+# A settings file that is there but empty names no MCP server.
+doc = {} if not text.strip() else tomllib.loads(text.decode()) if kind == "toml" else json.loads(text)
 found = []
 def walk(v):
     if isinstance(v, dict):
@@ -348,7 +351,7 @@ check "after stop, the third comment got no answer" "$([ "$(replies "$third" 0)"
 
 echo "waits of the listening session (seconds, what came):"
 grep -E " end listen pid=[0-9]+ status=[0-9]+ [0-9]+s wait" "$work/calls.log" | awk '{for (i = 1; i < NF; i++) if ($i == "=>") { print "  " $6, $(i + 1); break }}' || :
-echo "listening session: $(grep -c " start listen wait" "$work/calls.log" || :) waits, $(awk '$3=="listen"{if(!f)f=$1;l=$1}END{print l-f}' "$work/calls.log")s from its first call to its last"
+echo "listening session: $(grep -cE " start listen pid=[0-9]+ wait( |$)" "$work/calls.log" || :) waits, $(awk '$3=="listen"{if(!f)f=$1;l=$1}END{print l-f}' "$work/calls.log")s from its first call to its last"
 echo "the skill the tool was given (the tested quadit's own, sha256 $("$real" skill | shasum -a 256 | cut -c 1-12)):"
 sed -n 's/^installed //p' "$work/skills.txt" | while read -r file; do echo "  $file  sha256 $(shasum -a 256 "$file" | cut -c 1-12)"; done
 if [ -n "$tokens_from" ] && [ -n "$tokens_to" ] && [ "$tokens_to" -ge "$tokens_from" ]; then
