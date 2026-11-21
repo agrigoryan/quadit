@@ -35,6 +35,7 @@ var commands = []command{
 	{names: []string{"layout"}, args: 1, usage: "layout PROJECT", run: readCommand("/projects/%s/layout")},
 	{names: []string{"dashboard"}, run: readsWithFilters("/dashboard")},
 	{names: []string{"agents"}, run: readCommand("/agents")},
+	{names: []string{"connect"}, noDryRun: true, run: (*runner).connect}, // connect.go
 
 	// find (cmd_read.go)
 	{names: []string{"tasks", "ls"}, run: readsWithFilters("/tasks")},
@@ -46,8 +47,9 @@ var commands = []command{
 
 	// follow (cmd_follow.go, listen.go)
 	{names: []string{"events"}, run: readsWithFilters("/events")},
-	{names: []string{"ack"}, args: 1, usage: "ack SEQ [NAME]", run: (*runner).ack},
+	{names: []string{"ack"}, args: 1, usage: "ack SEQ [NAME] [lease=ID]", run: (*runner).ack},
 	{names: []string{"listen"}, noDryRun: true, run: (*runner).listen},
+	{names: []string{"wait"}, noDryRun: true, run: (*runner).wait},
 	{names: []string{"read"}, run: (*runner).markRead},
 
 	// act on tasks (cmd_task.go)

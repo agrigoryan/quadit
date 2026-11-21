@@ -11,7 +11,8 @@ import (
 )
 
 // ack marks the feed handled up to a sequence number, under a cursor's
-// name ("main" when none is given).
+// name ("main" when none is given). The cursor "listen" is moved with the
+// listener's lease (lease=ID).
 func (r *runner) ack(in input) error {
 	seq, err := strconv.ParseInt(in.pos[0], 10, 64)
 	if err != nil {
@@ -21,7 +22,7 @@ func (r *runner) ack(in input) error {
 	if len(in.pos) > 1 {
 		name = in.pos[1]
 	}
-	out, err := r.setCursor(name, seq)
+	out, err := r.setCursor(name, seq, firstValue(in.f["lease"]))
 	if err != nil {
 		return err
 	}
@@ -32,10 +33,14 @@ func (r *runner) ack(in input) error {
 	return nil
 }
 
-// setCursor moves a cursor to a sequence number and returns the server's
-// answer.
-func (r *runner) setCursor(name string, seq int64) ([]byte, error) {
-	return r.send("PUT", "/cursors/"+url.PathEscape(name), nil, map[string]int64{"seq": seq}, "")
+// setCursor moves a cursor to a sequence number, with the listener's lease
+// for the cursor "listen" (or none), and returns the server's answer.
+func (r *runner) setCursor(name string, seq int64, lease string) ([]byte, error) {
+	body := map[string]any{"seq": seq}
+	if lease != "" {
+		body["lease"] = lease
+	}
+	return r.send("PUT", "/cursors/"+url.PathEscape(name), nil, body, "")
 }
 
 // markRead marks inbox items read: all of them, or the ones named.

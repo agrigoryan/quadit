@@ -9,13 +9,18 @@ orient    me                         who am I: role, scope, hand-off limit, curs
           work                       what waits on me, what is assigned, unread inbox
           layout PROJECT             statuses, labels, members, epics
           dashboard | agents         where everything stands; what each agent is doing
+          connect [CODE]             an agent gives back the code a person made for it, proving it is connected
 find      tasks [filter=value ...]   assignee=me status=todo label=art open=1 q=text sort=priority
                                      count=1 for a number, view=SLUG for a saved view
           show KEY [since=SEQ]       one task with decisions and comments
           context KEY                everything needed to work on a task
           search TEXT | decisions [state=open] | inbox [all=1]
 follow    events [after=SEQ] [wait=50] [cursor=NAME] [mine=1] [others=1] [task=KEY]
-          ack SEQ [NAME]             mark the feed handled up to SEQ
+          ack SEQ [NAME] [lease=ID]  mark the feed handled up to SEQ (the cursor listen takes its lease)
+          wait [for=SECONDS] [lease=ID] [take=1]
+                                     wait for the next inbox item (50 seconds unless for= says);
+                                     prints ITEM or IDLE and the exact commands to go on. One session
+                                     at a time listens; take=1 takes over, only when the person says so
           listen --exec CMD          run CMD for each inbox item, again until it succeeds
 act       new PROJECT TITLE [field=value ...]      description=- reads it from stdin
           update KEY field=value ... status=done assignee=@ann priority=high add_labels=a,b
@@ -46,7 +51,7 @@ more      quadit help secrets        using keys without holding them
           quadit help server         serve, admin, backup, restore
 
 Every command takes --json for full data and --dry-run to check a write
-(run, request and listen refuse it: they cannot check without doing).
+(run, request, listen, wait and connect refuse it: they cannot check without doing).
 A write takes --id=UUID (send it again with the same id and it happens once)
 and --for=@WHO (it runs with that member's access).
 Connect with QUADIT_URL and QUADIT_TOKEN (both, or neither is used), or: quadit login URL

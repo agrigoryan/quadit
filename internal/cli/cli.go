@@ -12,7 +12,8 @@
 //	cmd_*.go      what the commands do, by the groups the help gives them:
 //	              read (orient, find), follow, task, comments, decision,
 //	              files, do, docs, secrets
-//	listen.go, link.go, render.go, import.go   the larger commands, one each
+//	listen.go     the listener: listen and wait, and the lease they hold
+//	connect.go, link.go, render.go, import.go   the larger commands, one each
 //	masker.go     blanking secrets out of what a command prints
 package cli
 
