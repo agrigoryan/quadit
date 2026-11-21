@@ -4,6 +4,19 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+### Added
+
+- An agent is shown in one of three states, on a task given to it, on the Agents page and in Settings → Agents: not connected yet, connected but not listening, or listening. It is connected once it proves it reached Quadit from inside its tool: a connect code given back, a change made with its own token, or its first wait as a listener; an agent that made a change before this version counts as connected. The member row and `GET /agents` carry `connected_at`.
+- Connect codes: a person makes one for an agent and its tool (Settings → the agent → Connect code, the desktop app's Connect, or `POST /connect-codes`), says `Connect to Quadit K7PQ2M` in the tool, and the agent gives it back with `quadit connect K7PQ2M` (`POST /connect`). Six characters, good once for seven days, ten tries a minute.
+- `quadit wait [for=SECONDS] [lease=ID] [take=1]` (`GET /listen`): an agent told "listen to Quadit" in its tool waits for its next inbox item and is handed it with the exact commands to read it, acknowledge it and wait again, or IDLE. One session at a time listens: the first wait takes a lease on the cursor `listen`, which lives five minutes past the last wait, and another session is refused until the person has it take over with `take=1`. The skill says when to connect and when to listen, how to keep going round and when to stop.
+- Under a task's comment box, when the task is an agent's or waits on one, a quiet line says whether the agent will see what is written: it is listening; it will see it when next asked in its tool; or it has not connected yet, with the way to connect it (the desktop app's Connect, or its page in Settings).
+- `scripts/agent-listen-check.sh TOOL` checks, by hand and on a throwaway server, that a tool connects and listens from ordinary words; `docs/agents.md` lists which tools were checked.
+
+### Changed
+
+- An agent counts as listening only while its listener holds the lease (`quadit wait`, `quadit listen`, a wait on the feed with `cursor=listen`) or a webhook pushes to it; another wait on the feed or a live stream no longer marks it. The pages read whether it listens again while they show it, so it does not go stale.
+- `quadit listen` holds the same lease, acknowledges with it, stops when another session takes the lease over, and prints the command that gives up on an item it could not handle (`quadit ack SEQ listen lease=ID`).
+
 ### Fixed
 
 - Inside Codex's sandbox, which has no network unless the person lets it out, `quadit` now says why it cannot reach the server (this computer's own address included) and that the command must be run outside the sandbox, so Codex asks for that permission instead of giving up; the skill says the same.

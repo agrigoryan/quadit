@@ -8,6 +8,7 @@ An agent is a member of the workspace with its own account, role and token. Peop
 2. Issue it a token (an admin, or the person responsible for the agent). It is shown once.
 3. Give the agent `QUADIT_URL` and `QUADIT_TOKEN`, or run `quadit login URL TOKEN` (`-` for the token reads it from standard input). Or let the desktop app do steps 2 to 4: see [Connect from the desktop app](#connect-from-the-desktop-app).
 4. Teach the agent Quadit: `quadit skill install` (see [Your agent](#your-agent)).
+5. Prove it reaches Quadit from inside its tool: on the agent's page in Settings, make a connect code and say the line it gives in the tool (`Connect to Quadit K7PQ2M`). See [Connected, and listening](#connected-and-listening).
 
 ## Your agent
 
@@ -103,6 +104,48 @@ Tokens are kept only in `quadit`'s own login files, readable by the user alone, 
 
 **Disconnect** puts back what Connect changed, except where a file has been changed since (it is left as it is, and said), and revokes the token. An MCP sign-in is ended in the agent itself.
 
+Connect is a page of the app laid over the workspace window (File → Connect Agents…, the Agents page, the button under a task's comment box). A tool it set up shows the line to say in it, `Connect to Quadit K7PQ2M`, until the agent gives the code back; then whether it listens.
+
+### Connected, and listening
+
+Files written are not proof that an agent reaches Quadit, and an agent that does reach it sees what is written to it only when it looks. So an agent is in one of three states, shown on a task given to it, under the comment box, on the Agents page and in Settings → Agents:
+
+- **Not connected yet**: it has never proven it reached Quadit from inside its tool.
+- **Connected, not listening**: it works when the person asks it in its tool; what is written in Quadit waits until then.
+- **Listening**: a session of it is waiting for its inbox right now (or a webhook pushes to it), and answers what comes in.
+
+An agent is connected by the first of: a connect code given back, a change made with its own token, its listener's first wait. Reading proves nothing: `quadit login` and `quadit me` do not connect it. The member row and `GET /agents` carry `connected_at`.
+
+**Connect codes.** A person who may make the agent a token makes a code for it and the tool it runs in: Settings → the agent → Connect code, the desktop app's Connect, or `POST /connect-codes {"agent": "@codex", "tool": "Codex"}`, which answers `{id, code, …}` with the code this once. It is six characters with no look-alikes, good once for seven days; a new code for the same agent and tool replaces the open one, and `GET /connect-codes/{id}` tells its maker whether it was used. Said in the tool, `Connect to Quadit K7PQ2M` has the agent run:
+
+```bash
+quadit connect K7PQ2M    # with its own login: "Connected as @codex in Personal." and what to tell the person
+quadit connect           # with no code: who this login is
+```
+
+A wrong, used or expired code is refused saying which (`reason`: `wrong`, `used`, `expired`), ten tries a minute per agent; a person's login is refused, since an agent connects with its own. Connecting starts no wait.
+
+**Listening.** Only when the person in the tool asks ("listen to Quadit"), the agent runs, again and again:
+
+```bash
+quadit wait for=110      # blocks until the next inbox item, at most for= seconds (50 when left out)
+```
+
+It prints one record: `ITEM #SEQ KIND TASK-OR-PAGE from @WHO: "…"` with the commands to read it, to acknowledge it once handled (`quadit ack SEQ listen lease=ID`) and to wait again (`quadit wait lease=ID`); or `IDLE` and the command to wait again. It delivers the inbox items `quadit listen` delivers, from the same cursor `listen`, and one session at a time may: the first wait takes a lease, and the commands it prints carry the lease's id. The lease lives five minutes past the end of its holder's last wait, and the agent counts as listening while it does. Another session's wait is refused, "@codex is already listening from another session (last heard 14:02 UTC)", until the person has it take over with `quadit wait take=1`; an acknowledgment with a lease taken over since is refused. The API is `GET /listen?wait=50&lease=ID` (`take=1` to take over), answering `{lease, seq, item}`; a wait on the feed with `cursor=listen` holds the same lease, and `PUT /cursors/listen {"seq", "lease"}` acknowledges. `for=` should be a little under the longest the tool lets one command run.
+
+Each tool, as `scripts/agent-listen-check.sh TOOL` finds it (a throwaway server, ordinary words: "Connect to Quadit CODE", then "Listen to Quadit", two comments answered once each, a second session refused, nothing answered after stop). It spends the person's plan, so it is run by hand.
+
+| Tool | Connect and listen | Idle cost |
+| --- | --- | --- |
+| Claude Code | not verified yet | |
+| Codex | not verified yet | |
+| Antigravity CLI | not verified yet | |
+| Gemini CLI | not verified yet | |
+| Cursor | not verified yet | |
+| GitHub Copilot CLI | not verified yet | |
+| opencode | not verified yet | |
+| pi | not verified yet | |
+
 ## A session in five calls
 
 An agent needs no memory of its own between sessions.
@@ -148,12 +191,13 @@ Everything that changes is one event in one ordered feed per workspace. A commen
 | Narrow | `mine=1` (tasks you are assigned, mentioned in or watch), `others=1` (not your own changes), `task=SVA-12`, `types=decision.picked`, or any task filter |
 | Inbox only | `inbox=1`: assignments, mentions, answers to your questions, replies |
 | Push | A webhook "for" the agent gets its inbox items as signed POSTs, in order, retried until they arrive. The server calls public addresses only; one on its own machine or network needs `--allow-private-networks` ([install](install.md#addresses-users-give)) |
+| Listen in a session | `quadit wait`, again and again, in the agent's own session when the person asks it to listen: one inbox item at a time, with the commands to go on ([Connected, and listening](#connected-and-listening)) |
 | Companion | `quadit listen --exec ./wake.sh` holds the wait for you and runs a command for each inbox item: for agents with nothing running |
 | Live stream | `GET /events/stream`: server-sent events |
 
 Rules in Settings → Automation add wake-ups such as "when a person answers a decision, tell @coordinator".
 
-`quadit listen` delivers each inbox item at least once, one at a time, in order. Its cursor (`listen`, or the one named with `cursor=NAME`) moves past an item only after the command exited with 0. When the item's secrets cannot be had, or the command fails, listen says so, waits (1 second, doubling up to 5 minutes) and runs it again; the items after it wait for it. So the command must be safe to run twice for the same item: a crash, or a failure after part of the work was done, brings the item back. To give up on an item instead, move the cursor past it: `quadit ack SEQ listen`, with the item's number (the `#1207` its line starts with).
+`quadit listen` delivers each inbox item at least once, one at a time, in order. Its cursor (`listen`, or the one named with `cursor=NAME`) moves past an item only after the command exited with 0. When the item's secrets cannot be had, or the command fails, listen says so, waits (1 second, doubling up to 5 minutes) and runs it again; the items after it wait for it. So the command must be safe to run twice for the same item: a crash, or a failure after part of the work was done, brings the item back. To give up on an item instead, move the cursor past it with the command listen prints when it says the item was not handled: `quadit ack SEQ listen lease=ID`. Listen holds the listener's lease like `quadit wait`, so only one of them delivers the inbox at a time, and it stops when another session takes the lease over.
 
 ## Writing
 
@@ -167,7 +211,7 @@ quadit ask SVA-12 "Which explosion?" option="A: ring" file=ring.gif option="B: b
 quadit do task.update '{"id": "SVA-12", "base_seq": 1042, "title": "New title"}'
 ```
 
-- `--dry-run` checks a write without making it: a change, `remember` and `ack` are checked by the server; `upload`, `attach` and a comment's `file=` check that the files can be read and send nothing. `run`, `request` and `listen` cannot check without doing, so they refuse `--dry-run`.
+- `--dry-run` checks a write without making it: a change, `remember` and `ack` are checked by the server; `upload`, `attach` and a comment's `file=` check that the files can be read and send nothing. `run`, `request`, `listen`, `wait` and `connect` cannot check without doing, so they refuse `--dry-run`.
 - `base_seq` refuses the update if the task changed since you read it, and says which fields changed.
 - A batch (`POST /changes {"changes": […]}`) applies all of its changes or none. An admin bringing in history may mark a change, alone or in a batch, `"quiet": true`: it reaches no inbox, wakes nobody, starts no rule and raises no watched-view alert, and its events say `"quiet": true`. Webhooks still get it, as they mirror the feed, with `"quiet": true` in the payload. `quadit import` does this for an admin; a member or a member-role agent is refused.
 - A person's undo is a change like any other, sent with `"undoes": "<change id>"`, and its events carry `"undoes"` with that id. Read such a pair as "nothing happened": the first change was a mistake put right, not a decision reversed, so do not report it as work done and reopened. If the first change woke you (a task given to you, then taken back), the undo's own event tells you so: stop, and say in a comment anything you already did. Within five minutes of the first change the inbox item it made is removed again if still unread.

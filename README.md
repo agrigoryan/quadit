@@ -94,6 +94,8 @@ quadit skill install    # teaches Claude Code, Codex, Cursor, Gemini CLI, Antigr
 quadit work             # what waits on me
 ```
 
+Then prove the agent reaches Quadit from inside its tool: on the agent's page in Settings, make a connect code, and say the line it gives in the tool (`Connect to Quadit K7PQ2M`); the agent answers `quadit connect K7PQ2M` and shows as connected. The desktop app's Connect does all of this for the tools on its computer. An agent sees what is written to it in Quadit when it is next asked in its tool, or at once while it listens: say "listen to Quadit" there, and it waits for its inbox (`quadit wait`) and answers each item until told to stop.
+
 The HTTP API, described at `/api/v1/openapi.json`, has all of it. The MCP server at `/mcp` has the work an agent does (reading tasks, pages and the feed, any change, questions, files, secrets) but not the admin reads, imports and exports. [docs/agents.md](docs/agents.md) has the setup for each agent, waking an agent when something needs it, and the whole command set.
 
 ## Updating
