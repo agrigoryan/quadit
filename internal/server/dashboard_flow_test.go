@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 	"time"
+
+	"github.com/agrigoryan/quadit/internal/core"
 )
 
 // TestFlowWeeksAreTheLastTwelveMondays checks that the dashboard's weekly
@@ -27,5 +29,23 @@ func TestFlowWeeksAreTheLastTwelveMondays(t *testing.T) {
 			t.Errorf("week %d of the series is %s, want %s", i, week.Week, want)
 		}
 		monday = monday.AddDate(0, 0, -7)
+	}
+}
+
+// TestFlowByStatusLeavesOutProjectsInTheTrash: the statuses of a project in
+// the trash are not counted; they stay stored with it, to come back if it
+// is restored.
+func TestFlowByStatusLeavesOutProjectsInTheTrash(t *testing.T) {
+	names := &nameLookup{
+		projects: map[string]core.Project{"p1": {ID: "p1", Key: "SVA"}, "p2": {ID: "p2", Key: "GS", DeletedAt: 1}},
+		statuses: map[string]core.Status{
+			"s1": {ID: "s1", ProjectID: "p1", Name: "Todo", Category: core.CatUnstarted},
+			"s2": {ID: "s2", ProjectID: "p2", Name: "Todo", Category: core.CatUnstarted},
+		},
+	}
+	who := &viewer{}
+	got := who.flowByStatus(dashboardScope{names: names, covers: who})
+	if len(got) != 1 || got[0].Project != "SVA" {
+		t.Fatalf("the flow by status is %+v, want SVA's Todo alone", got)
 	}
 }

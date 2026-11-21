@@ -20,7 +20,8 @@ type flowStatus struct {
 }
 
 // flowByStatus counts the tasks, archived ones left out, in each status of
-// the projects the dashboard covers.
+// the projects the dashboard covers. A project in the trash keeps its
+// statuses, and is not counted.
 func (who *viewer) flowByStatus(scope dashboardScope) []flowStatus {
 	names := scope.names
 	count := map[string]int{}
@@ -31,7 +32,7 @@ func (who *viewer) flowByStatus(scope dashboardScope) []flowStatus {
 	}
 	var statuses []core.Status
 	for _, status := range names.statuses {
-		if status.DeletedAt == 0 && scope.covers.canProject(status.ProjectID) {
+		if status.DeletedAt == 0 && names.projects[status.ProjectID].DeletedAt == 0 && scope.covers.canProject(status.ProjectID) {
 			statuses = append(statuses, status)
 		}
 	}
