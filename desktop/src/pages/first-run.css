@@ -5,7 +5,6 @@
  */
 
 :root {
-  color-scheme: dark;
   --page: #131419;
   --stage: #0f1015;
   /* A change of step (first-run.ts's STEP_MS). */
@@ -23,6 +22,9 @@ body {
 }
 
 body {
+  /* Keep the dark background on the fading element, instead of painting the view's canvas. */
+  contain: paint;
+  color-scheme: dark;
   overflow: hidden;
   position: relative;
   background: var(--page);
