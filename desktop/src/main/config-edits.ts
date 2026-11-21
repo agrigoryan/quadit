@@ -77,6 +77,8 @@ export type Applied =
 /** A file as it is and as it will be: text, for a link its target, for a folder ""; null for none. */
 export interface FileEdit {
   path: string;
+  /** The kind of the first change (or record) that made it: what the file is to the plan, in a word. */
+  kind: Change["kind"] | Applied["kind"];
   link: boolean;
   folder?: true;
   before: string | null;
@@ -302,14 +304,14 @@ export function changedSince(edits: FileEdit[]): FileEdit | null {
 function editOf(path: string, kind: Change["kind"] | Applied["kind"]): FileEdit {
   if (kind === "link") {
     const before = readLink(path);
-    return { path, link: true, before, after: before };
+    return { path, kind, link: true, before, after: before };
   }
   if (kind === "folder") {
     const before = statSync(path, { throwIfNoEntry: false })?.isDirectory() ? "" : null;
-    return { path, link: false, folder: true, before, after: before };
+    return { path, kind, link: false, folder: true, before, after: before };
   }
   const before = readText(path);
-  return { path, link: false, before, after: before };
+  return { path, kind, link: false, before, after: before };
 }
 
 /**

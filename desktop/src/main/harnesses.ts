@@ -16,6 +16,8 @@ import type { Change } from "@/main/config-edits";
 export interface Harness {
   id: string;
   name: string;
+  /** The letters on its tile, where the app shows tools as neutral tiles rather than their logos. */
+  initials: string;
   /** Its command, looked for on the login shell's PATH. */
   command: string;
   /**
@@ -46,6 +48,7 @@ export interface Harness {
 export const HARNESSES: readonly Harness[] = [
   {
     id: "claude",
+    initials: "CC",
     name: "Claude Code",
     command: "claude",
     trace: ".claude",
@@ -87,6 +90,7 @@ export const HARNESSES: readonly Harness[] = [
   },
   {
     id: "codex",
+    initials: "CX",
     name: "Codex",
     command: "codex",
     trace: ".codex",
@@ -121,6 +125,7 @@ export const HARNESSES: readonly Harness[] = [
   },
   {
     id: "gemini",
+    initials: "Ge",
     name: "Gemini CLI",
     command: "gemini",
     trace: ".gemini/settings.json",
@@ -141,6 +146,7 @@ export const HARNESSES: readonly Harness[] = [
     // Google's successor to Gemini CLI: its own command (agy), and its own
     // files under ~/.gemini, which Gemini CLI's settings.json does not reach.
     id: "antigravity",
+    initials: "AG",
     name: "Antigravity CLI",
     command: "agy",
     trace: ".gemini/antigravity-cli",
@@ -159,6 +165,7 @@ export const HARNESSES: readonly Harness[] = [
   },
   {
     id: "cursor",
+    initials: "Cu",
     name: "Cursor",
     command: "cursor-agent",
     trace: ".cursor",
@@ -172,6 +179,7 @@ export const HARNESSES: readonly Harness[] = [
   },
   {
     id: "opencode",
+    initials: "oc",
     name: "opencode",
     command: "opencode",
     trace: ".config/opencode",
@@ -183,8 +191,15 @@ export const HARNESSES: readonly Harness[] = [
       signIn: "In a terminal, run: opencode mcp auth quadit",
     },
   },
-  { id: "pi", name: "pi", command: "pi", trace: ".pi", skills: ".agents/skills" },
-  { id: "copilot", name: "GitHub Copilot CLI", command: "copilot", trace: ".copilot", skills: ".agents/skills" },
+  { id: "pi", name: "pi", initials: "pi", command: "pi", trace: ".pi", skills: ".agents/skills" },
+  {
+    id: "copilot",
+    name: "GitHub Copilot CLI",
+    initials: "GH",
+    command: "copilot",
+    trace: ".copilot",
+    skills: ".agents/skills",
+  },
 ];
 
 /** opencode reads opencode.jsonc when there is one, and opencode.json otherwise. */

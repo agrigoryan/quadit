@@ -219,6 +219,40 @@ posixOnly("Connect plans", () => {
     });
   }
 
+  it("says what each file is to the plan, for its plain words, and where it is as a person writes it", async () => {
+    const { connections, choice, home } = setUp({ quaditOnPath: false, writableOnPath: false });
+    mkdirSync(join(home, ".claude"));
+    writeFileSync(join(home, ".claude", "settings.json"), "{}");
+    const claude = await connections.planConnect(choice("claude"));
+    if (!claude.ok) throw new Error(claude.error);
+    expect(claude.plan.files.map((f) => [f.shown, f.role, f.change])).toEqual([
+      ["~/.local/bin", "folder", "new"],
+      ["~/.local/bin/quadit", "command", "new"],
+      ["~/.zprofile", "profile", "new"],
+      ["~/.claude/skills/quadit/SKILL.md", "skill", "new"],
+      ["~/Library/Application Support/quadit/claude.json", "login", "new"],
+      ["~/.claude/settings.json", "settings", "edited"],
+    ]);
+    // Without a setting for a login of its own, the login the plan makes is the computer's.
+    const pi = await connections.planConnect(choice("pi"));
+    if (!pi.ok) throw new Error(pi.error);
+    expect(pi.plan.files.find((f) => f.path.endsWith("config.json"))?.role).toBe("shared-login");
+  });
+
+  it("says a disconnect takes the files it made away and puts the others back, the login among them", async () => {
+    const { connections, connect, choice, home } = setUp();
+    mkdirSync(join(home, ".claude"));
+    writeFileSync(join(home, ".claude", "settings.json"), "{}");
+    await connect(choice("claude"));
+    const planned = connections.planDisconnect("claude");
+    if (!planned.ok) throw new Error(planned.error);
+    expect(planned.plan.files.map((f) => [f.shown, f.role, f.change])).toEqual([
+      ["~/.claude/skills/quadit/SKILL.md", "skill", "removed"],
+      ["~/Library/Application Support/quadit/claude.json", "login", "removed"],
+      ["~/.claude/settings.json", "settings", "restored"],
+    ]);
+  });
+
   it("says which harnesses work as the default login, and offers MCP where it has it", async () => {
     const { connections } = setUp();
     const view = await connections.state();

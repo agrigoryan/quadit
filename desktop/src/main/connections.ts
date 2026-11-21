@@ -45,7 +45,15 @@ import {
 import { HARNESSES, type Harness } from "@/main/harnesses";
 import type { QuaditCli } from "@/main/quadit-cli";
 import type { DesktopOutcome, DesktopRequest, DesktopSummary } from "@/shared/bridge";
-import type { ConnectChoice, ConnectMethod, ConnectView, Planned, PlanView } from "@/shared/pages-api";
+import type {
+  ConnectChoice,
+  ConnectMethod,
+  ConnectView,
+  FileRole,
+  PlanFile,
+  Planned,
+  PlanView,
+} from "@/shared/pages-api";
 
 export interface ConnectionsParts {
   home: string;
@@ -106,6 +114,8 @@ type Plan =
       edits: FileEdit[];
       notes: string[];
       revoke: Connection["token"];
+      /** The login file the connection made (its token's config), shared or not; null without one. */
+      login: string | null;
       backupDir: string;
       warnings: string[];
     };
@@ -150,6 +160,7 @@ export class Connections {
         return {
           id: harness.id,
           name: harness.name,
+          initials: harness.initials,
           installed: this.installed(harness, look.path),
           mcp: !!harness.mcp,
           cliIdentity: harness.env ? "own" : "default",
@@ -348,8 +359,14 @@ export class Connections {
     this.plans.clear();
   }
 
-  /** Carries out a connect plan the person saw; it is good for one Apply. */
-  async applyConnect(planId: string): Promise<{ ok: true; hint: string } | { ok: false; error: string }> {
+  /**
+   * Carries out a connect plan the person saw; it is good for one Apply.
+   * Gives what to do next, and the workspace's agent the tool was connected
+   * as (null where the quadit command alone works as a default login there already).
+   */
+  async applyConnect(
+    planId: string,
+  ): Promise<{ ok: true; hint: string; agent: { id: string; handle: string } | null } | { ok: false; error: string }> {
     const plan = this.plans.get(planId);
     this.plans.delete(planId);
     if (plan?.kind !== "connect") return { ok: false, error: "That plan is gone: review the changes again." };
@@ -413,6 +430,7 @@ export class Connections {
     return {
       ok: true,
       hint: newPath ? `${hint} Terminals opened from now on find quadit; reopen any that are open now.` : hint,
+      agent: agent ? { id: agent.id, handle: agent.handle } : null,
     };
   }
 
@@ -434,6 +452,7 @@ export class Connections {
         edits,
         notes,
         revoke,
+        login: token?.config ?? null,
         backupDir: this.backupDir(harness.id),
         warnings: [
           ...notes,
@@ -480,8 +499,20 @@ export class Connections {
   }
 
   private view(plan: Plan): PlanView {
-    const files = plan.edits.map((edit) => ({
+    const { home } = this.parts;
+    const login = plan.kind === "disconnect" ? plan.login : null;
+    const files: PlanFile[] = plan.edits.map((edit) => ({
       path: edit.path,
+      shown: homely(home, edit.path),
+      role: roleOf(edit.kind, plan.harness, edit.writtenBy === true || edit.path === login),
+      change:
+        plan.kind === "connect"
+          ? edit.before === null
+            ? "new"
+            : "edited"
+          : edit.after === null
+            ? "removed"
+            : "restored",
       diff: diffOf(edit),
       ...(edit.writtenBy
         ? { note: "Written by quadit login, which checks the token with the server first. The token is shown masked." }
@@ -491,6 +522,9 @@ export class Connections {
       for (const record of plan.shared) {
         files.push({
           path: record.path,
+          shown: homely(home, record.path),
+          role: roleOf(record.kind, plan.harness, record.path === plan.sharedToken?.config),
+          change: "shared",
           diff: "",
           note: "Done already for another connected harness; shared with it.",
         });
@@ -543,6 +577,29 @@ export class Connections {
     const next = `${this.ledgerFile}.next`;
     writeFileSync(next, JSON.stringify(ledger, null, 2), { mode: 0o600 });
     renameSync(next, this.ledgerFile);
+  }
+}
+
+/**
+ * What a file is to a plan, from the kind of change that made it (or the
+ * record of it): `login`, it is the quadit login the plan makes or takes back,
+ * the tool's own or, for a tool without a setting for one, the computer's default.
+ */
+function roleOf(kind: FileEdit["kind"], harness: Harness, login: boolean): FileRole {
+  if (login || kind === "written-by") return harness.env ? "login" : "shared-login";
+  switch (kind) {
+    case "file":
+      return "skill";
+    case "json":
+    case "json-item":
+    case "toml":
+      return "settings";
+    case "link":
+      return "command";
+    case "folder":
+      return "folder";
+    case "line":
+      return "profile";
   }
 }
 
