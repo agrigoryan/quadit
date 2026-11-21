@@ -1,8 +1,9 @@
-// The first run, as a person meets it (desktop contract §7 and §8):
-// Welcome, a name, "Set up on this computer", the workspace, signed in,
-// and, where an agent tool is found, Welcome's step that connects it with
-// one button; or "Connect to a server", as far as it goes without a
-// browser. Each step's window is saved as a picture in
+// The first run, as a person meets it (desktop contract §10): one window
+// from the first launch to the workspace. Welcome, a name, "Set up on this
+// computer", the tools step (looking, the tool found, what connecting it
+// changes, Connected and Undo), Continue, and the workspace on its sample
+// tasks; or no tool found; or "Connect to a server instead", as far as it
+// goes without a browser. Every state is saved as a picture in
 // onboarding-screens/ (outside test-results, which Playwright empties at
 // every run), in the order a person sees them; desktop-ci keeps the folder
 // on every run as the artifact desktop-onboarding-screens.
@@ -15,18 +16,16 @@ import { Desktop, expect, fakeComputer, slowToStart, test } from "./desktop";
 
 const SCREENS = join(__dirname, "../../onboarding-screens");
 
-/** Saves what `page`'s window shows as `name` in the screens folder. */
+/** Saves what `page` shows as `name` in the screens folder. The first run's page fills its window. */
 async function screen(page: Page, name: string) {
   mkdirSync(SCREENS, { recursive: true });
   await page.screenshot({ path: join(SCREENS, name) });
 }
 
-/** Whether one of the app's own pages, `file`, is open. */
-function isOpen(desktop: Desktop, file: string): boolean {
-  return desktop.app.windows().some((page) => page.url().endsWith(`/${file}`));
-}
+/** The note the web app shows over the "Getting started" project's task list while its samples are there. */
+const SAMPLES_NOTE = "Three sample tasks to try Quadit with.";
 
-test("the first run sets Quadit up on this computer with a name alone, lands in the workspace signed in, and connects the tool found with one button", async ({
+test("the first run sets Quadit up on this computer in one window, connects the tool found, and lands on the sample tasks", async ({
   run,
 }) => {
   // Two starts of the app, each waiting for its server.
@@ -38,96 +37,122 @@ test("the first run sets Quadit up on this computer with a name alone, lands in 
   let desktop = await Desktop.launch(data, run, [], { env, firstStart: true });
   let origin = "";
   try {
-    const welcome = await desktop.appPage("welcome.html");
-    await expect(welcome.getByRole("heading", { level: 1, name: "Welcome to Quadit" })).toBeVisible();
-    const name = welcome.getByLabel("Your name");
+    const first = await desktop.firstRun();
+    await expect(first.getByRole("heading", { level: 1, name: "Welcome to Quadit" })).toBeVisible();
+    const name = first.getByLabel("Your name");
     // Offered: the name of the person's account on this computer.
     await expect(name).not.toHaveValue("");
-    await expect(welcome.getByRole("button", { name: "Connect to a server" })).toBeVisible();
-    expect(isOpen(desktop, "setup.html")).toBe(false);
-    await screen(welcome, "01-welcome.png");
+    await expect(first.getByRole("button", { name: "Connect to a server instead" })).toBeVisible();
+    // One window, the one the workspace will be in.
+    await expect.poll(() => desktop.shownWindows()).toHaveLength(1);
+    const [windowId] = await desktop.shownWindows();
+    expect(desktop.app.windows().some((page) => page.url().endsWith("/setup.html"))).toBe(false);
+    await screen(first, "01-welcome.png");
 
     await name.fill("Lou Local");
-    await screen(welcome, "02-name.png");
-    await welcome.getByRole("button", { name: "Set up on this computer" }).click();
-    await expect(welcome.getByText("Starting Quadit…")).toBeVisible();
-    await screen(welcome, "03-starting.png");
+    await screen(first, "02-name.png");
+    await first.getByRole("button", { name: "Set up on this computer" }).click();
+    await expect(first.getByText("Starting Quadit…")).toBeVisible();
+    await screen(first, "03-starting.png");
 
+    // The tools step, in the same page: looking first, for at least about a second.
+    await expect(first.getByRole("heading", { level: 1, name: "Connect your AI tools" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(first.getByText("Looking on this computer…")).toBeVisible();
+    await screen(first, "04-looking.png");
+    const card = first.getByRole("article", { name: "Claude Code" });
+    await expect(card.getByText("Found on this computer")).toBeVisible();
+    await expect(first.getByText("Quadit found one on this computer.", { exact: false })).toBeVisible();
+    await expect(first.getByText("Not on this computer:")).toBeVisible();
+    await expect(first.getByRole("button", { name: "Skip for now" })).toBeVisible();
+    await expect(first.getByText("You can do this later from the Agents page.")).toBeVisible();
+    await screen(first, "05-tools-found.png");
+
+    // Under the page, the workspace the app made, signed in as the name given: no form, no browser.
     origin = await desktop.localOrigin();
     const page = await desktop.pageOf(origin);
-    // The workspace the app made, signed in as the name given: no form, no browser.
-    await expect(page.getByRole("heading", { level: 1, name: "My work" })).toBeVisible({ timeout: 30_000 });
-    await expect(page).toHaveURL(`${origin}/personal/my-work`);
+    await expect(page).toHaveURL(new RegExp(`^${origin}/personal`), { timeout: 30_000 });
     const me = (await page.evaluate(async () => (await fetch("/api/v1/auth/me")).json())) as { user: { name: string } };
     expect(me.user.name).toBe("Lou Local");
     expect((await desktop.recorded()).opened).toEqual([]);
+    // Each side keeps its own: the server's page has the bridge and never the app pages' API; the first run's page
+    // has that API and never the bridge.
+    expect(await page.evaluate(() => ["quaditDesktop" in window, "quaditPages" in window])).toEqual([true, false]);
+    expect(await first.evaluate(() => ["quaditDesktop" in window, "quaditPages" in window])).toEqual([false, true]);
 
-    // Welcome's last step, over the workspace: the tool found, one button, a way to skip, and how to do it later.
-    await expect(welcome.getByRole("heading", { name: "Connect your AI tools" })).toBeVisible();
-    await expect(
-      welcome.getByText(
-        "Quadit found these on your computer. Connected, they can take tasks, ask you questions and report back here.",
-      ),
-    ).toBeVisible();
-    await expect(welcome.getByRole("button", { name: "Skip for now" })).toBeVisible();
-    await expect(
-      welcome.getByText("You can connect tools later from the Agents page, or from the menu: Connect Agents…"),
-    ).toBeVisible();
-    await screen(welcome, "04-connect-agents.png");
-
-    // What it changes, before anything is changed; shown again, it folds away.
+    // What connecting changes, in plain words, before anything is changed.
     const skill = join(computer.home, ".claude", "skills", "quadit", "SKILL.md");
-    const seeChanges = welcome.getByRole("button", { name: "See what connecting Claude Code changes" });
-    // The file's name, over its diff (which begins with it too).
-    const skillShown = welcome.getByText(skill, { exact: true });
-    await seeChanges.click();
-    await expect(skillShown).toBeVisible();
+    await card.getByRole("button", { name: "See the files connecting Claude Code changes" }).click();
+    const sheet = first.getByRole("dialog", { name: "What connecting Claude Code changes" });
+    await expect(sheet.getByText("The Quadit skill", { exact: true })).toBeVisible();
+    await expect(sheet.getByText("A login for Claude Code", { exact: true })).toBeVisible();
+    await expect(sheet.getByText("~/.claude/skills/quadit/SKILL.md", { exact: true })).toBeVisible();
+    // The exact changes wait behind their own control.
+    await expect(sheet.getByText(skill, { exact: true })).toBeHidden();
     expect(existsSync(skill)).toBe(false);
-    await seeChanges.click();
-    await expect(skillShown).toBeHidden();
+    await screen(first, "06-see-the-files.png");
+    await sheet.getByText("Show the exact changes").click();
+    await expect(sheet.getByText(skill, { exact: true })).toBeVisible();
+    await sheet.getByRole("button", { name: "Close" }).first().click();
+    await expect(sheet).toBeHidden();
 
     // Connected, with nothing asked: the command and its skill, as an agent of the tool's own name.
-    await welcome.getByRole("button", { name: "Connect Claude Code" }).click();
-    await expect(welcome.getByText("Connected", { exact: true })).toBeVisible({ timeout: 20_000 });
-    await expect(welcome.getByRole("button", { name: "Done" })).toBeVisible();
-    await screen(welcome, "04b-connected.png");
-    // What it changed, in the window's width: a long path wraps, a diff scrolls in its own box.
-    await seeChanges.click();
-    await expect(skillShown).toBeVisible();
-    expect(await welcome.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await screen(welcome, "04c-changes.png");
+    await card.getByRole("button", { name: "Connect Claude Code" }).click();
+    await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByText("Try it:")).toBeVisible();
+    await expect(first.getByText("Joined just now")).toBeVisible();
+    await expect(first.getByText("Connect more later from the Agents page.")).toBeVisible();
+    await expect(first.getByRole("button", { name: "Skip for now" })).toBeHidden();
+    await screen(first, "07-connected.png");
     expect(existsSync(skill)).toBe(true);
     const settings = JSON.parse(readFileSync(join(computer.home, ".claude", "settings.json"), "utf8")) as {
       env?: { QUADIT_CONFIG?: string };
     };
     expect(settings.env?.QUADIT_CONFIG).toBe(join(computer.configDir, "claude.json"));
-    const ledger = JSON.parse(readFileSync(join(data, "connections.json"), "utf8")) as {
-      harnesses: Record<string, { methods: string[]; agent: { handle: string } }>;
-    };
-    expect(ledger.harnesses.claude).toMatchObject({ methods: ["cli"], agent: { handle: "claude-code" } });
+    const ledger = () =>
+      JSON.parse(readFileSync(join(data, "connections.json"), "utf8")) as {
+        harnesses: Record<string, { methods: string[]; agent: { handle: string } }>;
+      };
+    expect(ledger().harnesses.claude).toMatchObject({ methods: ["cli"], agent: { handle: "claude-code" } });
 
-    await welcome.getByRole("button", { name: "Done" }).click();
-    await expect.poll(() => isOpen(desktop, "welcome.html")).toBe(false);
-    // The Connect window does not open by itself: the step was in Welcome.
-    expect(isOpen(desktop, "connect.html")).toBe(false);
-    await screen(page, "05-workspace.png");
+    // Undo takes it all back, asking nothing; connected again, it is the same agent.
+    await card.getByRole("button", { name: "Undo Claude Code" }).click();
+    await expect(card.getByRole("button", { name: "Connect Claude Code" })).toBeVisible();
+    expect(existsSync(skill)).toBe(false);
+    expect(ledger().harnesses).toEqual({});
+    await card.getByRole("button", { name: "Connect Claude Code" }).click();
+    await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 20_000 });
+
+    // Continue (Enter): the sample tasks, the third Claude Code's, and the first run goes, leaving the workspace.
+    await first.keyboard.press("Enter");
+    await expect.poll(() => desktop.firstRunShown(), { timeout: 20_000 }).toBe(false);
+    await expect(page.getByText(SAMPLES_NOTE)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Say hello and tell Lou what you can do")).toBeVisible();
+    await expect(page.getByText(/is for Claude Code/)).toBeVisible();
+    await screen(page, "08-workspace.png");
+    // Never another window: the one it began in.
+    expect(await desktop.shownWindows()).toEqual([windowId]);
+    // The Connect window does not open by itself.
+    expect(desktop.app.windows().some((p) => p.url().includes("/connect.html"))).toBe(false);
   } finally {
     await desktop.close();
   }
 
-  // Started again: the workspace again, signed in, and Connect agents does not come back by itself.
+  // Started again: the workspace again, signed in, and the first run does not come back by itself.
   desktop = await Desktop.launch(data, run, [], { env });
   try {
     const page = await desktop.pageOf(origin);
-    await expect(page.getByRole("heading", { level: 1, name: "My work" })).toBeVisible({ timeout: 30_000 });
-    expect(isOpen(desktop, "connect.html")).toBe(false);
-    expect(isOpen(desktop, "welcome.html")).toBe(false);
+    await expect(page).toHaveURL(new RegExp(`^${origin}/personal`), { timeout: 30_000 });
+    expect(await page.evaluate(async () => (await fetch("/api/v1/auth/me")).status)).toBe(200);
+    expect(desktop.firstRunShown()).toBe(false);
+    expect(desktop.app.windows().some((p) => p.url().includes("/connect.html"))).toBe(false);
   } finally {
     await desktop.close();
   }
 });
 
-test("after a first set-up on a computer where no agent tool is found, the workspace opens with nothing more to do", async ({
+test("set up on a computer where no agent tool is found, the tools step says so calmly, and Skip lands on the sample tasks", async ({
   run,
 }) => {
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
@@ -135,36 +160,52 @@ test("after a first set-up on a computer where no agent tool is found, the works
   const env = { QUADIT_DESKTOP_QUADIT: run.binary, HOME: computer.home, SHELL: computer.shell };
   const desktop = await Desktop.launch(data, run, [], { env, firstStart: true });
   try {
-    const welcome = await desktop.appPage("welcome.html");
-    await welcome.getByLabel("Your name").fill("Lou Local");
-    await welcome.getByRole("button", { name: "Set up on this computer" }).click();
+    const first = await desktop.firstRun();
+    await first.getByLabel("Your name").fill("Lou Local");
+    await first.getByRole("button", { name: "Set up on this computer" }).click();
+    await expect(first.getByText("No AI tools on this computer yet.", { exact: false })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(first.getByRole("button", { name: "Look again" })).toBeVisible();
+    await expect(first.getByText("Your first agent")).toBeVisible();
+    await screen(first, "05b-tools-none-found.png");
+    // Looking again finds nothing new, and says so the same way.
+    await first.getByRole("button", { name: "Look again" }).click();
+    await expect(first.getByRole("button", { name: "Look again" })).toBeVisible();
+
+    await first.getByRole("button", { name: "Skip for now" }).click();
+    await expect.poll(() => desktop.firstRunShown(), { timeout: 20_000 }).toBe(false);
     const page = await desktop.pageOf(await desktop.localOrigin());
-    await expect(page.getByRole("heading", { level: 1, name: "My work" })).toBeVisible({ timeout: 30_000 });
-    // Welcome closes once the set-up is done: no step about tools, and no Connect window.
-    await expect.poll(() => isOpen(desktop, "welcome.html")).toBe(false);
-    expect(isOpen(desktop, "connect.html")).toBe(false);
+    // A freshly set-up install has its "Getting started" project: no empty workspace, no banner to make a first one.
+    await expect(page.getByText(SAMPLES_NOTE)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Create your first project")).toHaveCount(0);
+    expect(desktop.app.windows().some((p) => p.url().includes("/connect.html"))).toBe(false);
   } finally {
     await desktop.close();
   }
 });
 
-test("the first run connects to a server elsewhere from Welcome, whose window offers the browser sign-in", async ({
+test("the first run connects to a server elsewhere, whose sign-in page its window becomes, offering the browser sign-in", async ({
   run,
 }) => {
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   const desktop = await Desktop.launch(data, run, [], { env: { QUADIT_DESKTOP_QUADIT: run.binary }, firstStart: true });
   try {
-    const welcome = await desktop.appPage("welcome.html");
-    await welcome.getByRole("button", { name: "Connect to a server" }).click();
-    await expect(welcome.getByRole("heading", { name: "Connect to a server" })).toBeVisible();
-    await expect(welcome.getByRole("button", { name: "Back" })).toBeVisible();
-    await welcome.getByLabel("Address").fill(run.server);
-    await screen(welcome, "06-connect-to-a-server.png");
-    await welcome.getByRole("button", { name: "Add server" }).click();
+    const first = await desktop.firstRun();
+    await expect.poll(() => desktop.shownWindows()).toHaveLength(1);
+    const [windowId] = await desktop.shownWindows();
+    await first.getByRole("button", { name: "Connect to a server instead" }).click();
+    await expect(first.getByRole("heading", { name: "Connect to a server" })).toBeVisible();
+    await expect(first.getByRole("button", { name: "Set up on this computer instead" })).toBeVisible();
+    // The server built from this tree, which speaks this app's window (inset): the first run's window fits it.
+    await first.getByLabel("Address").fill(run.direct);
+    await screen(first, "09-connect-to-a-server.png");
+    await first.getByRole("button", { name: "Add server" }).click();
 
-    const page = await desktop.pageOf(run.server);
+    const page = await desktop.pageOf(run.direct);
     await expect(page).toHaveURL(/\/login/);
-    await expect.poll(() => isOpen(desktop, "welcome.html")).toBe(false);
+    await expect.poll(() => desktop.firstRunShown()).toBe(false);
+    expect(await desktop.shownWindows()).toEqual([windowId]);
     // Nothing was set up on this computer.
     expect(await desktop.app.evaluate(({ Menu }) => !!Menu.getApplicationMenu()?.getMenuItemById("set-up-here"))).toBe(
       true,
@@ -175,7 +216,7 @@ test("the first run connects to a server elsewhere from Welcome, whose window of
     await bar.getByRole("button", { name: "Sign in with your browser" }).click();
     await expect.poll(async () => (await desktop.recorded()).opened.length).toBe(1);
     const sent = new URL((await desktop.recorded()).opened[0] ?? "");
-    expect(sent.origin + sent.pathname).toBe(`${run.server}/desktop/connect`);
+    expect(sent.origin + sent.pathname).toBe(`${run.direct}/desktop/connect`);
   } finally {
     await desktop.close();
   }

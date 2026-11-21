@@ -3,7 +3,8 @@
 // carries) on a data folder in its own, makes its owner itself and signs
 // its window in without a form whenever it has no session there, and has
 // the server stop when it quits. The first run's own way there is
-// onboarding.spec.ts.
+// onboarding.spec.ts; here it is reached from the server list, and its
+// tools step finds nothing and is skipped.
 
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,8 +14,8 @@ import { Desktop, expect, fakeComputer, slowToStart, test } from "./desktop";
 
 /**
  * The app's environment for running `binary` as its server, on a computer
- * of the test's own where no agent tool is found: Welcome ends with the
- * set-up, whatever the machine running the suite has installed.
+ * of the test's own where no agent tool is found: the first run's tools
+ * step offers nothing, whatever the machine running the suite has installed.
  */
 function serverEnv(binary: string): Record<string, string> {
   const computer = fakeComputer({ claudeCode: false });
@@ -70,16 +71,22 @@ http
   };
 }
 
-/** Sets Quadit up on this computer from the server list, through Welcome, and gives the server's address and its window on the workspace. */
+/**
+ * Sets Quadit up on this computer from the server list, through the first
+ * run, which it skips past once its tools step shows, and gives the server's
+ * address and its window on the workspace's sample tasks.
+ */
 async function setUpFromTheList(desktop: Desktop): Promise<{ origin: string; page: Page }> {
   const list = await desktop.serverList();
   await list.getByRole("button", { name: "Set up on this computer…" }).click();
-  const welcome = await desktop.appPage("welcome.html");
-  await welcome.getByLabel("Your name").fill("Lou Local");
-  await welcome.getByRole("button", { name: "Set up on this computer" }).click();
+  const first = await desktop.firstRun();
+  await first.getByLabel("Your name").fill("Lou Local");
+  await first.getByRole("button", { name: "Set up on this computer" }).click();
+  await first.getByRole("button", { name: "Continue" }).click({ timeout: 30_000 });
+  await expect.poll(() => desktop.firstRunShown(), { timeout: 20_000 }).toBe(false);
   const origin = await desktop.localOrigin();
   const page = await desktop.pageOf(origin);
-  await expect(page.getByRole("heading", { level: 1, name: "My work" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Three sample tasks to try Quadit with.")).toBeVisible({ timeout: 30_000 });
   return { origin, page };
 }
 
@@ -94,7 +101,7 @@ test("set up on this computer, the app runs a server whose owner it made, shows 
     ({ origin, page } = await setUpFromTheList(desktop));
     expect(await answers(origin)).toBe(true);
     expect(existsSync(join(data, "server", "quadit.sqlite"))).toBe(true);
-    await expect(page).toHaveURL(`${origin}/personal/my-work`);
+    await expect(page).toHaveURL(new RegExp(`^${origin}/personal/`));
     // Signed in in the window itself: no browser was asked.
     expect(await page.evaluate(async () => (await fetch("/api/v1/auth/me")).status)).toBe(200);
     expect((await desktop.recorded()).opened).toEqual([]);
@@ -188,18 +195,18 @@ test("the window of the server on this computer is signed in by the app whenever
   }
 });
 
-test("without a server to run, Welcome offers only connecting to one, and setup says why in a sentence", async ({
+test("without a server to run, the first run offers only connecting to one, and setup says why in a sentence", async ({
   run,
 }) => {
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   const desktop = await Desktop.launch(data, run, [], { firstStart: true });
   try {
-    const welcome = await desktop.appPage("welcome.html");
-    await expect(welcome.getByRole("heading", { name: "Connect to a server" })).toBeVisible();
-    await expect(welcome.getByLabel("Address")).toBeVisible();
-    await expect(welcome.getByRole("button", { name: "Set up on this computer" })).toHaveCount(0);
-    await expect(welcome.getByLabel("Your name")).toBeHidden();
-    await expect(welcome.getByRole("button", { name: "Back" })).toBeHidden();
+    const first = await desktop.firstRun();
+    await expect(first.getByRole("heading", { name: "Connect to a server" })).toBeVisible();
+    await expect(first.getByLabel("Address")).toBeVisible();
+    await expect(first.getByRole("button", { name: "Set up on this computer" })).toHaveCount(0);
+    await expect(first.getByLabel("Your name")).toBeHidden();
+    await expect(first.getByRole("button", { name: "Set up on this computer instead" })).toBeHidden();
 
     await desktop.chooseMenuItem("setup");
     const setup = await desktop.appPage("setup.html");
@@ -219,13 +226,13 @@ test("a program that answers on the server's port without the app key is never t
   try {
     const list = await desktop.serverList();
     await list.getByRole("button", { name: "Set up on this computer…" }).click();
-    const welcome = await desktop.appPage("welcome.html");
-    await welcome.getByLabel("Your name").fill("Lou Local");
-    await welcome.getByRole("button", { name: "Set up on this computer" }).click();
-    await expect(welcome.getByText(/^Another program answers on port \d+ of this computer/)).toBeVisible({
+    const first = await desktop.firstRun();
+    await first.getByLabel("Your name").fill("Lou Local");
+    await first.getByRole("button", { name: "Set up on this computer" }).click();
+    await expect(first.getByText(/^Another program answers on port \d+ of this computer/)).toBeVisible({
       timeout: 20_000,
     });
-    await expect(welcome.getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(first.getByRole("button", { name: "Try again" })).toBeVisible();
     const origin = await desktop.localOrigin();
     // Asked whether it is up, and for the proof it could not give: nothing else, never the key, never a cookie.
     expect(fake.requests()).toEqual(["GET /healthz - -", "POST /api/v1/auth/app-proof - -"]);
@@ -237,7 +244,7 @@ test("a program that answers on the server's port without the app key is never t
   }
 });
 
-test("quit before its set-up was finished, the server on this computer offers Welcome again at the next start, which finishes it", async ({
+test("quit before its set-up was finished, the server on this computer offers the first run again at the next start, over its window, which finishes it", async ({
   run,
 }) => {
   // Two starts of the app, the second waiting for its server.
@@ -249,10 +256,10 @@ test("quit before its set-up was finished, the server on this computer offers We
   });
   let origin = "";
   try {
-    const welcome = await desktop.appPage("welcome.html");
-    await welcome.getByLabel("Your name").fill("Lou Local");
-    await welcome.getByRole("button", { name: "Set up on this computer" }).click();
-    await expect(welcome.getByText("Starting Quadit…")).toBeVisible();
+    const first = await desktop.firstRun();
+    await first.getByLabel("Your name").fill("Lou Local");
+    await first.getByRole("button", { name: "Set up on this computer" }).click();
+    await expect(first.getByText("Starting Quadit…")).toBeVisible();
     origin = await desktop.localOrigin();
     // Saved in the list already: the next start has a server, and no first run.
     await expect.poll(() => desktop.serverId(origin)).not.toBe("");
@@ -262,15 +269,15 @@ test("quit before its set-up was finished, the server on this computer offers We
 
   desktop = await Desktop.launch(data, run, [], { env: serverEnv(run.binary) });
   try {
-    const welcome = await desktop.appPage("welcome.html");
-    await welcome.getByLabel("Your name").fill("Lou Later");
-    await welcome.getByRole("button", { name: "Set up on this computer" }).click();
+    const first = await desktop.firstRun();
+    await first.getByLabel("Your name").fill("Lou Later");
+    await first.getByRole("button", { name: "Set up on this computer" }).click();
+    await first.getByRole("button", { name: "Continue" }).click({ timeout: 30_000 });
+    await expect.poll(() => desktop.firstRunShown(), { timeout: 20_000 }).toBe(false);
     const page = await desktop.pageOf(origin);
-    await expect(page.getByRole("heading", { level: 1, name: "My work" })).toBeVisible({ timeout: 30_000 });
-    await expect(page).toHaveURL(`${origin}/personal/my-work`);
+    await expect(page.getByText("Three sample tasks to try Quadit with.")).toBeVisible({ timeout: 30_000 });
     const me = (await page.evaluate(async () => (await fetch("/api/v1/auth/me")).json())) as { user: { name: string } };
     expect(me.user.name).toBe("Lou Later");
-    await expect.poll(() => desktop.app.windows().some((p) => p.url().endsWith("/welcome.html"))).toBe(false);
   } finally {
     await desktop.close();
   }

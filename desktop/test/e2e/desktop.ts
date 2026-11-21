@@ -1,6 +1,6 @@
 // The `test` every desktop spec imports: Playwright's, with the app started
 // fresh for each test (its own empty data folder, the first run marked over
-// unless a test asks for the first start, which shows Welcome) and some things of the main process
+// unless a test asks for the first start, which shows the first run) and some things of the main process
 // stood in for from its start (stand-ins.cjs), so nothing leaves the test
 // and what the app did can be read back.
 
@@ -36,7 +36,7 @@ export class Desktop {
    * in place. `args` are given to it as a system gives a link that starts
    * the app (Windows and Linux; macOS reads the same argument at start);
    * `env` is added to its environment. A data folder without settings gets
-   * the first run marked over (no Welcome), unless `firstStart`.
+   * the first run marked over (none shown), unless `firstStart`.
    */
   static async launch(
     data: string,
@@ -130,6 +130,25 @@ export class Desktop {
       })
       .toBeTruthy();
     return found as Page;
+  }
+
+  /** The first run's page, laid over the window it ends in. */
+  async firstRun(): Promise<Page> {
+    return this.appPage("first-run.html");
+  }
+
+  /** Whether the first run's page is there. */
+  firstRunShown(): boolean {
+    return this.app.windows().some((page) => page.url().endsWith("/first-run.html"));
+  }
+
+  /** The ids of the app's windows on screen, whatever they show. */
+  async shownWindows(): Promise<number[]> {
+    return this.app.evaluate(({ BaseWindow }) =>
+      BaseWindow.getAllWindows()
+        .filter((w) => w.isVisible())
+        .map((w) => w.id),
+    );
   }
 
   /** The server list window. */
