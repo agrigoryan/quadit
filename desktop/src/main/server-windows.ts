@@ -12,7 +12,7 @@
 // the workspace (desktop contract §10), before its server is known: it is
 // shown as an app page laid over a server window (cover). With no server yet,
 // the window is made for the server about to be added, with an id of its own,
-// and loads nothing; the server added next with that id (waitingId) takes it,
+// and loads nothing; the server added with that id (cover gives it) takes it,
 // when the window's frame is the one that server's would have. Until then
 // nothing in it is a server's page, and its preload gives nothing.
 //
@@ -317,8 +317,8 @@ export class ServerWindows {
    * Lays `view` (an app page) over the whole of a window, shown and in front,
    * and keeps it there, sized with the window, until uncover: over the window
    * of the server `serverId`, or, with null, over a window made for the server
-   * about to be added (waitingId). Gives the id of the server whose window it
-   * covers. Closing that window calls `closed` (the cover's page is over); a
+   * about to be added. Gives the id of the server whose window it covers: a
+   * server added with that id takes the window made for it. Closing that window calls `closed` (the cover's page is over); a
    * window still waiting for its server then goes. One cover at a time: a
    * second covers nothing and shows the first.
    */
@@ -348,11 +348,6 @@ export class ServerWindows {
     win.focus();
     view.webContents.focus();
     return id;
-  }
-
-  /** The id the server about to be added is to have, to take the window made for it (cover); none when there is none. */
-  waitingId(): string | undefined {
-    return this.waiting && !this.waiting.win.isDestroyed() ? this.waiting.id : undefined;
   }
 
   /** Takes the cover away, showing the window under it; a window still waiting for its server goes with it. */
