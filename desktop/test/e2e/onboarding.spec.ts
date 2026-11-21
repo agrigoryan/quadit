@@ -222,3 +222,31 @@ test("the first run connects to a server elsewhere, whose sign-in page its windo
     await desktop.close();
   }
 });
+
+test("the minimum-size first-run window keeps Welcome and both setup choices reachable", async ({ run }) => {
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  const desktop = await Desktop.launch(data, run, [], { env: { QUADIT_DESKTOP_QUADIT: run.binary }, firstStart: true });
+  try {
+    const first = await desktop.firstRun();
+    const setup = first.getByRole("button", { name: "Set up on this computer", exact: true });
+    await expect(setup).toBeVisible();
+    await desktop.app.evaluate(({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows().find((w) => w.isVisible())!;
+      const [width, height] = win.getMinimumSize();
+      win.setSize(width, height);
+    });
+    const logo = first.locator(".mark");
+    await logo.scrollIntoViewIfNeeded();
+    await expect(logo).toBeInViewport({ ratio: 1 });
+    const strip = await first.locator(".window-strip").boundingBox();
+    expect((await logo.boundingBox())?.y).toBeGreaterThanOrEqual(strip?.height ?? 0);
+    await setup.scrollIntoViewIfNeeded();
+    await expect(setup).toBeInViewport({ ratio: 1 });
+    await first.getByRole("button", { name: "Connect to a server instead" }).click();
+    await expect(first.getByLabel("Address")).toBeFocused();
+    await first.getByRole("button", { name: "Set up on this computer instead" }).click();
+    await expect(first.getByLabel("Your name")).toBeFocused();
+  } finally {
+    await desktop.close();
+  }
+});

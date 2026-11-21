@@ -126,15 +126,23 @@ button {
 }
 
 .welcome .left {
+  --gutter: clamp(32px, 7.5vw, 96px);
+  --strip: env(titlebar-area-height, 0px);
   position: absolute;
-  left: clamp(32px, 7.5vw, 96px);
-  top: 0;
+  left: 0;
+  top: var(--strip);
   bottom: 76px;
-  width: min(404px, calc(100vw - 64px));
+  width: min(calc(var(--gutter) + 404px + 8px), 100%);
+  padding: 8px 8px calc(8px + var(--strip)) var(--gutter);
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: safe center;
   z-index: 1;
+}
+
+.welcome .left > * {
+  flex-shrink: 0;
 }
 
 .mark-bg {
@@ -330,7 +338,9 @@ button {
 }
 
 .connect .main {
-  padding: 68px 40px 32px clamp(32px, 5.6vw, 72px);
+  --strip: env(titlebar-area-height, 0px);
+  margin-top: var(--strip);
+  padding: calc(68px - var(--strip)) 40px 32px clamp(32px, 5.6vw, 72px);
   overflow-y: auto;
 }
 
