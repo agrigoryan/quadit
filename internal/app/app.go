@@ -606,7 +606,9 @@ func (run *adminRun) person(addr string) (core.User, error) {
 	return u, nil
 }
 
-// setup makes the first person and workspace.
+// setup makes the first person and workspace, with the sample tasks, as
+// the set-up page does: the person, their password and the workspace are
+// written together.
 func (run *adminRun) setup() error {
 	ctx, st := run.ctx, run.st
 	if strings.TrimSpace(run.email) == "" {
@@ -615,24 +617,18 @@ func (run *adminRun) setup() error {
 	if err := auth.CheckPasswordRules(run.password); err != nil {
 		return err
 	}
-	n, err := st.Count(ctx, "users", store.Eq("kind", core.KindPerson))
-	if err != nil {
-		return err
-	}
-	if n > 0 {
-		return errors.New("this install is already set up")
-	}
-	eng := engine.New(st, nil) // a new workspace and its owner hold no secret to seal
-	slug := strings.ToLower(strings.Join(strings.Fields(run.workspace), "-"))
-	ws, owner, err := eng.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: run.name, OwnerEmail: run.email, WorkspaceSlug: slug, WorkspaceName: run.workspace})
-	if err != nil {
-		return err
-	}
 	hash, err := auth.HashPassword(run.password)
 	if err != nil {
 		return err
 	}
-	if _, err := st.Update(ctx, "users", map[string]any{"password_hash": hash}, store.Eq("id", owner.ID)); err != nil {
+	eng := engine.New(st, nil) // a new workspace and its owner hold no secret to seal
+	slug := strings.ToLower(strings.Join(strings.Fields(run.workspace), "-"))
+	ws, owner, err := eng.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: run.name, OwnerEmail: run.email, WorkspaceSlug: slug, WorkspaceName: run.workspace,
+		Install: true, Also: func(ctx context.Context, db store.DB, owner core.User) error {
+			_, err := db.Update(ctx, "users", map[string]any{"password_hash": hash}, store.Eq("id", owner.ID))
+			return err
+		}})
+	if err != nil {
 		return err
 	}
 	fmt.Printf("workspace %s is ready; sign in as %s\n", ws.Slug, owner.Email)

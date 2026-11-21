@@ -525,3 +525,25 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 		})
 	})
 }
+
+// TestTheFormsSetUpIsOneWrite: the owner, the password, the workspace and
+// its sample tasks are written together or not at all: a set-up whose
+// password cannot be written leaves the install as it was, and trying again
+// sets it up with that password.
+func TestTheFormsSetUpIsOneWrite(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, plain store.Store) {
+		st := newFaultyStore(plain)
+		s := startSite(t, st, nil, nil)
+		st.faults.set("update users")
+		s.call(t, s.owner, "", "POST", "/api/v1/auth/setup", M{"name": "Aram", "email": "owner@example.com",
+			"password": "correct-horse-battery", "workspace_name": "Games"}, 500, nil)
+		var options signInOptions
+		s.call(t, nil, "", "GET", "/api/v1/auth/config", nil, 200, &options)
+		if !options.SetupNeeded {
+			t.Fatal("a set-up whose password was not written left the install set up")
+		}
+		st.faults.clear()
+		s.setUp(t)
+		s.signIn(t)
+	})
+}

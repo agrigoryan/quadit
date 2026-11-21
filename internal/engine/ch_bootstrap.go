@@ -24,10 +24,13 @@ type BootstrapArgs struct {
 	OwnerHandle   string
 	WorkspaceSlug string
 	WorkspaceName string
-	// Samples starts the workspace with the samples (samples.add, made by
-	// the owner, the third for nobody): an install's first workspace has
-	// them, one made later starts empty.
-	Samples bool
+	// Install marks the install's own set-up, whichever way it is made (the
+	// web form, the desktop app, the command line). It is refused when the
+	// install has a person already, under a lock, so that of two set-ups at
+	// once one is; and its workspace starts with the samples (samples.add,
+	// made by the owner, the third for nobody). A workspace made later
+	// starts empty.
+	Install bool
 	// Also, when set, writes more in the same transaction once the
 	// workspace and its owner are made: what must not be there without
 	// them, nor they without it. Its error undoes all of it.
@@ -51,6 +54,11 @@ func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace
 	written := false // the workspace is in, and what goes with it is being written
 	err := e.st.CreateWorkspace(ctx, ws, func(tx store.Tx) error {
 		written = true
+		if a.Install {
+			if err := setUpOnce(ctx, tx, at); err != nil {
+				return err
+			}
+		}
 		var err error
 		if owner, err = ownerFor(ctx, tx, a, at); err != nil {
 			return err
@@ -69,7 +77,7 @@ func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace
 			Kind: owner.Kind, Name: owner.Name, Avatar: owner.Avatar, CreatedAt: at}); err != nil {
 			return err
 		}
-		if a.Samples {
+		if a.Install {
 			run, err := e.startBatch(ctx, newMemoTx(tx), Actor{UserID: owner.ID})
 			if err != nil {
 				return err
@@ -91,6 +99,31 @@ func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace
 		e.OnCommit(ws.ID, seq)
 	}
 	return ws, owner, err
+}
+
+// installSetUp is the row of settings that says the install was set up.
+// Nothing reads it: its key is the lock that two set-ups at once meet, the
+// second waiting for the first and then refused, on every database.
+const installSetUp = "install.set_up"
+
+// setUpOnce refuses the set-up of an install that has a person already,
+// holding the install's set-up lock (installSetUp) until db commits.
+func setUpOnce(ctx context.Context, db store.DB, at int64) error {
+	setUp := &Error{Code: CodeConflict, Message: "this install is already set up; sign in instead"}
+	if err := db.Insert(ctx, core.Setting{Name: installSetUp, Value: json.RawMessage(`true`), UpdatedAt: at}); err != nil {
+		if errors.Is(err, store.ErrConflict) {
+			return setUp
+		}
+		return err
+	}
+	people, err := db.Count(ctx, "users", store.Eq("kind", core.KindPerson))
+	if err != nil {
+		return err
+	}
+	if people > 0 {
+		return setUp
+	}
+	return nil
 }
 
 // ownerFor finds the person who will own a new workspace: by id, or by

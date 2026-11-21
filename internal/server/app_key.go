@@ -106,7 +106,7 @@ func (s *Server) setUpByApp(ctx context.Context, b setupBody) (core.Workspace, c
 	if b.Email != "" || b.Password != "" {
 		return core.Workspace{}, core.User{}, errBad("the app sets the install up with a name and a workspace name only")
 	}
-	return s.eng.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: b.Name, WorkspaceSlug: b.WorkspaceSlug, WorkspaceName: b.WorkspaceName, Samples: true,
+	return s.eng.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: b.Name, WorkspaceSlug: b.WorkspaceSlug, WorkspaceName: b.WorkspaceName, Install: true,
 		Also: func(ctx context.Context, db store.DB, owner core.User) error {
 			ownerID, _ := json.Marshal(owner.ID) // a string always encodes
 			if err := s.settings.SetIn(ctx, db, localOwnerSetting, ownerID, owner.ID); err != nil {

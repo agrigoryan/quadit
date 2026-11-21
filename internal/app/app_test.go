@@ -1,11 +1,14 @@
 package app
 
 import (
+	"context"
+	"database/sql"
 	"io"
 	"net"
 	"net/http"
 	"net/netip"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"syscall"
@@ -272,5 +275,35 @@ func TestNetworksAreReadAsWritten(t *testing.T) {
 		if _, err := networks(bad); err == nil {
 			t.Errorf("%q was taken", bad)
 		}
+	}
+}
+
+// TestAdminSetupMakesTheSamples: an install set up from the command line
+// starts as one set up any other way, with the sample tasks and the
+// owner's password, and is set up once.
+func TestAdminSetupMakesTheSamples(t *testing.T) {
+	dir := setUpInstall(t)
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "quadit.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var projects, tasks, passwords int
+	row := db.QueryRowContext(context.Background(), `SELECT
+		(SELECT COUNT(*) FROM projects WHERE key = 'GS' AND samples IS NOT NULL),
+		(SELECT COUNT(*) FROM tasks WHERE key LIKE 'GS-%'),
+		(SELECT COUNT(*) FROM users WHERE email = 't@example.com' AND password_hash IS NOT NULL)`)
+	if err := row.Scan(&projects, &tasks, &passwords); err != nil {
+		t.Fatal(err)
+	}
+	if projects != 1 || tasks != 3 || passwords != 1 {
+		t.Fatalf("after admin setup: %d sample projects, %d sample tasks, %d owners with a password", projects, tasks, passwords)
+	}
+	var code int
+	stdoutOf(t, func() {
+		code = Admin([]string{"setup", "--data", dir, "--name", "B", "--email", "b@example.com", "--password", "a long password", "--workspace", "again"}, "test")
+	})
+	if code == 0 {
+		t.Fatal("setting a set-up install up again succeeded")
 	}
 }

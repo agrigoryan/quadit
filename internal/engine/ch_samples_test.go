@@ -2,7 +2,10 @@ package engine_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"slices"
+	"sync"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -134,9 +137,11 @@ func TestSamplesAddTwiceIsOnce(t *testing.T) {
 	})
 }
 
-// TestSamplesAddIsForOwnersAndAdminsAndAnAgent: a member may not add the
-// samples, and the third goes only to an agent of the workspace.
-func TestSamplesAddIsForOwnersAndAdminsAndAnAgent(t *testing.T) {
+// TestSamplesAreForPeopleWhoAdministerAndTheThirdForAnAgent: only a person
+// who is an owner or admin, with a credential that reaches the samples'
+// project, may add or remove them, and the third goes only to an agent of
+// the workspace.
+func TestSamplesAreForPeopleWhoAdministerAndTheThirdForAnAgent(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
@@ -157,6 +162,25 @@ func TestSamplesAddIsForOwnersAndAdminsAndAnAgent(t *testing.T) {
 		if n, err := w.db().Count(ctx, "projects"); err != nil || n != 0 {
 			t.Fatalf("refusals left %d projects (%v)", n, err)
 		}
+
+		t.Run("an agent, even an admin, may not", func(t *testing.T) {
+			bot := w.do(w.owner.ID, "agent.create", M{"name": "Ops", "handle": "ops", "role": "admin"}).Ref
+			w.refused(engine.CodeForbidden, bot, "samples.add", M{})
+			w.do(w.owner.ID, "samples.add", M{})
+			w.refused(engine.CodeForbidden, bot, "samples.add", M{})
+			w.refused(engine.CodeForbidden, bot, "samples.remove", M{})
+		})
+
+		t.Run("a credential kept to other projects learns nothing of them", func(t *testing.T) {
+			other := w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"}).Ref
+			narrow := engine.Actor{UserID: w.owner.ID, Projects: []string{other}}
+			for _, typ := range []string{"samples.add", "samples.remove"} {
+				_, err := w.e.Apply(ctx, w.ws.ID, narrow, change(typ, M{}))
+				if refusal, ok := errors.AsType[*engine.Error](err); !ok || refusal.Code != engine.CodeForbidden {
+					t.Fatalf("%s with a credential kept to SVA: %v", typ, err)
+				}
+			}
+		})
 	})
 }
 
@@ -220,25 +244,89 @@ func TestSamplesRemoveLeavesThePersonsOwnWork(t *testing.T) {
 			}
 		})
 
-		t.Run("with a page of the person's own", func(t *testing.T) {
+		// Whatever else a person can put in a project keeps it: each kind of
+		// row that belongs to a project, made after the samples, or a status
+		// or the label the samples came with, changed since.
+		for what, add := range map[string]func(w *world){
+			"a page":  func(w *world) { w.do(w.owner.ID, "doc.create", M{"title": "What I am working on", "project": "GS"}) },
+			"an epic": func(w *world) { w.do(w.owner.ID, "epic.create", M{"project": "GS", "name": "Launch"}) },
+			"a cycle": func(w *world) {
+				w.do(w.owner.ID, "cycle.create", M{"project": "GS", "starts_on": "2026-12-01", "ends_on": "2026-12-07"})
+			},
+			"a view": func(w *world) {
+				w.do(w.owner.ID, "view.create", M{"name": "Mine", "project": "GS", "query": M{"assignee": []string{"me"}}})
+			},
+			"a template": func(w *world) {
+				w.do(w.owner.ID, "template.create", M{"project": "GS", "name": "Bug", "title": "Bug: "})
+			},
+			"a preference": func(w *world) { w.do(w.owner.ID, "preference.create", M{"body": "Write short.", "project": "GS"}) },
+			"a status": func(w *world) {
+				w.do(w.owner.ID, "status.create", M{"project": "GS", "name": "Review", "category": "started"})
+			},
+			"a label": func(w *world) { w.do(w.owner.ID, "label.create", M{"project": "GS", "name": "bug"}) },
+			"a status renamed": func(w *world) {
+				w.do(w.owner.ID, "status.update", M{"id": "Todo", "name": "To do"})
+			},
+			"the label recoloured": func(w *world) { w.do(w.owner.ID, "label.update", M{"id": "Sample", "color": "#ff0000"}) },
+			"a webhook": func(w *world) {
+				w.do(w.owner.ID, "webhook.create", M{"name": "out", "url": "https://example.com/hook", "project": "GS"})
+			},
+			"an integration": func(w *world) {
+				w.do(w.owner.ID, "integration.create", M{"kind": "github", "name": "gh", "project": "GS"})
+			},
+			"a rule": func(w *world) {
+				gs := w.project(w.do(w.owner.ID, "samples.add", M{}).Ref)
+				w.do(w.owner.ID, "rule.create", M{"name": "Ping", "match": M{"event_types": []string{"task.updated"}, "project_id": gs.ID},
+					"action": M{"kind": "notify", "user_id": w.owner.ID, "message": "x"}})
+			},
+		} {
+			t.Run("with "+what+" of the person's own", func(t *testing.T) {
+				w := newWorld(t, st)
+				made := w.do(w.owner.ID, "samples.add", M{})
+				add(w)
+				w.do(w.owner.ID, "samples.remove", M{})
+				if w.project(made.Ref).DeletedAt != 0 {
+					t.Fatalf("the project with %s of the person's own in it went to the trash", what)
+				}
+			})
+		}
+
+		t.Run("a sample moved to another project is the person's", func(t *testing.T) {
 			w := newWorld(t, st)
+			w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 			made := w.do(w.owner.ID, "samples.add", M{})
-			w.do(w.owner.ID, "doc.create", M{"title": "What I am working on", "project": "GS"})
+			moved := w.samples(made.Ref)[0].ID
+			w.do(w.owner.ID, "task.move", M{"id": moved, "project": "SVA"})
 			w.do(w.owner.ID, "samples.remove", M{})
-			if w.project(made.Ref).DeletedAt != 0 {
-				t.Fatal("the project with the person's page in it went to the trash")
+			if w.task(moved).DeletedAt != 0 {
+				t.Fatal("a sample moved to another project went to the trash with the samples")
+			}
+			if w.project(made.Ref).DeletedAt == 0 {
+				t.Fatal("the project the samples were in stayed, with only them in it")
+			}
+		})
+
+		t.Run("samples moved away are not there", func(t *testing.T) {
+			w := newWorld(t, st)
+			w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+			made := w.do(w.owner.ID, "samples.add", M{})
+			for _, s := range w.samples(made.Ref) {
+				w.do(w.owner.ID, "task.move", M{"id": s.ID, "project": "SVA"})
+			}
+			if again := w.do(w.owner.ID, "samples.add", M{}); again.Ref == made.Ref {
+				t.Fatal("samples all moved to another project were taken for samples still there")
 			}
 		})
 	})
 }
 
-// TestBootstrapCanStartWithTheSamples: a workspace bootstrapped with its
-// samples has them from its first moment, the third for nobody.
-func TestBootstrapCanStartWithTheSamples(t *testing.T) {
+// TestSettingAnInstallUpMakesTheSamples: the workspace an install is set up
+// with has the samples from its first moment, the third for nobody.
+func TestSettingAnInstallUpMakesTheSamples(t *testing.T) {
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		ctx := context.Background()
 		e := engine.New(st, nil)
-		ws, owner, err := e.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: "Aram Grigoryan", WorkspaceSlug: "w" + id.New()[24:], WorkspaceName: "Personal", Samples: true})
+		ws, owner, err := e.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: "Aram Grigoryan", WorkspaceSlug: "personal", WorkspaceName: "Personal", Install: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -253,6 +341,49 @@ func TestBootstrapCanStartWithTheSamples(t *testing.T) {
 		}
 		if again := w.do(owner.ID, "samples.add", M{}); again.Ref != projects[0].ID {
 			t.Fatal("the samples made with the workspace are not found again")
+		}
+
+		t.Run("a workspace made later starts empty", func(t *testing.T) {
+			later, _, err := e.Bootstrap(ctx, engine.BootstrapArgs{OwnerID: owner.ID, WorkspaceSlug: "later", WorkspaceName: "Later"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if n, err := st.In(later.ID).Count(ctx, "projects"); err != nil || n != 0 {
+				t.Fatalf("a workspace made later has %d projects (%v)", n, err)
+			}
+		})
+	})
+}
+
+// TestAnInstallIsSetUpOnce: setting an install up is refused once it has
+// a person, and of two set-ups at once one is.
+func TestAnInstallIsSetUpOnce(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		ctx := context.Background()
+		e := engine.New(st, nil)
+		setUp := func(slug string) error {
+			_, _, err := e.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: "Aram", WorkspaceSlug: slug, WorkspaceName: slug, Install: true})
+			return err
+		}
+		refusedAsSetUp := func(err error) bool {
+			refusal, ok := errors.AsType[*engine.Error](err)
+			return ok && refusal.Code == engine.CodeConflict
+		}
+
+		var wg sync.WaitGroup
+		errs := make([]error, 2)
+		for i := range errs {
+			wg.Go(func() { errs[i] = setUp(fmt.Sprintf("first-%d", i)) })
+		}
+		wg.Wait()
+		if (errs[0] == nil) == (errs[1] == nil) || !refusedAsSetUp(errors.Join(errs[0], errs[1])) {
+			t.Fatalf("two set-ups at once ended %v and %v, want one set up and one refused", errs[0], errs[1])
+		}
+		if err := setUp("again"); !refusedAsSetUp(err) {
+			t.Fatalf("setting a set-up install up again: %v", err)
+		}
+		if n, err := st.Count(ctx, "users", store.Eq("kind", core.KindPerson)); err != nil || n != 1 {
+			t.Fatalf("the install has %d people (%v), want its one owner", n, err)
 		}
 	})
 }

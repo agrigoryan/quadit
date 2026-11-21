@@ -214,6 +214,8 @@ func (s *Server) handleSetUpInstall(x *c) error {
 		return err
 	}
 	ctx := x.ctx()
+	// A quick answer, before a password is hashed for nothing: the set-up
+	// itself refuses an install that has a person (engine.BootstrapArgs.Install).
 	if n, err := s.st.Count(ctx, "users", store.Eq("kind", core.KindPerson)); err != nil || n > 0 {
 		return &engine.Error{Code: engine.CodeConflict, Message: "this install is already set up; sign in instead"}
 	}
@@ -236,7 +238,8 @@ func (s *Server) handleSetUpInstall(x *c) error {
 }
 
 // setUpWithPassword makes the install's owner and first workspace from the
-// set-up form: the owner signs in with their email and password.
+// set-up form: the owner signs in with their email and password, written in
+// the same transaction, so a set-up never leaves an owner without it.
 func (s *Server) setUpWithPassword(ctx context.Context, b setupBody) (core.Workspace, core.User, error) {
 	var ws core.Workspace
 	var owner core.User
@@ -246,19 +249,15 @@ func (s *Server) setUpWithPassword(ctx context.Context, b setupBody) (core.Works
 	if err := auth.CheckPasswordRules(b.Password); err != nil {
 		return ws, owner, &engine.Error{Code: engine.CodeInvalid, Field: "password", Message: err.Error()}
 	}
-	ws, owner, err := s.eng.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: b.Name, OwnerEmail: b.Email, WorkspaceSlug: b.WorkspaceSlug, WorkspaceName: b.WorkspaceName,
-		Samples: true})
-	if err != nil {
-		return ws, owner, err
-	}
 	hash, err := auth.HashPassword(b.Password)
 	if err != nil {
 		return ws, owner, err
 	}
-	if _, err := s.st.Update(ctx, "users", map[string]any{"password_hash": hash}, store.Eq("id", owner.ID)); err != nil {
-		return ws, owner, err
-	}
-	return ws, owner, nil
+	return s.eng.Bootstrap(ctx, engine.BootstrapArgs{OwnerName: b.Name, OwnerEmail: b.Email, WorkspaceSlug: b.WorkspaceSlug, WorkspaceName: b.WorkspaceName,
+		Install: true, Also: func(ctx context.Context, db store.DB, owner core.User) error {
+			_, err := db.Update(ctx, "users", map[string]any{"password_hash": hash}, store.Eq("id", owner.ID))
+			return err
+		}})
 }
 
 func slugFrom(name string) string {
