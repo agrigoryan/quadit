@@ -9075,7 +9075,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
    "change_id": "<id #198>",
    "data": {
     "row": {
-     "color": "#8b5cf6",
+     "color": "#9a6bff",
      "id": "<id #206>",
      "name": "Sample",
      "project_id": "<id #199>",
@@ -18167,7 +18167,7 @@ seq: 278
  ],
  "labels": [
   {
-   "color": "#8b5cf6",
+   "color": "#9a6bff",
    "id": "<id #206>",
    "name": "Sample",
    "project_id": "<id #199>",
@@ -19841,7 +19841,7 @@ seq: 278
  ],
  "labels": [
   {
-   "color": "#8b5cf6",
+   "color": "#9a6bff",
    "id": "<id #206>",
    "name": "Sample",
    "project_id": "<id #199>",
@@ -22732,7 +22732,7 @@ Canceled  canceled  id=<id #231>
 {
  "labels": [
   {
-   "color": "#8b5cf6",
+   "color": "#9a6bff",
    "id": "<id #206>",
    "name": "Sample",
    "project_id": "<id #199>",
@@ -24833,7 +24833,7 @@ stale  Stale  id=<view Stale>
 {
  "labels": [
   {
-   "color": "#8b5cf6",
+   "color": "#9a6bff",
    "id": "<id #206>",
    "name": "Sample",
    "project_id": "<id #199>",
@@ -24869,7 +24869,7 @@ stale  Stale  id=<view Stale>
 {
  "labels": [
   {
-   "color": "#8b5cf6",
+   "color": "#9a6bff",
    "id": "<id #206>",
    "name": "Sample",
    "project_id": "<id #199>",
@@ -29814,7 +29814,7 @@ id: 7
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #198>","data":{"row":{"category":"canceled","color":"#ef4444","id":"<id #205>","name":"Canceled","project_id":"<id #199>","rank":"00000004qo","updated_seq":7}},"entity_id":"<id #205>","entity_type":"status","project_id":"<id #199>","scope_id":"<id #199>","scope_type":"project","seq":7,"type":"status.created"}
 
 id: 8
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #198>","data":{"row":{"color":"#8b5cf6","id":"<id #206>","name":"Sample","project_id":"<id #199>","updated_seq":8}},"entity_id":"<id #206>","entity_type":"label","project_id":"<id #199>","scope_id":"<id #199>","scope_type":"project","seq":8,"type":"label.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #198>","data":{"row":{"color":"#9a6bff","id":"<id #206>","name":"Sample","project_id":"<id #199>","updated_seq":8}},"entity_id":"<id #206>","entity_type":"label","project_id":"<id #199>","scope_id":"<id #199>","scope_type":"project","seq":8,"type":"label.created"}
 
 id: 9
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #198>","data":{"row":{"activity_seq":9,"assignee_id":"<@aram>","created_at":1700000000000,"created_by":"<@aram>","created_seq":9,"id":"<id #207>","key":"GS-1","label_ids":["<id #206>"],"number":1,"priority":0,"project_id":"<id #199>","rank":"00000000sg","status_id":"<id #201>","title":"Open this task and leave a comment","updated_at":1700000000000,"updated_seq":9}},"entity_id":"<id #207>","entity_type":"task","project_id":"<id #199>","scope_id":"<id #207>","scope_type":"task","seq":9,"type":"task.created"}
