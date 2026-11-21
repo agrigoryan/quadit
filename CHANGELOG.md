@@ -10,12 +10,17 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 - Connect codes: a person makes one for an agent and its tool (Settings → the agent → Connect code, the desktop app's Connect, or `POST /connect-codes`), says `Connect to Quadit K7PQ2M` in the tool, and the agent gives it back with `quadit connect K7PQ2M` (`POST /connect`). Six characters, good once for seven days, ten tries a minute.
 - `quadit wait [for=SECONDS] [lease=ID] [take=1]` (`GET /listen`): an agent told "listen to Quadit" in its tool waits for its next inbox item and is handed it with the exact commands to read it, acknowledge it and wait again, or IDLE. One session at a time listens: the first wait takes a lease on the cursor `listen`, which lives five minutes past the last wait, and another session is refused until the person has it take over with `take=1`. The skill says when to connect and when to listen, how to keep going round and when to stop.
 - Under a task's comment box, when the task is an agent's or waits on one, a quiet line says whether the agent will see what is written: it is listening; it will see it when next asked in its tool; or it has not connected yet, with the way to connect it (the desktop app's Connect, or its page in Settings).
-- `scripts/agent-listen-check.sh TOOL` checks, by hand and on a throwaway server, that a tool connects and listens from ordinary words; `docs/agents.md` lists which tools were checked.
+- `scripts/agent-listen-check.sh TOOL` checks, by hand and on a throwaway server, that a tool given the skill under test connects and listens from ordinary words; `docs/agents.md` lists which tools were checked.
+- With the desktop app quit, an agent's `quadit` with a login the app made for its own server (`quadit login URL - --app PATH`) starts the app without a window, waits up to 20 seconds for the server, and sends its request again; a server the person stopped from the app's menu stays stopped, and the command says so.
+- `GET /agents/connection` is the cheap read of how far each agent is connected, with the tool of the last connect code it gave back; the pages read it again while they show it.
 
 ### Changed
 
-- An agent counts as listening only while its listener holds the lease (`quadit wait`, `quadit listen`, a wait on the feed with `cursor=listen`) or a webhook pushes to it; another wait on the feed or a live stream no longer marks it. The pages read whether it listens again while they show it, so it does not go stale.
-- `quadit listen` holds the same lease, acknowledges with it, stops when another session takes the lease over, and prints the command that gives up on an item it could not handle (`quadit ack SEQ listen lease=ID`).
+- An agent counts as listening only while its listener holds the lease (`quadit wait`, `quadit listen`) or a webhook pushes to it, or while a `quadit listen` from before this version holds its wait on the cursor `listen`; another wait on the feed or a live stream no longer marks it. The pages read whether it listens again while they show it, so it does not go stale.
+- `quadit listen` holds the same lease (and keeps it beside its login, so a restart goes on with it; `take=1` takes it over), acknowledges with it, stops when another session takes the lease over, and prints the command that gives up on an item it could not handle (`quadit ack SEQ listen lease=ID`). An acknowledgment without a lease is made as before.
+- A listener's cursor never moved before starts at the oldest unread inbox item of the last day, else at the present, instead of replaying the whole inbox; the first answer says how many older unread items were left alone. A wait with nothing for the agent no longer moves the cursor.
+- A comment on a task reaches its assignee and whoever it waits on, whether or not they follow the task.
+- An inbox item's words are cut at 200 characters, not 200 bytes.
 
 ### Fixed
 

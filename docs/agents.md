@@ -114,7 +114,9 @@ Files written are not proof that an agent reaches Quadit, and an agent that does
 - **Connected, not listening**: it works when the person asks it in its tool; what is written in Quadit waits until then.
 - **Listening**: a session of it is waiting for its inbox right now (or a webhook pushes to it), and answers what comes in.
 
-An agent is connected by the first of: a connect code given back, a change made with its own token, its listener's first wait. Reading proves nothing: `quadit login` and `quadit me` do not connect it. The member row and `GET /agents` carry `connected_at`.
+An agent is connected by the first of: a connect code given back, a change made with its own token, its listener's first wait. Reading proves nothing: `quadit login` and `quadit me` do not connect it. The member row and `GET /agents` carry `connected_at`; `GET /agents/connection` is the cheap read of all three, with the tool of the last code the agent gave back, which pages read again while they show it.
+
+A comment on a task reaches the inbox of the task's assignee and of whoever the task waits on, whether or not they follow it (and never its own author), so the line under the comment box, "@codex is listening and will see this", holds for both.
 
 **Connect codes.** A person who may make the agent a token makes a code for it and the tool it runs in: Settings → the agent → Connect code, the desktop app's Connect, or `POST /connect-codes {"agent": "@codex", "tool": "Codex"}`, which answers `{id, code, …}` with the code this once. It is six characters with no look-alikes, good once for seven days; a new code for the same agent and tool replaces the open one, and `GET /connect-codes/{id}` tells its maker whether it was used. Said in the tool, `Connect to Quadit K7PQ2M` has the agent run:
 
@@ -123,7 +125,7 @@ quadit connect K7PQ2M    # with its own login: "Connected as @codex in Personal.
 quadit connect           # with no code: who this login is
 ```
 
-A wrong, used or expired code is refused saying which (`reason`: `wrong`, `used`, `expired`), ten tries a minute per agent; a person's login is refused, since an agent connects with its own. Connecting starts no wait.
+A wrong, used or expired code is refused saying which (`reason`: `wrong`, `used`, `expired`), ten tries a minute per agent; a person's login is refused, since an agent connects with its own. The code is taken in any case and with spaces or a dash in it, and a code for a tool replaces the open one of the same tool however its name is written. Connecting starts no wait.
 
 **Listening.** Only when the person in the tool asks ("listen to Quadit"), the agent runs, again and again:
 
@@ -131,9 +133,21 @@ A wrong, used or expired code is refused saying which (`reason`: `wrong`, `used`
 quadit wait for=110      # blocks until the next inbox item, at most for= seconds (50 when left out)
 ```
 
-It prints one record: `ITEM #SEQ KIND TASK-OR-PAGE from @WHO: "…"` with the commands to read it, to acknowledge it once handled (`quadit ack SEQ listen lease=ID`) and to wait again (`quadit wait lease=ID`); or `IDLE` and the command to wait again. It delivers the inbox items `quadit listen` delivers, from the same cursor `listen`, and one session at a time may: the first wait takes a lease, and the commands it prints carry the lease's id. The lease lives five minutes past the end of its holder's last wait, and the agent counts as listening while it does. Another session's wait is refused, "@codex is already listening from another session (last heard 14:02 UTC)", until the person has it take over with `quadit wait take=1`; an acknowledgment with a lease taken over since is refused. The API is `GET /listen?wait=50&lease=ID` (`take=1` to take over), answering `{lease, seq, item}`; a wait on the feed with `cursor=listen` holds the same lease, and `PUT /cursors/listen {"seq", "lease"}` acknowledges. `for=` should be a little under the longest the tool lets one command run.
+It prints one record: `ITEM #SEQ KIND TASK-OR-PAGE from @WHO: "…"` with the commands to read it, to acknowledge it once handled (`quadit ack SEQ listen lease=ID`) and to wait again (`quadit wait lease=ID`); or `IDLE` and the command to wait again. The agent runs those lines as written, so `wait` prints nothing the server sent unless it has the form quadit gives it (a lease id, a task key, a page id, a handle), and the item's words in quotes, cut at 200 characters, without line breaks or quotes of their own.
 
-Each tool, as `scripts/agent-listen-check.sh TOOL` finds it (a throwaway server, ordinary words: "Connect to Quadit CODE", then "Listen to Quadit", two comments answered once each, a second session refused, nothing answered after stop). It spends the person's plan, so it is run by hand.
+The rule of the lease:
+
+- One session of an agent delivers its inbox at a time: the one holding the agent's lease. Only `GET /listen` takes it (`quadit wait`, and `quadit listen` whatever its cursor); the first wait takes it, and the commands it prints carry its id. Another session's wait is refused, "@codex is already listening from another session (last heard 14:02 UTC)", until the person has it take over with `quadit wait take=1`. A wait that slept through a takeover hands nothing over.
+- The agent counts as listening while the lease lives: five minutes past the end of its holder's last wait that answered, so it does not flicker while the agent handles an item; thirty seconds past a wait its client gave up on (the agent was stopped); and a lease taken by a wait that never answered, whose id nobody learned, ends at once.
+- An acknowledgment that gives a lease (`PUT /cursors/listen {"seq", "lease"}`) is made only while that lease is the live one: one taken over since (`reason` `lease_stale`) or run out (`lease_ended`; the item comes again) is refused. One that gives none is made as before: a `quadit listen` from before the lease acknowledges so, and so does a person giving up on an item by hand.
+- Only an acknowledgment moves the cursor: a wait with nothing for the agent leaves it where it was. A cursor never moved starts at the oldest unread inbox item of the last day, else at the present, so the comment written a minute before "listen to Quadit" is handled and weeks of history are not replayed; the first answer says how many older unread items were left alone (`quadit inbox` lists them).
+- A `quadit listen` from before the lease keeps working: its waits on the feed with `cursor=listen` take no lease, and count as listening while they are held.
+
+The API is `GET /listen?wait=50&lease=ID` (`take=1` to take over, `cursor=NAME` for another cursor), answering `{lease}` or `{lease, seq, item, line}`, and `skipped` the first time. `for=` should be a little under the longest the tool lets one command run.
+
+Each tool, as `scripts/agent-listen-check.sh TOOL` finds it (a throwaway server, the skill under test given to the tool in its own project folder, ordinary words: "Connect to Quadit CODE", then "Listen to Quadit", a stretch with nothing arriving, two comments answered exactly once each, a second session refused, nothing answered after stop). It spends the person's plan, so it is run by hand.
+
+**When the app is quit.** A server on this computer runs only while the desktop app does. When the app is quit and an agent runs `quadit` with a login the app made for that server (`quadit login URL - --app PATH`), the command finds nothing listening at this computer's address, starts the app without a window (on macOS by its bundle id, unless it is running already; on Linux by the path the login records, without a shell), waits up to 20 seconds for the server, says `Quadit was not running; started it.` on stderr and sends the request again, once per run. If that fails, the error ends `Quadit could not be started: open the Quadit app.` (or, with the app running and its server silent, `Quadit is running but its server does not answer: look at the Quadit menu.`). A server the person stopped from the app's menu stays stopped: the app keeps a file `server-stopped` beside its logins while it is, and the error says `Quadit's server is stopped: start it from the Quadit menu.` A login made by hand, a server elsewhere, a timeout, Windows, and a command kept off the network (Codex's sandbox) start nothing.
 
 | Tool | Connect and listen | Idle cost |
 | --- | --- | --- |
@@ -197,7 +211,7 @@ Everything that changes is one event in one ordered feed per workspace. A commen
 
 Rules in Settings → Automation add wake-ups such as "when a person answers a decision, tell @coordinator".
 
-`quadit listen` delivers each inbox item at least once, one at a time, in order. Its cursor (`listen`, or the one named with `cursor=NAME`) moves past an item only after the command exited with 0. When the item's secrets cannot be had, or the command fails, listen says so, waits (1 second, doubling up to 5 minutes) and runs it again; the items after it wait for it. So the command must be safe to run twice for the same item: a crash, or a failure after part of the work was done, brings the item back. To give up on an item instead, move the cursor past it with the command listen prints when it says the item was not handled: `quadit ack SEQ listen lease=ID`. Listen holds the listener's lease like `quadit wait`, so only one of them delivers the inbox at a time, and it stops when another session takes the lease over.
+`quadit listen` delivers each inbox item at least once, one at a time, in order. Its cursor (`listen`, or the one named with `cursor=NAME`) moves past an item only after the command exited with 0. When the item's secrets cannot be had, or the command fails, listen says so, waits (1 second, doubling up to 5 minutes) and runs it again; the items after it wait for it. So the command must be safe to run twice for the same item: a crash, or a failure after part of the work was done, brings the item back. To give up on an item instead, move the cursor past it with the command listen prints when it says the item was not handled: `quadit ack SEQ listen lease=ID`. Listen holds the agent's lease like `quadit wait`, so only one of them delivers the inbox at a time; it stops when another session takes the lease over (`take=1` takes it over), and keeps the lease's id beside its login file, so a listen stopped or restarted goes on with the lease it held.
 
 ## Writing
 

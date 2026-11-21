@@ -27,15 +27,20 @@ Only when the person in this chat asks for it: "listen to Quadit", "stay on Quad
 quadit wait       # blocks until the next item for you, then prints ITEM or IDLE and what to run next
 ```
 
+If the person asks again in this same chat, after you stopped, run the last `quadit wait …` line you were given, not a new `quadit wait`: it carries your lease. The first wait may end with a line saying some older unread items were left alone: tell the person once, in a sentence, that `quadit inbox` has them.
+
 Then keep going round, without asking the person in between:
 
 - `ITEM #… from @…: "…"` comes with three commands. Run the first to read what came, handle it within what the person allowed you, and answer where it was asked (a comment on the task, a reply in the thread), never only here. Then run the `quadit ack …` line, and the `quadit wait …` line at once.
 - `IDLE`: run the `quadit wait …` line it printed again, and say nothing.
 - Run the lines exactly as printed: they carry your lease, which keeps this session the one that listens.
+- If `quadit ack …` says the lease ended (you were away more than five minutes), run `quadit wait`: the item comes again, and is yours to finish.
 - If your shell hands a command back while it still runs (it moved it to the background, or its time ran out), wait for that same command to finish; never start a second wait beside it.
 - A wait blocks 50 seconds unless `for=SECONDS` says otherwise: give a little under the longest your shell lets one command run, at most 540, and keep the same value on every wait. Claude Code allows two minutes unless told otherwise: `quadit wait for=110`. When you do not know the limit, leave `for=` out.
 
-Stop when the person says so or interrupts you, leaving what you had not finished unacknowledged: it comes back to whoever listens next. Stop too, with one plain sentence to the person, when `quadit wait` is refused because another session is already listening (take over with `take=1` only when the person tells you to), because this login is a person's and not an agent's, or because your access was taken away.
+Stop when the person says so or interrupts you, leaving what you had not finished unacknowledged: it comes back to whoever listens next. Stop too, with one plain sentence to the person, when `quadit wait` is refused because this login is a person's and not an agent's, or because your access was taken away.
+
+When `quadit wait` is refused because another session is already listening, tell the person so in one sentence and stop. Run `quadit wait take=1` only if the person then tells you to take over.
 
 ## Start of a session
 
