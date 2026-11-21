@@ -19,7 +19,8 @@ const SCREENS = join(__dirname, "../../onboarding-screens");
 /** Saves what `page` shows as `name` in the screens folder. The first run's page fills its window. */
 async function screen(page: Page, name: string) {
   mkdirSync(SCREENS, { recursive: true });
-  await page.screenshot({ path: join(SCREENS, name) });
+  // Capture the intended state even when a card or the files sheet has just started fading in.
+  await page.screenshot({ path: join(SCREENS, name), animations: "disabled" });
 }
 
 /** The note the web app shows over the "Getting started" project's task list while its samples are there. */
