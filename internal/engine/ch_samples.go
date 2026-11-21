@@ -28,7 +28,7 @@ const (
 	samplesKey     = "GS"
 	samplesProject = "Getting started"
 	sampleLabel    = "Sample"
-	sampleColor    = "#8b5cf6"
+	sampleColor    = "#9a6bff"
 )
 
 type samplesAddArgs struct {
