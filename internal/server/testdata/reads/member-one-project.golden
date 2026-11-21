@@ -214,7 +214,8 @@ surface: 2.0 (within 2.x nothing is removed or renamed)
 200
 {
  "desktop": {
-  "handoff": 1
+  "handoff": 1,
+  "inset": 1
  },
  "name": "quadit",
  "surface": "2.0",
