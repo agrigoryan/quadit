@@ -25,6 +25,7 @@ function setUp(owner: Owner[], startError?: string) {
   const windowFetches = new Map<string, Fetch>();
   const shown: { serverId: string; path: string; inset?: number }[] = [];
   const ownerAsked: { fetch: Fetch; name: string }[] = [];
+  const controlled: string[] = [];
   // The server it runs answers as this tree's server does.
   const fetcher: Fetch = async (url) =>
     new URL(url).pathname === "/api/v1/version"
@@ -62,9 +63,10 @@ function setUp(owner: Owner[], startError?: string) {
       ownerAsked.push({ fetch, name });
       return owner.shift() ?? { ok: false as const, error: "no answer" };
     },
-    start: () => {},
-    stop: async () => {},
-    restart: async () => {},
+    start: () => void controlled.push("start"),
+    stop: async () => void controlled.push("stop"),
+    stopOnPurpose: async () => void controlled.push("stop on purpose"),
+    restart: async () => void controlled.push("restart"),
   };
   const list = new ServerList(
     store,
@@ -82,8 +84,19 @@ function setUp(owner: Owner[], startError?: string) {
       loginItem: null,
     },
   );
-  return { list, store, shown, ownerAsked, windowFetches };
+  return { list, store, shown, ownerAsked, windowFetches, controlled };
 }
+
+describe("ServerList.control", () => {
+  it("stops the server on this computer on purpose when the person stops it, so it stays stopped (desktop contract §11, amendment)", async () => {
+    const { list, controlled } = setUp([{ ok: true, workspace: "personal" }]);
+    await list.setUpHere("Lou Local");
+    await list.control("stop");
+    await list.control("start");
+    await list.control("restart");
+    expect(controlled).toEqual(["stop on purpose", "start", "restart"]);
+  });
+});
 
 describe("ServerList.setUpHere", () => {
   it("adds the server on this computer and makes its owner through its window's own session, showing no window itself", async () => {

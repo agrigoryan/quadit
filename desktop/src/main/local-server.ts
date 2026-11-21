@@ -46,6 +46,7 @@ import { createConnection, createServer } from "node:net";
 import { join } from "node:path";
 import type { Fetch } from "@/main/probe";
 import type { Settings } from "@/main/settings";
+import type { StoppedMark } from "@/main/stopped-mark";
 import type { LocalState } from "@/shared/pages-api";
 
 /** What the app needs of a started quadit serve (Node's ChildProcess has it). */
@@ -95,6 +96,8 @@ export interface LocalServerParts {
   env: NodeJS.ProcessEnv;
   /** The PATH of the person's login shell (quadit-cli.ts, loginShellPath), which the server gets. */
   shellPath(): Promise<string>;
+  /** The sign that the person stopped the server on purpose, which the quadit command reads (stopped-mark.ts). */
+  stopped: Pick<StoppedMark, "set" | "clear" | "isSet">;
 }
 
 /** Quadit's own port, taken when it is free at set-up. */
@@ -195,11 +198,34 @@ export class LocalServer {
     return this.settingUp;
   }
 
-  /** Starts the server, unless it is starting or running already. Its state says how it goes. */
+  /**
+   * Starts the server, unless it is starting or running already, and takes
+   * away the sign of a stop on purpose. Its state says how it goes.
+   */
   start() {
+    void this.parts.stopped.clear();
     if (this.current.kind === "starting" || this.current.kind === "running") return;
     this.restarts = 0;
     void this.launch(++this.generation);
+  }
+
+  /**
+   * Starts the server for an app started in the background (`--background`,
+   * by the quadit command finding it not running), unless the person
+   * stopped it on purpose: then it stays stopped.
+   */
+  async startInBackground() {
+    if (!(await this.parts.stopped.isSet())) this.start();
+  }
+
+  /**
+   * Stops the server because the person asked (the menu, the server list):
+   * it is marked first, so that the quadit command, finding it gone, starts
+   * nothing; it stays stopped until it is started again.
+   */
+  async stopOnPurpose() {
+    await this.parts.stopped.set();
+    await this.stop();
   }
 
   /** Stops the server and waits for it: SIGTERM, then SIGKILL if it has not exited in time. Never starts it again. */

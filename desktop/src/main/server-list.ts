@@ -32,7 +32,17 @@ export const LOCAL_NAME = "This computer";
 /** What the list needs of the server on this computer. */
 type Local = Pick<
   LocalServer,
-  "available" | "dataDir" | "logFile" | "origin" | "state" | "setUp" | "setUpOwner" | "start" | "stop" | "restart"
+  | "available"
+  | "dataDir"
+  | "logFile"
+  | "origin"
+  | "state"
+  | "setUp"
+  | "setUpOwner"
+  | "start"
+  | "stop"
+  | "stopOnPurpose"
+  | "restart"
 >;
 
 /** What the list needs of the servers' windows. */
@@ -157,7 +167,7 @@ export class ServerList {
     const { local } = this.setup;
     if (!this.localServer()) return;
     if (control === "start") local.start();
-    else if (control === "stop") await local.stop();
+    else if (control === "stop") await local.stopOnPurpose();
     else if (control === "restart") await local.restart();
   }
 

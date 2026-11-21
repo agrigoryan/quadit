@@ -95,8 +95,12 @@ function setUp(
     proof?: "right" | "wrong" | "missing" | "away";
     /** What its sign-in options say of set-up. */
     setupNeeded?: boolean;
+    /** Whether the person stopped it on purpose before (the mark is there). */
+    stoppedOnPurpose?: boolean;
   } = {},
 ) {
+  // The mark of a stop on purpose, and what was done to it, in order.
+  const mark = { set: options.stoppedOnPurpose ?? false, said: [] as string[] };
   const userData = mkdtempSync(join(tmpdir(), "quadit-desktop-local-"));
   let settings: AppSettings = {
     setupDone: true,
@@ -150,6 +154,17 @@ function setUp(
     ports,
     env: { PATH: "/usr/bin", HOME: "/home/ann", QUADIT_DB: "postgres://elsewhere", QUADIT_SECRET: "x".repeat(20) },
     shellPath: async () => "/opt/homebrew/bin:/usr/bin:/bin",
+    stopped: {
+      set: async () => {
+        mark.said.push(`mark set (${spawned.at(-1)?.process.signals.length ? "stopping" : "running"})`);
+        mark.set = true;
+      },
+      clear: async () => {
+        mark.said.push("mark cleared");
+        mark.set = false;
+      },
+      isSet: async () => mark.set,
+    },
   };
   const server = new LocalServer(parts);
   const states: string[] = [];
@@ -162,6 +177,7 @@ function setUp(
     states,
     addressed,
     settings: () => settings,
+    mark,
     setReady: (now: boolean) => (ready = now),
     take: (port: number) => taken.add(port),
     release: (port: number) => taken.delete(port),
@@ -518,6 +534,55 @@ async function running() {
   const key = () => (made.spawned.at(-1)?.process.input.join("") ?? "").replace(/\n$/, "");
   return { ...made, key };
 }
+
+describe("LocalServer, stopped on purpose (desktop contract §11, amendment)", () => {
+  it("marks a stop the person asked for before it stops the server, so the command starts nothing meanwhile", async () => {
+    const { server, clock, mark } = setUp();
+    await server.setUp();
+    await clock.advance(0);
+    await server.stopOnPurpose();
+    expect(server.state()).toEqual({ kind: "stopped" });
+    expect(mark.said.at(-1)).toBe("mark set (running)");
+    expect(mark.set).toBe(true);
+  });
+
+  it("takes the mark away whenever it starts the server: set up, started, restarted", async () => {
+    const { server, clock, mark } = setUp();
+    await server.setUp();
+    await clock.advance(0);
+    expect(mark.said).toEqual(["mark cleared"]);
+    await server.stopOnPurpose();
+    server.start();
+    expect(mark.set).toBe(false);
+    await clock.advance(0);
+    await server.restart();
+    expect(mark.said.at(-1)).toBe("mark cleared");
+  });
+
+  it("started in the background, starts the server unless the person stopped it on purpose", async () => {
+    const running = setUp({ port: 4780 });
+    await running.server.startInBackground();
+    await running.clock.advance(0);
+    expect(running.spawned).toHaveLength(1);
+    expect(running.server.state()).toEqual({ kind: "running" });
+
+    const stopped = setUp({ port: 4780, stoppedOnPurpose: true });
+    await stopped.server.startInBackground();
+    await stopped.clock.advance(60_000);
+    expect(stopped.spawned).toHaveLength(0);
+    expect(stopped.server.state()).toEqual({ kind: "stopped" });
+    expect(stopped.mark.set).toBe(true);
+  });
+
+  it("is not marked when the app quits: the command may start it again", async () => {
+    const { server, clock, mark } = setUp();
+    await server.setUp();
+    await clock.advance(0);
+    server.stopWithoutWaiting();
+    await server.stop();
+    expect(mark.said).toEqual(["mark cleared"]);
+  });
+});
 
 describe("LocalServer's proof", () => {
   it("counts the server as running only once it has proved, with a fresh nonce, that it holds this start's key", async () => {

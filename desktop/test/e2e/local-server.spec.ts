@@ -330,3 +330,51 @@ test("quit before its set-up was finished, the server on this computer offers th
     await desktop.close();
   }
 });
+
+test("started with --background by the quadit command, the app shows no window and its server answers; one the person stopped stays stopped", async ({
+  run,
+}) => {
+  // Three starts of the app, each waiting for its server.
+  test.slow();
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  const computer = fakeComputer({ claudeCode: false });
+  const env = { QUADIT_DESKTOP_QUADIT: run.binary, HOME: computer.home, SHELL: computer.shell };
+  // The sign of a stop on purpose, beside the quadit logins, which the command reads.
+  const stoppedMark = join(computer.configDir, "server-stopped");
+  let desktop = await Desktop.launch(data, run, [], { env });
+  let origin = "";
+  try {
+    ({ origin } = await setUpFromTheList(desktop));
+  } finally {
+    await desktop.close();
+  }
+  await expect.poll(() => answers(origin), { timeout: 15_000 }).toBe(false);
+
+  desktop = await Desktop.launch(data, run, ["--background"], { env });
+  try {
+    await expect.poll(() => answers(origin), { timeout: 30_000 }).toBe(true);
+    expect(await desktop.shownWindows()).toEqual([]);
+    // The person stops it from the menu: marked, so that the command starts nothing for it.
+    await desktop.chooseMenuItem("local-stop");
+    await expect.poll(() => existsSync(stoppedMark)).toBe(true);
+    await expect.poll(() => answers(origin), { timeout: 15_000 }).toBe(false);
+  } finally {
+    await desktop.close();
+  }
+
+  desktop = await Desktop.launch(data, run, ["--background"], { env });
+  try {
+    // Started in the background again, it leaves the server stopped: waited out, and checked.
+    await expect.poll(() => desktop.app.evaluate(({ Menu }) => !!Menu.getApplicationMenu())).toBe(true);
+    await new Promise((done) => setTimeout(done, 3_000));
+    expect(await answers(origin)).toBe(false);
+    expect(existsSync(stoppedMark)).toBe(true);
+    expect(await desktop.shownWindows()).toEqual([]);
+    // Started by the person, it runs, and the mark goes.
+    await desktop.chooseMenuItem("local-start");
+    await expect.poll(() => answers(origin), { timeout: 30_000 }).toBe(true);
+    expect(existsSync(stoppedMark)).toBe(false);
+  } finally {
+    await desktop.close();
+  }
+});

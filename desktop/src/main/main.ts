@@ -7,12 +7,14 @@
 // quick capture), the browser sign-in
 // (handoff.ts), the unread badge (unread.ts), the menu (menu.ts), the
 // update notice (updates.ts) and the server on this computer
-// (local-server.ts), which runs while the app does.
+// (local-server.ts), which runs while the app does. Started with
+// --background (launch.ts), by the quadit command finding that server not
+// running, it opens no window, as at login.
 
 import { execFile, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir, hostname, userInfo } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { app, BrowserWindow, clipboard, dialog, Menu, net, powerMonitor, shell, webContents } from "electron";
@@ -26,6 +28,7 @@ import { Connections } from "@/main/connections";
 import { LocalServer, loopbackPorts } from "@/main/local-server";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
 import { SignInFlows } from "@/main/handoff";
+import { coldStart, secondStart } from "@/main/launch";
 import { menuTemplate } from "@/main/menu";
 import { Panel } from "@/main/panel";
 import { loginShellPath, QuaditCli } from "@/main/quadit-cli";
@@ -36,6 +39,7 @@ import { ServerWindows } from "@/main/server-windows";
 import { ServerStore } from "@/main/servers";
 import { Settings } from "@/main/settings";
 import { Setup } from "@/main/setup-page";
+import { StoppedMark } from "@/main/stopped-mark";
 import { refusedSwitches } from "@/main/switches";
 import { Unread } from "@/main/unread";
 import { isReleasePage, type Release, UpdateWatch } from "@/main/updates";
@@ -88,6 +92,13 @@ function start() {
 
   const fetcher = (url: string, init?: RequestInit) => net.fetch(url, init);
   const checks = new ServerChecks(store, fetcher, (words) => void warn(words));
+  const cli = new QuaditCli(bundledCli(), loginShellPath, { home: homedir(), shell: process.env.SHELL || "/bin/sh" });
+  // The folder of the quadit logins, as the quadit the person's agents run says (else the app's own).
+  const loginsFolder = async () => {
+    const look = await cli.look();
+    const binary = look.found?.path ?? cli.bundled;
+    return binary ? dirname(await cli.defaultConfig(binary)) : null;
+  };
   const local = new LocalServer({
     binary: localServerBinary(),
     dataDir: join(dataDir, "server"),
@@ -98,6 +109,7 @@ function start() {
     ports: loopbackPorts,
     env: process.env,
     shellPath: loginShellPath,
+    stopped: new StoppedMark(loginsFolder),
   });
   // Offered on macOS, for the installed app only: from source it would start the bare Electron.
   const loginItem =
@@ -166,9 +178,11 @@ function start() {
     dataDir,
     platform: process.platform,
     hostName: hostname(),
-    cli: new QuaditCli(bundledCli(), loginShellPath, { home: homedir(), shell: process.env.SHELL || "/bin/sh" }),
+    cli,
     summaries: () => requests.summaries(),
     server: (id) => store.get(id),
+    // The running app itself, which the quadit command starts: an AppImage by its own file, not where it is mounted.
+    appFor: (id) => (id === list.localServer()?.id ? process.env.APPIMAGE || app.getPath("exe") : null),
     ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
   });
   const connect = new ConnectPage({
@@ -311,9 +325,11 @@ function start() {
   };
 
   app.on("second-instance", (_event, argv) => {
-    const link = deepLinkInArgs(argv);
-    if (link) handleLink(link);
-    else if (!BrowserWindow.getAllWindows().some((win) => win.isVisible())) list.show();
+    const asked = secondStart(argv, { windowShown: BrowserWindow.getAllWindows().some((win) => win.isVisible()) });
+    if (asked.kind === "link") handleLink(asked.link);
+    else if (asked.kind === "background") {
+      if (list.localServer()) void local.startInBackground();
+    } else if (asked.kind === "list") list.show();
   });
   app.on("activate", () => {
     if (!BrowserWindow.getAllWindows().some((win) => win.isVisible())) list.show();
@@ -340,12 +356,17 @@ function start() {
   powerMonitor.on("resume", () => windows.wake());
   unread.start();
   capture.applyShortcut();
-  // Started before the windows are made, so that its window waits for it (whenReachable).
-  if (list.localServer()) local.start();
-  // Started at login (macOS), the app opens no window: it is there for its server and its notifications.
+  // Started at login (macOS), or in the background by the quadit command, the app opens no window: it is there
+  // for its server and its notifications.
   const atLogin = process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin;
-  const shown = windows.restore({ show: !atLogin });
-  if (atLogin) {
+  const starting = coldStart(process.argv, { atLogin });
+  // Started before the windows are made, so that its window waits for it (whenReachable).
+  if (list.localServer()) {
+    if (starting.server === "start") local.start();
+    else void local.startInBackground();
+  }
+  const shown = windows.restore({ show: starting.windows });
+  if (!starting.windows) {
     // Nothing to show.
   } else if (firstRun.due()) firstRun.show();
   else if (!shown) list.show();
