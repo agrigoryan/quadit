@@ -7,6 +7,7 @@
 // tools step finds nothing and is skipped.
 
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
@@ -382,5 +383,72 @@ test("started with --background by the quadit command, the app shows no window a
     expect(existsSync(stoppedMark)).toBe(false);
   } finally {
     await desktop.close();
+  }
+});
+
+test("started with --background, the app says nothing of its own (an owed first run, a server that no longer fits) until the person opens it", async ({
+  run,
+}) => {
+  test.slow();
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  const computer = fakeComputer({ claudeCode: false });
+  const env = { QUADIT_DESKTOP_QUADIT: run.binary, HOME: computer.home, SHELL: computer.shell };
+  let desktop = await Desktop.launch(data, run, [], { env });
+  let origin = "";
+  try {
+    ({ origin } = await setUpFromTheList(desktop));
+  } finally {
+    await desktop.close();
+  }
+  // A first run owed to it (as when the app quit during its tools step), and a server added before that now
+  // speaks a sign-in hand-off newer than this app's: each would show something at a start.
+  const newer = createServer((req, res) => {
+    if (req.url !== "/api/v1/version") return void res.writeHead(404).end();
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ name: "quadit", version: "99.0.0", surface: "x", desktop: { handoff: 99, inset: 0 } }));
+  });
+  await new Promise<void>((done) => newer.listen(0, "127.0.0.1", done));
+  const address = newer.address();
+  const elsewhere = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
+  const serversFile = join(data, "servers.json");
+  const saved = JSON.parse(readFileSync(serversFile, "utf8")) as {
+    servers: ({ id: string; origin: string } & Record<string, unknown>)[];
+  };
+  const local = saved.servers.find((server) => server.origin === origin);
+  saved.servers.push({
+    id: "elsewhere",
+    name: "Elsewhere",
+    origin: elsewhere,
+    open: false,
+    handoff: 1,
+    inset: 0,
+    version: "9.9.9",
+    warned: "",
+  });
+  writeFileSync(serversFile, JSON.stringify(saved));
+  const settingsFile = join(data, "settings.json");
+  const settings = JSON.parse(readFileSync(settingsFile, "utf8")) as Record<string, unknown>;
+  settings.pendingFirstRun = { serverId: local?.id, workspace: "personal", person: "Lou Local" };
+  writeFileSync(settingsFile, JSON.stringify(settings));
+
+  const started = Date.now();
+  desktop = await Desktop.launch(data, run, ["--background"], { env });
+  try {
+    await expect.poll(() => answers(origin), { timeout: 30_000 }).toBe(true);
+    // Nothing shown a while after the start: no window, no first run, no dialog. Waited out, and checked.
+    await new Promise((done) => setTimeout(done, Math.max(0, started + 6_000 - Date.now())));
+    expect(await desktop.shownWindows()).toEqual([]);
+    expect(desktop.firstRunShown()).toBe(false);
+    expect((await desktop.recorded()).dialogs).toEqual([]);
+
+    // The person opens the app: what it held is said now.
+    await desktop.chooseMenuItem("servers");
+    await expect.poll(() => desktop.firstRunShown(), { timeout: 20_000 }).toBe(true);
+    await expect
+      .poll(async () => (await desktop.recorded()).dialogs, { timeout: 20_000 })
+      .toContainEqual(expect.stringContaining("Elsewhere needs a newer Quadit app"));
+  } finally {
+    await desktop.close();
+    newer.close();
   }
 });

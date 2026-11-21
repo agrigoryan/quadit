@@ -62,3 +62,34 @@ export class ActivateAfterStart {
     return Date.now() >= this.quietUntil;
   }
 }
+
+/**
+ * What the app says on its own (the first run, a dialog: a server that no
+ * longer fits it, an update), held while it runs in the background: started
+ * with --background, or told so while running, it shows nothing at all until
+ * the person opens it themselves (a window of it comes to the front). Then
+ * what was held is said, in the order it came.
+ */
+export class Quiet {
+  private held: (() => void)[] = [];
+
+  /** `background`: the app was started with --background. */
+  constructor(private quiet: boolean) {}
+
+  /** Told to start in the background while running: quiet until the person next opens it. */
+  background() {
+    this.quiet = true;
+  }
+
+  /** The person opened the app: what was held is said now. */
+  seen() {
+    this.quiet = false;
+    for (const say of this.held.splice(0)) say();
+  }
+
+  /** Says `say` now, or, in the background, once the person opens the app. */
+  say(say: () => void) {
+    if (this.quiet) this.held.push(say);
+    else say();
+  }
+}

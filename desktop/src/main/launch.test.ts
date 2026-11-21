@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ActivateAfterStart, coldStart, secondStart } from "@/main/launch";
+import { ActivateAfterStart, coldStart, Quiet, secondStart } from "@/main/launch";
 
 const APP = ["/Applications/Quadit.app/Contents/MacOS/Quadit"];
 
@@ -52,5 +52,32 @@ describe("ActivateAfterStart", () => {
 
   it("takes every activate for the person's after any other start", () => {
     expect(new ActivateAfterStart(false).isThePersons()).toBe(true);
+  });
+});
+
+describe("Quiet", () => {
+  it("holds what the app would say on its own after a background start until the person opens it, then says it once, in order", () => {
+    const said: string[] = [];
+    const quiet = new Quiet(true);
+    quiet.say(() => said.push("the first run"));
+    quiet.say(() => said.push("a server no longer fits"));
+    expect(said).toEqual([]);
+    quiet.seen();
+    expect(said).toEqual(["the first run", "a server no longer fits"]);
+    quiet.seen();
+    expect(said).toHaveLength(2);
+    // Opened by the person, it says things at once.
+    quiet.say(() => said.push("an update"));
+    expect(said.at(-1)).toBe("an update");
+  });
+
+  it("is quiet again when told to start in the background while running, until the person next opens it", () => {
+    const said: string[] = [];
+    const quiet = new Quiet(false);
+    quiet.background();
+    quiet.say(() => said.push("the first run"));
+    expect(said).toEqual([]);
+    quiet.seen();
+    expect(said).toEqual(["the first run"]);
   });
 });

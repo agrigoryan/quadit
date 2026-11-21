@@ -28,7 +28,7 @@ import { Connections } from "@/main/connections";
 import { LocalServer, loopbackPorts } from "@/main/local-server";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
 import { SignInFlows } from "@/main/handoff";
-import { ActivateAfterStart, coldStart, secondStart } from "@/main/launch";
+import { ActivateAfterStart, coldStart, Quiet, secondStart } from "@/main/launch";
 import { menuTemplate } from "@/main/menu";
 import { Panel } from "@/main/panel";
 import { loginShellPath, QuaditCli } from "@/main/quadit-cli";
@@ -90,8 +90,17 @@ function start() {
 
   enablePasskeys();
 
+  // Started at login (macOS), or in the background by the quadit command, the app opens no window: it is there
+  // for its server and its notifications. In the background it says nothing of its own either (no first run, no
+  // dialog) until the person opens it; an `activate` its start brings opens no window.
+  const atLogin = process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin;
+  const starting = coldStart(process.argv, { atLogin });
+  const quiet = new Quiet(starting.server === "background");
+  const activated = new ActivateAfterStart(starting.server === "background");
+  app.on("browser-window-focus", () => quiet.seen());
+
   const fetcher = (url: string, init?: RequestInit) => net.fetch(url, init);
-  const checks = new ServerChecks(store, fetcher, (words) => void warn(words));
+  const checks = new ServerChecks(store, fetcher, (words) => quiet.say(() => void warn(words)));
   const cli = new QuaditCli(bundledCli(), loginShellPath, { home: homedir(), shell: process.env.SHELL || "/bin/sh" });
   // The folder of the quadit logins, as the quadit the person's agents run says (else the app's own).
   const loginsFolder = async () => {
@@ -247,7 +256,7 @@ function start() {
     version,
     fetcher,
     () => refreshMenu(),
-    (release) => void tellAboutUpdate(release),
+    (release) => quiet.say(() => void tellAboutUpdate(release)),
   );
 
   refreshMenu = () => {
@@ -304,8 +313,8 @@ function start() {
       void checks.check(entry.id);
       windows.serverStarted(entry.id);
       // Its set-up unfinished (the app quit during the first run, or an older version started it): the first run sets
-      // it up, over its window.
-      void local.setupNeeded().then((needed) => needed && firstRun.show());
+      // it up, over its window, once the person has the app before them.
+      quiet.say(() => void local.setupNeeded().then((needed) => needed && firstRun.show()));
     }
   });
   refreshMenu();
@@ -328,14 +337,10 @@ function start() {
     const asked = secondStart(argv, { windowShown: BrowserWindow.getAllWindows().some((win) => win.isVisible()) });
     if (asked.kind === "link") handleLink(asked.link);
     else if (asked.kind === "background") {
+      quiet.background();
       if (list.localServer()) void local.startInBackground();
     } else if (asked.kind === "list") list.show();
   });
-  // Started at login (macOS), or in the background by the quadit command, the app opens no window: it is there
-  // for its server and its notifications. An `activate` its background start brings opens none either.
-  const atLogin = process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin;
-  const starting = coldStart(process.argv, { atLogin });
-  const activated = new ActivateAfterStart(starting.server === "background");
   app.on("activate", () => {
     if (!activated.isThePersons()) return;
     if (!BrowserWindow.getAllWindows().some((win) => win.isVisible())) list.show();
@@ -369,7 +374,9 @@ function start() {
   }
   const shown = windows.restore({ show: starting.windows });
   if (!starting.windows) {
-    // Nothing to show.
+    // Nothing to show now; a first run owed is shown once the person opens the app (in the background), or at its
+    // next start (at login).
+    if (starting.server === "background") quiet.say(() => firstRun.due() && firstRun.show());
   } else if (firstRun.due()) firstRun.show();
   else if (!shown) list.show();
   // Servers upgrade and downgrade while the app is away: ask each again.
