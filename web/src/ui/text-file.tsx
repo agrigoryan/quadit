@@ -21,13 +21,15 @@ import { Loading } from "@/ui/spinner";
 
 /**
  * The longest Markdown rendered, in characters; a longer file is shown as
- * its source. Rendering is done at once on the page, and big or deeply
- * nested Markdown would hold it still: measured in the tests' DOM on the
- * build machine, 25,000 characters of mixed Markdown (headings, lists,
- * tables, code) take about 65 ms, 50,000 about 120 ms. A browser is faster
- * than the tests' DOM, so this stays well under a tenth of a second.
+ * its source. Rendering is done at once on the page, and very big Markdown
+ * would hold it still: measured in the tests' DOM on the build machine,
+ * 25,000 characters of mixed Markdown (headings, lists, tables, code) take
+ * about 65 ms, 100,000 about a quarter of a second, a megabyte seconds. A
+ * report an agent writes runs to tens of thousands of characters and must
+ * open rendered, so the limit is where a pause begins to be felt, not where
+ * rendering is instant.
  */
-export const RENDERED_MARKDOWN_CHARS = 25_000;
+export const RENDERED_MARKDOWN_CHARS = 100_000;
 
 /** Whether this Markdown is too long to render (RENDERED_MARKDOWN_CHARS), and is shown as its source. */
 export const tooLargeToRender = (text: string) => text.length > RENDERED_MARKDOWN_CHARS;
