@@ -106,6 +106,12 @@ Tokens are kept only in `quadit`'s own login files, readable by the user alone, 
 
 Connect is a page of the app laid over the workspace window (File → Connect Agents…, the Agents page, the button under a task's comment box). A tool it set up shows the line to say in it, `Connect to Quadit K7PQ2M`, until the agent gives the code back; then whether it listens.
 
+**For the server on this computer, the app connects and answers by itself.** Right after Connect writes a tool's files, the app runs the tool once, without a window, with its one-prompt command and "Connect to Quadit CODE", as that tool's own login, and the card turns "Connected" when the server says the code was used. If the tool cannot be run, is not signed in, or the code does not come back within two minutes, the card shows the line to say in the tool instead, with a word on why. Then, while the app is open, it keeps one listener for each connected tool: `quadit listen by="the Quadit app" --exec …`, whose command runs the tool's one-prompt command with "Quadit woke you for this inbox item: … Handle it with the quadit skill, answering where you were asked." A comment on a task of that agent is answered with no chat open, and the agent shows as Listening everywhere.
+
+- What it costs: one run of the tool for each item that comes in, on the person's own plan; nothing while nothing comes. One run at a time per tool, each with a ten-minute limit; more than six runs in a minute pauses the tool by itself.
+- The tool's card says "Answers by itself while Quadit is open", with Pause (remembered) and Resume. For a server elsewhere it is off, with "Answer by itself" on the card: other people's comments on a team server would otherwise start runs on this computer.
+- A chat can still take over ("listen to Quadit", then take over when the person says so): the app's listener steps aside, and comes back when that chat's lease has ended. `quadit listening` in a chat says "the Quadit app" while it answers.
+
 ### Connected, and listening
 
 Files written are not proof that an agent reaches Quadit, and an agent that does reach it sees what is written to it only when it looks. So an agent is in one of three states, shown on a task given to it, under the comment box, on the Agents page and in Settings → Agents:
