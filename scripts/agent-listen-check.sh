@@ -16,6 +16,20 @@
 #      task get exactly one answer each, as itself, after each; a second
 #      session told to listen is refused; after the first is stopped, a
 #      third comment gets no answer.
+#   3. Only for a tool that can be woken by a background command (claude
+#      and agy; AGENT_CHECK_WAKES=1 or 0 says otherwise): a chat with a
+#      person. The tool is run with the person's messages on its standard
+#      input, one at a time (AGENT_CHECK_CHAT_COMMAND, AGENT_CHECK_CHAT_FORMAT
+#      text or stream-json), told the person is there and will write again,
+#      and asked to listen. It passes when a wait was started and is still
+#      running while the tool answers the person's next question (so it runs
+#      in the background), a comment is still answered, and told to stop the
+#      agent stops listening (its lease goes within thirty seconds).
+#      Unproven until the lead runs it: that the tool's one-prompt mode
+#      reads a second message from standard input while a command runs in
+#      the background (Claude Code's stream-json input is meant to; no
+#      chat command is known for Antigravity CLI yet: set one), and that the
+#      tool, so run, takes the chat for a person's.
 #
 # It prints the tool's version, each wait's length, the tokens the tool
 # spent over the stretch with nothing arriving when it reports them as it
@@ -113,6 +127,21 @@ cursor-agent) default_command='cursor-agent -p --force "$1"' ;;
 *) default_command="" ;;
 esac
 command=${AGENT_CHECK_COMMAND:-$default_command}
+
+# Whether the tool wakes its agent for a background command, and how it is run as a chat with a person: a command
+# that reads the person's messages from standard input, and the form each message is written in there.
+# shellcheck disable=SC2016
+case $tool in
+claude)
+	wakes=1 chat_format=stream-json
+	default_chat='claude -p --input-format stream-json --output-format stream-json --verbose --setting-sources project,local --strict-mcp-config --allowedTools "Bash($AGENT_CHECK_WRAPPER:*)" "Bash(quadit:*)"'
+	;;
+agy) wakes=1 chat_format=text default_chat="" ;;
+*) wakes=0 chat_format=text default_chat="" ;;
+esac
+wakes=${AGENT_CHECK_WAKES:-$wakes}
+chat_command=${AGENT_CHECK_CHAT_COMMAND:-$default_chat}
+chat_format=${AGENT_CHECK_CHAT_FORMAT:-$chat_format}
 [ -n "$command" ] || { echo "no one-prompt command for $tool: set AGENT_CHECK_COMMAND" >&2; exit 2; }
 [ -x "$real" ] || { echo "no quadit at $real: run make server, or set QUADIT_BIN" >&2; exit 2; }
 
@@ -225,14 +254,41 @@ chmod +x "$wrapper"
 touch "$work/calls.log"
 steer=${AGENT_CHECK_STEER-"Use $wrapper for the quadit command."}
 
-# run SESSION PROMPT: the tool's one prompt, in its own process group, its output in WORK/SESSION.log.
-run() {
+# as_tool SESSION COMMAND [ARG ...]: runs COMMAND as the tool is run, in WORK/cwd with this check's environment.
+as_tool() {
 	(
 		cd "$work/cwd"
 		export AGENT_CHECK_SESSION=$1 AGENT_CHECK_WRAPPER=$wrapper AGENT_CHECK_LOGIN=$work/agent-login.json QUADIT_URL=$url QUADIT_TOKEN=$agent_token PATH="$work/bin:$PATH"
-		exec sh -c "$command" sh "$2${steer:+ $steer}"
-	) >"$work/$1.log" 2>&1
+		shift
+		exec "$@"
+	)
 }
+# run SESSION PROMPT: the tool's one prompt, its output in WORK/SESSION.log (in its own process group when run with &).
+run() { as_tool "$1" sh -c "$command" sh "$2${steer:+ $steer}" >"$work/$1.log" 2>&1; }
+# chat SESSION: the tool as a chat with a person, its messages read from WORK/chat.in, its output in WORK/SESSION.log.
+chat() { as_tool "$1" sh -c "$chat_command" sh <"$work/chat.in" >"$work/$1.log" 2>&1; }
+# tell TEXT: the person writes TEXT in the chat (to the tool's standard input, held open on descriptor 3).
+tell() {
+	case $chat_format in
+	stream-json) python3 -c 'import json,sys;print(json.dumps({"type":"user","message":{"role":"user","content":sys.argv[1]}}))' "$1" >&3 ;;
+	*) printf '%s\n' "$1" >&3 ;;
+	esac
+}
+# open_wait SESSION: a wait of SESSION was started and has not ended.
+open_wait() { python3 -c 'import sys
+open_ = set()
+for line in open(sys.argv[1]):
+    f = line.split()
+    if len(f) < 5 or f[2] != sys.argv[2]:
+        continue
+    if f[1] == "start" and f[4] == "wait":
+        open_.add(f[3])
+    elif f[1] == "end":
+        open_.discard(f[3])
+sys.exit(0 if open_ else 1)' "$work/calls.log" "$1"; }
+# said_while_waiting SESSION OFFSET WORD: the tool's output since byte OFFSET holds WORD, and a wait is still open.
+said_while_waiting() { tail -c "+$(($2 + 1))" "$work/$1.log" | grep -Eqw "$3" && open_wait "$1"; }
+not_listening() { [ "$(agents)" = "connected not-listening" ]; }
 calls() { grep " end $1 " "$work/calls.log" || :; }
 started() { grep " start $1 " "$work/calls.log" || :; }
 agents() { api GET /agents | python3 -c 'import json,sys
@@ -350,6 +406,36 @@ kill -TERM -- "-$listen_pid" 2>/dev/null || :
 third=$(say "@$handle and 4 and 4? Answer here in a comment.")
 sleep 90
 check "after stop, the third comment got no answer" "$([ "$(replies "$third" 0)" = 0 ] && echo 0 || echo 1)" "$(replies "$third" 0) answers"
+
+# 3. Listen in a chat, the wait in the background.
+if [ "$wakes" = 1 ]; then
+	echo "3. Listen to Quadit in a chat with a person"
+	if [ -z "$chat_command" ]; then
+		echo "  SKIP  no chat command is known for $tool: set AGENT_CHECK_CHAT_COMMAND (and AGENT_CHECK_CHAT_FORMAT) to run it"
+	else
+		# The stopped session's lease goes first: thirty seconds after a wait given up on, five minutes at most.
+		check "the stopped session's lease ended" "$(passed until_true 360 not_listening)" "$(agents)"
+		mkfifo "$work/chat.in"
+		set -m
+		chat chat &
+		chat_pid=$!
+		sessions+=("$chat_pid")
+		set +m
+		exec 3>"$work/chat.in"
+		tell "I am the person you work for, here in this chat, and I will write to you again while you work. Listen to Quadit.${steer:+ $steer}"
+		check "a wait was started" "$(passed until_true 180 open_wait chat)"
+		offset=$(wc -c <"$work/chat.log")
+		tell "While you listen: what is 7 times 6? Answer me here, in this chat."
+		check "the person's question was answered while the wait ran in the background" "$(passed until_true "$answer_time" said_while_waiting chat "$offset" "42|forty-two")" \
+			"no answer while a wait ran: the wait was not in the background, or the question was not answered"
+		fifth=$(say "@$handle what do 5 and 5 make? Answer here in a comment.")
+		check "a comment was still answered" "$(passed until_true "$answer_time" answered "$fifth" 0 10 ten)" "$(replies "$fifth" 0) answers after it"
+		tell "Stop listening."
+		check "told to stop, it stopped listening" "$(passed until_true 90 not_listening)" "$(agents)"
+		exec 3>&-
+		kill -TERM -- "-$chat_pid" 2>/dev/null || :
+	fi
+fi
 
 echo "waits of the listening session (seconds, what came):"
 grep -E " end listen pid=[0-9]+ status=[0-9]+ [0-9]+s wait" "$work/calls.log" | awk '{for (i = 1; i < NF; i++) if ($i == "=>") { print "  " $6, $(i + 1); break }}' || :
