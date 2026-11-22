@@ -48,32 +48,30 @@ func describe(t *testing.T, path string) []string {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	rows, err := db.Query(`
+		SELECT type || ' ' || name || ' ' || COALESCE(sql, '') FROM sqlite_master
+		UNION ALL SELECT 'goose ' || version_id || ' ' || is_applied FROM goose_db_version
+		UNION ALL SELECT 'version ' || version || ' ' || name FROM schema_migrations
+		UNION ALL SELECT 'user_version ' || user_version FROM pragma_user_version
+		UNION ALL SELECT 'application_id ' || application_id FROM pragma_application_id
+		UNION ALL SELECT 'page_size ' || page_size FROM pragma_page_size
+		UNION ALL SELECT 'auto_vacuum ' || auto_vacuum FROM pragma_auto_vacuum
+		UNION ALL SELECT 'encoding ' || encoding FROM pragma_encoding
+		ORDER BY 1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
 	var out []string
-	for _, query := range []string{
-		`SELECT type || ' ' || name || ' ' || COALESCE(sql, '') FROM sqlite_master ORDER BY type, name`,
-		`SELECT version_id || ' ' || is_applied FROM goose_db_version ORDER BY version_id`,
-		`SELECT version || ' ' || name FROM schema_migrations ORDER BY version`,
-		`PRAGMA user_version`,
-		`PRAGMA application_id`,
-		`PRAGMA page_size`,
-		`PRAGMA auto_vacuum`,
-		`PRAGMA encoding`,
-	} {
-		rows, err := db.Query(query)
-		if err != nil {
-			t.Fatalf("%s: %v", query, err)
-		}
-		for rows.Next() {
-			var line string
-			if err := rows.Scan(&line); err != nil {
-				t.Fatal(err)
-			}
-			out = append(out, line)
-		}
-		if err := rows.Err(); err != nil {
+	for rows.Next() {
+		var line string
+		if err := rows.Scan(&line); err != nil {
 			t.Fatal(err)
 		}
-		rows.Close()
+		out = append(out, line)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
 	}
 	return out
 }
