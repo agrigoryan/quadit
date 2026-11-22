@@ -27,7 +27,22 @@ $QUADIT_ITEM
 Handle it with the quadit skill, answering where you were asked."
 ```
 
-While the command runs, `listen` renews its lease every minute, so a run that takes longer than the lease's five minutes keeps the item from being handed to another session.
+While the command runs, `listen` renews its lease every minute, so a run that takes longer than the lease's five minutes keeps the item from being handed to another session. Without more, a run that fails is tried again, with longer pauses up to five minutes, until it succeeds. Three optional arguments bound that, for a caller such as the Quadit app:
+
+- `limit=SECONDS` (1 to 86400): a run that takes longer is ended, with everything it started (its process group is asked to stop, and killed five seconds later), and counts as failed.
+- `tries=N` (1 to 100): after N failed runs of the same item, it is given up: acknowledged, so the next item comes. Nothing is posted to the task; the item stays unread in the agent's inbox (`quadit inbox`).
+- `events=PATH`: a file or named pipe the caller made, which `listen` writes one JSON object a line to, saying what happens. The command's own output never goes there (it does not inherit it), so a caller can trust it. Each object has `event` and `at` (UTC, RFC 3339), and:
+
+| `event` | the other fields |
+|---|---|
+| `started` | the lease is taken: `as` (the agent's handle), `by`, `cursor` |
+| `run_started` | `seq` (the item), `try` (1 for the first run of it) |
+| `run_ended` | `seq`, `seconds`, `status`: the exit status, `"limit"` when it was ended for its limit, or `"not_run"` (its secrets could not be had, or it could not start) |
+| `gave_up` | `seq`, `why` |
+| `refused` | `why`: `listening_elsewhere` (with `by` and `last_heard` of what listens, when they have their forms) or `taken_over` |
+| `stopped` | `why`: `interrupted`, `refused` or `error` |
+
+The lines `listen` prints for a person stay as they are.
 
 Each agent below: its MCP settings with Quadit's tools allowed to run unattended, and its one-prompt command. Replace `https://quadit.example.com` with your server; `QUADIT_TOKEN` is read from the environment.
 
@@ -143,7 +158,7 @@ A wrong, used or expired code is refused saying which (`reason`: `wrong`, `used`
 - **In a chat with a person, in a tool that cannot** (Codex today: a background command's result reaches the agent only when the person writes again): listening keeps the chat busy. The agent says so first ("Listening keeps this chat busy until you stop me; use another chat to talk to me meanwhile.") and then waits in the foreground.
 - **With nobody there** (a one-prompt run, a companion): it waits in the foreground, a little under the longest the tool lets one command run.
 
-Before the first wait, an agent in a chat first asks `quadit listening` whether something already listens as it (a companion, the Quadit app): if so, it tells the person that Quadit is already answered for it, and does not listen from the chat. An agent whose `quadit` commands each ask the person for approval says so, and how to allow them: in the Quadit app, Connect agents, the tool's More options, "Let it use Quadit without asking each time", or the tool's own allow rule. From a chat that cannot be woken, the agent offers the person the two real choices: keep this chat busy, or a companion run in a terminal (`quadit listen --exec …` with the tool's one-prompt command; Ctrl-C stops it). `quadit help listen` says all of it.
+Before the first wait, an agent in a chat first asks `quadit listening` whether something already listens as it (a companion, the Quadit app): if so, it tells the person that Quadit is already answered for it, and does not listen from the chat. An agent whose `quadit` commands each ask the person for approval says so, and how to stop that: the Quadit app's Connect allows the `quadit` command when it connects a tool, so connecting again from the app does it; a tool set up by hand allows it in its own settings. From a chat that cannot be woken, the agent offers the person the two real choices: keep this chat busy, or a companion run in a terminal (`quadit listen --exec …` with the tool's one-prompt command; Ctrl-C stops it). `quadit help listen` says all of it.
 
 ```bash
 quadit wait for=3600     # in the background: up to an hour, renewing the server's holds and the lease inside itself

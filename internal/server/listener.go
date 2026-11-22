@@ -15,7 +15,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -77,7 +76,7 @@ func (s *Server) handleNextInboxItem(x *c) error {
 	}
 	wait := min(x.intParam("wait", 0), maxFeedWait)
 	by := v.Get("by")
-	if by != "" && !listenerLabel.MatchString(by) {
+	if by != "" && !core.ListenerLabel.MatchString(by) {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "by", Message: "by= names what listens in a few plain words (\"a chat\", \"a companion\"): at most 40 letters, digits, spaces, - and '"}
 	}
 	lease, taken, err := s.holdLease(x, leaseAsk{lease: v.Get("lease"), take: truthyParam(v, "take"), by: by}, time.Duration(wait)*time.Second)
@@ -198,9 +197,6 @@ type leaseAsk struct {
 	take  bool
 	by    string
 }
-
-// listenerLabel is the form of what a listener says it is.
-var listenerLabel = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} '-]{0,39}$`)
 
 // holdLease gives the caller's listener the lease for a wait of the length
 // given, and returns its id and whether it is new (its holder does not know

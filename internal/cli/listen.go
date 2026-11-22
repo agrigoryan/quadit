@@ -14,13 +14,14 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/agrigoryan/quadit/internal/core"
 )
 
 // listen is the companion: it holds a request open on the caller's inbox
@@ -57,11 +58,21 @@ const leaseRenewal = time.Minute
 // every renewEvery while a command runs.
 func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error {
 	if len(opts.command) == 0 {
-		return errors.New("usage: quadit listen [cursor=NAME] [take=1] [by=WORDS] --exec COMMAND [ARG ...]")
+		return errors.New("usage: quadit listen [cursor=NAME] [take=1] [by=WORDS] [limit=SECONDS] [tries=N] [events=PATH] --exec COMMAND [ARG ...]")
 	}
-	if !labelForm.MatchString(opts.by) {
+	if opts.bad != "" {
+		return errors.New(opts.bad)
+	}
+	if !core.ListenerLabel.MatchString(opts.by) {
 		return errors.New("by= says what listens in a few plain words (\"the Quadit app\"): at most 40 letters, digits, spaces, - and '")
 	}
+	events, err := openEvents(opts.events)
+	if err != nil {
+		return err
+	}
+	defer events.close()
+	why := "error"
+	defer func() { events.say("stopped", map[string]any{"why": why}) }()
 	cursor, take := opts.cursor, opts.take
 	fmt.Fprintf(r.out, "listening as cursor %q; running %q for each inbox item\n", cursor, strings.Join(opts.command, " "))
 	const (
@@ -76,17 +87,22 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 	}
 	defer kept.close()
 	lease := kept.kept()
+	var failedSeq int64 // the item whose runs failed, failed times in a row
+	failed, started := 0, false
 	for {
 		page, err := r.nextItem(r.ctx, listenAsk{cursor: cursor, lease: lease, take: take, by: opts.by}, waitHold)
 		if err != nil {
 			if r.ctx.Err() != nil {
+				why = "interrupted"
 				return r.ctx.Err()
 			}
 			if lostTheLease(err) {
-				return r.lostLease(err)
+				why = "refused"
+				return r.lostLease(err, events)
 			}
 			fmt.Fprintln(r.out, "retrying:", err)
 			if err := pause(r.ctx, readPause); err != nil {
+				why = "interrupted"
 				return err
 			}
 			readPause = min(readPause*2, maxReadPause)
@@ -100,11 +116,18 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 			kept.keep(page.Lease)
 		}
 		lease, take = page.Lease, false
+		if !started {
+			started = true
+			events.say("started", map[string]any{"as": r.handleForEvents(events), "by": opts.by, "cursor": cursor})
+		}
 		r.sayLeftAlone(page.Skipped)
 		if page.Item == nil {
 			continue
 		}
 		fmt.Fprintln(r.out, page.Line)
+		if page.Seq != failedSeq {
+			failedSeq, failed = page.Seq, 0
+		}
 		renew := func(ctx context.Context) {
 			ticker := time.NewTicker(renewEvery)
 			defer ticker.Stop()
@@ -118,25 +141,46 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 				}
 			}
 		}
-		if err := r.wake(opts.command, opts.secrets, wakeItem{line: page.Line, record: page.Item.record()}, renew); err != nil {
-			if r.ctx.Err() != nil {
-				return r.ctx.Err()
+		events.say("run_started", map[string]any{"seq": page.Seq, "try": failed + 1})
+		began := time.Now()
+		end := r.wake(opts.command, opts.secrets, wakeItem{line: page.Line, record: page.Item.record()}, opts.limit, renew)
+		ended := map[string]any{"seq": page.Seq, "seconds": int(time.Since(began).Seconds()), "status": end.code}
+		switch {
+		case end.limited:
+			ended["status"] = "limit"
+		case end.notRun:
+			ended["status"] = "not_run"
+		}
+		if r.ctx.Err() != nil {
+			why = "interrupted"
+			return r.ctx.Err()
+		}
+		events.say("run_ended", ended)
+		if end.err != nil {
+			failed++
+			if opts.tries == 0 || failed < opts.tries {
+				fmt.Fprintf(r.out, "not handled, trying it again in %s: %v\n", itemPause, end.err)
+				fmt.Fprintf(r.out, "  to give up on it: %s\n", giveUp(cursor, page.Seq, lease))
+				if err := pause(r.ctx, itemPause); err != nil {
+					why = "interrupted"
+					return err
+				}
+				itemPause = min(itemPause*2, maxItemPause)
+				continue
 			}
-			fmt.Fprintf(r.out, "not handled, trying it again in %s: %v\n", itemPause, err)
-			fmt.Fprintf(r.out, "  to give up on it: %s\n", giveUp(cursor, page.Seq, lease))
-			if err := pause(r.ctx, itemPause); err != nil {
-				return err
-			}
-			itemPause = min(itemPause*2, maxItemPause)
-			continue
+			// Given up: acknowledged, so the next item comes. It stays unread in the agent's inbox.
+			fmt.Fprintf(r.out, "gave up on #%d after %d failed runs; it stays unread in quadit inbox\n", page.Seq, failed)
+			events.say("gave_up", map[string]any{"seq": page.Seq, "why": fmt.Sprintf("%d failed runs", failed)})
 		}
 		itemPause = firstPause
 		if _, err := r.setCursor(cursor, page.Seq, lease); err != nil {
 			if r.ctx.Err() != nil {
+				why = "interrupted"
 				return r.ctx.Err()
 			}
 			if lostTheLease(err) {
-				return r.lostLease(err)
+				why = "refused"
+				return r.lostLease(err, events)
 			}
 			fmt.Fprintln(r.out, "ack failed, the item will come again:", err)
 		}
@@ -164,6 +208,10 @@ type listenOptions struct {
 	cursor           string
 	take             bool
 	by               string
+	limit            time.Duration // the longest one run may take; 0: no limit
+	tries            int           // failed runs of one item before it is given up; 0: never
+	events           string        // where to report what happens (events=PATH)
+	bad              string        // what is wrong with the arguments, when something is
 }
 
 // listenArgs reads them.
@@ -183,46 +231,23 @@ func listenArgs(args []string) listenOptions {
 			opts.cursor = strings.TrimPrefix(args[i], "cursor=")
 		case strings.HasPrefix(args[i], "by="):
 			opts.by = strings.TrimPrefix(args[i], "by=")
+		case strings.HasPrefix(args[i], "limit="):
+			n, ok := wholeIn(strings.TrimPrefix(args[i], "limit="), 1, 86400)
+			if !ok {
+				opts.bad = "limit= is a number of seconds, from 1 to 86400"
+			}
+			opts.limit = time.Duration(n) * time.Second
+		case strings.HasPrefix(args[i], "tries="):
+			n, ok := wholeIn(strings.TrimPrefix(args[i], "tries="), 1, 100)
+			if !ok {
+				opts.bad = "tries= is a number of runs, from 1 to 100"
+			}
+			opts.tries = n
+		case strings.HasPrefix(args[i], "events="):
+			opts.events = strings.TrimPrefix(args[i], "events=")
 		}
 	}
 	return opts
-}
-
-// wakeItem is one inbox item as listen hands it to its command: the line the
-// feed writes (QUADIT_EVENT, and on stdin, as it always was), and the
-// record wait prints for it (QUADIT_ITEM: the ITEM line, the command that
-// reads it, the one that answers it once).
-type wakeItem struct{ line, record string }
-
-// wake runs the command for one inbox item, with alongside running beside
-// it until it ends, and says whether it handled it: an error is the
-// secrets not being given (the command did not run) or the command
-// failing.
-func (r *runner) wake(command, secrets []string, it wakeItem, alongside func(context.Context)) error {
-	// Secrets are fetched for each run, so a changed or withdrawn one
-	// takes effect at once.
-	env, err := r.secretEnv(secrets)
-	if err != nil {
-		return fmt.Errorf("the secrets could not be had, so the command did not run: %w", err)
-	}
-	cmd, out := r.secretCommand(command, env, "QUADIT_EVENT="+it.line, "QUADIT_ITEM="+it.record)
-	cmd.Stdin = strings.NewReader(it.line + "\n")
-	ctx, stop := context.WithCancel(r.ctx)
-	beside := make(chan struct{})
-	go func() {
-		defer close(beside)
-		alongside(ctx)
-	}()
-	runErr := cmd.Run()
-	stop()
-	<-beside
-	if err := out.Flush(); err != nil {
-		fmt.Fprintln(os.Stderr, "the command's output could not be printed:", err)
-	}
-	if runErr != nil {
-		return fmt.Errorf("the command failed: %w", runErr)
-	}
-	return nil
 }
 
 // giveUp is the command that moves the cursor past an item that should not
@@ -241,13 +266,43 @@ func lostTheLease(err error) bool {
 
 // lostLease says, in the command's own words, why listen stops: another
 // session listens (and what, as quadit listening reads it), or took the
-// lease over.
-func (r *runner) lostLease(err error) error {
+// lease over; and reports it as refused.
+func (r *runner) lostLease(err error, events *listenEvents) error {
 	var ae *APIError
 	if errors.As(err, &ae) && ae.Reason == "lease_stale" {
+		events.say("refused", map[string]any{"why": "taken_over"})
 		return errors.New("another session took the lease over; this listen stops")
 	}
+	who := r.listener()
+	refused := map[string]any{"why": "listening_elsewhere"}
+	if core.ListenerLabel.MatchString(who.By) {
+		refused["by"] = who.By
+	}
+	if timeForm.MatchString(who.LastHeard) {
+		refused["last_heard"] = who.LastHeard
+	}
+	events.say("refused", refused)
 	return errors.New(r.whoListens())
+}
+
+// wholeIn reads a whole number from lo to hi.
+func wholeIn(v string, lo, hi int) (int, bool) {
+	n, err := strconv.Atoi(v)
+	return n, err == nil && n >= lo && n <= hi
+}
+
+// handleForEvents is the agent's handle, in its form, for the started
+// event; nothing without events, or when it cannot be had.
+func (r *runner) handleForEvents(events *listenEvents) string {
+	if events == nil {
+		return ""
+	}
+	raw, err := r.c.JSON(r.ctx, "/me", url.Values{})
+	var me struct{ Handle string }
+	if err != nil || json.Unmarshal(raw, &me) != nil || !handleForm.MatchString(me.Handle) {
+		return ""
+	}
+	return me.Handle
 }
 
 // waitHold is the longest the server holds one wait; a longer wait is
@@ -422,7 +477,6 @@ func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) er
 // task key, a page id, a handle, a kind of item.
 var (
 	leaseForm  = regexp.MustCompile(`^[A-HJKMNP-Z2-9]{8}$`)
-	labelForm  = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} '-]{0,39}$`)
 	timeForm   = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$`)
 	taskForm   = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,9}-[0-9]{1,9}$`)
 	pageForm   = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
@@ -567,7 +621,7 @@ type listener struct {
 // is, and when, only in the forms a label and a time have.
 func (who listener) sentences() string {
 	by := "another session"
-	if labelForm.MatchString(who.By) {
+	if core.ListenerLabel.MatchString(who.By) {
 		by = who.By
 	}
 	at := func(t string) string {
@@ -596,10 +650,19 @@ func (who listener) sentences() string {
 // whoListens says what already listens as the caller, in one line, for a
 // wait refused because of it.
 func (r *runner) whoListens() string {
-	raw, err := r.c.JSON(r.ctx, "/listening", url.Values{})
-	var who listener
-	if err != nil || json.Unmarshal(raw, &who) != nil {
+	who := r.listener()
+	if !who.Listening {
 		return "Another session already listens as you."
 	}
 	return strings.TrimSpace(who.sentences())
+}
+
+// listener is what GET /listening says; nothing listening when it cannot
+// be had.
+func (r *runner) listener() listener {
+	var who listener
+	if raw, err := r.c.JSON(r.ctx, "/listening", url.Values{}); err == nil {
+		_ = json.Unmarshal(raw, &who)
+	}
+	return who
 }

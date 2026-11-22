@@ -31,6 +31,7 @@ package core
 
 import (
 	"encoding/json"
+	"regexp"
 	"slices"
 )
 
@@ -232,6 +233,12 @@ const MemberTints = 8
 // ListenCursor is the cursor an agent's inbox is delivered from, by `quadit
 // wait` and `quadit listen`; one session at a time holds its lease.
 const ListenCursor = "listen"
+
+// ListenerLabel is the form of what a listener says it is (by=, "the
+// Quadit app"): a few plain words, at most 40 letters, digits, spaces, -
+// and '. The server keeps only such a label, and the command prints only
+// such a label.
+var ListenerLabel = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} '-]{0,39}$`)
 
 // ProjectSettings are a project's switches.
 type ProjectSettings struct {

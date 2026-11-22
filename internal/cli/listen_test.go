@@ -54,6 +54,8 @@ func (s *inboxServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(20 * time.Millisecond) // a hold with nothing coming
 		s.mu.Lock()
 		_ = json.NewEncoder(w).Encode(map[string]any{"lease": testLease})
+	case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/me"):
+		_, _ = io.WriteString(w, `{"handle":"@coder","kind":"agent"}`)
 	case r.Method == http.MethodPut && strings.Contains(r.URL.Path, "/cursors/"):
 		var body struct {
 			Seq   int64
@@ -548,7 +550,7 @@ func TestAListenerSaysWhatItIs(t *testing.T) {
 // main help points to it.
 func TestHelpListenIsATopic(t *testing.T) {
 	topic := helpFor([]string{"help", "listen"})
-	for _, want := range []string{"listening [lease=ID]", "wait [for=SECONDS]", "take=1", "listen [take=1] [by=WORDS] --exec", "Ctrl-C"} {
+	for _, want := range []string{"listening [lease=ID]", "wait [for=SECONDS]", "take=1", "listen [take=1] [by=WORDS] [limit=SECONDS] [tries=N] [events=PATH] --exec", "Ctrl-C"} {
 		if !strings.Contains(topic, want) {
 			t.Fatalf("quadit help listen does not say %q:\n%s", want, topic)
 		}

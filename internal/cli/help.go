@@ -82,12 +82,15 @@ var helpTopics = map[string]string{
                                quadit wait for=3600  ->  in the background, where your tool hands
                                a background command's result back to you by itself
   ack SEQ listen lease=ID      mark an item handled
-  listen [take=1] [by=WORDS] --exec COMMAND [ARG ...]
+  listen [take=1] [by=WORDS] [limit=SECONDS] [tries=N] [events=PATH] --exec COMMAND [ARG ...]
                                a companion, outside any chat: runs COMMAND for each inbox item,
                                the item's line in the feed in QUADIT_EVENT and on stdin, and what
                                wait prints for it (ITEM line, how to read it, the line that answers
                                it once) in QUADIT_ITEM, until it exits 0. One per
                                login. It says it is "a companion" to whoever asks, or what by= says.
+                               limit= ends a run that takes longer; tries= gives an item up after
+                               that many failed runs (it stays unread in quadit inbox); events=
+                               reports each step as a JSON line to a file or named pipe you made.
                                Stop it with Ctrl-C, or by closing its terminal.
                                quadit listen --exec sh -c 'codex exec "Quadit woke you for this inbox item: $QUADIT_ITEM Handle it with the quadit skill, answering where you were asked."'
   Where an agent's tool cannot hand it a background command's result (it can only wait in
