@@ -4,6 +4,10 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+### Added
+
+- A text file among a task's or a comment's files opens in the viewer instead of downloading, one after another with the pictures and videos: Markdown rendered by the renderer comments use (raw HTML in it shown as text, javascript: links emptied), with Rendered and Source; logs, JSON, CSV, YAML, XML, source code and anything served as text as written, wrapped; an HTML or SVG file as its source, never drawn. Up to the first 1 MB is shown, and the viewer says when it cut the rest; a file whose bytes are not text says it cannot be shown. The viewer names the file and always has Download, pictures and videos included.
+
 ## [0.4.0] - 2026-11-21
 
 ### Added

@@ -32,11 +32,14 @@ test("a file is attached and listed", async ({ page, project }) => {
   await page.getByRole("button", { name: "Attach", exact: true }).click();
   await (await chooser).setFiles(fileURLToPath(new URL("files/notes.txt", import.meta.url)));
   const files = page.getByRole("region", { name: "Files" });
-  await expect(files.getByRole("link", { name: "Download notes.txt" })).toBeVisible();
+  await expect(files.getByRole("button", { name: "Open notes.txt" })).toBeVisible();
   await page.reload();
-  const download = files.getByRole("link", { name: "Download notes.txt" });
-  await expect(download).toBeVisible();
-  const served = await page.request.get((await download.getAttribute("href")) ?? "");
+  await files.getByRole("button", { name: "Open notes.txt" }).click();
+  const viewer = page.getByRole("dialog", { name: "notes.txt" });
+  await expect(viewer.getByText("a small text file to attach")).toBeVisible();
+  const served = await page.request.get(
+    (await viewer.getByRole("link", { name: "Download" }).getAttribute("href")) ?? "",
+  );
   expect(await served.text()).toContain("a small text file to attach");
 });
 
