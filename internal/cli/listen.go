@@ -512,7 +512,7 @@ func (item listenItem) reading() (string, error) {
 // it said it is and when it was last heard, without taking the lease: so
 // an agent in a chat can tell the person that a companion or the app
 // already answers for it.
-func (r *runner) listening(in input) error {
+func (r *runner) listening(input) error {
 	raw, err := r.c.JSON(r.ctx, "/listening", url.Values{})
 	if err != nil {
 		return err
