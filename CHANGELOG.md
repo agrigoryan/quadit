@@ -23,7 +23,6 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 - The skill says what an agent does when a listener outside any chat (a companion, or the Quadit app) wakes it for one item: handle that item, answer where it was asked, and finish, without listening or acknowledging. `docs/agents.md` and the README say that for the server on its computer the desktop app gives the connect code back itself and, while open, answers by itself, one run of the tool per item, with Pause on the tool's card.
 - `scripts/agent-listen-check.sh` gains a companion phase, run as the desktop app runs its listener, and records each run's length and tokens: the cost of one answered comment.
-
 - Listening no longer blocks a chat with a person where the tool can be woken by a background command (Claude Code, Antigravity CLI): the skill has the agent run `quadit wait for=3600` in the background and go on talking. Where the tool cannot be woken (Codex today), the agent says first that listening keeps the chat busy; a run with nobody in it waits in the foreground as before. Before it listens, an agent whose `quadit` commands each ask for approval says so, and how to allow them.
 - `quadit wait for=` goes up to 3600 seconds, renewing the server's holds and the lease inside itself.
 - From a chat whose tool cannot be woken, the agent first asks whether something already listens as it, and if nothing does, offers the person two choices: keep the chat busy, or a companion run in a terminal, given as the exact command. It never searches the quadit binary for how to listen: `quadit help listen` says all of it.
@@ -41,9 +40,6 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 - `GET /agents/connection` is the cheap read of how far each agent is connected, with the tool of the last connect code it gave back; the pages read it again while they show it.
 
 ### Changed
-
-- The skill says what an agent does when a listener outside any chat (a companion, or the Quadit app) wakes it for one item: handle that item, answer where it was asked, and finish, without listening or acknowledging. `docs/agents.md` and the README say that for the server on its computer the desktop app gives the connect code back itself and, while open, answers by itself, one run of the tool per item, with Pause on the tool's card.
-- `scripts/agent-listen-check.sh` gains a companion phase, run as the desktop app runs its listener, and records each run's length and tokens: the cost of one answered comment.
 
 - An agent counts as listening only while its listener holds the lease (`quadit wait`, `quadit listen`) or a webhook pushes to it, or while a `quadit listen` from before this version holds its wait on the cursor `listen`; another wait on the feed or a live stream no longer marks it. The pages read whether it listens again while they show it, so it does not go stale.
 - `quadit listen` holds the same lease (and keeps it beside its login, so a restart goes on with it; `take=1` takes it over), acknowledges with it, stops when another session takes the lease over, and prints the command that gives up on an item it could not handle (`quadit ack SEQ listen lease=ID`). An acknowledgment without a lease is made as before.
@@ -68,9 +64,6 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ### Changed
 
-- The skill says what an agent does when a listener outside any chat (a companion, or the Quadit app) wakes it for one item: handle that item, answer where it was asked, and finish, without listening or acknowledging. `docs/agents.md` and the README say that for the server on its computer the desktop app gives the connect code back itself and, while open, answers by itself, one run of the tool per item, with Pause on the tool's card.
-- `scripts/agent-listen-check.sh` gains a companion phase, run as the desktop app runs its listener, and records each run's length and tokens: the cost of one answered comment.
-
 - The desktop app's first run happens in one window, the one the workspace opens in, instead of small windows of its own: Welcome, then "Connect your AI tools", which looks for the tools on the computer and shows each as a card that connects with one button, says in plain words which files it changes, and takes it back with Undo; Continue opens the workspace on its sample tasks. The Connect window shows the tools with the same cards, its technical choices under More options.
 
 ### Fixed
@@ -91,9 +84,6 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 - `quadit reply` takes `file=PATH`, as `comment` and `result` do, and the agent skill asks agents to attach what they made and to put each option's picture on the option.
 
 ### Changed
-
-- The skill says what an agent does when a listener outside any chat (a companion, or the Quadit app) wakes it for one item: handle that item, answer where it was asked, and finish, without listening or acknowledging. `docs/agents.md` and the README say that for the server on its computer the desktop app gives the connect code back itself and, while open, answers by itself, one run of the tool per item, with Pause on the tool's card.
-- `scripts/agent-listen-check.sh` gains a companion phase, run as the desktop app runs its listener, and records each run's length and tokens: the cost of one answered comment.
 
 - Local builds take their version from the server's own tags.
 
