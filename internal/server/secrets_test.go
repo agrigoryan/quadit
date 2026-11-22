@@ -71,7 +71,9 @@ func TestVault(t *testing.T) {
 		}
 		// Other secrets given in a change are blanked on the record too.
 		s.change(t, s.owner, "", "integration.create", M{"kind": "github", "secret": "ghp_integration_secret", "config": M{"repo": "a/b"}})
-		s.change(t, s.owner, "", "webhook.create", M{"name": "hook", "url": api.URL + "/hook", "secret": "whsec_signing_secret"})
+		// The webhook's deliveries go to a receiver of their own: the service
+		// counts only what the secret's requests send it.
+		s.change(t, s.owner, "", "webhook.create", M{"name": "hook", "url": newReceiver(t, "").srv.URL, "secret": "whsec_signing_secret"})
 		for _, path := range []string{w + "/audit", "/api/v1/admin/audit", "/api/v1/admin/audit?format=csv"} {
 			if out := s.call(t, s.owner, "", "GET", path, nil, 200, nil); strings.Contains(out, "ghp_integration_secret") || strings.Contains(out, "whsec_signing_secret") {
 				t.Fatalf("%s holds a secret in plain text", path)
