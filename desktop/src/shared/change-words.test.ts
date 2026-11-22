@@ -1,6 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { countWord, diskLine, fileWords, filesSummary, sheetIntro, unrevokedWords } from "@/shared/change-words";
 
+describe("fileWords for a tool's command rules", () => {
+  it("names the rules file and its folder plainly", () => {
+    expect(fileWords({ role: "rules", change: "new" }, "Codex")).toEqual({
+      title: "Codex’s command rules",
+      what: "Lets Codex run quadit without asking you each time.",
+      chip: "New file",
+    });
+    expect(fileWords({ role: "rules", change: "edited" }, "Codex").chip).toBe("Added to");
+    expect(fileWords({ role: "rules-folder", change: "new" }, "Codex")).toEqual({
+      title: "A folder for Codex’s command rules",
+      what: "Made where Codex looks for them.",
+      chip: "New folder",
+    });
+  });
+});
+
 describe("fileWords", () => {
   it("says what each kind of file is for, in plain words, with what happens to it", () => {
     expect(fileWords({ role: "skill", change: "new" }, "Claude Code")).toEqual({
@@ -62,26 +78,38 @@ describe("countWord", () => {
 });
 
 describe("diskLine", () => {
+  it("says in a few words that connecting lets a tool run quadit without asking, where it has settings for that", () => {
+    const codex = { name: "Codex", ownLogin: true, worksAs: null, allows: true };
+    expect(diskLine(codex, false, false)).toBe(
+      "Adds the Quadit skill and a login file for this tool, and lets Codex run quadit without asking. Nothing else is touched; a backup is kept.",
+    );
+    expect(diskLine(codex, false, true)).toBe(
+      "Added the Quadit skill and a login file, and let Codex run quadit without asking. A backup of everything is kept.",
+    );
+  });
+
   it("says what connecting a tool with a login of its own adds, and that nothing else is touched", () => {
-    expect(diskLine({ ownLogin: true, worksAs: null }, false, false)).toBe(
+    expect(diskLine({ name: "Cursor", ownLogin: true, worksAs: null, allows: false }, false, false)).toBe(
       "Adds the Quadit skill and a login file for this tool. Nothing else is touched; a backup is kept.",
     );
-    expect(diskLine({ ownLogin: true, worksAs: null }, false, true)).toBe(
+    expect(diskLine({ name: "Cursor", ownLogin: true, worksAs: null, allows: false }, false, true)).toBe(
       "Added the Quadit skill and a login file. A backup of everything is kept.",
     );
   });
 
   it("names the quadit command when the computer has none yet, and the computer's login for a tool without its own", () => {
-    expect(diskLine({ ownLogin: true, worksAs: null }, true, false)).toBe(
+    expect(diskLine({ name: "Cursor", ownLogin: true, worksAs: null, allows: false }, true, false)).toBe(
       "Adds the quadit command, the Quadit skill and a login file for this tool. Nothing else is touched; a backup is kept.",
     );
-    expect(diskLine({ ownLogin: false, worksAs: null }, false, false)).toBe(
+    expect(diskLine({ name: "Cursor", ownLogin: false, worksAs: null, allows: false }, false, false)).toBe(
       "Adds the Quadit skill; it signs in with this computer’s Quadit login. Nothing else is touched; a backup is kept.",
     );
   });
 
   it("says whom a tool without a login of its own works as, when this computer's login is there already", () => {
-    expect(diskLine({ ownLogin: false, worksAs: "@ann on https://q.example" }, false, true)).toBe(
+    expect(
+      diskLine({ name: "Cursor", ownLogin: false, worksAs: "@ann on https://q.example", allows: false }, false, true),
+    ).toBe(
       "Added the Quadit skill; it works as @ann on https://q.example, this computer’s Quadit login. A backup of everything is kept.",
     );
   });

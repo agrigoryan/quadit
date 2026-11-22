@@ -42,14 +42,25 @@ export interface Harness {
    * the computer's default login.
    */
   env?(home: string, config: string): Change[];
-  /** The changes that let its agent run quadit without asking each time, and what that means. */
-  allowCli?: { changes(home: string): Change[]; warning?: string };
+  /**
+   * The changes that let its agent run quadit without asking each time,
+   * which Connect always makes (desktop contract §11, second amendment: the
+   * owner's "max permissive by default"), and `said`, the plain statement of
+   * what they let it do, shown with the files. `quadit` is the absolute path
+   * of the quadit command on the PATH, as an agent may call it; null when
+   * there is none.
+   */
+  allowCli?: { changes(home: string, quadit: string | null): Change[]; said: string };
   mcp?: {
-    /** The changes that add Quadit's MCP server at `url`; `unattended`: its tools run without asking. */
-    changes(home: string, url: string, unattended: boolean): Change[];
+    /** The changes that add Quadit's MCP server at `url`. */
+    changes(home: string, url: string): Change[];
+    /** The changes that let its agent use Quadit's MCP tools without asking, always made with the server's, and what they let it do. */
+    allow?: { changes(home: string, url: string): Change[]; said: string };
     /** How the person signs the harness in to the server. */
     signIn: string;
   };
+  /** Where it keeps command rules the app adds to (allowCli), under the home folder: so a plan names them plainly. */
+  rules?: { folder: string; file: string };
 }
 
 export const HARNESSES: readonly Harness[] = [
@@ -73,26 +84,28 @@ export const HARNESSES: readonly Harness[] = [
           value: "Bash(quadit:*)",
         },
       ],
+      said: "Claude Code may run quadit commands without asking.",
     },
     mcp: {
-      changes: (home, url, unattended) => [
+      changes: (home, url) => [
         {
           kind: "json",
           path: join(home, ".claude.json"),
           keyPath: ["mcpServers", "quadit"],
           value: { type: "http", url },
         },
-        ...(unattended
-          ? [
-              {
-                kind: "json-item" as const,
-                path: join(home, ".claude", "settings.json"),
-                keyPath: ["permissions", "allow"],
-                value: "mcp__quadit",
-              },
-            ]
-          : []),
       ],
+      allow: {
+        changes: (home) => [
+          {
+            kind: "json-item",
+            path: join(home, ".claude", "settings.json"),
+            keyPath: ["permissions", "allow"],
+            value: "mcp__quadit",
+          },
+        ],
+        said: "Claude Code may use Quadit's MCP tools without asking.",
+      },
       signIn: "In Claude Code, type /mcp, choose quadit and then Authenticate.",
     },
   },
@@ -112,19 +125,28 @@ export const HARNESSES: readonly Harness[] = [
         entries: { QUADIT_CONFIG: config },
       },
     ],
+    // Two settings: its sandbox may reach the network (quadit cannot reach the server from inside it otherwise), and
+    // a command rule per way an agent calls quadit, which Codex runs outside the sandbox without asking
+    // (`codex execpolicy check --rules FILE -- quadit me` says "allow" for each). A command wrapped in a shell
+    // (`zsh -lc "quadit …"`) matches no rule: there the sandbox's network is what lets quadit work.
     allowCli: {
-      changes: (home) => [
+      changes: (home, quadit) => [
         {
           kind: "toml",
           path: join(home, ".codex", "config.toml"),
           table: ["sandbox_workspace_write"],
           entries: { network_access: true },
         },
+        { kind: "folder", path: join(home, ".codex", "rules") },
+        ...["quadit", ...(quadit ? [quadit] : [])].map((command) => ({
+          kind: "line" as const,
+          path: join(home, ".codex", "rules", "default.rules"),
+          line: codexRule(command),
+        })),
       ],
-      warning:
-        "Codex's sandbox has no network unless it is let out, so quadit cannot reach the server from inside it. " +
-        "Allowing it sets network_access = true for its sandbox: every command Codex runs there may then reach the network, not only quadit.",
+      said: "Codex may run quadit without asking, and its sandbox may reach the network (every command it runs, not only quadit).",
     },
+    rules: { folder: ".codex/rules", file: ".codex/rules/default.rules" },
     mcp: {
       changes: (home, url) => [
         { kind: "toml", path: join(home, ".codex", "config.toml"), table: ["mcp_servers", "quadit"], entries: { url } },
@@ -141,14 +163,25 @@ export const HARNESSES: readonly Harness[] = [
     skills: ".agents/skills",
     listenVerified: false,
     mcp: {
-      changes: (home, url, unattended) => [
+      changes: (home, url) => [
         {
           kind: "json",
           path: join(home, ".gemini", "settings.json"),
           keyPath: ["mcpServers", "quadit"],
-          value: unattended ? { httpUrl: url, trust: true } : { httpUrl: url },
+          value: { httpUrl: url },
         },
       ],
+      allow: {
+        changes: (home, url) => [
+          {
+            kind: "json",
+            path: join(home, ".gemini", "settings.json"),
+            keyPath: ["mcpServers", "quadit"],
+            value: { httpUrl: url, trust: true },
+          },
+        ],
+        said: "Gemini CLI may use Quadit's MCP tools without asking.",
+      },
       signIn: "In Gemini CLI, type /mcp auth quadit",
     },
   },
@@ -229,4 +262,12 @@ function opencodeConfig(home: string): string {
   const folder = join(home, ".config", "opencode");
   const jsonc = join(folder, "opencode.jsonc");
   return existsSync(jsonc) ? jsonc : join(folder, "opencode.json");
+}
+
+/**
+ * A Codex command rule that lets `command` (and whatever follows it) run
+ * without asking, with the app's mark, so Disconnect takes out exactly it.
+ */
+function codexRule(command: string): string {
+  return `prefix_rule(pattern=[${JSON.stringify(command)}], decision="allow")  # Added by the Quadit app: Disconnect in the app takes it out.`;
 }

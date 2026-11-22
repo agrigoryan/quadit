@@ -194,7 +194,6 @@ function setUp({
     workspaceId: "w1",
     methods: ["cli"],
     agent: { id: "u2" },
-    allowUnattended: false,
     ...extra,
   });
   const connect = async (c: ConnectChoice) => {
@@ -232,7 +231,13 @@ posixOnly("Connect plans", () => {
     [
       "codex",
       ["cli", "mcp"],
-      [".agents/skills/quadit/SKILL.md", "Library/Application Support/quadit/codex.json", ".codex/config.toml"],
+      [
+        ".agents/skills/quadit/SKILL.md",
+        "Library/Application Support/quadit/codex.json",
+        ".codex/config.toml",
+        ".codex/rules",
+        ".codex/rules/default.rules",
+      ],
     ],
     [
       "gemini",
@@ -339,7 +344,7 @@ posixOnly("Connect plans", () => {
     const diff = opencode.plan.files.find((f) => f.path.endsWith("opencode.jsonc"))?.diff ?? "";
     expect(diff).toContain("// mine");
     expect(diff).toContain('+    "quadit": {');
-    const claude = await connections.planConnect(choice("claude", { allowUnattended: true }));
+    const claude = await connections.planConnect(choice("claude"));
     if (!claude.ok) throw new Error(claude.error);
     const settings = claude.plan.files.find((f) => f.path.endsWith(".claude/settings.json"))?.diff ?? "";
     expect(settings).toContain('"Read"');
@@ -379,7 +384,6 @@ posixOnly("Connect and Disconnect", () => {
       workspaceId: "w1",
       methods: ["cli", "mcp"],
       agent: { id: "u2" },
-      allowUnattended: true,
     });
     expect(hint).toContain("@coder");
     expect(asked).toEqual([
@@ -644,7 +648,7 @@ posixOnly("the skill, kept up to date with the app's quadit", () => {
     const { connections, connect, choice, read, ledger } = setUp();
     await connect(choice("claude"));
     const before = ledger();
-    expect(await connections.refreshSkills()).toEqual({ updated: [], changedByHand: [] });
+    expect((await connections.refresh()).skills).toEqual({ updated: [], changedByHand: [] });
     expect(read(".claude/skills/quadit/SKILL.md")).toBe("# Quadit skill\n");
     expect(ledger()).toBe(before);
   });
@@ -655,7 +659,7 @@ posixOnly("the skill, kept up to date with the app's quadit", () => {
     // The app was updated: its quadit carries a newer skill.
     writeFileSync(join(root, "quadit-bundled.skill"), NEWER);
     const skill = join(home, ".claude", "skills", "quadit", "SKILL.md");
-    expect(await connections.refreshSkills()).toEqual({ updated: [skill], changedByHand: [] });
+    expect((await connections.refresh()).skills).toEqual({ updated: [skill], changedByHand: [] });
     expect(read(".claude/skills/quadit/SKILL.md")).toBe(NEWER);
     const backups = readdirSync(join(root, "data", "backups")).filter((d) => d.endsWith("-skill"));
     expect(backups).toHaveLength(1);
@@ -672,7 +676,7 @@ posixOnly("the skill, kept up to date with the app's quadit", () => {
     await connect(choice("cursor", { agent: null }));
     writeFileSync(join(root, "quadit-bundled.skill"), NEWER);
     const skill = join(home, ".agents", "skills", "quadit", "SKILL.md");
-    expect(await connections.refreshSkills()).toEqual({ updated: [skill], changedByHand: [] });
+    expect((await connections.refresh()).skills).toEqual({ updated: [skill], changedByHand: [] });
     expect(read(".agents/skills/quadit/SKILL.md")).toBe(NEWER);
     await disconnect("gemini");
     expect(existsSync(skill)).toBe(true);
@@ -686,7 +690,7 @@ posixOnly("the skill, kept up to date with the app's quadit", () => {
     const skill = join(home, ".claude", "skills", "quadit", "SKILL.md");
     writeFileSync(skill, "# My own notes\n");
     writeFileSync(join(root, "quadit-bundled.skill"), NEWER);
-    expect(await connections.refreshSkills()).toEqual({ updated: [], changedByHand: [skill] });
+    expect((await connections.refresh()).skills).toEqual({ updated: [], changedByHand: [skill] });
     expect(read(".claude/skills/quadit/SKILL.md")).toBe("# My own notes\n");
     const claude = async () => (await connections.state()).harnesses.find((h) => h.id === "claude");
     expect((await claude())?.skillChangedByHand).toBe(true);
@@ -706,9 +710,145 @@ posixOnly("the skill, kept up to date with the app's quadit", () => {
     mkdirSync(join(home, ".claude", "skills", "quadit"), { recursive: true });
     writeFileSync(join(home, ".claude", "skills", "quadit", "SKILL.md"), "# Installed by hand\n");
     writeFileSync(join(root, "quadit-bundled.skill"), NEWER);
-    expect(await connections.refreshSkills()).toEqual({ updated: [], changedByHand: [] });
+    expect((await connections.refresh()).skills).toEqual({ updated: [], changedByHand: [] });
     expect(read(".claude/skills/quadit/SKILL.md")).toBe("# Installed by hand\n");
     expect(await connections.updateSkill("claude")).toEqual({ ok: false, error: "Claude Code is not connected." });
+  });
+});
+
+posixOnly("letting each tool use Quadit without asking (desktop contract §11, second amendment)", () => {
+  const MARK = "  # Added by the Quadit app: Disconnect in the app takes it out.";
+
+  it("is written by every Connect of Codex: its sandbox's network and a rule for quadit, by name and by path", async () => {
+    const { connect, disconnect, choice, home, bin, read } = setUp();
+    mkdirSync(join(home, ".codex", "rules"), { recursive: true });
+    writeFileSync(join(home, ".codex", "config.toml"), 'model = "o9"\n');
+    const mine = 'prefix_rule(pattern=["git", "status"], decision="allow")\n';
+    writeFileSync(join(home, ".codex", "rules", "default.rules"), mine);
+    await connect(choice("codex"));
+    expect(read(".codex/config.toml")).toContain("[sandbox_workspace_write]\nnetwork_access = true");
+    expect(read(".codex/rules/default.rules")).toBe(
+      `${mine}prefix_rule(pattern=["quadit"], decision="allow")${MARK}\n` +
+        `prefix_rule(pattern=[${JSON.stringify(join(bin, "quadit"))}], decision="allow")${MARK}\n`,
+    );
+    await disconnect("codex");
+    expect(read(".codex/config.toml")).toBe('model = "o9"\n');
+    expect(read(".codex/rules/default.rules")).toBe(mine);
+  });
+
+  it("makes Codex's rules file and folder when they are missing, and takes both away with Disconnect", async () => {
+    const { connect, disconnect, choice, home, read } = setUp();
+    await connect(choice("codex"));
+    expect(read(".codex/rules/default.rules")).toContain('prefix_rule(pattern=["quadit"], decision="allow")');
+    await disconnect("codex");
+    expect(existsSync(join(home, ".codex", "rules"))).toBe(false);
+  });
+
+  it("leaves what is there already as it is, and says what it cannot write for the person to add, connecting all the same", async () => {
+    const { connections, connect, choice, home, read } = setUp();
+    mkdirSync(join(home, ".codex"));
+    writeFileSync(join(home, ".codex", "config.toml"), "[sandbox_workspace_write]\nwritable_roots = []\n");
+    const planned = await connections.planConnect(choice("codex"));
+    if (!planned.ok) throw new Error(planned.error);
+    expect(planned.plan.warnings.join(" ")).toContain("already has sandbox_workspace_write");
+    await connect(choice("codex"));
+    expect(read(".codex/config.toml")).toContain("writable_roots = []");
+    expect(read(".codex/config.toml")).not.toContain("network_access");
+    expect(read(".codex/rules/default.rules")).toContain("quadit");
+    // The person's own setting, there before, is the person's: not recorded, not taken away.
+    const own = setUp();
+    mkdirSync(join(own.home, ".codex"));
+    writeFileSync(join(own.home, ".codex", "config.toml"), "[sandbox_workspace_write]\nnetwork_access = true\n");
+    await own.connect(own.choice("codex"));
+    expect(own.ledger()).not.toContain("network_access");
+    await own.disconnect("codex");
+    expect(own.read(".codex/config.toml")).toBe("[sandbox_workspace_write]\nnetwork_access = true\n");
+  });
+
+  it("is written for Claude Code, and for Gemini CLI's MCP, and Disconnect leaves their settings as they were", async () => {
+    const { connect, disconnect, choice, home, json } = setUp();
+    mkdirSync(join(home, ".claude"));
+    writeFileSync(join(home, ".claude", "settings.json"), JSON.stringify({ permissions: { allow: ["Read"] } }));
+    await connect(choice("claude", { methods: ["cli", "mcp"] }));
+    expect((json(".claude/settings.json").permissions as { allow: string[] }).allow).toEqual([
+      "Read",
+      "Bash(quadit:*)",
+      "mcp__quadit",
+    ]);
+    await disconnect("claude");
+    expect(json(".claude/settings.json")).toEqual({ permissions: { allow: ["Read"] } });
+
+    await connect(choice("gemini", { methods: ["cli", "mcp"] }));
+    expect(json(".gemini/settings.json")).toEqual({
+      mcpServers: { quadit: { httpUrl: `${ORIGIN}/mcp`, trust: true } },
+    });
+    await disconnect("gemini");
+    expect(json(".gemini/settings.json")).toEqual({});
+  });
+
+  it("is shown with the files, in plain words: what each file is, and what it lets the tool do", async () => {
+    const { connections, choice } = setUp();
+    const planned = await connections.planConnect(choice("codex"));
+    if (!planned.ok) throw new Error(planned.error);
+    expect(planned.plan.files.slice(-2).map((f) => [f.shown, f.role, f.change])).toEqual([
+      ["~/.codex/rules", "rules-folder", "new"],
+      ["~/.codex/rules/default.rules", "rules", "new"],
+    ]);
+    expect(planned.plan.warnings).toContain(
+      "Codex may run quadit without asking, and its sandbox may reach the network (every command it runs, not only quadit).",
+    );
+    const claude = await connections.planConnect(choice("claude"));
+    if (!claude.ok) throw new Error(claude.error);
+    expect(claude.plan.warnings).toContain("Claude Code may run quadit commands without asking.");
+    expect((await connections.state()).harnesses.map((h) => [h.id, h.allows])).toEqual([
+      ["claude", true],
+      ["codex", true],
+      ["gemini", false],
+      ["antigravity", false],
+      ["cursor", false],
+      ["opencode", false],
+      ["pi", false],
+      ["copilot", false],
+    ]);
+  });
+
+  it("is brought to a tool connected before this version at a start, once: one the person takes away later stays away", async () => {
+    const { connections, connect, disconnect, choice, home, root, json } = setUp();
+    mkdirSync(join(home, ".claude"));
+    writeFileSync(join(home, ".claude", "settings.json"), JSON.stringify({ permissions: { allow: ["Read"] } }));
+    await connect(choice("claude"));
+    // As an older version left it: no allow entry written, and no mark that it was brought up to date.
+    const file = join(root, "data", "connections.json");
+    const old = JSON.parse(readFileSync(file, "utf8"));
+    const claude = old.harnesses.claude;
+    delete claude.allowed;
+    claude.edits = claude.edits.filter((r: { kind: string; value?: string }) => r.value !== "Bash(quadit:*)");
+    writeFileSync(file, JSON.stringify(old));
+    writeFileSync(
+      join(home, ".claude", "settings.json"),
+      JSON.stringify({
+        permissions: { allow: ["Read"] },
+        env: (json(".claude/settings.json") as { env: unknown }).env,
+      }),
+    );
+
+    expect((await connections.refresh()).allowed).toEqual(["claude"]);
+    expect((json(".claude/settings.json").permissions as { allow: string[] }).allow).toEqual([
+      "Read",
+      "Bash(quadit:*)",
+    ]);
+    // The person takes it away: the next start leaves it so.
+    writeFileSync(
+      join(home, ".claude", "settings.json"),
+      JSON.stringify({
+        permissions: { allow: ["Read"] },
+        env: (json(".claude/settings.json") as { env: unknown }).env,
+      }),
+    );
+    expect((await connections.refresh()).allowed).toEqual([]);
+    expect((json(".claude/settings.json").permissions as { allow: string[] }).allow).toEqual(["Read"]);
+    await disconnect("claude");
+    expect(json(".claude/settings.json")).toEqual({ permissions: { allow: ["Read"] } });
   });
 });
 

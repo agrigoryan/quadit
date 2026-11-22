@@ -12,7 +12,6 @@ describe("defaultChoice", () => {
       workspaceId: "w1",
       methods: ["cli"],
       agent: { create: { name: "Claude Code", handle: "claude-code" } },
-      allowUnattended: false,
     });
   });
 

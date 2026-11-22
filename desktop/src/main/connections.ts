@@ -36,7 +36,13 @@
 // (the app's own, updated with the app): at every start, a skill file that
 // still says what Connect wrote is rewritten through the same plan, backup
 // and ledger, so Disconnect still takes back exactly what is there; one the
-// person changed since is left, and its tool says so (refreshSkills).
+// person changed since is left, and its tool says so (refresh).
+//
+// What lets a tool use Quadit without asking each time (its allow entries,
+// Codex's command rules and sandbox network: harnesses.ts) is written by
+// every Connect, shown with the files in plain words, and taken back by
+// Disconnect; a tool connected by a version from before is brought up to it
+// once, at a start (refresh), and never again after the person takes one away.
 
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -49,6 +55,7 @@ import {
   diffOf,
   EditRefused,
   type FileEdit,
+  inPlace,
   planChanges,
   planReverts,
   readText,
@@ -113,6 +120,12 @@ interface Connection {
   member?: { id: string; handle: string } | null;
   /** The connect code open for `member` in this tool, until it is given back; absent in ledgers from before codes. */
   code?: OpenCode | null;
+  /**
+   * What lets the tool use Quadit without asking was written for this
+   * connection (at Connect, or once at a start since): it is not written
+   * again, even after the person takes it away. Absent in ledgers from before.
+   */
+  allowed?: boolean;
   at: number;
 }
 
@@ -214,6 +227,7 @@ export class Connections {
           mcp: !!harness.mcp,
           cliIdentity: harness.env ? "own" : "default",
           listenVerified: harness.listenVerified,
+          allows: !!harness.allowCli,
           skillChangedByHand: !!connection && skill !== null && this.skillState(ledger, harness, skill) === "by hand",
           connected: connection
             ? {
@@ -249,8 +263,63 @@ export class Connections {
    * background too: the person agreed to these files when connecting. Gives
    * the files rewritten, and those left for being changed by hand.
    */
-  refreshSkills(): Promise<{ updated: string[]; changedByHand: string[] }> {
-    return this.inTurn(async () => {
+  /**
+   * What the app does for the tools Connect set up at every start of the
+   * app, in the background too, saying nothing: their skills follow the
+   * quadit they run (refreshSkills), and a tool connected by a version from
+   * before is given, once, what lets it use Quadit without asking
+   * (allowConnected). Gives what was done.
+   */
+  refresh(): Promise<{ skills: { updated: string[]; changedByHand: string[] }; allowed: string[] }> {
+    return this.inTurn(async () => ({ skills: await this.refreshSkills(), allowed: await this.allowConnected() }));
+  }
+
+  /**
+   * Gives each tool in the ledger not yet given them (a connection from a
+   * version before) what lets it use Quadit without asking, through the
+   * same plan, backup and ledger as Connect, so Disconnect takes it back;
+   * what is there already is the person's and left alone. Marked once done,
+   * it is never written again for that connection, even after the person
+   * takes it away; one the app could not write (a table of theirs in the
+   * way) is tried again at the next start. Gives the tools written to.
+   */
+  private async allowConnected(): Promise<string[]> {
+    const ledger = this.ledger();
+    const owed = Object.entries(ledger.harnesses).filter(([, connection]) => !connection.allowed);
+    if (this.parts.platform === "win32" || owed.length === 0) return [];
+    const { home } = this.parts;
+    const look = await this.parts.cli.look();
+    const done: string[] = [];
+    for (const [id, connection] of owed) {
+      const harness = HARNESSES.find((h) => h.id === id);
+      if (!harness) continue;
+      const groups: AllowGroup[] = [];
+      if (connection.methods.includes("cli") && harness.allowCli)
+        groups.push({ changes: harness.allowCli.changes(home, look.found?.path ?? null), said: harness.allowCli.said });
+      const origin = this.parts.server(connection.serverId)?.origin;
+      const mcpAllow = harness.mcp?.allow;
+      if (connection.methods.includes("mcp") && mcpAllow && origin)
+        groups.push({ changes: mcpAllow.changes(home, `${origin}/mcp`), said: mcpAllow.said });
+      const others = this.recordsByTarget({
+        harnesses: Object.fromEntries(Object.entries(ledger.harnesses).filter(([other]) => other !== id)),
+      });
+      const { make, refused } = allowable(groups, others, []);
+      const own = make.filter((change) => !others.has(targetOf(change)));
+      const { edits, applied } = planChanges(own);
+      if (edits.length > 0) {
+        backUp(edits, this.backupDir(id));
+        writeEdits(edits);
+        done.push(id);
+      }
+      connection.edits.push(...applied, ...make.flatMap((change) => others.get(targetOf(change)) ?? []));
+      if (!refused) connection.allowed = true;
+    }
+    this.saveLedger(ledger);
+    return done;
+  }
+
+  private async refreshSkills(): Promise<{ updated: string[]; changedByHand: string[] }> {
+    {
       const done = { updated: [] as string[], changedByHand: [] as string[] };
       const ledger = this.ledger();
       if (this.parts.platform === "win32" || Object.keys(ledger.harnesses).length === 0) return done;
@@ -268,7 +337,7 @@ export class Connections {
       }
       if (done.updated.length > 0) this.saveLedger(ledger);
       return done;
-    });
+    }
   }
 
   /** Writes the skill the tools' quadit carries now over a tool's skill the person changed by hand (its card's "Update it"). */
@@ -381,6 +450,7 @@ export class Connections {
     const others = this.recordsByTarget(ledger);
     const changes: Change[] = [];
     const warnings: string[] = [];
+    const allow: AllowGroup[] = [];
     let login: { binary: string; config: string } | null = null;
     let worksAs: { id: string; handle: string } | null = null;
     let worksAsServer: string | null = null;
@@ -417,6 +487,10 @@ export class Connections {
         path: join(home, harness.skills, "quadit", "SKILL.md"),
         content: await cli.skill(binary).catch(tooOld),
       });
+      // The command as an agent may call it by its path: the one on the PATH, or the app's copy linked there now.
+      const command = look.found?.path ?? (look.linkInto && cli.bundled ? join(look.linkInto.folder, "quadit") : null);
+      if (harness.allowCli)
+        allow.push({ changes: harness.allowCli.changes(home, command), said: harness.allowCli.said });
       const defaultConfig = await cli.defaultConfig(binary).catch(tooOld);
       const shown = `${JSON.stringify({ url: origin, token: MASKED_TOKEN }, null, 2)}\n`;
       if (harness.env) {
@@ -453,14 +527,13 @@ export class Connections {
         changes.push({ kind: "written-by", path: defaultConfig, shown });
         login = { binary, config: defaultConfig };
       }
-      if (choice.allowUnattended && harness.allowCli) {
-        changes.push(...harness.allowCli.changes(home));
-        if (harness.allowCli.warning) warnings.push(harness.allowCli.warning);
-      }
     }
     if (methods.includes("mcp") && harness.mcp) {
-      changes.push(...harness.mcp.changes(home, `${origin}/mcp`, choice.allowUnattended));
+      changes.push(...harness.mcp.changes(home, `${origin}/mcp`));
+      const { allow: mcpAllow } = harness.mcp;
+      if (mcpAllow) allow.push({ changes: mcpAllow.changes(home, `${origin}/mcp`), said: mcpAllow.said });
     }
+    changes.push(...allowable(allow, others, warnings).make);
     if (harness.id === "claude" && claudePluginInstalled(home)) {
       warnings.push(
         "The Quadit plugin for Claude Code is installed. Its MCP entry needs QUADIT_URL and QUADIT_TOKEN in the environment, " +
@@ -606,6 +679,7 @@ export class Connections {
         token,
         member,
         code: code?.ok ? code.code : null,
+        allowed: true,
         at: Date.now(),
       };
       this.saveLedger(ledger);
@@ -813,7 +887,7 @@ export class Connections {
     const files: PlanFile[] = plan.edits.map((edit) => ({
       path: edit.path,
       shown: homely(home, edit.path),
-      role: roleOf(edit.kind, plan.harness, edit.writtenBy === true || edit.path === login),
+      role: roleOf(edit, plan.harness, home, edit.writtenBy === true || edit.path === login),
       change:
         plan.kind === "connect"
           ? edit.before === null
@@ -832,7 +906,7 @@ export class Connections {
         files.push({
           path: record.path,
           shown: homely(home, record.path),
-          role: roleOf(record.kind, plan.harness, record.path === plan.sharedToken?.config),
+          role: roleOf(record, plan.harness, home, record.path === plan.sharedToken?.config),
           change: "shared",
           diff: "",
           note: "Done already for another connected harness; shared with it.",
@@ -900,13 +974,63 @@ function memberOfRecord(connection: Connection, harness: Harness): { id: string;
   return harness.env ? connection.agent : null;
 }
 
+/** Changes that let a tool use Quadit without asking, and the plain statement of what they let it do. */
+interface AllowGroup {
+  changes: Change[];
+  said: string;
+}
+
+/**
+ * Of what lets a tool use Quadit without asking, the changes to make: not
+ * one in place already by the person's hand (one another connection made is
+ * made again, to be shared with it), nor one the app cannot make (a table of
+ * the person's in the way), which is said in `warnings` for them to make by
+ * hand. Each group's statement is said too, when any of it holds. `refused`:
+ * some change could not be made.
+ */
+function allowable(
+  groups: AllowGroup[],
+  others: Map<string, Applied>,
+  warnings: string[],
+): { make: Change[]; refused: boolean } {
+  const make: Change[] = [];
+  let refused = false;
+  for (const group of groups) {
+    let holds = false;
+    for (const change of group.changes) {
+      if (inPlace(change) && !others.has(targetOf(change))) {
+        holds = true;
+        continue;
+      }
+      try {
+        planChanges([change]);
+        make.push(change);
+        holds = true;
+      } catch (err) {
+        if (!(err instanceof EditRefused)) throw err;
+        warnings.push(err.message);
+        refused = true;
+      }
+    }
+    if (holds) warnings.push(group.said);
+  }
+  return { make, refused };
+}
+
 /**
  * What a file is to a plan, from the kind of change that made it (or the
  * record of it): `login`, it is the quadit login the plan makes or takes back,
  * the tool's own or, for a tool without a setting for one, the computer's default.
  */
-function roleOf(kind: FileEdit["kind"], harness: Harness, login: boolean): FileRole {
+function roleOf(
+  { kind, path }: { kind: FileEdit["kind"]; path: string },
+  harness: Harness,
+  home: string,
+  login: boolean,
+): FileRole {
   if (login || kind === "written-by") return harness.env ? "login" : "shared-login";
+  if (harness.rules && path === realPath(join(home, harness.rules.file))) return "rules";
+  if (harness.rules && path === realPath(join(home, harness.rules.folder))) return "rules-folder";
   switch (kind) {
     case "file":
       return "skill";

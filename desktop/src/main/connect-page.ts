@@ -160,7 +160,6 @@ function choiceOf(raw: unknown): ConnectChoice {
         : typeof agent.id === "string"
           ? { id: agent.id }
           : { create: { name: text(create.name), handle: text(create.handle) } },
-    allowUnattended: c.allowUnattended === true,
   };
 }
 

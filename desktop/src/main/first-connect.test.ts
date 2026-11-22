@@ -22,6 +22,7 @@ function harness(id: string, name: string, extra: Partial<HarnessView> = {}): Ha
     cliIdentity: "own",
     listenVerified: true,
     skillChangedByHand: false,
+    allows: false,
     connected: null,
     ...extra,
   };
@@ -170,6 +171,7 @@ describe("FirstConnect", () => {
           ownLogin: true,
           worksAs: null,
           listenVerified: true,
+          allows: false,
         },
         {
           id: "pi",
@@ -179,6 +181,7 @@ describe("FirstConnect", () => {
           ownLogin: false,
           worksAs: "@ann on https://q.example",
           listenVerified: false,
+          allows: false,
         },
       ],
       addsCommand: false,
@@ -201,7 +204,6 @@ describe("FirstConnect", () => {
         workspaceId: "w1",
         methods: ["cli"],
         agent: { create: { name: "Claude Code", handle: "claude-code" } },
-        allowUnattended: false,
       },
     ]);
     expect(appliedIds).toEqual(["p1"]);

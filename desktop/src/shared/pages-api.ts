@@ -88,6 +88,8 @@ export interface ToolView {
   worksAs: string | null;
   /** Whether an agent in it was seen to listen (main/harnesses.ts); its card says so when not. */
   listenVerified: boolean;
+  /** Whether connecting also lets it run quadit without asking each time (it has settings for that, which Connect writes). */
+  allows: boolean;
 }
 
 /** The agent tools as the first run finds them, and whether connecting one puts the quadit command on this computer too. */
@@ -126,6 +128,8 @@ export interface HarnessView {
   cliIdentity: "own" | "default";
   /** Whether an agent in it was seen to listen (main/harnesses.ts). */
   listenVerified: boolean;
+  /** Whether connecting also lets it run quadit without asking each time (it has settings for that, which Connect writes). */
+  allows: boolean;
   /** Connected, its Quadit skill was changed by hand since the app wrote it, so the app does not update it by itself. */
   skillChangedByHand: boolean;
   connected: { methods: ConnectMethod[]; server: string; workspace: string; agent: string } | null;
@@ -195,8 +199,6 @@ export interface ConnectChoice {
   methods: ConnectMethod[];
   /** Null where no choice would hold: the quadit command alone, working as a default login already there. */
   agent: { id: string } | { create: { name: string; handle: string } } | null;
-  /** Let the harness use quadit without asking each time, where it has a setting for that. */
-  allowUnattended: boolean;
 }
 
 /**
@@ -204,9 +206,10 @@ export interface ConnectChoice {
  * (shared/change-words.ts): the skill, the tool's own login, the computer's
  * default login (which the tool works as), the tool's settings, the link that
  * puts the quadit command on the PATH, the folder made for it, the line in
- * the shell's profile.
+ * the shell's profile, the tool's command rules and the folder made for them.
  */
-export type FileRole = "skill" | "login" | "shared-login" | "settings" | "command" | "folder" | "profile";
+export type FileRole =
+  "skill" | "login" | "shared-login" | "settings" | "command" | "folder" | "profile" | "rules" | "rules-folder";
 
 /**
  * What a plan does to a file: makes it, edits it, takes it away, or puts it

@@ -22,7 +22,6 @@ export function defaultChoice(
     workspaceId: summary.workspace.id,
     methods: ["cli"],
     agent: agent ? { id: agent.id } : { create: { name: tool.name, handle } },
-    allowUnattended: false,
   };
 }
 

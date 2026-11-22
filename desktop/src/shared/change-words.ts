@@ -13,10 +13,11 @@ import type { FileChange, FileRole, PlanFile, Unrevoked } from "@/shared/pages-a
  * computer has none on its PATH yet (`addsCommand`), the skill, and the
  * tool's own login where it can have one (`ownLogin`); else it signs in with
  * this computer's login, the one there already (`worksAs`, whom it is) or
- * one made for it.
+ * one made for it; and, where it has settings for that (`allows`), that it
+ * lets the tool run quadit without asking.
  */
 export function diskLine(
-  tool: { ownLogin: boolean; worksAs: string | null },
+  tool: { name: string; ownLogin: boolean; worksAs: string | null; allows: boolean },
   addsCommand: boolean,
   done: boolean,
 ): string {
@@ -31,9 +32,10 @@ export function diskLine(
     : tool.worksAs
       ? `; it works as ${tool.worksAs}, this computer’s Quadit login`
       : "; it signs in with this computer’s Quadit login";
+  const lets = tool.allows ? `, and ${done ? "let" : "lets"} ${tool.name} run quadit without asking` : "";
   return done
-    ? `Added ${listed}${login}. A backup of everything is kept.`
-    : `Adds ${listed}${login}. Nothing else is touched; a backup is kept.`;
+    ? `Added ${listed}${login}${lets}. A backup of everything is kept.`
+    : `Adds ${listed}${login}${lets}. Nothing else is touched; a backup is kept.`;
 }
 
 /** The computer's default quadit login as a person reads it: "@ann on https://q.example"; null when there is none. */
@@ -100,13 +102,17 @@ function roleWords(role: FileRole, tool: string): Omit<FileWords, "chip"> {
       return { title: "A folder for the quadit command", what: "Made in your home folder to hold it." };
     case "profile":
       return { title: "Your terminal’s start-up file", what: "Adds the quadit command’s folder to your PATH." };
+    case "rules":
+      return { title: `${tool}’s command rules`, what: `Lets ${tool} run quadit without asking you each time.` };
+    case "rules-folder":
+      return { title: `A folder for ${tool}’s command rules`, what: `Made where ${tool} looks for them.` };
   }
 }
 
 function chipOf(role: FileRole, change: FileChange): string {
   switch (change) {
     case "new":
-      return role === "folder" ? "New folder" : role === "command" ? "New link" : "New file";
+      return role === "folder" || role === "rules-folder" ? "New folder" : role === "command" ? "New link" : "New file";
     // Connecting only ever adds to a file there already: a line, a setting, a table.
     case "edited":
       return role === "profile" ? "One line added" : "Added to";
