@@ -74,6 +74,28 @@ func deliveryOf(t *testing.T, st store.Store, hookID string) core.WebhookDeliver
 	return list[0]
 }
 
+// tasksWebhook makes a webhook for the task events, once the dispatcher has
+// handled every event before it, and returns its id. The dispatcher hands an
+// event to the webhooks there are when it gets to it: a webhook made while
+// the set-up's events still wait (on a loaded machine) would be sent those
+// too, and a test that counts its deliveries would find more than its own.
+func (s *site) tasksWebhook(t *testing.T, st store.Store, url string) string {
+	t.Helper()
+	eventually(t, "the dispatcher to handle the events so far", func() bool {
+		var wss []core.Workspace
+		if err := st.List(context.Background(), &wss, store.Q{}); err != nil {
+			t.Fatal(err)
+		}
+		for _, ws := range wss {
+			if ws.DispatchedSeq < ws.Seq {
+				return false
+			}
+		}
+		return true
+	})
+	return s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": url, "event_types": []string{"task.*"}})["ref"].(string)
+}
+
 func TestADeliveryOutlivesABriefOutage(t *testing.T) {
 	t.Run("a webhook that cannot be read for a moment is not given up", func(t *testing.T) {
 		logs := captureLogs(t)
@@ -81,7 +103,7 @@ func TestADeliveryOutlivesABriefOutage(t *testing.T) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		rcv := newReceiver(t, "")
-		hook := s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": rcv.srv.URL, "event_types": []string{"task.*"}})["ref"].(string)
+		hook := s.tasksWebhook(t, st.Store, rcv.srv.URL)
 		fired := st.faults.arm(fault{op: "get", table: "webhooks", times: 1,
 			match: func(_ map[string]any, where []store.Cond) bool { return whereHas(where, "id", hook) }})
 		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
@@ -97,7 +119,7 @@ func TestADeliveryOutlivesABriefOutage(t *testing.T) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		rcv := newReceiver(t, "")
-		hook := s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": rcv.srv.URL, "event_types": []string{"task.*"}})["ref"].(string)
+		hook := s.tasksWebhook(t, st.Store, rcv.srv.URL)
 		fired := st.faults.arm(fault{op: "update", table: "webhook_deliveries", times: 1,
 			match: func(set map[string]any, _ []store.Cond) bool { return set["state"] == "ok" }})
 		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
@@ -417,7 +439,7 @@ func TestADeliveryInFlightAtShutdownIsKeptForTheNextStart(t *testing.T) {
 		}))
 		t.Cleanup(slow.Close)
 		t.Cleanup(func() { close(ended) })
-		hook := s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": slow.URL, "event_types": []string{"task.*"}})["ref"].(string)
+		hook := s.tasksWebhook(t, st, slow.URL)
 		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane"})
 		select {
 		case <-arrived:
@@ -470,7 +492,7 @@ func TestADeliveryWhoseWorkspaceIsGoneIsEnded(t *testing.T) {
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
 	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	hook := s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": newReceiver(t, "").srv.URL, "event_types": []string{"task.*"}})["ref"].(string)
+	hook := s.tasksWebhook(t, st.Store, newReceiver(t, "").srv.URL)
 	wsID := siteWorkspaceID(t, st.Store)
 	gone := st.faults.arm(fault{op: "get", table: "workspaces", err: &store.NotFoundError{What: "workspace"},
 		match: func(_ map[string]any, where []store.Cond) bool { return whereHas(where, "id", wsID) }})
