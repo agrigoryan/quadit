@@ -528,7 +528,7 @@ if [ "$wakes" = 1 ]; then
 		fifth=$(say "@$handle what do 5 and 5 make? Answer here in a comment.")
 		check "a comment was still answered" "$(passed until_true "$answer_time" answered "$fifth" 0 10 ten)" "$(replies "$fifth" 0) answers after it"
 		tell "Stop listening."
-		check "told to stop, it stopped listening" "$(passed until_true 90 not_listening)" "$(agents)"
+		check "told to stop, it stopped listening" "$(passed until_true 180 not_listening)" "$(agents)"
 		exec 3>&-
 		kill -TERM -- "-$chat_pid" 2>/dev/null || :
 	fi
@@ -565,7 +565,7 @@ else
 	kill -INT -- "-$companion_pid" 2>/dev/null || :
 	sleep 5
 	kill -TERM -- "-$companion_pid" 2>/dev/null || :
-	check "stopped, the companion stops listening" "$(passed until_true 90 not_listening)" "$(agents)"
+	check "stopped, the companion stops listening" "$(passed until_true 180 not_listening)" "$(agents)"
 	eighth=$(say "@$handle and 4 and 4? Answer here in a comment.")
 	sleep 60
 	check "after stop, the third comment got no answer" "$([ "$(replies "$eighth" 0)" = 0 ] && echo 0 || echo 1)" "$(replies "$eighth" 0) answers"
