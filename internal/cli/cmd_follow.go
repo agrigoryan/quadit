@@ -23,10 +23,6 @@ func (r *runner) ack(in input) error {
 		name = in.pos[1]
 	}
 	out, err := r.setCursor(name, seq, firstValue(in.f["lease"]))
-	var ae *APIError
-	if errors.As(err, &ae) && ae.Reason == "lease_ended" {
-		return fmt.Errorf("%w\n  to go on: quadit wait (the item comes again)", err)
-	}
 	if err != nil {
 		return err
 	}

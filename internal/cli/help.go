@@ -66,9 +66,8 @@ Codex, Cursor, Gemini CLI, Antigravity CLI, Copilot, opencode and pi look; quadi
 // helpTopics are the texts of "quadit help TOPIC".
 var helpTopics = map[string]string{
 	"listen": `listening: answering what comes in to you in Quadit
-  One session at a time listens as you: it holds your lease, which lives five minutes past
-  its last wait (thirty seconds past a wait cut off). Another session is refused, and told
-  what holds the lease and since when.
+  One session at a time listens as you: it holds your lease, which lives ninety seconds past
+  its last request. Another session is refused, and told what holds the lease and since when.
 
   listening [lease=ID]         whether something already listens as you, what and since when,
                                without taking the lease

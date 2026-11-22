@@ -243,7 +243,7 @@ func (s *Server) setCursor(x *c, name string, seq int64, lease string) error {
 		if err := tx.Get(x.ctx(), &m, store.Eq("user_id", x.member.UserID)); err != nil {
 			return err
 		}
-		if err := leaseLets(m, lease, time.Now()); err != nil {
+		if err := leaseLets(m, lease); err != nil {
 			return err
 		}
 		return move(tx)
@@ -252,7 +252,7 @@ func (s *Server) setCursor(x *c, name string, seq int64, lease string) error {
 
 // checkCursorMove refuses what setCursor would refuse, without moving
 // anything: a name it cannot keep, a position that is not in the feed, or a
-// move made with a lease that is not the listener's live one.
+// move made with a lease another session took over since.
 func (s *Server) checkCursorMove(x *c, name string, seq int64, lease string) error {
 	if err := s.checkCursorPosition(x, name, seq); err != nil {
 		return err
@@ -264,7 +264,7 @@ func (s *Server) checkCursorMove(x *c, name string, seq int64, lease string) err
 	if err := x.db.Get(x.ctx(), &m, store.Eq("user_id", x.member.UserID)); err != nil {
 		return err
 	}
-	return leaseLets(m, lease, time.Now())
+	return leaseLets(m, lease)
 }
 
 // checkCursorPosition refuses a cursor name the server cannot keep, and a

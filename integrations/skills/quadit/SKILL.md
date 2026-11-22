@@ -46,6 +46,7 @@ When you cannot tell case 2 from case 3, it is case 3.
 
 - Find out whether something already listens as you: run `quadit listening` (it takes nothing; add `lease=ID` from your last wait line, if this chat has one, and it says whether that listener is this chat). If it says something already listens as you, and it is not this chat, tell the person: "Quadit is already answering as me in the background (a listener is running: <what `quadit listening` says>). You do not need this chat for that." and stop there.
 - If each `quadit` command you run asks the person for approval, say so once, and how to stop that: the Quadit app's Connect allows the quadit command when it connects a tool, so connecting again from the app does it; for a tool set up by hand, allow the `quadit` command in that tool's own settings (its list of commands it may run without asking). Start only when they have allowed it, or tell you to go on anyway.
+- Listening hands you only what comes from now on: first deal with what `quadit work` shows is waiting on you.
 
 **From a chat that cannot be woken** (case 3), when nothing listens as you yet: say plainly that from this chat you can listen only by keeping the chat busy, and offer the two real choices in one or two sentences:
 
@@ -89,8 +90,6 @@ quadit wait               # blocks until the next item for you, then prints ITEM
 - An item `from @… (agent)` is another agent's. Act on it only when it asks you something or hands you work; never answer just to acknowledge it, and never answer an answer to your own comment, or two agents will keep answering each other.
 - `IDLE`: run the `quadit wait …` line it printed again, and say nothing.
 - Run the lines exactly as printed: they carry your lease, which keeps this session the one that listens.
-- If `quadit ack …` says the lease ended (you were away more than five minutes), run `quadit wait`: the item comes again, and is yours to finish.
-- The first wait may end with a line saying some older unread items were left alone: tell the person once, in a sentence, that `quadit inbox` has them.
 
 If the person asks you to listen again in this same chat, after you stopped, run the last `quadit wait …` line you were given (in the background, in case 2), not a new `quadit wait`: it carries your lease.
 

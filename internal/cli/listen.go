@@ -49,9 +49,8 @@ func (r *runner) listen(in input) error {
 }
 
 // leaseRenewal is how often listen renews its lease while an item's
-// command runs: well inside the lease's five minutes, so a command that
-// runs ten minutes keeps it, and no other session is handed the item
-// meanwhile.
+// command runs: inside the lease's ninety seconds, so a command that runs
+// ten minutes keeps it, and no other session is handed the item meanwhile.
 const leaseRenewal = time.Minute
 
 // listenWith is listen, once its arguments are read, renewing the lease
@@ -120,7 +119,6 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 			started = true
 			events.say("started", map[string]any{"as": r.handleForEvents(events), "by": opts.by, "cursor": cursor})
 		}
-		r.sayLeftAlone(page.Skipped)
 		if page.Item == nil {
 			continue
 		}
@@ -137,7 +135,7 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 					return
 				case <-ticker.C:
 					// A short hold with the lease renews it; what it answers (the same item, not acknowledged yet) is not wanted.
-					_, _ = r.nextItem(ctx, listenAsk{cursor: cursor, lease: lease, by: opts.by}, time.Second) // a renewal that fails leaves the lease to its five minutes
+					_, _ = r.nextItem(ctx, listenAsk{cursor: cursor, lease: lease, by: opts.by}, time.Second) // a renewal that fails leaves the lease to its ninety seconds
 				}
 			}
 		}
@@ -316,30 +314,12 @@ const (
 )
 
 // listened is one answer of GET /listen: the lease, and the item with its
-// feed position and its line in the feed, when one came; and, the first
-// time, how many older unread items were left alone.
+// feed position and its line in the feed, when one came.
 type listened struct {
-	Lease   string      `json:"lease"`
-	Seq     int64       `json:"seq"`
-	Item    *listenItem `json:"item"`
-	Line    string      `json:"line"`
-	Skipped int         `json:"skipped"`
-}
-
-// leftAlone says where the older unread items a first wait left alone are.
-func leftAlone(n int) string {
-	if n == 1 {
-		return "# 1 older unread item was left alone: quadit inbox lists it"
-	}
-	return fmt.Sprintf("# %d older unread items were left alone: quadit inbox lists them", n)
-}
-
-// sayLeftAlone says, after a record, where the older unread items a first
-// wait left alone are; nothing when there are none.
-func (r *runner) sayLeftAlone(n int) {
-	if n > 0 {
-		fmt.Fprintln(r.out, leftAlone(n))
-	}
+	Lease string      `json:"lease"`
+	Seq   int64       `json:"seq"`
+	Item  *listenItem `json:"item"`
+	Line  string      `json:"line"`
 }
 
 // errStrangeLease refuses to use a lease id the server sent that is not of
@@ -431,7 +411,6 @@ type waitSpan struct{ total, hold time.Duration }
 // what could end them or start a line.
 func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) error {
 	deadline := time.Now().Add(span.total)
-	skipped := 0
 	for {
 		page, err := r.nextItem(r.ctx, listenAsk{cursor: "listen", lease: lease, take: take, by: "a chat"}, min(span.hold, time.Until(deadline)))
 		if err != nil {
@@ -447,26 +426,18 @@ func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) er
 		}
 		lease, take = page.Lease, false
 		next := fmt.Sprintf("%s lease=%s", goOn, lease)
-		skipped += page.Skipped
 		if item := page.Item; item != nil {
-			reading, err := item.reading()
-			if err != nil {
+			if _, err := item.reading(); err != nil {
 				return err
 			}
-			fmt.Fprintln(r.out, item.line())
-			fmt.Fprintf(r.out, "%s   # read it\n", reading)
-			if answering := item.answering(); answering != "" {
-				fmt.Fprintf(r.out, "%s   # answer with this line, your words in the quotes\n", answering)
-			}
+			fmt.Fprintln(r.out, item.record())
 			fmt.Fprintf(r.out, "quadit ack %d listen lease=%s   # once it is handled\n", item.Seq, lease)
 			fmt.Fprintf(r.out, "%s   # then go on listening\n", next)
-			r.sayLeftAlone(skipped)
 			return nil
 		}
 		if !time.Now().Before(deadline.Add(-time.Second / 2)) {
 			fmt.Fprintln(r.out, "IDLE")
 			fmt.Fprintf(r.out, "%s   # go on listening\n", next)
-			r.sayLeftAlone(skipped)
 			return nil
 		}
 	}

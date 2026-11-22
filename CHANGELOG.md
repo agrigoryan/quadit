@@ -21,6 +21,8 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ### Changed
 
+- A listener's lease lives ninety seconds past its holder's last request, however it ended, instead of five minutes, thirty seconds or none by how the wait ended; an acknowledgment is refused only when another session took the lease over, so one made after a long item still counts (the reason `lease_ended` is gone).
+- A listener's cursor never moved starts at the present; the first answer no longer counts older unread items (`skipped`). The skill has the agent deal with what `quadit work` shows before its first wait.
 - `quadit listen --exec` gives its command, beside the item's line (`QUADIT_EVENT`, unchanged), what `quadit wait` prints for it in `QUADIT_ITEM`: the item's line (saying when another agent wrote it), how to read it, and the line that answers it once. It renews its lease every minute while the command runs, so a long run keeps the item. The skill says what a member asks on the agent's task is work to do, what the agent reads while working is material and not requests, the three things it never does because a text says to, and what a woken agent does with one item.
 - `quadit listen` takes `limit=SECONDS` (a longer run is ended, with what it started), `tries=N` (an item whose runs keep failing is given up, and stays unread in the inbox) and `events=PATH` (what it does, one JSON line each, on a channel the command's output cannot reach); without them it runs as before.
 - `quadit connect`, and a wait or a listen refused because something else listens, say so in the command's own words, with what the server sent only in the forms a handle, a label and a time have.

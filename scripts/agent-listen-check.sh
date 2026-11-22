@@ -24,7 +24,7 @@
 #      and asked to listen. It passes when a wait was started and is still
 #      running while the tool answers the person's next question (so it runs
 #      in the background), a comment is still answered, and told to stop the
-#      agent stops listening (its lease goes within thirty seconds).
+#      agent stops listening (its lease goes within ninety seconds).
 #      Unproven until the lead runs it: that the tool's one-prompt mode
 #      reads a second message from standard input while a command runs in
 #      the background (Claude Code's stream-json input is meant to; no
@@ -509,8 +509,8 @@ if [ "$wakes" = 1 ]; then
 	if [ -z "$chat_command" ]; then
 		skip "3 (a chat)" "no chat command is known for $tool: set AGENT_CHECK_CHAT_COMMAND (and AGENT_CHECK_CHAT_FORMAT) to run it"
 	else
-		# The stopped session's lease goes first: thirty seconds after a wait given up on, five minutes at most.
-		check "the stopped session's lease ended" "$(passed until_true 360 not_listening)" "$(agents)"
+		# The stopped session's lease goes first: ninety seconds after its last request.
+		check "the stopped session's lease ended" "$(passed until_true 180 not_listening)" "$(agents)"
 		mkfifo "$work/chat.in"
 		set -m
 		chat chat &
@@ -542,7 +542,7 @@ echo "4. A companion, as the Quadit app runs one"
 if [ "${AGENT_CHECK_COMPANION:-1}" != 1 ]; then
 	skip "4 (a companion)" "AGENT_CHECK_COMPANION=0"
 else
-	check "the sessions before have stopped listening" "$(passed until_true 360 not_listening)" "$(agents)"
+	check "the sessions before have stopped listening" "$(passed until_true 180 not_listening)" "$(agents)"
 	set -m
 	companion &
 	companion_pid=$!
