@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"strings"
@@ -77,8 +78,12 @@ func runCommand(cmd *exec.Cmd, limit time.Duration) runEnd {
 	if err := cmd.Start(); err != nil {
 		return runEnd{code: -1, notRun: true, err: fmt.Errorf("the command failed: %w", err)}
 	}
-	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
+	var waitErr error
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		waitErr = cmd.Wait()
+	}()
 	var over <-chan time.Time
 	if limit > 0 {
 		t := time.NewTimer(limit)
@@ -86,15 +91,15 @@ func runCommand(cmd *exec.Cmd, limit time.Duration) runEnd {
 		over = t.C
 	}
 	select {
-	case err := <-done:
-		if err != nil {
-			return runEnd{code: cmd.ProcessState.ExitCode(), err: fmt.Errorf("the command failed: %w", err)}
+	case <-done:
+		if waitErr != nil {
+			return runEnd{code: cmd.ProcessState.ExitCode(), err: fmt.Errorf("the command failed: %w", waitErr)}
 		}
 		return runEnd{}
 	case <-over:
 		_ = endGroup(cmd, false) // it may have just ended by itself
 		select {
-		case <-done:
+		case <-done: // how it went does not matter: it ran over its limit
 		case <-time.After(endGrace):
 		}
 		_ = endGroup(cmd, true) // what it started may still run, even when it went
@@ -136,9 +141,7 @@ func (e *listenEvents) say(event string, fields map[string]any) {
 		return
 	}
 	line := map[string]any{"event": event, "at": time.Now().UTC().Format(time.RFC3339)}
-	for k, v := range fields {
-		line[k] = v
-	}
+	maps.Copy(line, fields)
 	raw, err := json.Marshal(line)
 	if err != nil {
 		return

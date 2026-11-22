@@ -71,7 +71,7 @@ var helpTopics = map[string]string{
 
   listening [lease=ID]         whether something already listens as you, what and since when,
                                without taking the lease
-                               quadit listening  ->  Something already listens as you: a companion, since 14:02 UTC (last heard 14:05 UTC).
+                               quadit listening  ->  Something already listens as you: a companion, since 2026-11-21 14:02 UTC (last heard 2026-11-21 14:05 UTC).
   wait [for=SECONDS] [lease=ID] [take=1]
                                wait for the next inbox item (50 seconds unless for= says, up to
                                3600), then print ITEM or IDLE and the exact commands to go on:
