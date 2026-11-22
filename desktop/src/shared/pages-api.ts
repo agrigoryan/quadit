@@ -185,18 +185,12 @@ export type Handshake =
  * §11, third amendment, main/self-runs.ts): `proving`, giving its connect
  * code back by running it once, while it runs, or why it could not (the
  * card then shows the line to paste), null otherwise; `answering`, its
- * listener: on, paused by the person, paused by the loop guard, off (a tool
- * of another server, not turned on), or none (the app cannot run it).
+ * listener: on, paused by the person, paused by the loop guard, or none
+ * (the app does not run it).
  */
 export interface SelfRun {
   proving: { state: "running" } | { state: "failed"; reason: string } | null;
-  /**
-   * on; paused by the person; paused by the loop guard (guarded) or because
-   * the app could not run it (stuck, `why`); none: the app does not run it.
-   */
-  answering: "on" | "paused" | "guarded" | "stuck" | "none";
-  /** stuck: why, in a few words. */
-  why?: string;
+  answering: "on" | "paused" | "guarded" | "none";
   /** on: why the last item it could not answer failed, until it answers one. */
   missed?: string;
 }
@@ -378,7 +372,7 @@ export interface PagesApi {
   newConnectCode(id: string): Promise<{ ok: true } | Refused>;
   /** What the app does by itself for a tool Connect set up (main/self-runs.ts); null when it is not set up. */
   toolSelf(id: string): Promise<SelfRun | null>;
-  /** The person's Pause, Resume or "Answer by itself": whether the tool answers by itself. */
+  /** The person's Pause or Resume: whether the tool answers by itself. */
   setAnswering(id: string, on: boolean): Promise<void>;
   /** Opens the log of what the app ran for a tool. */
   showToolLog(id: string): Promise<void>;

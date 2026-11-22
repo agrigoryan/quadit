@@ -850,10 +850,11 @@ export class Connections {
 
   /**
    * The tools connected through the quadit command, as the app runs them
-   * (self-runs.ts): the server, the login file each uses (its own, or the
-   * computer's default one), and whether it answers by itself as chosen.
+   * (self-runs.ts): the login file each uses (its own, or the computer's
+   * default one), whether the app ran it, and whether it answers by itself
+   * (off only when the person paused it).
    */
-  async selfRunTools(): Promise<{ id: string; serverId: string; login: string; ran: boolean; answering?: boolean }[]> {
+  async selfRunTools(): Promise<{ id: string; login: string; ran: boolean; answering: boolean }[]> {
     const connections = Object.entries(this.ledger().harnesses).filter(([, c]) => c.methods.includes("cli"));
     let defaultLogin: string | null = null;
     if (connections.some(([, c]) => !c.token)) {
@@ -863,17 +864,7 @@ export class Connections {
     }
     return connections.flatMap(([id, c]) => {
       const login = c.token?.config ?? defaultLogin;
-      return login
-        ? [
-            {
-              id,
-              serverId: c.serverId,
-              login,
-              ran: c.ran === true,
-              ...(c.answering === undefined ? {} : { answering: c.answering }),
-            },
-          ]
-        : [];
+      return login ? [{ id, login, ran: c.ran === true, answering: c.answering !== false }] : [];
     });
   }
 

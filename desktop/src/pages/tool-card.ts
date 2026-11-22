@@ -312,7 +312,7 @@ export class ToolCard {
         ? (self?.proving ?? null)
         : stands === "found"
           ? null
-          : [self?.answering ?? "none", self?.why ?? null, self?.missed ?? null];
+          : [self?.answering ?? "none", self?.missed ?? null];
     const drawn = JSON.stringify([stands, handshake, shown]);
     if (drawn === this.drawn) return;
     this.drawn = drawn;
@@ -337,7 +337,6 @@ export class ToolCard {
     if (handshake?.state === "unknown")
       this.stand.replaceChildren(
         make("p", `Set up on ${HERE}. Whether it reached Quadit is not known here.`, "set-up-line"),
-        ...this.answering(),
       );
     else if (self?.proving?.state === "running") {
       const connecting = make("p", "", "waiting");
@@ -386,19 +385,12 @@ export class ToolCard {
         return [line(`Paused. It answers when you ask it in ${name}.`, resume())];
       case "guarded":
         return [line("Paused: it was started more than six times in a minute. Resume when you have looked.", resume())];
-      case "stuck":
-        return [
-          line(
-            `Paused: Quadit could not run ${name} (${this.self.why ?? "it stopped"}). Resume when it works again.`,
-            resume(),
-          ),
-        ];
       default:
         return [];
     }
   }
 
-  /** The person's Pause, Resume or "Answer by itself"; the card shows the result once the app says it. */
+  /** The person's Pause or Resume; the card shows the result once the app says it. */
   private async setAnswering(control: HTMLButtonElement, on: boolean) {
     control.disabled = true;
     await api.setAnswering(this.tool.id, on);

@@ -32,7 +32,7 @@ import {
 import { accountName } from "@/main/account-name";
 import { AppPages } from "@/main/app-pages";
 import { Capture } from "@/main/capture";
-import { childEnv, startChild } from "@/main/child-guard";
+import { startChild } from "@/main/child-guard";
 import { ConnectPage } from "@/main/connect-page";
 import { Connections } from "@/main/connections";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
@@ -44,7 +44,7 @@ import { ActivateAfterStart, coldStart, Quiet, secondStart } from "@/main/launch
 import { LocalServer, loopbackPorts } from "@/main/local-server";
 import { menuTemplate } from "@/main/menu";
 import { Panel } from "@/main/panel";
-import { type CliLook, loginShellPath, QuaditCli } from "@/main/quadit-cli";
+import { loginShellPath, QuaditCli } from "@/main/quadit-cli";
 import { QuitGuard } from "@/main/quit";
 import { Requests } from "@/main/requests";
 import { SelfRuns } from "@/main/self-runs";
@@ -240,13 +240,8 @@ function start() {
   });
   // What the app runs by itself for the tools connected (desktop contract §11, third amendment): each tool's program
   // on the login shell's PATH, else its desktop app's copy; the listeners' quadit the one on the PATH, else the app's.
+  // Looked at again at each Connect, Disconnect, Resume, change of the server here and start.
   //
-  // Looking at the login shell's PATH runs the login shell: once a minute at most.
-  let looked: { at: number; look: Promise<CliLook> } | null = null;
-  const lookNow = () => {
-    if (!looked || Date.now() - looked.at > 60_000) looked = { at: Date.now(), look: cli.look() };
-    return looked.look;
-  };
   // Whether a quadit login is the app's own server's: that server's address, and the app's mark (login --app). The
   // tool runs with that file, so it decides, never the ledger.
   const loginIsHere = (file: string): boolean => {
@@ -259,14 +254,14 @@ function start() {
     }
   };
   const selfRuns = new SelfRuns({
-    tools: async () => {
-      const look = await lookNow();
+    look: async () => {
+      const look = await cli.look();
       const where = {
         home: homedir(),
         path: look.path,
         applications: ["/Applications", join(homedir(), "Applications")],
       };
-      return (await connections.selfRunTools()).flatMap((tool) => {
+      const tools = (await connections.selfRunTools()).flatMap((tool) => {
         const harness = HARNESSES.find((h) => h.id === tool.id);
         if (!harness) return [];
         return [
@@ -284,46 +279,18 @@ function start() {
           },
         ];
       });
+      return { tools, quadit: look.found?.path ?? cli.bundled, path: look.path.join(":") };
     },
-    quadit: async () => (await lookNow()).found?.path ?? cli.bundled,
-    loginPath: async () => (await lookNow()).path.join(":"),
     start: (program, args, options) => startChild(program, args, options),
     codeGivenBack: async (id) => (await connections.handshake(id))?.state === "connected",
     openCode: (id) => connections.waitingCodes().find((open) => open.id === id)?.code ?? null,
     newCode: async (id) => void (await connections.newCode(id)),
     ran: (id) => connections.markRan(id),
-    listening: (tool) => whoListens(tool.login),
     remember: (id, on) => connections.setAnswering(id, on),
     dir: join(dataDir, "tools"),
     env: process.env,
     changed: () => pages.changed(),
   });
-  /**
-   * Who listens as the agent of the quadit login `login`: `quadit --json listening`, which takes no lease, as
-   * that login; null when it cannot say (an older quadit, a server away) within its time.
-   */
-  async function whoListens(login: string): Promise<{ listening: boolean; by: string } | null> {
-    const quadit = (await cli.look()).found?.path ?? cli.bundled;
-    if (!quadit) return null;
-    const said: string[] = [];
-    const child = startChild(quadit, ["--json", "listening"], {
-      cwd: dataDir,
-      env: childEnv(process.env, login, (await lookNow()).path.join(":")),
-      line: (line) => void said.push(line),
-    });
-    const timer = setTimeout(() => child.stop(), 20_000);
-    const exit = await child.exited;
-    clearTimeout(timer);
-    try {
-      const answer = JSON.parse(said.join("\n")) as { listening?: unknown; by?: unknown };
-      if (exit !== 0 || typeof answer.listening !== "boolean") return null;
-      return { listening: answer.listening, by: typeof answer.by === "string" ? answer.by : "" };
-    } catch {
-      return null;
-    }
-  }
-  // A login changed by hand (another server, another account) is followed within a minute.
-  setInterval(() => void selfRuns.sync(), 60_000).unref();
   const connect = new ConnectPage({
     pages,
     connections,
@@ -530,7 +497,7 @@ function start() {
   // by a version from before is let use Quadit without asking, silently, in the background too. What is not done
   // now (no quadit answered) is at the next start.
   // Then the tools are run by themselves (a background start too), once the app's own server runs (local.onChange);
-  // a tool of another server answers by itself only if the person asked.
+  // a tool of another server never is.
   void connections
     .refresh()
     .catch(() => {})

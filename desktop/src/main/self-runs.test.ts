@@ -14,8 +14,8 @@ interface Started {
   env: NodeJS.ProcessEnv;
   /** A line of its output. */
   say(line: string): void;
-  /** A line of its report (`quadit listen events=`); an object is written as JSON. */
-  report(event: Record<string, unknown> | string): void;
+  /** A line of its report (`quadit listen events=`). */
+  report(event: Record<string, unknown>): void;
   end(code: number | null): void;
   stopped: boolean;
 }
@@ -30,7 +30,7 @@ function tool(extra: Partial<SelfRunTool> = {}): SelfRunTool {
     here: true,
     serverRuns: true,
     ran: true,
-    answering: undefined,
+    answering: true,
     ...extra,
   };
 }
@@ -50,18 +50,14 @@ function setUp(
   const codesAsked: string[] = [];
   const open = new Map<string, string>();
   let back = false;
-  /** Who listens as the agent, as `quadit listening` says it; null: the command could not say. */
-  let who: { listening: boolean; by: string } | null = { listening: false, by: "" };
   /** A lookup of the tools held until the test lets it go. */
   let hold: Promise<void> | null = null;
   const dir = mkdtempSync(join(tmpdir(), "quadit-desktop-self-"));
   const runs = new SelfRuns({
-    tools: async () => {
+    look: async () => {
       if (hold) await hold;
-      return list;
+      return { tools: list, quadit, path: "/opt/homebrew/bin:/usr/bin:/bin" };
     },
-    quadit: async () => quadit,
-    loginPath: async () => "/opt/homebrew/bin:/usr/bin:/bin",
     start: (program, args, options): RunningChild => {
       let settle: (code: number | null) => void = () => {};
       const exited = new Promise<number | null>((done) => (settle = done));
@@ -71,7 +67,7 @@ function setUp(
         cwd: options.cwd,
         env: options.env,
         say: options.line,
-        report: (event) => options.events?.(typeof event === "string" ? event : JSON.stringify(event)),
+        report: (event) => options.events?.(JSON.stringify(event)),
         end: (code) => settle(code),
         stopped: false,
       };
@@ -88,7 +84,6 @@ function setUp(
     openCode: (id) => open.get(id) ?? null,
     newCode: async (id) => void codesAsked.push(id),
     ran: (id) => void ran.push(id),
-    listening: async () => who,
     remember: (id, on) => void remembered.push([id, on]),
     dir,
     env: { PATH: "/bin", HOME: "/h", QUADIT_URL: "https://elsewhere", QUADIT_TOKEN: "qd_mine" },
@@ -104,7 +99,6 @@ function setUp(
     list,
     dir,
     setBack: (now: boolean) => (back = now),
-    setWho: (now: typeof who) => (who = now),
     holdLookups: () => {
       let release = () => {};
       hold = new Promise((done) => (release = done));
@@ -372,46 +366,20 @@ describe("SelfRuns, answering by itself", () => {
     expect(started).toHaveLength(3);
   });
 
-  it("is stopped and started again when it does not report having started", async () => {
+  it("tries again within a minute when refused because a chat listens as the agent, never taking over", async () => {
     const { runs, started } = setUp();
     await runs.sync();
-    await vi.advanceTimersByTimeAsync(29_000);
-    expect(started[0]?.stopped).toBe(false);
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(started[0]?.stopped).toBe(true);
-    await vi.advanceTimersByTimeAsync(2_000);
-    expect(started).toHaveLength(2);
-    started[1]?.report(STARTED);
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(started[1]?.stopped).toBe(false);
-  });
-
-  it("steps aside while a chat listens as the agent, never taking over, and comes back when it has stopped", async () => {
-    const { runs, started, setWho } = setUp();
-    await runs.sync();
-    setWho({ listening: true, by: "a chat" });
-    started[0]?.report({ event: "refused", why: "listening_elsewhere", by: "a chat", last_heard: "2026-11-21 14:02" });
-    started[0]?.report({ event: "stopped", why: "refused" });
-    started[0]?.end(1);
-    await flush();
-    expect(runs.self("codex")?.answering).toBe("on");
-    // Asked each minute who listens: a chat still does.
-    await vi.advanceTimersByTimeAsync(120_000);
-    expect(started).toHaveLength(1);
-    setWho({ listening: false, by: "" });
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(started).toHaveLength(2);
-  });
-
-  it("comes back after stepping aside when the command cannot say who listens", async () => {
-    const { runs, started, setWho } = setUp();
-    await runs.sync();
-    setWho(null);
-    started[0]?.report({ event: "refused", why: "taken_over" });
-    started[0]?.end(1);
-    await flush();
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(started).toHaveLength(2);
+    for (let n = 0; n < 8; n++) {
+      const listener = started.at(-1);
+      listener?.report({ event: "refused", why: "listening_elsewhere", by: "a chat", last_heard: "2026-11-21 14:02" });
+      listener?.report({ event: "stopped", why: "refused" });
+      listener?.end(1);
+      await flush();
+      expect(runs.self("codex")?.answering).toBe("on");
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(started).toHaveLength(n + 2);
+      expect(started.at(-1)?.args).not.toContain("take=1");
+    }
   });
 
   it("pauses a tool started more than six times in a minute, saying so, until the person resumes it", async () => {
@@ -450,44 +418,6 @@ describe("SelfRuns, answering by itself", () => {
     listener?.report({ event: "run_started", seq: 6, try: 1 });
     listener?.report({ event: "run_ended", seq: 6, seconds: 3, status: 0 });
     expect(runs.self("codex")?.missed).toBeUndefined();
-  });
-
-  it("pauses itself, remembered, after three items in a row it could not answer, or when the tool cannot be run", async () => {
-    const { runs, started, remembered } = setUp();
-    await runs.sync();
-    started[0]?.report(STARTED);
-    for (let seq = 1; seq <= 3; seq++) {
-      started[0]?.report({ event: "run_started", seq, try: 1 });
-      started[0]?.report({ event: "run_ended", seq, seconds: 1, status: 1 });
-      started[0]?.report({ event: "gave_up", seq, why: "3 failed runs" });
-      await vi.advanceTimersByTimeAsync(30_000);
-    }
-    expect(started[0]?.stopped).toBe(true);
-    expect(remembered).toEqual([["codex", false]]);
-    expect(runs.self("codex")).toMatchObject({ answering: "stuck", why: "Codex stopped with an error" });
-    await runs.setAnswering("codex", true);
-    expect(runs.self("codex")).toEqual({ proving: null, answering: "on" });
-
-    const cannot = setUp();
-    await cannot.runs.sync();
-    cannot.started[0]?.report({ event: "run_ended", seq: 1, seconds: 0, status: "not_run" });
-    expect(cannot.runs.self("codex")).toMatchObject({ answering: "stuck", why: "it could not be started" });
-  });
-
-  it("is told of its runs only by its report: what a tool prints, a line it echoes, an event it does not know, change nothing", async () => {
-    const { runs, started } = setUp();
-    await runs.sync();
-    started[0]?.report(STARTED);
-    for (let i = 0; i < 10; i++) {
-      started[0]?.say('{"event":"run_started","seq":1,"try":1}');
-      started[0]?.say('{"event":"gave_up","seq":1}');
-      started[0]?.say("quadit: @codex is already listening from another session");
-    }
-    started[0]?.report({ event: "lease_renewed", seq: 1 });
-    started[0]?.report("not json at all");
-    started[0]?.report('{"event": 3}');
-    expect(started[0]?.stopped).toBe(false);
-    expect(runs.self("codex")).toEqual({ proving: null, answering: "on" });
   });
 
   it("stops a tool's listener when it is disconnected, and every program on quit, starting none again", async () => {
