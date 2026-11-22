@@ -153,9 +153,7 @@ async function fetchAnswer<T>(method: string, path: string, opts: RequestOptions
 
     let text: string;
     try {
-      // A server that sends more than was asked for is not taken at its word.
-      if (bytes !== undefined && res.status >= 200 && res.status < 300)
-        return new Uint8Array(await res.arrayBuffer()).subarray(0, bytes) as T;
+      if (bytes !== undefined && res.status >= 200 && res.status < 300) return (await firstOf(res, bytes)) as T;
       text = await res.text();
     } catch (err) {
       // The connection went away while the answer was arriving, or the time for all of it passed.
@@ -166,6 +164,26 @@ async function fetchAnswer<T>(method: string, path: string, opts: RequestOptions
   } finally {
     limit?.release();
   }
+}
+
+/**
+ * The first `count` bytes of an answer, or all of it when it is shorter. A
+ * server that sends more than was asked for (one that ignores the range) is
+ * read no further: the rest is let go of.
+ */
+async function firstOf(res: Response, count: number): Promise<Uint8Array> {
+  const out = new Uint8Array(count);
+  const reader = res.body?.getReader();
+  let have = 0;
+  while (reader && have < count) {
+    const { done, value } = await reader.read();
+    if (done) return out.subarray(0, have);
+    const take = Math.min(value.length, count - have);
+    out.set(value.subarray(0, take), have);
+    have += take;
+  }
+  await reader?.cancel();
+  return out.subarray(0, have);
 }
 
 /**

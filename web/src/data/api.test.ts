@@ -284,6 +284,27 @@ describe("a read of a file's first bytes", () => {
     expect(new TextDecoder().decode(got)).toBe("hello");
   });
 
+  it("stops reading, and lets go of the rest, once it has the bytes it asked for from a server that sends everything", async () => {
+    let parts = 0;
+    let cancelled = false;
+    // A server that ignores the range: a file of a hundred parts of ten bytes.
+    const body = new ReadableStream<Uint8Array>({
+      pull(stream) {
+        parts++;
+        stream.enqueue(new Uint8Array(10).fill(97));
+        if (parts === 100) stream.close();
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(body));
+    const got = await api.bytes("/f/1/big.log", 25);
+    expect(got).toHaveLength(25);
+    expect(cancelled).toBe(true);
+    expect(parts).toBeLessThan(10);
+  });
+
   it("fails as any read does when the server refuses", async () => {
     answersBytes(new TextEncoder().encode(JSON.stringify({ error: { message: "file not found" } })), 404);
     await expect(api.bytes("/f/1/notes.txt", 5)).rejects.toMatchObject({ status: 404, message: "file not found" });
