@@ -744,17 +744,29 @@ posixOnly("letting each tool use Quadit without asking (desktop contract §11, s
     expect(existsSync(join(home, ".codex", "rules"))).toBe(false);
   });
 
-  it("leaves what is there already as it is, and says what it cannot write for the person to add, connecting all the same", async () => {
-    const { connections, connect, choice, home, read } = setUp();
+  it("adds the network to Codex's sandbox table when the person has one, and leaves it off where they turned it off", async () => {
+    const { connect, disconnect, choice, home, read } = setUp();
     mkdirSync(join(home, ".codex"));
-    writeFileSync(join(home, ".codex", "config.toml"), "[sandbox_workspace_write]\nwritable_roots = []\n");
-    const planned = await connections.planConnect(choice("codex"));
-    if (!planned.ok) throw new Error(planned.error);
-    expect(planned.plan.warnings.join(" ")).toContain("already has sandbox_workspace_write");
+    const theirs = '[sandbox_workspace_write]\nwritable_roots = []\n\n[tui]\ntheme = "dark"\n';
+    writeFileSync(join(home, ".codex", "config.toml"), theirs);
     await connect(choice("codex"));
-    expect(read(".codex/config.toml")).toContain("writable_roots = []");
-    expect(read(".codex/config.toml")).not.toContain("network_access");
-    expect(read(".codex/rules/default.rules")).toContain("quadit");
+    expect(read(".codex/config.toml")).toContain(
+      "[sandbox_workspace_write]\nnetwork_access = true  # Added by the Quadit app; Disconnect in the app takes it out.\nwritable_roots = []",
+    );
+    await disconnect("codex");
+    expect(read(".codex/config.toml")).toBe(theirs);
+
+    const off = setUp();
+    mkdirSync(join(off.home, ".codex"));
+    writeFileSync(join(off.home, ".codex", "config.toml"), "[sandbox_workspace_write]\nnetwork_access = false\n");
+    const planned = await off.connections.planConnect(off.choice("codex"));
+    if (!planned.ok) throw new Error(planned.error);
+    expect(planned.plan.warnings).toContain(
+      `${join(off.home, ".codex", "config.toml")} sets network_access = false in [sandbox_workspace_write]: that is your setting, so the app leaves it.`,
+    );
+    await off.connect(off.choice("codex"));
+    expect(off.read(".codex/config.toml")).toMatch(/^\[sandbox_workspace_write\]\nnetwork_access = false\n\n# Added/);
+    expect(off.read(".codex/rules/default.rules")).toContain("quadit");
     // The person's own setting, there before, is the person's: not recorded, not taken away.
     const own = setUp();
     mkdirSync(join(own.home, ".codex"));

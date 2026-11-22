@@ -136,6 +136,8 @@ export const HARNESSES: readonly Harness[] = [
           path: join(home, ".codex", "config.toml"),
           table: ["sandbox_workspace_write"],
           entries: { network_access: true },
+          // The person may have this table already (its writable roots): the network goes into it.
+          intoExisting: true,
         },
         { kind: "folder", path: join(home, ".codex", "rules") },
         ...["quadit", ...(quadit ? [quadit] : [])].map((command) => ({

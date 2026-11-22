@@ -43,8 +43,18 @@ export type Change =
   | { kind: "json"; path: string; keyPath: string[]; value: unknown }
   /** Adds the string `value` to the array at a key of a JSON or JSONC file, when it is not there. */
   | { kind: "json-item"; path: string; keyPath: string[]; value: string }
-  /** Appends a table `[table]` holding `entries` to a TOML file. */
-  | { kind: "toml"; path: string; table: string[]; entries: Record<string, string | boolean> }
+  /**
+   * Appends a table `[table]` holding `entries` to a TOML file. With
+   * `intoExisting`, a table there already gets the entries it lacks instead,
+   * right under its header; one it sets otherwise is the person's and refused.
+   */
+  | {
+      kind: "toml";
+      path: string;
+      table: string[];
+      entries: Record<string, string | boolean>;
+      intoExisting?: true;
+    }
   /** Writes a whole file. */
   | { kind: "file"; path: string; content: string }
   /**
@@ -67,7 +77,8 @@ export type Change =
 export type Applied =
   | { kind: "json"; path: string; keyPath: string[]; prior?: unknown; wrote: unknown; existed: number }
   | { kind: "json-item"; path: string; keyPath: string[]; value: string; existed: number }
-  | { kind: "toml"; path: string; table: string[]; block: string }
+  /** `within`: the entries `block` added inside a table that was there already (intoExisting). */
+  | { kind: "toml"; path: string; table: string[]; block: string; within?: Record<string, string | boolean> }
   | { kind: "file"; path: string; sha256: string; backup: string | null }
   | { kind: "link"; path: string; target: string }
   | { kind: "folder"; path: string }
@@ -145,6 +156,11 @@ function applyChange(edit: FileEdit, change: Change): Applied | null {
       const text = edit.after ?? "";
       let root = readToml(text, path);
       const name = change.table.join(".");
+      const there = lookUp(root, change.table);
+      if (change.intoExisting && there.existed === change.table.length && typeof there.value === "object") {
+        const added = addToTable(edit, change, there.value as Record<string, unknown>);
+        if (added !== "no header") return added;
+      }
       const block = `${text === "" || text.endsWith("\n") ? "" : "\n"}\n${TOML_MARK}\n${stringifyToml(nest(change.table, change.entries))}\n`;
       for (let i = 1; i <= change.table.length; i++) {
         const found = lookUp(root, change.table.slice(0, i));
@@ -189,6 +205,44 @@ function applyChange(edit: FileEdit, change: Change): Applied | null {
       return { kind: "line", path, line: change.line, created: edit.before === null };
     }
   }
+}
+
+/**
+ * Adds to the table `change` names, there already in `edit`'s text, the
+ * entries it lacks: marked lines right under its header, its other entries
+ * untouched. An entry it sets otherwise is the person's choice: refused,
+ * saying so. Nothing to add, null; a table without a header of its own
+ * (dotted keys), "no header", for the caller's usual way.
+ */
+function addToTable(
+  edit: FileEdit,
+  change: Extract<Change, { kind: "toml" }>,
+  table: Record<string, unknown>,
+): Applied | null | "no header" {
+  const name = change.table.join(".");
+  const missing: Record<string, string | boolean> = {};
+  for (const [key, value] of Object.entries(change.entries)) {
+    if (!Object.hasOwn(table, key)) missing[key] = value;
+    else if (!same(table[key], value)) {
+      const theirs = stringifyToml({ [key]: table[key] }).trim();
+      throw new EditRefused(`${change.path} sets ${theirs} in [${name}]: that is your setting, so the app leaves it.`);
+    }
+  }
+  if (Object.keys(missing).length === 0) return null;
+  const text = edit.after ?? "";
+  const lines = text.split("\n");
+  const header = lines.findIndex((line) => /^\s*\[\s*([^[\]]+?)\s*\]\s*(#.*)?$/.exec(line)?.[1] === name);
+  if (header < 0) return "no header";
+  const block = Object.entries(missing)
+    .map(([key, value]) => `${stringifyToml({ [key]: value }).trim()}  ${TOML_MARK}\n`)
+    .join("");
+  lines.splice(header + 1, 0, block.slice(0, -1));
+  const after = lines.join("\n");
+  const now = lookUp(readToml(after, change.path), change.table).value as Record<string, unknown>;
+  if (Object.entries(missing).some(([key, value]) => !same(now[key], value)))
+    throw new Error(`${change.path}: ${name} was not added to`);
+  edit.after = after;
+  return { kind: "toml", path: change.path, table: change.table, block, within: missing };
 }
 
 /**
@@ -242,6 +296,14 @@ function revertOne(edit: FileEdit, record: Applied, edits: Map<string, FileEdit>
       return null;
     }
     case "toml": {
+      if (record.within) {
+        if (!text.includes(record.block)) return null;
+        const now = lookUp(readToml(text, record.path), record.table).value as Record<string, unknown> | undefined;
+        if (Object.entries(record.within).some(([key, value]) => !same(now?.[key], value)))
+          return "the setting the app added changed since";
+        edit.after = text.replace(record.block, "");
+        return null;
+      }
       if (!text.includes(record.block))
         return text.includes(TOML_MARK) ? "the table the app added changed since" : null;
       // An entry added below the block belongs to its table: taking the block out would give it to the table before.

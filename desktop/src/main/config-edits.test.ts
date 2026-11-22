@@ -140,6 +140,35 @@ posixOnly("TOML edits", () => {
     );
   });
 
+  it("adds what a table there already lacks, right under its header, when asked to, and takes exactly that back out", () => {
+    const path = join(folder(), "config.toml");
+    const theirs = `${original}\n[sandbox_workspace_write]\nwritable_roots = ["/tmp"]\n`;
+    writeFileSync(path, theirs);
+    const change = {
+      kind: "toml" as const,
+      path,
+      table: ["sandbox_workspace_write"],
+      entries: { network_access: true },
+      intoExisting: true as const,
+    };
+    const applied = apply([change]);
+    expect(readFileSync(path, "utf8")).toBe(
+      theirs.replace(
+        "[sandbox_workspace_write]\n",
+        "[sandbox_workspace_write]\nnetwork_access = true  # Added by the Quadit app; Disconnect in the app takes it out.\n",
+      ),
+    );
+    expect(revert(applied)).toEqual([]);
+    expect(readFileSync(path, "utf8")).toBe(theirs);
+    // An entry the table sets otherwise is the person's: left, and said.
+    writeFileSync(path, "[sandbox_workspace_write]\nnetwork_access = false\n");
+    expect(() => planChanges([change])).toThrow(
+      new EditRefused(
+        `${path} sets network_access = false in [sandbox_workspace_write]: that is your setting, so the app leaves it.`,
+      ),
+    );
+  });
+
   it("refuses a table a dotted key already defines", () => {
     const path = join(folder(), "config.toml");
     writeFileSync(path, `shell_environment_policy.set.HOME_X = "1"\n`);
