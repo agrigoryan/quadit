@@ -557,3 +557,29 @@ func TestHelpListenIsATopic(t *testing.T) {
 		t.Fatal("quadit help does not point to quadit help listen")
 	}
 }
+
+// TestListeningInJSONIsTheServersObject: `quadit --json listening` prints
+// the server's answer as it is, one object and nothing else on stdout: the
+// desktop app reads listening and by from it.
+func TestListeningInJSONIsTheServersObject(t *testing.T) {
+	const answer = `{"by":"the Quadit app","last_heard":"2026-11-21 14:05","listening":true,"since":"2026-11-21 14:02","webhook":false,"yours":false}`
+	srv := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, answer+"\n")
+	})
+	out := &bytes.Buffer{}
+	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: out, json: true}
+	if err := r.listening(input{}); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != answer+"\n" {
+		t.Fatalf("--json printed %q", out)
+	}
+	var got struct {
+		Listening bool   `json:"listening"`
+		By        string `json:"by"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil || !got.Listening || got.By != "the Quadit app" {
+		t.Fatalf("the object read back is %+v (%v)", got, err)
+	}
+}
