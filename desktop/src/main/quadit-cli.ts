@@ -11,6 +11,7 @@
 import { execFile } from "node:child_process";
 import { accessSync, constants, existsSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
+import { withoutQuadit } from "@/main/child-guard";
 
 const RUN_TIMEOUT_MS = 20_000;
 
@@ -190,8 +191,7 @@ function run(
   env: Record<string, string | undefined> = {},
   stdin?: string,
 ): Promise<string> {
-  const own = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("QUADIT_")));
-  const merged = { ...own, ...env };
+  const merged = { ...withoutQuadit(process.env), ...env };
   for (const [key, value] of Object.entries(env)) if (value === undefined) delete merged[key];
   return new Promise((resolve, reject) => {
     const child = execFile(binary, args, { env: merged, timeout: RUN_TIMEOUT_MS }, (err, stdout, stderr) => {

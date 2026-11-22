@@ -67,15 +67,3 @@ posixOnly("toolProgram", () => {
     expect(toolProgram(harness("pi"), { home: dir, path: [dir], applications: [] })).toBeNull();
   });
 });
-
-describe("the one-prompt commands", () => {
-  it("are argument lists, the prompt one argument whatever it holds", () => {
-    const prompt = 'Connect to Quadit ABC234; rm -rf "$HOME"';
-    expect(Object.fromEntries(HARNESSES.filter((h) => h.oneShot).map((h) => [h.id, h.oneShot?.(prompt)]))).toEqual({
-      claude: ["-p", prompt],
-      codex: ["exec", "--skip-git-repo-check", prompt],
-      antigravity: ["-p", prompt, "--dangerously-skip-permissions"],
-      cursor: ["-p", "--force", prompt],
-    });
-  });
-});

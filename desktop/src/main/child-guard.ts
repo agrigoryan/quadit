@@ -129,8 +129,12 @@ async function endGroup(pgid: number): Promise<void> {
  * variable is kept: a tool may need its own keys.
  */
 export function childEnv(env: NodeJS.ProcessEnv, login: string, path?: string): NodeJS.ProcessEnv {
-  const own = Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith("QUADIT_")));
-  return { ...own, ...(path ? { PATH: path } : {}), QUADIT_CONFIG: login };
+  return { ...withoutQuadit(env), ...(path ? { PATH: path } : {}), QUADIT_CONFIG: login };
+}
+
+/** `env` without any QUADIT_ setting: the person's own servers' address and token never reach what the app runs. */
+export function withoutQuadit(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith("QUADIT_")));
 }
 
 /**

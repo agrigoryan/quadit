@@ -25,7 +25,6 @@
 import type { WebContents, WebContentsView } from "electron";
 import type { AppPages } from "@/main/app-pages";
 import type { Connections } from "@/main/connections";
-import { HARNESSES } from "@/main/harnesses";
 import type { SelfRuns } from "@/main/self-runs";
 import type { ServerWindows } from "@/main/server-windows";
 import type { ConnectChoice, ConnectTarget } from "@/shared/pages-api";
@@ -92,14 +91,9 @@ export class ConnectPage {
       toolHandshake: (_sender, harness) => connections.handshake(String(harness)),
       newConnectCode: (_sender, harness) => connections.newCode(String(harness)),
       updateSkill: (_sender, harness) => connections.updateSkill(String(harness)),
-      // A tool's id names files (its log, its runs' folder): only the app's own ids are taken.
-      toolSelf: (_sender, harness) => (isHarness(harness) ? parts.selfRuns.self(harness) : null),
-      setAnswering: async (_sender, harness, on) => {
-        if (isHarness(harness)) await parts.selfRuns.setAnswering(harness, on === true);
-      },
-      showToolLog: async (_sender, harness) => {
-        if (isHarness(harness)) await parts.showLog(parts.selfRuns.logOf(harness));
-      },
+      toolSelf: (_sender, harness) => parts.selfRuns.self(String(harness)),
+      setAnswering: (_sender, harness, on) => parts.selfRuns.setAnswering(String(harness), on === true),
+      showToolLog: (_sender, harness) => parts.showLog(parts.selfRuns.logOf(String(harness))),
       copyText: (_sender, text) => parts.copy(String(text)),
     });
   }
@@ -166,9 +160,4 @@ function choiceOf(raw: unknown): ConnectChoice {
 
 function text(raw: unknown): string {
   return typeof raw === "string" ? raw : "";
-}
-
-/** Whether `id` is the id of one of the app's tools. */
-function isHarness(id: unknown): id is string {
-  return HARNESSES.some((harness) => harness.id === id);
 }

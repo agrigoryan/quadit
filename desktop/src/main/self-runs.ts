@@ -100,8 +100,8 @@ export interface SelfRunsParts {
   changed(): void;
 }
 
-/** What the app's listeners say they are, to whoever asks who listens as the agent (a chat refused, the web's agent page). */
-export const BY_LABEL = "the Quadit app";
+/** What the app's listeners say they are, to whoever asks who listens as the agent (a chat refused). */
+const BY_LABEL = "the Quadit app";
 
 /** The argument the wake command puts the item's prompt in place of, in a tool's one-prompt command. */
 const ITEM = "{quadit-item}";
