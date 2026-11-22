@@ -359,21 +359,20 @@ def answers(body):
 print(sum(c["by"] == who and after < c["seq"] < before and answers(c.get("body", "")) for c in json.load(sys.stdin).get("comments") or []))' "@$handle" "$@"; }
 # say TEXT: the person comments on the task; prints the comment's feed position.
 say() { person --json comment "$key" "$1" | field seq; }
-# answer_ids AFTER BEFORE: the ids of the agent's comments between feed positions AFTER and BEFORE (0: no end).
-answer_ids() { person --json show "$key" | python3 -c 'import json,sys
+# answers_to AFTER BEFORE: the thread each of the agent's comments between feed positions AFTER and BEFORE (0: no
+# end) answers, one a line ("-" for one outside a thread).
+answers_to() { person --json show "$key" | python3 -c 'import json,sys
 after, before = int(sys.argv[2]), int(sys.argv[3]) or 1 << 62
 for c in json.load(sys.stdin).get("comments") or []:
     if c["by"] == sys.argv[1] and after < c["seq"] < before:
-        print(c["id"])' "@$handle" "$@"; }
-# woken_for ID: the runs of the companion whose item (QUADIT_ITEM, kept in runs/N.item) answers with the fixed id ID.
-woken_for() { grep -l -- "--id=$1" "$work"/runs/*.item 2>/dev/null || :; }
-# tied AFTER BEFORE WORDS: the one answer between AFTER and BEFORE carries the fixed id of exactly one run's item,
-# and that item is the comment asking WORDS.
+        print(c.get("reply_to") or "-")' "@$handle" "$@"; }
+# tied AFTER BEFORE WORDS: the one answer between AFTER and BEFORE went to the thread named by the answering line of
+# exactly one run's item (QUADIT_ITEM, kept in runs/N.item), and that item is the comment asking WORDS.
 tied() {
-	local ids runs
-	ids=$(answer_ids "$1" "$2")
-	[ "$(printf '%s' "$ids" | grep -c .)" = 1 ] || return 1
-	runs=$(woken_for "$ids")
+	local thread runs
+	thread=$(answers_to "$1" "$2")
+	[ "$(printf '%s' "$thread" | grep -c .)" = 1 ] && [ "$thread" != - ] || return 1
+	runs=$(grep -l -- "^quadit reply $thread " "$work"/runs/*.item 2>/dev/null || :)
 	[ "$(printf '%s' "$runs" | grep -c .)" = 1 ] && head -n 1 "$runs" | grep -q -- "$3"
 }
 # tokens_now: the last running total of tokens the tool printed in the listening session's log, or nothing.
@@ -466,7 +465,7 @@ if kill -0 "$second_pid" 2>/dev/null; then
 	second_session=1
 fi
 check "the second session ended by itself" "$second_session"
-check "the second session was refused" "$(calls second | grep -E "pid=[0-9]+ status=[0-9]+ [0-9]+s wait" | grep -q "already listening" && echo 0 || echo 1)"
+check "the second session was refused" "$(calls second | grep -E "pid=[0-9]+ status=[0-9]+ [0-9]+s wait" | grep -q "already listens as you" && echo 0 || echo 1)"
 check "the second session did not take over" "$(calls second | grep -q "take=1" && echo 1 || echo 0)"
 
 # Stop the first, as a person interrupts it; a comment after that gets no answer.
@@ -561,8 +560,8 @@ else
 		"$(replies "$sixth" "$seventh") comments by @$handle between it and the second"
 	check "the second comment got exactly one answer, saying 6" "$([ "$(replies "$seventh" 0)" = 1 ] && [ "$(replies "$seventh" 0 6 six)" = 1 ] && echo 0 || echo 1)" \
 		"$(replies "$seventh" 0) comments by @$handle after it"
-	check "each answer carries the fixed id of the one run woken for its comment" "$(tied "$sixth" "$seventh" "2 and 2" && tied "$seventh" 0 "3 and 3" && echo 0 || echo 1)" \
-		"answers $(answer_ids "$sixth" 0 | tr '\n' ' '); runs' items in $work/runs"
+	check "each answer went where the one run woken for its comment was told to answer" "$(tied "$sixth" "$seventh" "2 and 2" && tied "$seventh" 0 "3 and 3" && echo 0 || echo 1)" \
+		"answers in threads $(answers_to "$sixth" 0 | tr '\n' ' '); runs' items in $work/runs"
 	kill -INT -- "-$companion_pid" 2>/dev/null || :
 	sleep 5
 	kill -TERM -- "-$companion_pid" 2>/dev/null || :
