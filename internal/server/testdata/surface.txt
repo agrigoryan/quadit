@@ -55,6 +55,7 @@ api GET /api/v1/w/{workspace}/integrations/{id}/webhook
 api GET /api/v1/w/{workspace}/invites
 api GET /api/v1/w/{workspace}/list/{collection}
 api GET /api/v1/w/{workspace}/listen
+api GET /api/v1/w/{workspace}/listening
 api GET /api/v1/w/{workspace}/me
 api GET /api/v1/w/{workspace}/memory
 api GET /api/v1/w/{workspace}/my-work

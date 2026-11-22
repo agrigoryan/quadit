@@ -724,6 +724,7 @@ func (rw *richWorkspace) reads() []read {
 	add(inWS("/cycles/{id}/chart", "/cycles/"+id("cycle SVA now")+"/chart", "/cycles/"+id("cycle OPS now")+"/chart", "/cycles/"+id("cycle SVA gone")+"/chart", "/cycles/"+id("project SVA")+"/chart")...)
 	add(inWS("/agents", "/agents", "/agents?format=text")...)
 	add(inWS("/agents/connection", "/agents/connection")...)
+	add(inWS("/listening", "/listening", "/listening?lease=NOTALEAS")...)
 
 	// Files, tokens, secrets and the rest.
 	for _, name := range []string{"file notes.txt", "file vault.txt", "file ring.txt", "file nights.txt", "file gone.txt", "file ops-gone.txt", "file burst.txt", "file loose.txt",

@@ -551,3 +551,42 @@ func TestALoginKeptToSomeProjectsDoesNotSkipTheAgentsOtherWork(t *testing.T) {
 		}
 	})
 }
+
+// TestWhatListensIsToldWithoutTakingTheLease: GET /listening says whether
+// something listens as the caller, what it said it is and since when,
+// without taking the lease, so a chat can learn that a companion already
+// answers for it; the refusal of a second session says it too.
+func TestWhatListensIsToldWithoutTakingTheLease(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		coder := s.agentToken(t, "coder")
+		type listener struct {
+			Listening, Yours, Webhook bool
+			By, Since                 string
+			LastHeard                 string `json:"last_heard"`
+		}
+		var before listener
+		s.call(t, nil, coder, "GET", w+"/listening", nil, 200, &before)
+		if before.Listening || s.listening(t, "coder") {
+			t.Fatalf("before any wait the check says %+v", before)
+		}
+
+		var held listened
+		s.call(t, nil, coder, "GET", w+"/listen?wait=0&by=a+companion", nil, 200, &held)
+		var now listener
+		s.call(t, nil, coder, "GET", w+"/listening", nil, 200, &now)
+		if !now.Listening || now.By != "a companion" || now.Since == "" || now.LastHeard == "" || now.Yours {
+			t.Fatalf("with a companion listening the check says %+v", now)
+		}
+		s.call(t, nil, coder, "GET", w+"/listening?lease="+held.Lease, nil, 200, &now)
+		if !now.Yours {
+			t.Fatalf("asked with the live lease, the check says %+v", now)
+		}
+		var r refusal
+		s.call(t, nil, coder, "GET", w+"/listen?wait=0&by=a+chat", nil, 409, &r)
+		if !strings.Contains(r.Error.Message, "already listening from another session (a companion, last heard ") {
+			t.Fatalf("a second session is told %q", r.Error.Message)
+		}
+		s.call(t, nil, coder, "GET", w+"/listen?wait=0&lease="+held.Lease+"&by=a+companion%3B+rm+-rf", nil, 400, nil)
+	})
+}

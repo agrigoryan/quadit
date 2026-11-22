@@ -160,6 +160,11 @@ type Member struct {
 	ListeningUntil int64  `json:"listening_until,omitempty" db:"listening_until,null"`
 	ListenLease    string `json:"-" db:"listen_lease,null"`
 	ListenHeardAt  int64  `json:"-" db:"listen_heard_at,null"`
+	// ListenBy is what holds the lease, in words a person reads ("a chat",
+	// "a companion", "the Quadit app"), as the holder said; ListenSince
+	// when it took the lease.
+	ListenBy    string `json:"-" db:"listen_by,null"`
+	ListenSince int64  `json:"-" db:"listen_since,null"`
 	// ConnectedAt is when an agent first proved it reached Quadit from
 	// inside its tool: a connect code given back, a change made with its
 	// own credential, or its listener's first lease. A read proves nothing.

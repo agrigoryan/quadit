@@ -15,6 +15,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -50,7 +51,8 @@ const (
 // listenerRoutes are the routes of the listener.
 func (s *Server) listenerRoutes() []route {
 	return []route{
-		{"GET /api/v1/w/{ws}/listen", s.workspaceMember(s.handleNextInboxItem), "The listener's read: the next item of the caller's inbox after its cursor (listen, or the one named), waiting for one up to wait seconds (at most 55). It holds the agent's listener lease: the first call takes it, and each call after gives its id as lease=; while it lives (five minutes past the end of the last wait) another session is refused (reason listening_elsewhere) unless it asks with take=1, and the agent counts as listening. Answers {lease} when the wait ended with nothing, or {lease, seq, item, line} (line: the item as the feed writes it). Nothing moves the cursor but an acknowledgment with the lease: PUT cursors/{name} {seq, lease}. An agent's login only.", "wait: seconds, up to 55; lease: the id the last call answered with; take: true to take the lease from the session that holds it; cursor: the cursor to deliver from (listen)", "follow"},
+		{"GET /api/v1/w/{ws}/listening", s.workspaceMember(s.handleShowListener), "Whether something listens as the caller, without taking the lease: {listening, by, since, last_heard, yours, webhook}. by is what holds the lease, as the holder said (\"a chat\", \"a companion\", \"the Quadit app\"); yours, whether it is the lease given as lease=; webhook, whether a webhook delivers the caller's inbox.", "lease: a lease id, to learn whether it is the one that lives", "follow"},
+		{"GET /api/v1/w/{ws}/listen", s.workspaceMember(s.handleNextInboxItem), "The listener's read: the next item of the caller's inbox after its cursor (listen, or the one named), waiting for one up to wait seconds (at most 55). It holds the agent's listener lease: the first call takes it, and each call after gives its id as lease=; while it lives (five minutes past the end of the last wait) another session is refused (reason listening_elsewhere) unless it asks with take=1, and the agent counts as listening. Answers {lease} when the wait ended with nothing, or {lease, seq, item, line} (line: the item as the feed writes it). Nothing moves the cursor but an acknowledgment with the lease: PUT cursors/{name} {seq, lease}. An agent's login only.", "wait: seconds, up to 55; lease: the id the last call answered with; take: true to take the lease from the session that holds it; cursor: the cursor to deliver from (listen); by: what listens, in a few plain words, said to whoever asks (\"a chat\", \"a companion\")", "follow"},
 	}
 }
 
@@ -74,7 +76,11 @@ func (s *Server) handleNextInboxItem(x *c) error {
 		return errBad("a cursor name is 1 to 64 characters")
 	}
 	wait := min(x.intParam("wait", 0), maxFeedWait)
-	lease, taken, err := s.holdLease(x, v.Get("lease"), truthyParam(v, "take"), time.Duration(wait)*time.Second)
+	by := v.Get("by")
+	if by != "" && !listenerLabel.MatchString(by) {
+		return &engine.Error{Code: engine.CodeInvalid, Field: "by", Message: "by= names what listens in a few plain words (\"a chat\", \"a companion\"): at most 40 letters, digits, spaces, - and '"}
+	}
+	lease, taken, err := s.holdLease(x, leaseAsk{lease: v.Get("lease"), take: truthyParam(v, "take"), by: by}, time.Duration(wait)*time.Second)
 	if err != nil {
 		return err
 	}
@@ -184,15 +190,27 @@ func (s *Server) listenStart(x *c, name string) (start int64, skipped int, err e
 	return start, len(older), err
 }
 
+// leaseAsk is what a wait asks of the lease: the id it holds (or none),
+// whether to take it from another session, and what it is, in words a
+// person reads, for whoever asks what listens.
+type leaseAsk struct {
+	lease string
+	take  bool
+	by    string
+}
+
+// listenerLabel is the form of what a listener says it is.
+var listenerLabel = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} '-]{0,39}$`)
+
 // holdLease gives the caller's listener the lease for a wait of the length
 // given, and returns its id and whether it is new (its holder does not know
-// it yet): the lease given is renewed while it lives, and a new one is
+// it yet): the lease asked for is renewed while it lives, and a new one is
 // taken when none lives or, with take, from the session that holds it.
 // Another session's live lease refuses the wait. The write is not cut off
 // by the caller going away, so that when it answers, what it did is known.
-func (s *Server) holdLease(x *c, given string, take bool, wait time.Duration) (lease string, taken bool, err error) {
+func (s *Server) holdLease(x *c, ask leaseAsk, wait time.Duration) (lease string, taken bool, err error) {
 	now := time.Now()
-	lease = given
+	given, lease := ask.lease, ask.lease
 	ctx := context.WithoutCancel(x.ctx())
 	err = s.st.Write(ctx, x.ws.ID, func(tx store.Tx) error {
 		var m core.Member
@@ -200,15 +218,19 @@ func (s *Server) holdLease(x *c, given string, take bool, wait time.Duration) (l
 			return err
 		}
 		live := leaseLives(m, now)
+		set := map[string]any{"listening_until": now.Add(wait + leaseLife).UnixMilli(), "listen_heard_at": now.UnixMilli(), "listen_by": ask.by}
 		switch {
 		case live && given == m.ListenLease:
-		case live && !take:
+		case live && !ask.take:
 			return listeningElsewhere(m)
 		case given == "" || given != m.ListenLease:
 			lease, taken = randomCode(leaseLength), true
+			set["listen_since"] = now.UnixMilli()
+		default:
+			set["listen_since"] = now.UnixMilli() // its own lease, which had run out: held again from now
 		}
-		_, err := tx.Update(ctx, "members", map[string]any{"listen_lease": lease, "listening_until": now.Add(wait + leaseLife).UnixMilli(), "listen_heard_at": now.UnixMilli()},
-			store.Eq("user_id", m.UserID))
+		set["listen_lease"] = lease
+		_, err := tx.Update(ctx, "members", set, store.Eq("user_id", m.UserID))
 		return err
 	})
 	if err != nil {
@@ -279,8 +301,35 @@ func leaseLets(m core.Member, given string, now time.Time) error {
 }
 
 // listeningElsewhere refuses a session the listener of m, whose lease
-// another session holds.
+// another session holds, saying what holds it when the holder said.
 func listeningElsewhere(m core.Member) error {
+	what := ""
+	if m.ListenBy != "" {
+		what = m.ListenBy + ", "
+	}
 	return &engine.Error{Code: engine.CodeConflict, Field: "lease", Reason: reasonListeningElsewhere,
-		Message: fmt.Sprintf("@%s is already listening from another session (last heard %s UTC)", m.Handle, time.UnixMilli(m.ListenHeardAt).UTC().Format("15:04"))}
+		Message: fmt.Sprintf("@%s is already listening from another session (%slast heard %s UTC)", m.Handle, what, time.UnixMilli(m.ListenHeardAt).UTC().Format("15:04"))}
+}
+
+// handleShowListener says whether something listens as the caller, and
+// what and since when, without taking the lease: so a chat can learn that
+// a companion or the app already answers for it. With lease= it says
+// whether that lease is the one that lives (yours).
+func (s *Server) handleShowListener(x *c) error {
+	var m core.Member
+	if err := x.db.Get(x.ctx(), &m, store.Eq("user_id", x.member.UserID)); err != nil {
+		return err
+	}
+	now := time.Now()
+	out := map[string]any{"listening": leaseLives(m, now)}
+	if leaseLives(m, now) {
+		given := x.r.URL.Query().Get("lease")
+		out["by"], out["since"], out["last_heard"], out["yours"] = m.ListenBy, formatTime(m.ListenSince), formatTime(m.ListenHeardAt), given != "" && given == m.ListenLease
+	}
+	reach, err := x.agentReach(x.ctx())
+	if err != nil {
+		return err
+	}
+	out["webhook"] = reach.pushed[m.UserID]
+	return x.ok(out)
 }
