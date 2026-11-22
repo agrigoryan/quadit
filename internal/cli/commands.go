@@ -50,6 +50,7 @@ var commands = []command{
 	{names: []string{"ack"}, args: 1, usage: "ack SEQ [NAME] [lease=ID]", run: (*runner).ack},
 	{names: []string{"listen"}, noDryRun: true, run: (*runner).listen},
 	{names: []string{"wait"}, noDryRun: true, run: (*runner).wait},
+	{names: []string{"listening"}, run: (*runner).listening},
 	{names: []string{"read"}, run: (*runner).markRead},
 
 	// act on tasks (cmd_task.go)

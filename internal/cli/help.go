@@ -22,7 +22,8 @@ follow    events [after=SEQ] [wait=50] [cursor=NAME] [mine=1] [others=1] [task=K
                                      3600: an hour, for a wait in the background);
                                      prints ITEM or IDLE and the exact commands to go on. One session
                                      at a time listens; take=1 takes over, only when the person says so
-          listen --exec CMD          run CMD for each inbox item, again until it succeeds
+          listening                  whether something already listens as you, what and since when
+          listen --exec CMD          run CMD for each inbox item, again until it succeeds (quadit help listen)
 act       new PROJECT TITLE [field=value ...]      description=- reads it from stdin
           update KEY field=value ... status=done assignee=@ann priority=high add_labels=a,b
           status KEY NAME | assign KEY @WHO|none | take KEY | release KEY
@@ -45,7 +46,8 @@ act       new PROJECT TITLE [field=value ...]      description=- reads it from s
 secrets   secrets                    the keys I may use (names only; values are never shown)
           request NAME URL [method=POST] [header=K:V ...] [body=TEXT|-]
                                      an HTTP request with {{secret}} filled in by the server
-more      quadit help secrets        using keys without holding them
+more      quadit help listen         answering what comes in: in a chat, in the background, a companion
+          quadit help secrets        using keys without holding them
           quadit help docs           pages, databases, memory
           quadit help code           git links, pictures of pages
           quadit help import         bring work in from other tools
@@ -63,6 +65,32 @@ Codex, Cursor, Gemini CLI, Antigravity CLI, Copilot, opencode and pi look; quadi
 
 // helpTopics are the texts of "quadit help TOPIC".
 var helpTopics = map[string]string{
+	"listen": `listening: answering what comes in to you in Quadit
+  One session at a time listens as you: it holds your lease, which lives five minutes past
+  its last wait (thirty seconds past a wait cut off). Another session is refused, and told
+  what holds the lease and since when.
+
+  listening [lease=ID]         whether something already listens as you, what and since when,
+                               without taking the lease
+                               quadit listening  ->  Something already listens as you: a companion, since 14:02 UTC (last heard 14:05 UTC).
+  wait [for=SECONDS] [lease=ID] [take=1]
+                               wait for the next inbox item (50 seconds unless for= says, up to
+                               3600), then print ITEM or IDLE and the exact commands to go on:
+                               read it, answer it once, acknowledge it, wait again. Run them as
+                               printed: they carry your lease. take=1 takes the lease from another
+                               session, only when the person says so.
+                               quadit wait for=3600  ->  in the background, where your tool hands
+                               a background command's result back to you by itself
+  ack SEQ listen lease=ID      mark an item handled
+  listen [take=1] [by=WORDS] --exec COMMAND [ARG ...]
+                               a companion, outside any chat: runs COMMAND for each inbox item,
+                               the item in QUADIT_EVENT and on stdin, until it exits 0. One per
+                               login. It says it is "a companion" to whoever asks, or what by= says.
+                               Stop it with Ctrl-C, or by closing its terminal.
+                               quadit listen --exec sh -c 'codex exec "Quadit woke you for this inbox item: $QUADIT_EVENT. Handle it with the quadit skill, answering where you were asked."'
+  Where an agent's tool cannot hand it a background command's result (it can only wait in
+  the foreground), listening from a chat keeps that chat busy; a companion keeps it free.
+`,
 	"secrets": `secrets: keys and passwords an agent can use but not read
   An admin sets one:   quadit do secret.set '{"name":"DEPLOY_KEY","value":"…","hosts":["api.example.com"],"agents":["@coder"]}'
   secrets                      the secrets I may use, with the hosts each may go to

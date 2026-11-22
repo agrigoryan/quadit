@@ -714,6 +714,7 @@ cli inbox
 cli layout
 cli link
 cli listen
+cli listening
 cli ls
 cli me
 cli memory

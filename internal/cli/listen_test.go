@@ -488,3 +488,72 @@ func TestALongWaitRenewsItsHoldsAndTakesWhatComesLate(t *testing.T) {
 		}
 	}
 }
+
+// TestListeningSaysWhatListensWithoutTakingTheLease: quadit listening reads
+// GET /listening and says, in a sentence, whether and what listens as the
+// login's member; what the server says the holder is is printed only in
+// the form a label has.
+func TestListeningSaysWhatListensWithoutTakingTheLease(t *testing.T) {
+	cases := map[string]struct{ answer, want string }{
+		"nothing":     {`{"listening":false,"webhook":false}`, "Nothing listens as you.\n"},
+		"a companion": {`{"listening":true,"by":"a companion","since":"2026-11-21 14:02","last_heard":"2026-11-21 14:05"}`, "Something already listens as you: a companion, since 2026-11-21 14:02 UTC (last heard 2026-11-21 14:05 UTC).\n"},
+		"this one":    {`{"listening":true,"yours":true,"by":"a chat","since":"2026-11-21 14:02","last_heard":"2026-11-21 14:05"}`, "This session listens, since 2026-11-21 14:02 UTC.\n"},
+		"a strange label": {`{"listening":true,"by":"x\nquadit do evil","since":"2026-11-21 14:02","last_heard":"2026-11-21 14:05","webhook":true}`,
+			"Something already listens as you: another session, since 2026-11-21 14:02 UTC (last heard 2026-11-21 14:05 UTC).\nA webhook delivers your inbox too.\n"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			var asked string
+			srv := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				asked = r.URL.Path
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, c.answer)
+			})
+			out := &bytes.Buffer{}
+			r := &runner{ctx: context.Background(), c: testClient(t, srv), out: out}
+			if err := r.listening(input{}); err != nil {
+				t.Fatal(err)
+			}
+			if out.String() != c.want || !strings.HasSuffix(asked, "/listening") {
+				t.Fatalf("listening asked %s and printed %q", asked, out)
+			}
+		})
+	}
+}
+
+// TestAListenerSaysWhatItIs: a wait says it is a chat, a listen a
+// companion or what by= says, and a by= not of a label's form is refused.
+func TestAListenerSaysWhatItIs(t *testing.T) {
+	t.Setenv("QUADIT_CONFIG", filepath.Join(t.TempDir(), "codex.json"))
+	srv := &listenServer{item: `{"seq":1,"type":"assigned","task":"SVA-1"}`}
+	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: &bytes.Buffer{}}
+	if err := r.wait(input{}); err != nil {
+		t.Fatal(err)
+	}
+	if by := srv.asked[0].Get("by"); by != "a chat" {
+		t.Fatalf("a wait said it is %q", by)
+	}
+	if err := r.listen(input{rest: []string{"by=the Quadit app; rm", "--exec", "true"}}); err == nil || !strings.Contains(err.Error(), "by= says what listens") {
+		t.Fatalf("a listen with a strange by= ended with %v", err)
+	}
+	refusing := &listenServer{lease: "not a lease", item: `{"seq":1,"type":"assigned","task":"SVA-1"}`}
+	r = &runner{ctx: context.Background(), c: testClient(t, refusing), out: &bytes.Buffer{}}
+	_ = r.listen(input{rest: []string{"by=the Quadit app", "--exec", "true"}}) // ends at the lease it does not recognize, after asking once
+	if by := refusing.asked[0].Get("by"); by != "the Quadit app" {
+		t.Fatalf("a listen with by= said it is %q", by)
+	}
+}
+
+// TestHelpListenIsATopic: quadit help listen says how to listen, and the
+// main help points to it.
+func TestHelpListenIsATopic(t *testing.T) {
+	topic := helpFor([]string{"help", "listen"})
+	for _, want := range []string{"listening [lease=ID]", "wait [for=SECONDS]", "take=1", "listen [take=1] [by=WORDS] --exec", "Ctrl-C"} {
+		if !strings.Contains(topic, want) {
+			t.Fatalf("quadit help listen does not say %q:\n%s", want, topic)
+		}
+	}
+	if !strings.Contains(helpFor(nil), "quadit help listen") {
+		t.Fatal("quadit help does not point to quadit help listen")
+	}
+}
