@@ -1,5 +1,5 @@
-// Input held back for a moment on Connect agents opened by a server's page
-// (src/main/connect-page.ts): its first 700 ms on screen take no pointer or
+// Input held back for a moment on Connect agents opened by another server's
+// page (src/main/connect-page.ts): its first 700 ms on screen take no pointer or
 // keyboard input, so that a click the page timed for itself, meant by the
 // person for that page, lands on nothing rather than on a card's one-click
 // Connect. A delay of this kind is the usual guard against a page making a

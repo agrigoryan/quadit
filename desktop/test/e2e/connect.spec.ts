@@ -200,11 +200,7 @@ test("a card set up from the Agents page turns Connected when the agent gives it
     await expect.poll(() => desktop.overlays(run.server)).not.toContainEqual(CONNECT);
     await expect(page).toHaveURL(/\/e2e\/agents/);
 
-    // Left so, the page cannot open it again for ten seconds (past the once-a-second limit on its asks); the menu can.
-    await page.getByRole("button", { name: "Connect a tool on this computer" }).first().click();
-    // Nothing is to come: waited out over more than the limit, and checked.
-    await page.waitForTimeout(1_500);
-    expect(await desktop.overlays(run.server)).not.toContainEqual(CONNECT);
+    // Opened from the menu, it is the person's: nothing says a server asked.
     await desktop.chooseMenuItem("connect");
     const again = await desktop.appPage("connect.html");
     await expect(again.getByText(/^Opened by /)).toBeHidden();

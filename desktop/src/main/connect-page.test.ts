@@ -1,5 +1,5 @@
 import type { WebContents, WebContentsView } from "electron";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { PageHandlers } from "@/main/app-pages";
 import { ConnectPage } from "@/main/connect-page";
 import type { ConnectTarget } from "@/shared/pages-api";
@@ -8,9 +8,9 @@ import type { ConnectTarget } from "@/shared/pages-api";
  * Connect agents over stand-ins: each view is `{ webContents: { id } }`; the
  * windows record what they are asked, and the window of the server
  * `covered`, when given, has another of the app's pages over it already;
- * the windows of the servers in `front` are in front of the person.
+ * "local" is the server the app runs on this computer.
  */
-function harness({ covered = "", front = new Set<string>() }: { covered?: string; front?: Set<string> } = {}) {
+function harness({ covered = "" }: { covered?: string } = {}) {
   let handlers: Partial<PageHandlers> = {};
   const said: string[] = [];
   const closers = new Map<number, () => void>();
@@ -36,8 +36,8 @@ function harness({ covered = "", front = new Set<string>() }: { covered?: string
       },
       uncover: (view) => void said.push(`uncover ${viewId(view)}`),
       isCovered: (serverId) => serverId === covered,
-      inFront: (serverId) => front.has(serverId),
     },
+    isLocal: (serverId) => serverId === "local",
     target: (serverId): Omit<ConnectTarget, "openedByPage"> => ({
       serverId,
       serverName: `Server ${serverId}`,
@@ -106,52 +106,28 @@ describe("ConnectPage", () => {
 });
 
 describe("ConnectPage, asked by a server's page", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  it("opens only over that page's window while it is in front, and tells its page that a server's page asked", async () => {
-    const front = new Set<string>();
-    const { connect, said, call } = harness({ front });
-    connect.asked("s1");
-    expect(said).toEqual([]);
-    front.add("s1");
+  it("opens over that page's window, telling its page that another server's page asked", async () => {
+    const { connect, said, call } = harness();
     connect.asked("s1");
     expect(said).toEqual(["cover s1 with 1"]);
     expect(await call(1, "connectTarget")).toMatchObject({ serverName: "Server s1", openedByPage: true });
     // Asked again while it is there: nothing more.
     connect.asked("s1");
     expect(said).toEqual(["cover s1 with 1"]);
-  });
-
-  it("cannot open it again for ten seconds after the person left it, whichever way it was opened; the menu always can", async () => {
-    const { connect, said, call } = harness({ front: new Set(["s1"]) });
-    connect.show("s1");
+    // Left, it may ask again at once.
     await call(1, "closeConnect");
-    vi.advanceTimersByTime(9_999);
     connect.asked("s1");
-    expect(said).toEqual(["cover s1 with 1", "uncover 1", "drop plans"]);
-    connect.show("s1");
     expect(said.at(-1)).toBe("cover s1 with 2");
-    expect(await call(2, "connectTarget")).toMatchObject({ openedByPage: false });
-    await call(2, "closeConnect");
-    vi.advanceTimersByTime(10_000);
-    connect.asked("s1");
-    expect(said.at(-1)).toBe("cover s1 with 3");
   });
 
-  it("counts moving to another window as not leaving, and closing the window as leaving", () => {
-    const { connect, said, closers } = harness({ front: new Set(["s1", "s2"]) });
-    connect.show("s1");
-    connect.show("s2");
-    connect.asked("s1");
-    expect(said.at(-1)).toBe("cover s1 with 3");
-    closers.get(3)?.();
-    connect.asked("s1");
-    expect(said.slice(-2)).toEqual(["uncover 3", "drop plans"]);
+  it("opens for the app's own server's page as the person would: nothing held, nothing said of who asked", async () => {
+    const { connect, call } = harness();
+    connect.asked("local");
+    expect(await call(1, "connectTarget")).toMatchObject({ openedByPage: false });
   });
 
   it("never opens while the first run covers the window, nor brings that window forward", () => {
-    const { connect, said } = harness({ covered: "s1", front: new Set(["s1"]) });
+    const { connect, said } = harness({ covered: "s1" });
     connect.asked("s1");
     expect(said).toEqual([]);
   });

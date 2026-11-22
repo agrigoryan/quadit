@@ -7,8 +7,9 @@
 // whose plan the sheet shows before anything is written, and, once a tool is
 // connected, where and as whom. Disconnect shows what taking it back does
 // first. "Done" and Escape take the page away, showing the one under it.
-// Opened by a server's page rather than by the person, it says which server
-// asked, and takes no input for its first moment on screen (hold-input.ts).
+// Opened by another server's page rather than by the person, it says which
+// server asked, and takes no input for its first moment on screen
+// (hold-input.ts).
 // A redraw keeps each tool's card and changes it in place: its nodes are
 // replaced only when what it shows changes, so focus, a selection or a click
 // in it survive the redraw after a Connect or a Disconnect.

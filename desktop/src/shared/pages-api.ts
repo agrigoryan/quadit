@@ -204,7 +204,8 @@ export interface SelfRun {
 /**
  * The window Connect agents is laid over: its server, the workspace its page
  * shows (null: none yet, or signed out), and whether that server's page
- * asked for Connect (`openedByPage`), not the person.
+ * asked for Connect (`openedByPage`), a server other than the app's own,
+ * not the person.
  */
 export interface ConnectTarget {
   serverId: string;

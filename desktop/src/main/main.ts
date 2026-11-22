@@ -328,6 +328,7 @@ function start() {
     pages,
     connections,
     windows,
+    isLocal: (serverId) => serverId === list.localServer()?.id,
     target: (serverId) => {
       const server = store.get(serverId);
       const page = windows.pageOf(serverId);
