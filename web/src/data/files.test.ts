@@ -109,6 +109,10 @@ describe("shownAs", () => {
     expect(as("page.htm")).toBe("text");
     expect(as("logo.svg", "image/svg+xml")).toBe("text");
     expect(as("logo", "image/svg+xml")).toBe("text");
+    // The name says what it is, whatever type it arrived with.
+    expect(as("page.html", "text/markdown")).toBe("text");
+    expect(as("logo.svg", "text/markdown")).toBe("text");
+    expect(as("feed.xml", "text/markdown")).toBe("text");
   });
 
   it("leaves anything else to download", () => {

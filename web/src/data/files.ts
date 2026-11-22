@@ -212,8 +212,9 @@ const TEXT_TYPE = /^(text\/|application\/(json|xml|ya?ml|toml|javascript|x-sh|sq
 /** How the viewer shows this file, or null when it cannot and the file downloads. */
 export function shownAs(f: Pick<FileRow, "name" | "content_type">): Shown | null {
   const type = (f.content_type.split(";")[0] ?? "").trim().toLowerCase();
-  if (MARKDOWN_NAME.test(f.name) || type === "text/markdown") return "markdown";
+  if (MARKDOWN_NAME.test(f.name)) return "markdown";
   if (TEXT_NAME.test(f.name) || type === "image/svg+xml") return "text";
+  if (type === "text/markdown") return "markdown";
   if (isImage(f)) return "image";
   if (isVideo(f)) return "video";
   return TEXT_TYPE.test(type) ? "text" : null;
