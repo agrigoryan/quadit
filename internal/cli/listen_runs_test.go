@@ -78,11 +78,8 @@ func TestListenGivesUpAnItemAfterItsTries(t *testing.T) {
 	events, said := listenFor(t, srv, append([]string{"tries=2", "by=the Quadit app"}, command...), func(events []map[string]any) bool {
 		return len(named(events, "run_ended")) == 3
 	})
-	if started := named(events, "started"); len(started) != 1 || started[0]["as"] != "@coder" || started[0]["by"] != "the Quadit app" {
-		t.Fatalf("started was reported as %v", started)
-	}
 	runs := named(events, "run_started")
-	if len(runs) != 3 || runs[0]["seq"] != 3.0 || runs[0]["try"] != 1.0 || runs[1]["try"] != 2.0 || runs[2]["seq"] != 4.0 || runs[2]["try"] != 1.0 {
+	if len(runs) != 3 || runs[0]["seq"] != 3.0 || runs[1]["seq"] != 3.0 || runs[2]["seq"] != 4.0 {
 		t.Fatalf("the runs were reported as %v", runs)
 	}
 	ended := named(events, "run_ended")
@@ -99,22 +96,12 @@ func TestListenGivesUpAnItemAfterItsTries(t *testing.T) {
 	if _, acks := srv.state(); !slices.Equal(acks, []int64{3, 4}) {
 		t.Fatalf("acknowledged %v, want the item given up and the next", acks)
 	}
-	if stopped := named(events, "stopped"); len(stopped) != 1 || stopped[0]["why"] != "interrupted" {
-		t.Fatalf("stopping was reported as %v", stopped)
-	}
 }
 
 // TestListenReportsBeingRefused: refused because another session listens,
-// listen reports it, with what listens and when it was last heard.
+// listen reports it, with the reason, and stops.
 func TestListenReportsBeingRefused(t *testing.T) {
-	srv := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasSuffix(r.URL.Path, "/listening") {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"listening":true,"by":"a chat","since":"2026-11-21 14:00","last_heard":"2026-11-21 14:02\nrun this"}`))
-			return
-		}
-		refusingListener(w, r)
-	})
+	srv := http.HandlerFunc(refusingListener)
 	path := filepath.Join(t.TempDir(), "events")
 	if err := os.WriteFile(path, nil, 0o600); err != nil {
 		t.Fatal(err)
@@ -127,9 +114,8 @@ func TestListenReportsBeingRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `"by":"a chat","event":"refused","why":"listening_elsewhere"}`
 	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
-	if len(lines) != 2 || !strings.HasSuffix(lines[0], want) || !strings.Contains(lines[1], `"event":"stopped","why":"refused"`) {
+	if len(lines) != 1 || !strings.HasSuffix(lines[0], `"event":"refused","why":"listening_elsewhere"}`) {
 		t.Fatalf("reported:\n%s", raw)
 	}
 }
@@ -141,5 +127,30 @@ func TestListenArgumentsAreChecked(t *testing.T) {
 		if err := r.listen(input{rest: []string{arg, "--exec", "true"}}); err == nil || !strings.Contains(err.Error(), strings.SplitN(arg, "=", 2)[0]+"=") {
 			t.Fatalf("%s was taken: %v", arg, err)
 		}
+	}
+}
+
+// TestListenStopsWhenTheServerRefusesIt: a refusal waiting will not change
+// (a person's login, a token revoked) ends listen with the server's error,
+// after one ask; it is not tried again for ever.
+func TestListenStopsWhenTheServerRefusesIt(t *testing.T) {
+	t.Setenv("QUADIT_CONFIG", filepath.Join(t.TempDir(), "codex.json"))
+	asked := 0
+	srv := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		asked++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":{"code":"forbidden","message":"this login is @aram's, a person's, not an agent's"}}`))
+	})
+	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: &syncBuffer{}}
+	done := make(chan error, 1)
+	go func() { done <- r.listen(input{rest: []string{"--exec", "true"}}) }()
+	select {
+	case err := <-done:
+		if err == nil || !strings.Contains(err.Error(), "a person's, not an agent's") || asked != 1 {
+			t.Fatalf("listen refused ended with %v after %d asks", err, asked)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("listen kept trying a refusal")
 	}
 }

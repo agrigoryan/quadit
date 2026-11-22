@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -68,9 +69,9 @@ func (r *runner) secretEnv(names []string) (map[string]string, error) {
 // each under its name, after whatever more adds to it; and the masker its
 // output goes through. The caller gives the command its input, runs it and
 // flushes the masker.
-func (r *runner) secretCommand(command []string, env map[string]string, more ...string) (*exec.Cmd, *masker) {
+func (r *runner) secretCommand(ctx context.Context, command []string, env map[string]string, more ...string) (*exec.Cmd, *masker) {
 	out := newMasker(r.out, env)
-	cmd := exec.CommandContext(r.ctx, command[0], command[1:]...)
+	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
 	cmd.Env = append(os.Environ(), more...)
 	for k, v := range env {
 		cmd.Env = append(cmd.Env, k+"="+v)
@@ -104,7 +105,7 @@ func (r *runner) runWithSecrets(in input) error {
 	if err != nil {
 		return err
 	}
-	cmd, out := r.secretCommand(command, env)
+	cmd, out := r.secretCommand(r.ctx, command, env)
 	cmd.Stdin = os.Stdin
 	err = cmd.Run()
 	if flushErr := out.Flush(); err == nil {

@@ -22,7 +22,7 @@ follow    events [after=SEQ] [wait=50] [cursor=NAME] [mine=1] [others=1] [task=K
                                      3600: an hour, for a wait in the background);
                                      prints ITEM or IDLE and the exact commands to go on. One session
                                      at a time listens; take=1 takes over, only when the person says so
-          listening                  whether something already listens as you, what and since when
+          listening                  whether something already listens as you, and what
           listen --exec CMD          run CMD for each inbox item, again until it succeeds (quadit help listen)
 act       new PROJECT TITLE [field=value ...]      description=- reads it from stdin
           update KEY field=value ... status=done assignee=@ann priority=high add_labels=a,b
@@ -67,11 +67,11 @@ Codex, Cursor, Gemini CLI, Antigravity CLI, Copilot, opencode and pi look; quadi
 var helpTopics = map[string]string{
 	"listen": `listening: answering what comes in to you in Quadit
   One session at a time listens as you: it holds your lease, which lives ninety seconds past
-  its last request. Another session is refused, and told what holds the lease and since when.
+  the wait it last asked for. Another session is refused, and told what holds the lease.
 
-  listening [lease=ID]         whether something already listens as you, what and since when,
-                               without taking the lease
-                               quadit listening  ->  Something already listens as you: a companion, since 2026-11-21 14:02 UTC (last heard 2026-11-21 14:05 UTC).
+  listening                    whether something already listens as you, and what, without
+                               taking the lease
+                               quadit listening  ->  Something already listens as you: a companion (last heard 2026-11-21 14:05 UTC).
   wait [for=SECONDS] [lease=ID] [take=1]
                                wait for the next inbox item (50 seconds unless for= says, up to
                                3600), then print ITEM or IDLE and the exact commands to go on:
@@ -87,9 +87,9 @@ var helpTopics = map[string]string{
                                wait prints for it (ITEM line, how to read it, the line that answers
                                it once) in QUADIT_ITEM, until it exits 0. One per
                                login. It says it is "a companion" to whoever asks, or what by= says.
-                               limit= ends a run that takes longer; tries= gives an item up after
+                               limit= kills a run that takes longer; tries= gives an item up after
                                that many failed runs (it stays unread in quadit inbox); events=
-                               reports each step as a JSON line to a file or named pipe you made.
+                               reports each run as a JSON line to a file or named pipe you made.
                                Stop it with Ctrl-C, or by closing its terminal.
                                quadit listen --exec sh -c 'codex exec "Quadit woke you for this inbox item: $QUADIT_ITEM Handle it with the quadit skill, answering where you were asked."'
   Where an agent's tool cannot hand it a background command's result (it can only wait in

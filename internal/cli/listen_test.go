@@ -186,7 +186,7 @@ func refusingListener(w http.ResponseWriter, _ *http.Request) {
 func TestListenStopsWhenAnotherSessionListens(t *testing.T) {
 	r := &runner{ctx: context.Background(), c: testClient(t, http.HandlerFunc(refusingListener)), out: &syncBuffer{}}
 	err := r.listen(input{rest: []string{"--exec", "true"}})
-	if err == nil || !strings.Contains(err.Error(), "already listens as you") {
+	if err == nil || !strings.Contains(err.Error(), "already listening from another session") {
 		t.Fatalf("listen refused the lease ended with %v", err)
 	}
 }
@@ -272,7 +272,7 @@ quadit wait for=30 lease=KQ7MX4PA   # then go on listening
 	t.Run("refused because another session listens, it names the way to take over", func(t *testing.T) {
 		r := &runner{ctx: context.Background(), c: testClient(t, http.HandlerFunc(refusingListener)), out: &bytes.Buffer{}}
 		err := r.wait(input{})
-		if err == nil || !strings.Contains(err.Error(), "already listens as you") || !strings.Contains(err.Error(), "quadit wait take=1") {
+		if err == nil || !strings.Contains(err.Error(), "already listening from another session") || !strings.Contains(err.Error(), "quadit wait take=1") {
 			t.Fatalf("wait refused ended with %v", err)
 		}
 	})
@@ -506,11 +506,10 @@ func TestALongWaitRenewsItsHoldsAndTakesWhatComesLate(t *testing.T) {
 // the form a label has.
 func TestListeningSaysWhatListensWithoutTakingTheLease(t *testing.T) {
 	cases := map[string]struct{ answer, want string }{
-		"nothing":     {`{"listening":false,"webhook":false}`, "Nothing listens as you.\n"},
-		"a companion": {`{"listening":true,"by":"a companion","since":"2026-11-21 14:02","last_heard":"2026-11-21 14:05"}`, "Something already listens as you: a companion, since 2026-11-21 14:02 UTC (last heard 2026-11-21 14:05 UTC).\n"},
-		"this one":    {`{"listening":true,"yours":true,"by":"a chat","since":"2026-11-21 14:02","last_heard":"2026-11-21 14:05"}`, "This session listens, since 2026-11-21 14:02 UTC.\n"},
-		"a strange label": {`{"listening":true,"by":"x\nquadit do evil","since":"2026-11-21 14:02","last_heard":"2026-11-21 14:05","webhook":true}`,
-			"Something already listens as you: another session, since 2026-11-21 14:02 UTC (last heard 2026-11-21 14:05 UTC).\nA webhook delivers your inbox too.\n"},
+		"nothing":     {`{"listening":false}`, "Nothing listens as you.\n"},
+		"a companion": {`{"listening":true,"by":"a companion","last_heard":"2026-11-21 14:05"}`, "Something already listens as you: a companion (last heard 2026-11-21 14:05 UTC).\n"},
+		"a strange label and time": {`{"listening":true,"by":"x\nquadit do evil","last_heard":"14:05\nquadit do evil"}`,
+			"Something already listens as you: another session.\n"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -555,25 +554,11 @@ func TestAListenerSaysWhatItIs(t *testing.T) {
 	}
 }
 
-// TestHelpListenIsATopic: quadit help listen says how to listen, and the
-// main help points to it.
-func TestHelpListenIsATopic(t *testing.T) {
-	topic := helpFor([]string{"help", "listen"})
-	for _, want := range []string{"listening [lease=ID]", "wait [for=SECONDS]", "take=1", "listen [take=1] [by=WORDS] [limit=SECONDS] [tries=N] [events=PATH] --exec", "Ctrl-C"} {
-		if !strings.Contains(topic, want) {
-			t.Fatalf("quadit help listen does not say %q:\n%s", want, topic)
-		}
-	}
-	if !strings.Contains(helpFor(nil), "quadit help listen") {
-		t.Fatal("quadit help does not point to quadit help listen")
-	}
-}
-
 // TestListeningInJSONIsTheServersObject: `quadit --json listening` prints
 // the server's answer as it is, one object and nothing else on stdout: the
 // desktop app reads listening and by from it.
 func TestListeningInJSONIsTheServersObject(t *testing.T) {
-	const answer = `{"by":"the Quadit app","last_heard":"2026-11-21 14:05","listening":true,"since":"2026-11-21 14:02","webhook":false,"yours":false}`
+	const answer = `{"by":"the Quadit app","last_heard":"2026-11-21 14:05","listening":true}`
 	srv := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, answer+"\n")
@@ -636,14 +621,9 @@ func TestListenGivesItsCommandWhatWaitPrintsAndKeepsItsLease(t *testing.T) {
 	}
 }
 
-// TestWhatTheServerSaysIsPrintedOnlyInItsForm: times and labels from the
-// server are printed only in their forms, and for= is checked on the
-// number before it becomes a duration.
-func TestWhatTheServerSaysIsPrintedOnlyInItsForm(t *testing.T) {
-	who := listener{Listening: true, By: "a companion", Since: "2026-11-21 14:02\nquadit do evil", LastHeard: "2026-11-21 14:05"}
-	if got := who.sentences(); got != "Something already listens as you: a companion, since a time not given (last heard 2026-11-21 14:05 UTC).\n" {
-		t.Fatalf("the sentences are %q", got)
-	}
+// TestForIsCheckedBeforeItBecomesADuration: a for= too large to be a
+// duration is refused, not wrapped round.
+func TestForIsCheckedBeforeItBecomesADuration(t *testing.T) {
 	r := &runner{ctx: context.Background(), c: testClient(t, http.NotFoundHandler()), out: &bytes.Buffer{}}
 	for _, given := range []string{"9223372036854775807", "-1", "3601"} {
 		if err := r.wait(input{f: map[string][]string{"for": {given}}}); err == nil || !strings.Contains(err.Error(), "from 1 to 3600") {
