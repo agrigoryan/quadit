@@ -19,6 +19,19 @@ import { EmptyState } from "@/ui/empty";
 import { Markdown } from "@/ui/markdown";
 import { Loading } from "@/ui/spinner";
 
+/**
+ * The longest Markdown rendered, in characters; a longer file is shown as
+ * its source. Rendering is done at once on the page, and big or deeply
+ * nested Markdown would hold it still: measured in the tests' DOM on the
+ * build machine, 25,000 characters of mixed Markdown (headings, lists,
+ * tables, code) take about 65 ms, 50,000 about 120 ms. A browser is faster
+ * than the tests' DOM, so this stays well under a tenth of a second.
+ */
+export const RENDERED_MARKDOWN_CHARS = 25_000;
+
+/** Whether this Markdown is too long to render (RENDERED_MARKDOWN_CHARS), and is shown as its source. */
+export const tooLargeToRender = (text: string) => text.length > RENDERED_MARKDOWN_CHARS;
+
 interface Props {
   file: FileRow;
   /** Markdown as it reads, not as it is written. */
@@ -57,15 +70,18 @@ export function TextFile({ file, rendered }: Props) {
     );
 
   const { text, cut } = read.data;
+  const tooLarge = rendered && tooLargeToRender(text);
+  const note = "flex items-center justify-between gap-3 border-b border-line bg-sunken px-4 py-2 text-sm text-ink-2";
   return (
     <>
       {cut && (
-        <p className="flex items-center justify-between gap-3 border-b border-line bg-sunken px-4 py-2 text-sm text-ink-2">
+        <p className={note}>
           {t("viewer.cut")}
           <DownloadLink file={file} className={buttonLook("secondary", "sm")} />
         </p>
       )}
-      {rendered ? (
+      {tooLarge && <p className={note}>{t("viewer.tooLarge")}</p>}
+      {rendered && !tooLarge ? (
         <Markdown text={text} className="p-4 sm:p-6" />
       ) : (
         <pre className="p-4 font-mono text-sm/5 whitespace-pre-wrap text-ink wrap-anywhere sm:p-6">{text}</pre>

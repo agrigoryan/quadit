@@ -95,6 +95,7 @@ export const common = {
   "viewer.rendered": "Rendered",
   "viewer.source": "Source",
   "viewer.cut": "Showing the first 1 MB",
+  "viewer.tooLarge": "Too large to show rendered",
   "viewer.notText": "This file cannot be shown",
   "viewer.notTextHint": "It is not text. Download it to open it in another app.",
   "viewer.failed": "Could not load this file",

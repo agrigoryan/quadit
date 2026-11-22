@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { WithQuery } from "@/test/query";
 import type { FileRow } from "@/types/core";
 import { Lightbox } from "@/ui/media";
+import { RENDERED_MARKDOWN_CHARS } from "@/ui/text-file";
 import { TooltipProvider } from "@/ui/tooltip";
 
 afterEach(() => {
@@ -134,6 +135,29 @@ describe("Lightbox with text files", () => {
     expect(within(dialog).queryByRole("heading", { name: "The plan" })).toBeNull();
     fireEvent.click(within(dialog).getByRole("radio", { name: "Rendered" }));
     expect(within(dialog).getByRole("heading", { name: "The plan" })).toBeTruthy();
+  });
+
+  it("puts the focus on the text of each text file it comes to, by key or by button, so the keys scroll it", async () => {
+    serves({ "/files/run.log": "one", "/files/b.log": "two" });
+    render(<Open files={[picture("a.png"), text("run.log"), text("b.log")]} />);
+    const dialog = screen.getByRole("dialog");
+    expect(document.activeElement).toBe(dialog);
+
+    fireEvent.keyDown(dialog, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(screen.getByRole("region", { name: "run.log" }));
+    fireEvent.keyDown(document.activeElement ?? dialog, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(screen.getByRole("region", { name: "b.log" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Previous" }));
+    expect(document.activeElement).toBe(screen.getByRole("region", { name: "run.log" }));
+  });
+
+  it("opens Markdown too large to render on its source, with the choice held there", async () => {
+    serves({ "/files/big.md": `# Big\n\n${"Words. ".repeat(RENDERED_MARKDOWN_CHARS)}` });
+    render(<Open files={[text("big.md")]} />);
+    const dialog = screen.getByRole("dialog", { name: "big.md" });
+    expect(await within(dialog).findByText("Too large to show rendered")).toBeTruthy();
+    expect(within(dialog).getByRole("radio", { name: "Source" })).toBeChecked();
+    expect(within(dialog).getByRole("radio", { name: "Rendered" })).toBeDisabled();
   });
 
   it("starts on the text, so the keys scroll it", async () => {

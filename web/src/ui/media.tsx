@@ -2,12 +2,13 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Download, FileText, Play, X } from "lucide-react";
 import { Dialog as RDialog } from "radix-ui";
 import { cx } from "@/lib/cx";
+import { useFileText } from "@/data/file-text";
 import { fileSize, isImage, isVideo, shownAs } from "@/data/files";
 import { t } from "@/lib/i18n";
 import type { FileRow } from "@/types/core";
 import { CarouselArrows, CarouselCount, onCarouselKey, type Steps } from "@/ui/carousel";
 import { Segmented } from "@/ui/segmented";
-import { TextFile } from "@/ui/text-file";
+import { TextFile, tooLargeToRender } from "@/ui/text-file";
 
 interface ThumbProps {
   file: FileRow;
@@ -85,6 +86,34 @@ function MediaFull({ file, className }: { file: FileRow; className?: string }) {
   );
 }
 
+type MarkdownAs = "rendered" | "source";
+
+/** Rendered or Source, for a Markdown file; held at Source for one too large to render. */
+function MarkdownSwitch({
+  file,
+  value,
+  onChange,
+}: {
+  file: FileRow;
+  value: MarkdownAs;
+  onChange: (as: MarkdownAs) => void;
+}) {
+  const read = useFileText(file);
+  const tooLarge = !!read.data && tooLargeToRender(read.data.text);
+  return (
+    <Segmented
+      label={t("viewer.showAs")}
+      value={tooLarge ? "source" : value}
+      onChange={onChange}
+      disabled={tooLarge}
+      options={[
+        { value: "rendered", label: t("viewer.rendered") },
+        { value: "source", label: t("viewer.source") },
+      ]}
+    />
+  );
+}
+
 interface LightboxProps {
   /** The file shown; null while it is closed. */
   file: FileRow | null;
@@ -112,7 +141,7 @@ const round = cx("flex size-10 shrink-0 items-center justify-center", dark);
 export function Lightbox({ file, files, onShow, onClose }: LightboxProps) {
   const box = useRef<HTMLDivElement | null>(null);
   const textBox = useRef<HTMLElement | null>(null);
-  const [markdownAs, setMarkdownAs] = useState<"rendered" | "source">("rendered");
+  const [markdownAs, setMarkdownAs] = useState<MarkdownAs>("rendered");
   const at = file ? files.findIndex((f) => f.id === file.id) : -1;
   const steps: Steps = {
     index: Math.max(at, 0),
@@ -126,11 +155,14 @@ export function Lightbox({ file, files, onShow, onClose }: LightboxProps) {
   const shown = file ? shownAs(file) : null;
   const text = shown === "markdown" || shown === "text";
 
-  // The text box stays from one text file to the next, so the keys that
-  // scroll it keep working; each file starts at its top.
+  // A text file shown, however it was come to, has the focus, so the keys
+  // scroll it at once; each starts at its top.
   const fileId = file?.id;
   useLayoutEffect(() => {
-    if (fileId && textBox.current) textBox.current.scrollTop = 0;
+    const box = textBox.current;
+    if (!fileId || !box) return;
+    box.scrollTop = 0;
+    box.focus({ preventScroll: true });
   }, [fileId]);
 
   return (
@@ -157,17 +189,7 @@ export function Lightbox({ file, files, onShow, onClose }: LightboxProps) {
             <RDialog.Title className="min-w-0 flex-1 truncate text-sm font-medium text-white" title={file?.name}>
               {file?.name}
             </RDialog.Title>
-            {shown === "markdown" && (
-              <Segmented
-                label={t("viewer.showAs")}
-                value={markdownAs}
-                onChange={setMarkdownAs}
-                options={[
-                  { value: "rendered", label: t("viewer.rendered") },
-                  { value: "source", label: t("viewer.source") },
-                ]}
-              />
-            )}
+            {file && shown === "markdown" && <MarkdownSwitch file={file} value={markdownAs} onChange={setMarkdownAs} />}
             {file && (
               <a
                 href={file.url}

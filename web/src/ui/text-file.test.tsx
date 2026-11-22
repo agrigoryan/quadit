@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SHOWN_TEXT_BYTES } from "@/data/file-text";
 import { WithQuery } from "@/test/query";
 import type { FileRow } from "@/types/core";
-import { TextFile } from "@/ui/text-file";
+import { RENDERED_MARKDOWN_CHARS, TextFile } from "@/ui/text-file";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -98,6 +98,15 @@ describe("TextFile", () => {
     expect(page.querySelectorAll("script, img, iframe, a")).toHaveLength(0);
   });
 
+  it("shows a Markdown file too large to render quickly as its source, and says why", async () => {
+    const big = `# Big\n\n${"Words to read. ".repeat(Math.ceil(RENDERED_MARKDOWN_CHARS / 15))}`;
+    serves(big);
+    const page = show("big.md", true);
+    expect(await screen.findByText("Too large to show rendered")).toBeTruthy();
+    expect(page.querySelector("pre")?.textContent).toBe(big);
+    expect(screen.queryByRole("heading", { name: "Big" })).toBeNull();
+  });
+
   it("says a file is not text, and offers the file", async () => {
     serves(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
     show("logo.txt");
@@ -108,9 +117,12 @@ describe("TextFile", () => {
   });
 
   it("shows the first megabyte of a longer file and says so, with the whole file a click away", async () => {
-    const fetch = serves("x".repeat(SHOWN_TEXT_BYTES + 1));
-    show("big.log");
+    const fetch = serves(`${"x".repeat(SHOWN_TEXT_BYTES - 4)}LAST and what comes after`);
+    const page = show("big.log");
     expect(await screen.findByText("Showing the first 1 MB")).toBeTruthy();
+    const shown = page.querySelector("pre")?.textContent ?? "";
+    expect(shown).toHaveLength(SHOWN_TEXT_BYTES);
+    expect(shown.endsWith("xLAST")).toBe(true);
     expect(screen.getByRole("link", { name: "Download" }).getAttribute("href")).toBe("/f/big.log");
     expect(fetch.mock.calls[0]?.[0]).toBe("/f/big.log");
   });
