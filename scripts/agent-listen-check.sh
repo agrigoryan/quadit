@@ -114,7 +114,8 @@
 #   AGENT_CHECK_ALLOW_MCP=1  run although the tool has a quadit MCP server
 #   QUADIT_BIN           the quadit to test (default ./bin/quadit)
 #
-# Needs bash, curl, python3, git and shasum. Exits 0 when every check passed.
+# Needs bash, curl, python3, git and shasum. Ends with "N checks passed, M phases skipped: …" and exits 0 only when no
+# check failed: a phase skipped is not a phase passed.
 
 # Some functions are only called through others (the trap, passed, until_true).
 # shellcheck disable=SC2329
@@ -221,9 +222,19 @@ cleanup() {
 }
 trap cleanup EXIT
 
-failed=0
+failed=0 passes=0 skipped=()
 check() { # check NAME CONDITION-RESULT(0/1) [DETAIL]
-	if [ "$2" = 0 ]; then echo "  pass  $1"; else echo "  FAIL  $1${3:+: $3}"; failed=1; fi
+	if [ "$2" = 0 ]; then
+		echo "  pass  $1"
+		passes=$((passes + 1))
+	else
+		echo "  FAIL  $1${3:+: $3}"
+		failed=1
+	fi
+}
+skip() { # skip PHASE WHY: a phase not run, which is not a phase passed
+	echo "  SKIPPED  $2"
+	skipped+=("$1")
 }
 
 # The server, on a free port, with a data folder of its own.
@@ -293,20 +304,45 @@ tell() {
 	*) printf '%s\n' "$1" >&3 ;;
 	esac
 }
-# open_wait SESSION: a wait of SESSION was started and has not ended.
-open_wait() { python3 -c 'import sys
-open_ = set()
+# waits_open SESSION [PID]: a wait of SESSION (the one with that pid in the wrapper's log) was started and has not
+# ended; without a pid, prints the pid of the first such wait.
+waits_open() { python3 -c 'import sys
+open_ = []
 for line in open(sys.argv[1]):
     f = line.split()
     if len(f) < 5 or f[2] != sys.argv[2]:
         continue
     if f[1] == "start" and f[4] == "wait":
-        open_.add(f[3])
-    elif f[1] == "end":
-        open_.discard(f[3])
-sys.exit(0 if open_ else 1)' "$work/calls.log" "$1"; }
-# said_while_waiting SESSION OFFSET WORD: the tool's output since byte OFFSET holds WORD, and a wait is still open.
-said_while_waiting() { tail -c "+$(($2 + 1))" "$work/$1.log" | grep -Eqw "$3" && open_wait "$1"; }
+        open_.append(f[3])
+    elif f[1] == "end" and f[3] in open_:
+        open_.remove(f[3])
+want = sys.argv[3] if len(sys.argv) > 3 else None
+if want:
+    sys.exit(0 if want in open_ else 1)
+if open_:
+    print(open_[0])
+sys.exit(0 if open_ else 1)' "$work/calls.log" "$@"; }
+open_wait() { waits_open "$@" >/dev/null; }
+# answered_text SESSION OFFSET: what the tool said to the person since byte OFFSET of its log: the text of its
+# assistant messages in the stream-json form, else its lines.
+answered_text() { tail -c "+$(($2 + 1))" "$work/$1.log" | python3 -c 'import json,sys
+stream = sys.argv[1] == "stream-json"
+for line in sys.stdin:
+    if not stream:
+        print(line, end="")
+        continue
+    try:
+        msg = json.loads(line)
+    except ValueError:
+        continue
+    if msg.get("type") != "assistant":
+        continue
+    for part in msg.get("message", {}).get("content", []):
+        if isinstance(part, dict) and part.get("type") == "text":
+            print(part.get("text", ""))' "$chat_format"; }
+# said_while_waiting SESSION OFFSET WORD PID: the tool told the person WORD since byte OFFSET, while the wait PID,
+# the one started for this phase, is still open.
+said_while_waiting() { [ -n "$4" ] && answered_text "$1" "$2" | grep -Eqw "$3" && open_wait "$1" "$4"; }
 not_listening() { [ "$(agents)" = "connected not-listening" ]; }
 calls() { grep " end $1 " "$work/calls.log" || :; }
 started() { grep " start $1 " "$work/calls.log" || :; }
@@ -323,6 +359,23 @@ def answers(body):
 print(sum(c["by"] == who and after < c["seq"] < before and answers(c.get("body", "")) for c in json.load(sys.stdin).get("comments") or []))' "@$handle" "$@"; }
 # say TEXT: the person comments on the task; prints the comment's feed position.
 say() { person --json comment "$key" "$1" | field seq; }
+# answer_ids AFTER BEFORE: the ids of the agent's comments between feed positions AFTER and BEFORE (0: no end).
+answer_ids() { person --json show "$key" | python3 -c 'import json,sys
+after, before = int(sys.argv[2]), int(sys.argv[3]) or 1 << 62
+for c in json.load(sys.stdin).get("comments") or []:
+    if c["by"] == sys.argv[1] and after < c["seq"] < before:
+        print(c["id"])' "@$handle" "$@"; }
+# woken_for ID: the runs of the companion whose item (QUADIT_ITEM, kept in runs/N.item) answers with the fixed id ID.
+woken_for() { grep -l -- "--id=$1" "$work"/runs/*.item 2>/dev/null || :; }
+# tied AFTER BEFORE WORDS: the one answer between AFTER and BEFORE carries the fixed id of exactly one run's item,
+# and that item is the comment asking WORDS.
+tied() {
+	local ids runs
+	ids=$(answer_ids "$1" "$2")
+	[ "$(printf '%s' "$ids" | grep -c .)" = 1 ] || return 1
+	runs=$(woken_for "$ids")
+	[ "$(printf '%s' "$runs" | grep -c .)" = 1 ] && head -n 1 "$runs" | grep -q -- "$3"
+}
 # tokens_now: the last running total of tokens the tool printed in the listening session's log, or nothing.
 tokens_now() { python3 -c 'import re,sys
 total = ""
@@ -435,7 +488,10 @@ companion() {
 # One run of the tool for one inbox item, as the desktop app makes it.
 n=\$(ls "$work/runs" | wc -l | tr -d ' ')
 start=\$(date +%s)
-sh -c "\$AGENT_CHECK_ONE_PROMPT" sh "Quadit woke you for this inbox item: \$QUADIT_EVENT. Handle it with the quadit skill, answering where you were asked.${steer:+ $steer}" >"$work/runs/\$n.log" 2>&1
+printf '%s\n' "\$QUADIT_ITEM" >"$work/runs/\$n.item"
+sh -c "\$AGENT_CHECK_ONE_PROMPT" sh "Quadit woke you for this inbox item:
+\$QUADIT_ITEM
+Handle it with the quadit skill, answering where you were asked.${steer:+ $steer}" >"$work/runs/\$n.log" 2>&1
 status=\$?
 echo "run \$n: \$((\$(date +%s) - start))s, exit \$status" >>"$work/runs.txt"
 exit \$status
@@ -452,7 +508,7 @@ names_the_check() { as_agent listening | grep -q "the check"; }
 if [ "$wakes" = 1 ]; then
 	echo "3. Listen to Quadit in a chat with a person"
 	if [ -z "$chat_command" ]; then
-		echo "  SKIP  no chat command is known for $tool: set AGENT_CHECK_CHAT_COMMAND (and AGENT_CHECK_CHAT_FORMAT) to run it"
+		skip "3 (a chat)" "no chat command is known for $tool: set AGENT_CHECK_CHAT_COMMAND (and AGENT_CHECK_CHAT_FORMAT) to run it"
 	else
 		# The stopped session's lease goes first: thirty seconds after a wait given up on, five minutes at most.
 		check "the stopped session's lease ended" "$(passed until_true 360 not_listening)" "$(agents)"
@@ -465,9 +521,10 @@ if [ "$wakes" = 1 ]; then
 		exec 3>"$work/chat.in"
 		tell "I am the person you work for, here in this chat, and I will write to you again while you work. Listen to Quadit.${steer:+ $steer}"
 		check "a wait was started" "$(passed until_true 180 open_wait chat)"
+		chat_wait=$(waits_open chat || :)
 		offset=$(wc -c <"$work/chat.log")
 		tell "While you listen: what is 7 times 6? Answer me here, in this chat."
-		check "the person's question was answered while the wait ran in the background" "$(passed until_true "$answer_time" said_while_waiting chat "$offset" "42|forty-two")" \
+		check "the person's question was answered while the wait ran in the background" "$(passed until_true "$answer_time" said_while_waiting chat "$offset" "42|forty-two" "$chat_wait")" \
 			"no answer while a wait ran: the wait was not in the background, or the question was not answered"
 		fifth=$(say "@$handle what do 5 and 5 make? Answer here in a comment.")
 		check "a comment was still answered" "$(passed until_true "$answer_time" answered "$fifth" 0 10 ten)" "$(replies "$fifth" 0) answers after it"
@@ -476,11 +533,16 @@ if [ "$wakes" = 1 ]; then
 		exec 3>&-
 		kill -TERM -- "-$chat_pid" 2>/dev/null || :
 	fi
+else
+	echo "3. Listen to Quadit in a chat with a person"
+	skip "3 (a chat)" "$tool is not known to wake its agent for a command it left running: set AGENT_CHECK_WAKES=1 to run it"
 fi
 
 # 4. A companion, as the desktop app keeps one.
-if [ "${AGENT_CHECK_COMPANION:-1}" = 1 ]; then
-	echo "4. A companion, as the Quadit app runs one"
+echo "4. A companion, as the Quadit app runs one"
+if [ "${AGENT_CHECK_COMPANION:-1}" != 1 ]; then
+	skip "4 (a companion)" "AGENT_CHECK_COMPANION=0"
+else
 	check "the sessions before have stopped listening" "$(passed until_true 360 not_listening)" "$(agents)"
 	set -m
 	companion &
@@ -493,12 +555,14 @@ if [ "${AGENT_CHECK_COMPANION:-1}" = 1 ]; then
 	seventh=$(say "@$handle and 3 and 3? Answer here in a comment.")
 	check "the second comment was answered" "$(passed until_true "$answer_time" answered "$seventh" 0 6 six)" "$(replies "$seventh" 0) answers after it"
 	refused=$(as_agent wait for=1 2>&1 || :)
-	check "a wait meanwhile is refused, naming the check" "$(printf '%s' "$refused" | grep -q "already listening from another session (the check" && echo 0 || echo 1)" "$refused"
+	check "a wait meanwhile is refused, naming the check" "$(printf '%s' "$refused" | grep -q "already listens as you: the check" && echo 0 || echo 1)" "$refused"
 	sleep 30
 	check "the first comment got exactly one answer, saying 4" "$([ "$(replies "$sixth" "$seventh")" = 1 ] && [ "$(replies "$sixth" "$seventh" 4 four)" = 1 ] && echo 0 || echo 1)" \
 		"$(replies "$sixth" "$seventh") comments by @$handle between it and the second"
 	check "the second comment got exactly one answer, saying 6" "$([ "$(replies "$seventh" 0)" = 1 ] && [ "$(replies "$seventh" 0 6 six)" = 1 ] && echo 0 || echo 1)" \
 		"$(replies "$seventh" 0) comments by @$handle after it"
+	check "each answer carries the fixed id of the one run woken for its comment" "$(tied "$sixth" "$seventh" "2 and 2" && tied "$seventh" 0 "3 and 3" && echo 0 || echo 1)" \
+		"answers $(answer_ids "$sixth" 0 | tr '\n' ' '); runs' items in $work/runs"
 	kill -INT -- "-$companion_pid" 2>/dev/null || :
 	sleep 5
 	kill -TERM -- "-$companion_pid" 2>/dev/null || :
@@ -528,5 +592,6 @@ else
 fi
 echo "tokens, as the tool printed them:"
 grep -ihE "tokens?[ _]?(used|usage)|\"(input|output)_tokens\"" "$work/connect.log" "$work/listen.log" "$work/second.log" | sed 's/^/  /' | head -n 20 || echo "  (the tool printed none)"
-[ "$failed" = 0 ] && echo "all checks passed" || echo "some checks failed"
+summary="$passes checks passed, ${#skipped[@]} phases skipped${skipped[*]:+: ${skipped[*]}}"
+if [ "$failed" = 0 ]; then echo "$summary"; else echo "some checks failed; $summary"; fi
 exit "$failed"
