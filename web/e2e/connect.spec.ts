@@ -41,7 +41,7 @@ test("the comment box says what happens to a comment in each of the agent's stat
   await expect(page.getByText("Waiting for Codex…")).toBeVisible();
 
   // The agent gives it back from inside its tool, and the page sees it.
-  expect(await agent("connect", code)).toContain(`Connected as @${handle} in ${WORKSPACE.name}.`);
+  expect(await agent("connect", code)).toContain(`Connected as @${handle} in the workspace "${WORKSPACE.name}".`);
   await expect(page.getByText("Connected: Codex gave the code back.")).toBeVisible();
 
   await page.goto(`/${WORKSPACE.slug}/task/${key}`);
