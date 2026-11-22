@@ -1,6 +1,6 @@
 module github.com/agrigoryan/quadit
 
-go 1.26.0
+go 1.26.11
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.2
