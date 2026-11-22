@@ -60,6 +60,7 @@ import {
   planReverts,
   readText,
   realPath,
+  recordInPlace,
   sha256,
   targetOf,
   writeEdits,
@@ -135,8 +136,22 @@ interface Connection {
   at: number;
 }
 
+/**
+ * Changes under way for a tool, written down before they are made (and the
+ * token as soon as it is made), so a start after the app stopped midway
+ * finishes them: a Connect is taken back (what of it is in place, its token
+ * revoked), an upgrade kept as the connection's (what of it is in place).
+ * Never the person's: a half-made change is the app's to finish.
+ */
+interface Pending {
+  kind: "connect" | "upgrade";
+  records: Applied[];
+  token: { id: string; serverId: string; workspaceId: string } | null;
+}
+
 interface Ledger {
   harnesses: Record<string, Connection>;
+  pending?: Record<string, Pending>;
 }
 
 type Plan =
@@ -277,7 +292,28 @@ export class Connections {
    * (allowConnected). Gives what was done.
    */
   refresh(): Promise<{ skills: { updated: string[]; changedByHand: string[] }; allowed: string[] }> {
-    return this.inTurn(async () => ({ skills: await this.refreshSkills(), allowed: await this.allowConnected() }));
+    return this.inTurn(async () => {
+      this.finishPending();
+      return { skills: await this.refreshSkills(), allowed: await this.allowConnected() };
+    });
+  }
+
+  /** Finishes what the app left midway when it stopped (Pending): a Connect taken back, an upgrade kept. */
+  private finishPending() {
+    const ledger = this.ledger();
+    for (const [id, pending] of Object.entries(ledger.pending ?? {})) {
+      if (pending.kind === "connect") this.takeBack(pending);
+      else ledger.harnesses[id]?.edits.push(...pending.records.filter(recordInPlace));
+      delete ledger.pending?.[id];
+    }
+    this.saveLedger(ledger);
+  }
+
+  /** Takes back what of a Connect stopped midway is in place, and revokes its token (on a server that answers). */
+  private takeBack(pending: Pending) {
+    writeEdits(planReverts(pending.records).edits);
+    const { token } = pending;
+    if (token) void this.parts.ask(token.serverId, token.workspaceId, { kind: "revoke-token", token: token.id });
   }
 
   /**
@@ -286,8 +322,9 @@ export class Connections {
    * same plan, backup and ledger as Connect, so Disconnect takes it back;
    * what is there already is the person's and left alone. Marked once done,
    * it is never written again for that connection, even after the person
-   * takes it away; one the app could not write (a table of theirs in the
-   * way) is tried again at the next start. Gives the tools written to.
+   * takes it away, or kept part of it (a setting of theirs in the way).
+   * Each tool is written down before its files are written (Pending), and
+   * saved before the next. Gives the tools written to.
    */
   private async allowConnected(): Promise<string[]> {
     const ledger = this.ledger();
@@ -300,8 +337,9 @@ export class Connections {
       const harness = HARNESSES.find((h) => h.id === id);
       if (!harness) continue;
       const groups: AllowGroup[] = [];
-      if (connection.methods.includes("cli") && harness.allowCli)
-        groups.push({ changes: harness.allowCli.changes(home, look.found?.path ?? null), said: harness.allowCli.said });
+      if (connection.methods.includes("cli"))
+        for (const group of harness.allowCli ?? [])
+          groups.push({ changes: group.changes(home, look.found?.path ?? null), said: group.said });
       const origin = this.parts.server(connection.serverId)?.origin;
       const mcpAllow = harness.mcp?.allow;
       if (connection.methods.includes("mcp") && mcpAllow && origin)
@@ -309,18 +347,28 @@ export class Connections {
       const others = this.recordsByTarget({
         harnesses: Object.fromEntries(Object.entries(ledger.harnesses).filter(([other]) => other !== id)),
       });
-      const { make, refused } = allowable(groups, others, []);
+      const { make } = allowable(groups, others, []);
       const own = make.filter((change) => !others.has(targetOf(change)));
       const { edits, applied } = planChanges(own);
-      if (edits.length > 0) {
-        backUp(edits, this.backupDir(id));
+      const records = hashed(applied, edits, backUp(edits, this.backupDir(id)));
+      (ledger.pending ??= {})[id] = { kind: "upgrade", records, token: null };
+      this.saveLedger(ledger);
+      try {
         writeEdits(edits);
-        done.push(id);
+      } finally {
+        // Done or stopped midway: what is in place is the connection's.
+        connection.edits.push(
+          ...records.filter(recordInPlace),
+          ...make.flatMap((change) => others.get(targetOf(change)) ?? []),
+        );
+        delete ledger.pending[id];
+        this.saveLedger(ledger);
       }
-      connection.edits.push(...applied, ...make.flatMap((change) => others.get(targetOf(change)) ?? []));
-      if (!refused) connection.allowed = true;
+      if (edits.length > 0) done.push(id);
+      // Once, whatever the person had in the way: never again after.
+      connection.allowed = true;
+      this.saveLedger(ledger);
     }
-    this.saveLedger(ledger);
     return done;
   }
 
@@ -476,7 +524,9 @@ export class Connections {
         changes.push({ kind: "link", path: linked.path, target: linked.target });
         for (const record of others.values()) {
           if (record.kind === "folder" && record.path === dirname(linked.path)) changes.push(record);
-          if (record.kind === "line") changes.push({ kind: "line", path: record.path, line: record.line });
+          // The profile line that puts the folder on the PATH; never another tool's own settings (its command rules).
+          if (record.kind === "line" && !HARNESSES.some((h) => h.rules && record.path === join(home, h.rules.file)))
+            changes.push({ kind: "line", path: record.path, line: record.line });
         }
       } else if (!look.found && look.linkInto && cli.bundled) {
         const { folder, profile } = look.linkInto;
@@ -495,8 +545,9 @@ export class Connections {
       });
       // The command as an agent may call it by its path: the one on the PATH, or the app's copy linked there now.
       const command = look.found?.path ?? (look.linkInto && cli.bundled ? join(look.linkInto.folder, "quadit") : null);
-      if (harness.allowCli)
-        allow.push({ changes: harness.allowCli.changes(home, command), said: harness.allowCli.said });
+      for (const group of harness.allowCli ?? [])
+        allow.push({ changes: group.changes(home, command), said: group.said });
+      if (harness.selfRunSaid) warnings.push(harness.selfRunSaid);
       const defaultConfig = await cli.defaultConfig(binary).catch(tooOld);
       const shown = `${JSON.stringify({ url: origin, token: MASKED_TOKEN }, null, 2)}\n`;
       if (harness.env) {
@@ -634,11 +685,29 @@ export class Connections {
       if (!worksAs) return { ok: false, error: "Pick an agent you may connect as." };
 
       const backups = backUp(plan.edits, plan.backupDir);
+      // Written down before anything is made (Pending), so a start after the app stopped midway takes it back.
+      const pending: Pending = { kind: "connect", records: hashed(plan.applied, plan.edits, backups), token: null };
+      const journal = () => {
+        const now = this.ledger();
+        (now.pending ??= {})[harness.id] = pending;
+        this.saveLedger(now);
+      };
+      const forget = () => {
+        const now = this.ledger();
+        delete now.pending?.[harness.id];
+        this.saveLedger(now);
+      };
+      journal();
       let token = plan.sharedToken;
       if (plan.login) {
         const label = `${harness.name} on ${this.parts.hostName}`;
         const issued = await ask({ kind: "agent-token", agent: worksAs.id, label });
-        if (!issued.ok || !issued.token) return { ok: false, error: issued.ok ? "No token was made." : issued.message };
+        if (!issued.ok || !issued.token) {
+          forget();
+          return { ok: false, error: issued.ok ? "No token was made." : issued.message };
+        }
+        pending.token = { id: issued.token.id, serverId: choice.serverId, workspaceId: choice.workspaceId };
+        journal();
         try {
           await this.parts.cli.login(
             plan.login.binary,
@@ -648,9 +717,13 @@ export class Connections {
             this.parts.appFor(choice.serverId),
           );
         } catch (err) {
-          void ask({ kind: "revoke-token", token: issued.token.id });
+          this.takeBack(pending);
+          forget();
           return { ok: false, error: (err as Error).message };
         }
+        // What `quadit login` wrote is known now: the login is the app's, to take back.
+        pending.records = hashed(plan.applied, plan.edits, backups);
+        journal();
         token = {
           id: issued.token.id,
           label,
@@ -659,7 +732,16 @@ export class Connections {
           workspaceId: choice.workspaceId,
         };
       }
-      writeEdits(plan.edits);
+      try {
+        writeEdits(plan.edits);
+      } catch (err) {
+        this.takeBack(pending);
+        forget();
+        return {
+          ok: false,
+          error: `Connect stopped midway, and took back what it had done: ${(err as Error).message}`,
+        };
+      }
       const link = plan.applied.find((record) => record.kind === "link");
       if (link) this.parts.cli.linked(link.path);
 
@@ -670,12 +752,9 @@ export class Connections {
           ? await this.makeCode(choice.serverId, choice.workspaceId, member.id, harness.name)
           : null;
 
-      const records = plan.applied.map((record) =>
-        record.kind === "file"
-          ? { ...record, sha256: sha256(readText(record.path) ?? ""), backup: backups.get(record.path) ?? null }
-          : record,
-      );
+      const records = pending.records;
       const ledger = this.ledger();
+      delete ledger.pending?.[harness.id];
       ledger.harnesses[harness.id] = {
         serverId: choice.serverId,
         workspaceId: choice.workspaceId,
@@ -993,7 +1072,8 @@ export class Connections {
   private ledger(): Ledger {
     try {
       const parsed = JSON.parse(readFileSync(this.ledgerFile, "utf8")) as Partial<Ledger>;
-      if (parsed.harnesses && typeof parsed.harnesses === "object") return { harnesses: parsed.harnesses };
+      if (parsed.harnesses && typeof parsed.harnesses === "object")
+        return { harnesses: parsed.harnesses, ...(parsed.pending && { pending: parsed.pending }) };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "ENOENT")
         throw new Error(`${this.ledgerFile} cannot be read`, { cause: err });
@@ -1004,7 +1084,9 @@ export class Connections {
   private saveLedger(ledger: Ledger) {
     mkdirSync(dirname(this.ledgerFile), { recursive: true });
     const next = `${this.ledgerFile}.next`;
-    writeFileSync(next, JSON.stringify(ledger, null, 2), { mode: 0o600 });
+    const { pending, ...rest } = ledger;
+    const kept = pending && Object.keys(pending).length > 0 ? { ...rest, pending } : rest;
+    writeFileSync(next, JSON.stringify(kept, null, 2), { mode: 0o600 });
     renameSync(next, this.ledgerFile);
   }
 }
@@ -1145,4 +1227,17 @@ function claudePluginInstalled(home: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * The records a plan will leave once written: a file's with the hash of what
+ * it will hold (what `quadit login` wrote, once it has) and its backup.
+ */
+function hashed(applied: Applied[], edits: FileEdit[], backups: Map<string, string>): Applied[] {
+  return applied.map((record) => {
+    if (record.kind !== "file") return record;
+    const edit = edits.find((e) => e.path === record.path);
+    const text = edit?.writtenBy ? readText(record.path) : edit?.after;
+    return { ...record, sha256: sha256(text ?? ""), backup: backups.get(record.path) ?? null };
+  });
 }

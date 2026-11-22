@@ -398,6 +398,40 @@ export function inPlace(change: Change): boolean {
   }
 }
 
+/**
+ * Whether what `record` wrote is still in its file: the key holds what was
+ * written, the list has the item, the table the entries or the block, the
+ * file what was written (its hash), the line, the folder, the link. A file
+ * that cannot be read as what it should be holds nothing.
+ */
+export function recordInPlace(record: Applied): boolean {
+  try {
+    switch (record.kind) {
+      case "json":
+        return inPlace({ kind: "json", path: record.path, keyPath: record.keyPath, value: record.wrote });
+      case "json-item":
+        return inPlace({ kind: "json-item", path: record.path, keyPath: record.keyPath, value: record.value });
+      case "toml":
+        return record.within
+          ? inPlace({ kind: "toml", path: record.path, table: record.table, entries: record.within })
+          : (readText(record.path) ?? "").includes(record.block);
+      case "file": {
+        const text = readText(record.path);
+        return text !== null && sha256(text) === record.sha256;
+      }
+      case "link":
+        return readLink(record.path) === record.target;
+      case "folder":
+        return statSync(record.path, { throwIfNoEntry: false })?.isDirectory() ?? false;
+      case "line":
+        return (readText(record.path) ?? "").split("\n").includes(record.line);
+    }
+  } catch (err) {
+    if (err instanceof EditRefused) return false;
+    throw err;
+  }
+}
+
 /** The first edit whose file is no longer as it was when planned, or null when none is. */
 export function changedSince(edits: FileEdit[]): FileEdit | null {
   return (

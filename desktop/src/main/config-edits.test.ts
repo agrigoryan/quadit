@@ -21,6 +21,7 @@ import {
   EditRefused,
   inPlace,
   planChanges,
+  recordInPlace,
   planReverts,
   sha256,
   writeEdits,
@@ -409,5 +410,29 @@ posixOnly("what is in place, and taking back in turn", () => {
     ]);
     expect(revert([...first, ...second])).toEqual([]);
     expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({});
+  });
+});
+
+posixOnly("what a record wrote, still there", () => {
+  it("says whether each kind of record still shows what it wrote", () => {
+    const dir = folder();
+    const json = join(dir, "settings.json");
+    const toml = join(dir, "config.toml");
+    const rules = join(dir, "rules", "default.rules");
+    writeFileSync(toml, "[sandbox]\nother = 1\n");
+    const records = apply([
+      { kind: "json-item", path: json, keyPath: ["permissions", "allow"], value: "Bash(quadit:*)" },
+      { kind: "json", path: json, keyPath: ["env", "X"], value: "1" },
+      { kind: "toml", path: toml, table: ["sandbox"], entries: { network_access: true }, intoExisting: true },
+      { kind: "folder", path: join(dir, "rules") },
+      { kind: "line", path: rules, line: "allow quadit" },
+      { kind: "file", path: join(dir, "SKILL.md"), content: "skill" },
+    ]);
+    expect(records.map(recordInPlace)).toEqual([true, true, true, true, true, true]);
+    writeFileSync(json, "{}");
+    writeFileSync(toml, "[sandbox]\nother = 1\n");
+    writeFileSync(rules, "");
+    writeFileSync(join(dir, "SKILL.md"), "mine");
+    expect(records.map(recordInPlace)).toEqual([false, false, false, true, false, false]);
   });
 });

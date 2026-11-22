@@ -12,6 +12,7 @@ import {
   readFileSync,
   readlinkSync,
   realpathSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
@@ -413,10 +414,7 @@ posixOnly("Connect and Disconnect", () => {
     expect(JSON.parse(readFileSync(config, "utf8"))).toEqual({ url: ORIGIN, token: "qd_secret1" });
     expect(statSync(config).mode & 0o777).toBe(0o600);
     expect(json(".claude/settings.json")).toEqual({
-      permissions: {
-        allow: ["Read", "Bash(quadit:*)", "mcp__quadit"],
-        ask: ["Bash(quadit listen:*)", "Bash(quadit run:*)"],
-      },
+      permissions: { allow: ["Read", "Bash(quadit:*)", "mcp__quadit"] },
       env: { QUADIT_CONFIG: config },
     });
     expect(json(".claude.json")).toEqual({ mcpServers: { quadit: { type: "http", url: `${ORIGIN}/mcp` } } });
@@ -750,16 +748,8 @@ posixOnly("letting each tool use Quadit without asking (desktop contract §11, s
     await connect(choice("codex"));
     expect(read(".codex/config.toml")).toContain("[sandbox_workspace_write]\nnetwork_access = true");
     expect(read(".codex/rules/default.rules")).toBe(
-      [
-        'prefix_rule(pattern=["git", "status"], decision="allow")',
-        ...["quadit", join(bin, "quadit")].flatMap((command) => [
-          `prefix_rule(pattern=[${JSON.stringify(command)}], decision="allow")${MARK}`,
-          // What starts another program asks first: the most restrictive rule wins.
-          `prefix_rule(pattern=[${JSON.stringify(command)}, "listen"], decision="prompt")${MARK}`,
-          `prefix_rule(pattern=[${JSON.stringify(command)}, "run"], decision="prompt")${MARK}`,
-        ]),
-        "",
-      ].join("\n"),
+      `${mine}prefix_rule(pattern=["quadit"], decision="allow")${MARK}\n` +
+        `prefix_rule(pattern=[${JSON.stringify(join(bin, "quadit"))}], decision="allow")${MARK}\n`,
     );
     await disconnect("codex");
     expect(read(".codex/config.toml")).toBe('model = "o9"\n');
@@ -812,10 +802,7 @@ posixOnly("letting each tool use Quadit without asking (desktop contract §11, s
     mkdirSync(join(home, ".claude"));
     writeFileSync(join(home, ".claude", "settings.json"), JSON.stringify({ permissions: { allow: ["Read"] } }));
     await connect(choice("claude", { methods: ["cli", "mcp"] }));
-    expect(json(".claude/settings.json").permissions).toEqual({
-      allow: ["Read", "Bash(quadit:*)", "mcp__quadit"],
-      ask: ["Bash(quadit listen:*)", "Bash(quadit run:*)"],
-    });
+    expect(json(".claude/settings.json").permissions).toEqual({ allow: ["Read", "Bash(quadit:*)", "mcp__quadit"] });
     await disconnect("claude");
     expect(json(".claude/settings.json")).toEqual({ permissions: { allow: ["Read"] } });
 
@@ -835,13 +822,18 @@ posixOnly("letting each tool use Quadit without asking (desktop contract §11, s
       ["~/.codex/rules", "rules-folder", "new"],
       ["~/.codex/rules/default.rules", "rules", "new"],
     ]);
+    expect(planned.plan.warnings).toContain("Codex may run quadit without asking.");
     expect(planned.plan.warnings).toContain(
-      "Codex may run quadit without asking, but asks before quadit starts another program, and its sandbox may reach the network (every command it runs, not only quadit).",
+      "Codex's sandbox may reach the network, for every command it runs, not only quadit.",
     );
     const claude = await connections.planConnect(choice("claude"));
     if (!claude.ok) throw new Error(claude.error);
-    expect(claude.plan.warnings).toContain(
-      "Claude Code may run quadit commands without asking, but asks before quadit starts another program.",
+    expect(claude.plan.warnings).toContain("Claude Code may run quadit commands without asking.");
+    // A tool the app runs with its permission checks off says so.
+    const agy = await connections.planConnect(choice("antigravity"));
+    if (!agy.ok) throw new Error(agy.error);
+    expect(agy.plan.warnings).toContain(
+      "Quadit runs Antigravity CLI by itself to answer, with its permission checks off for those runs.",
     );
     expect((await connections.state()).harnesses.map((h) => [h.id, h.allows])).toEqual([
       ["claude", true],
@@ -920,6 +912,92 @@ posixOnly("what the app runs by itself for a connected tool (desktop contract §
     ]);
     connections.setAnswering("claude", false);
     expect((await connections.selfRunTools())[0]?.answering).toBe(false);
+  });
+});
+
+posixOnly("a change stopped midway (desktop contract §11 review)", () => {
+  it("takes back a Connect stopped midway, the login and its token among it, and is not connected", async () => {
+    const { connections, choice, home, configDir, asked, ledger } = setUp();
+    mkdirSync(join(home, ".claude", "skills"), { recursive: true });
+    writeFileSync(join(home, ".claude", "settings.json"), "{}");
+    // The settings cannot be written: the skill and the login are, before it fails.
+    chmodSync(join(home, ".claude"), 0o500);
+    try {
+      const planned = await connections.planConnect(choice("claude"));
+      if (!planned.ok) throw new Error(planned.error);
+      expect(await connections.applyConnect(planned.plan.id)).toEqual({
+        ok: false,
+        error: expect.stringContaining("Connect stopped midway, and took back what it had done"),
+      });
+    } finally {
+      chmodSync(join(home, ".claude"), 0o700);
+    }
+    expect(existsSync(join(home, ".claude", "skills", "quadit", "SKILL.md"))).toBe(false);
+    expect(existsSync(join(configDir, "claude.json"))).toBe(false);
+    expect(asked.at(-1)).toEqual({ kind: "revoke-token", token: "t1" });
+    expect(JSON.parse(ledger())).toEqual({ harnesses: {} });
+  });
+
+  it("keeps what an upgrade stopped between files wrote as the app's, and finishes it at the next start", async () => {
+    const { connections, connect, disconnect, choice, home, root, read } = setUp();
+    await connect(choice("codex"));
+    // As an older version left it: no network, no rules, nothing recorded of them.
+    const file = join(root, "data", "connections.json");
+    const old = JSON.parse(readFileSync(file, "utf8"));
+    const codex = old.harnesses.codex;
+    delete codex.allowed;
+    const network = codex.edits.find((r: { table?: string[] }) => r.table?.[0] === "sandbox_workspace_write");
+    codex.edits = codex.edits.filter((r: { path: string }) => r !== network && !r.path.includes(".codex/rules"));
+    writeFileSync(file, JSON.stringify(old));
+    writeFileSync(join(home, ".codex", "config.toml"), read(".codex/config.toml").replace(network.block, ""));
+    rmSync(join(home, ".codex", "rules"), { recursive: true });
+    // The rules cannot be written: the network is, before it fails.
+    mkdirSync(join(home, ".codex", "rules"), { mode: 0o500 });
+    await expect(connections.refresh()).rejects.toThrow();
+    expect(read(".codex/config.toml")).toContain("network_access = true");
+    chmodSync(join(home, ".codex", "rules"), 0o700);
+    expect((await connections.refresh()).allowed).toEqual(["codex"]);
+    expect(read(".codex/rules/default.rules")).toContain("quadit");
+    // What the stopped upgrade wrote is the app's: Disconnect takes it back with the rest.
+    await disconnect("codex");
+    expect(read(".codex/config.toml").trim()).toBe("");
+    expect(existsSync(join(home, ".codex", "rules", "default.rules"))).toBe(false);
+  });
+
+  it("brings a tool up to date once though the person turned one of the settings off: never again after", async () => {
+    const { connections, connect, choice, home, root, ledger } = setUp();
+    await connect(choice("codex"));
+    const file = join(root, "data", "connections.json");
+    const old = JSON.parse(readFileSync(file, "utf8"));
+    delete old.harnesses.codex.allowed;
+    writeFileSync(file, JSON.stringify(old));
+    writeFileSync(
+      join(home, ".codex", "config.toml"),
+      `${readFileSync(join(home, ".codex", "config.toml"), "utf8").replace("network_access = true", "network_access = false")}`,
+    );
+    await connections.refresh();
+    expect(JSON.parse(ledger()).harnesses.codex.allowed).toBe(true);
+  });
+
+  it("says only what is true: the sandbox's network not, where the person turned it off", async () => {
+    const { connections, choice, home } = setUp();
+    mkdirSync(join(home, ".codex"));
+    writeFileSync(join(home, ".codex", "config.toml"), "[sandbox_workspace_write]\nnetwork_access = false\n");
+    const planned = await connections.planConnect(choice("codex"));
+    if (!planned.ok) throw new Error(planned.error);
+    expect(planned.plan.warnings).toContain("Codex may run quadit without asking.");
+    expect(planned.plan.warnings.join(" ")).not.toContain("may reach the network");
+  });
+
+  it("shares the quadit command's link with a later tool, but not another tool's own settings", async () => {
+    const { connect, disconnect, choice, root, home, read } = setUp({ quaditOnPath: false });
+    await connect(choice("codex"));
+    await connect(choice("pi"));
+    const pi = JSON.parse(readFileSync(join(root, "data", "connections.json"), "utf8")).harnesses.pi;
+    expect(pi.edits.some((r: { path: string }) => r.path.includes(".codex"))).toBe(false);
+    await disconnect("codex");
+    expect(existsSync(join(home, ".codex", "rules"))).toBe(false);
+    expect(read(".codex/config.toml").trim()).toBe("");
   });
 });
 
