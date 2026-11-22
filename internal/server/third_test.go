@@ -289,18 +289,18 @@ func TestThirdAuditFindings(t *testing.T) {
 		}
 		s.change(t, s.owner, "", "webhook.delete", M{"id": hook})
 
-		// A call to MCP with no token at all is counted like a wrong one.
+		// A call to MCP with no token at all is counted like a wrong one: 120
+		// a minute from one address. The minutes are counted apart, and a run
+		// may cross into the next: twice the limit and one more puts one
+		// minute over it, however the calls fall. They all come from
+		// 127.0.0.1, so they count as one caller.
+		const limit = 120
 		limited := false
-		for i := 0; i < 140 && !limited; i++ {
-			resp, err := http.Post(s.url+"/mcp", "application/json", strings.NewReader("{}"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			limited = resp.StatusCode == http.StatusTooManyRequests
-			resp.Body.Close()
+		for i := 0; i < 2*limit+1 && !limited; i++ {
+			limited = postFrom127(t, s, "/mcp", M{}, "") == http.StatusTooManyRequests
 		}
 		if !limited {
-			t.Fatal("140 calls with no token were never slowed down")
+			t.Fatalf("%d calls with no token were never slowed down", 2*limit+1)
 		}
 	})
 }
