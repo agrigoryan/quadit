@@ -14,7 +14,7 @@
 #      no wait was started.
 #   2. "Listen to Quadit": the agent shows as listening, a stretch with
 #      nothing arriving passes in a wait, two comments get exactly one
-#      answer each, and a second session told to listen is refused.
+#      answer each, and a second session told to listen does not listen.
 #   3. For a tool that wakes its agent for a background command (claude,
 #      agy; AGENT_CHECK_WAKES says otherwise): a chat with a person, whose
 #      question is answered while a wait is open, a comment still answered,
@@ -213,7 +213,7 @@ as_tool() {
 	)
 }
 # run SESSION PROMPT: the tool's one prompt, its output in WORK/SESSION.log (in its own process group when run with &).
-run() { as_tool "$1" sh -c "$command" sh "$2${steer:+ $steer}" >"$work/$1.log" 2>&1; }
+run() { as_tool "$1" sh -c "$command" sh "$2${steer:+ $steer}" >"$work/$1.log" 2>&1 </dev/null; }
 # chat SESSION: the tool as a chat with a person, its messages read from WORK/chat.in, its output in WORK/SESSION.log.
 chat() { as_tool "$1" sh -c "$chat_command" sh <"$work/chat.in" >"$work/$1.log" 2>&1; }
 # tell TEXT: the person writes TEXT in the chat (to the tool's standard input, held open on descriptor 3).
@@ -335,7 +335,9 @@ if kill -0 "$second_pid" 2>/dev/null; then
 	second_session=1
 fi
 check "the second session ended by itself" "$second_session"
-check "the second session was refused" "$(calls second | grep -E "pid=[0-9]+ status=[0-9]+ [0-9]+s wait" | grep -q "already listening from another session" && echo 0 || echo 1)"
+# It learns that from quadit listening, as the skill has it ask first, or from a wait the server refuses.
+check "the second session found the agent already listening" "$(calls second | grep -Eq "listening => Something already listens as you|s wait.*already listening from another session" && echo 0 || echo 1)"
+check "the second session held no wait" "$(calls second | grep -Eq "status=0 [0-9]+s wait" && echo 1 || echo 0)"
 check "the second session did not take over" "$(calls second | grep -q "take=1" && echo 1 || echo 0)"
 
 # Stop the first, as a person interrupts it.
@@ -343,6 +345,12 @@ listen_pid=${sessions[0]}
 kill -INT -- "-$listen_pid" 2>/dev/null || :
 sleep 10
 kill -TERM -- "-$listen_pid" 2>/dev/null || :
+# A tool may leave the wait it put in the background running when it is stopped (Antigravity CLI does): end it here,
+# as the next item would, and say so.
+sleep 2
+left=$(awk '$3 == "listen" && $2 == "start" && $5 == "wait" { open[$4] = 1 } $3 == "listen" && $2 == "end" { delete open[$4] } END { for (p in open) print substr(p, 5) }' "$work/calls.log")
+for pid in $left; do pkill -TERM -P "$pid" 2>/dev/null || :; done
+[ -z "$left" ] || echo "   note: stopped, the tool left its background wait running; the check ended it"
 
 # A companion, as the desktop app runs one: listen as the agent's login (through the wrapper, so its lease file is the
 # check's own), each item a run of the tool's one-prompt command with the wake sentence (WORK/bin/wake, which keeps
