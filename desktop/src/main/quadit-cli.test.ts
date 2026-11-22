@@ -19,6 +19,23 @@ posixOnly("QuaditCli", () => {
     ).rejects.toThrow("quadit login: usage: quadit login URL TOKEN");
   });
 
+  it("never hands the quadit it asks the app's own QUADIT_ settings (the person's own servers' token among them)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "quadit-desktop-cli-"));
+    const quadit = join(dir, "quadit");
+    writeFileSync(quadit, '#!/bin/sh\necho "quadit 9.9.9 [${QUADIT_TOKEN:-none}] [${QUADIT_URL:-none}]"\n');
+    chmodSync(quadit, 0o755);
+    process.env.QUADIT_TOKEN = "qd_person";
+    process.env.QUADIT_URL = "https://theirs";
+    try {
+      const cli = new QuaditCli(null, async () => dir, { home: "/nowhere", shell: "/bin/sh" });
+      expect((await cli.look()).found?.version).toBe("9.9.9");
+      expect(await cli.skill(quadit)).toBe("quadit 9.9.9 [none] [none]\n");
+    } finally {
+      delete process.env.QUADIT_TOKEN;
+      delete process.env.QUADIT_URL;
+    }
+  });
+
   /** A quadit that notes the arguments of each login, and refuses `--app` when it is `older`. */
   function noting(older: boolean) {
     const dir = mkdtempSync(join(tmpdir(), "quadit-desktop-cli-"));

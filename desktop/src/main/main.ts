@@ -44,7 +44,7 @@ import { ActivateAfterStart, coldStart, Quiet, secondStart } from "@/main/launch
 import { LocalServer, loopbackPorts } from "@/main/local-server";
 import { menuTemplate } from "@/main/menu";
 import { Panel } from "@/main/panel";
-import { loginShellPath, QuaditCli } from "@/main/quadit-cli";
+import { type CliLook, loginShellPath, QuaditCli } from "@/main/quadit-cli";
 import { QuitGuard } from "@/main/quit";
 import { Requests } from "@/main/requests";
 import { SelfRuns } from "@/main/self-runs";
@@ -234,18 +234,33 @@ function start() {
     // The running app itself, which the quadit command starts: an AppImage by its own file, not where it is mounted.
     appFor: (id) => (id === list.localServer()?.id ? process.env.APPIMAGE || app.getPath("exe") : null),
     ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
-    connected: (id, code) => {
-      if (code) void selfRuns.prove(id, code);
-      void selfRuns.sync();
-    },
+    // A code to give back first (one program at a time: the listener follows it), else the listener at once.
+    connected: (id, code) => void (code ? selfRuns.prove(id, code) : selfRuns.sync()),
     disconnected: () => void selfRuns.sync(),
   });
   // What the app runs by itself for the tools connected (desktop contract §11, third amendment): each tool's program
   // on the login shell's PATH, else its desktop app's copy; the listeners' quadit the one on the PATH, else the app's.
+  //
+  // Looking at the login shell's PATH runs the login shell: once a minute at most.
+  let looked: { at: number; look: Promise<CliLook> } | null = null;
+  const lookNow = () => {
+    if (!looked || Date.now() - looked.at > 60_000) looked = { at: Date.now(), look: cli.look() };
+    return looked.look;
+  };
+  // Whether a quadit login is the app's own server's: that server's address, and the app's mark (login --app). The
+  // tool runs with that file, so it decides, never the ledger.
+  const loginIsHere = (file: string): boolean => {
+    const origin = list.localServer() ? local.origin() : null;
+    try {
+      const saved = JSON.parse(readFileSync(file, "utf8")) as { url?: unknown; app?: unknown };
+      return !!origin && saved.url === origin && typeof saved.app === "object" && saved.app !== null;
+    } catch {
+      return false;
+    }
+  };
   const selfRuns = new SelfRuns({
     tools: async () => {
-      const look = await cli.look();
-      const here = list.localServer()?.id;
+      const look = await lookNow();
       const where = {
         home: homedir(),
         path: look.path,
@@ -261,13 +276,16 @@ function start() {
             program: toolProgram(harness, where),
             oneShot: harness.oneShot ?? null,
             login: tool.login,
-            here: tool.serverId === here,
+            here: loginIsHere(tool.login),
+            // Runs for the app's own server exist only while it runs as the app's child (never another program on its port).
+            serverRuns: local.state().kind === "running",
             answering: tool.answering,
           },
         ];
       });
     },
-    quadit: async () => (await cli.look()).found?.path ?? cli.bundled,
+    quadit: async () => (await lookNow()).found?.path ?? cli.bundled,
+    loginPath: async () => (await lookNow()).path.join(":"),
     start: (program, args, options) => startChild(program, args, options),
     codeGivenBack: async (id) => (await connections.handshake(id))?.state === "connected",
     listening: (tool) => whoListens(tool.login),
@@ -286,7 +304,7 @@ function start() {
     const said: string[] = [];
     const child = startChild(quadit, ["--json", "listening"], {
       cwd: dataDir,
-      env: childEnv(process.env, login),
+      env: childEnv(process.env, login, (await lookNow()).path.join(":")),
       line: (line) => void said.push(line),
     });
     const timer = setTimeout(() => child.stop(), 20_000);
@@ -300,15 +318,12 @@ function start() {
       return null;
     }
   }
-  /** Runs once each tool still waiting to be proven connected, of the server here (`here`) or of the others. */
-  const proveWaiting = (here: boolean) => {
-    const local = list.localServer()?.id;
-    void connections.selfRunTools().then((tools) => {
-      for (const { id, code } of connections.waitingCodes()) {
-        if (tools.some((tool) => tool.id === id && (tool.serverId === local) === here)) void selfRuns.prove(id, code);
-      }
-    });
+  /** Runs once each tool still waiting to be proven connected (only those of the app's own server are: self-runs.ts). */
+  const proveWaiting = () => {
+    for (const { id, code } of connections.waitingCodes()) void selfRuns.prove(id, code);
   };
+  // A login changed by hand (another server, another account) is followed within a minute.
+  setInterval(() => void selfRuns.sync(), 60_000).unref();
   const connect = new ConnectPage({
     pages,
     connections,
@@ -437,9 +452,10 @@ function start() {
       // it up, over its window, once the person has the app before them.
       quiet.say(() => void local.setupNeeded().then((needed) => needed && firstRun.show()));
       // Its tools still waiting are run to give their codes back, and their listeners follow it.
-      proveWaiting(true);
-      void selfRuns.sync();
+      proveWaiting();
     }
+    // Whatever it became (running, stopped on purpose, failed, its port taken), the tools' runs follow it.
+    void selfRuns.sync();
   });
   refreshMenu();
 
@@ -513,15 +529,12 @@ function start() {
   // The app may have been updated, and its quadit with it: the skills Connect wrote follow, and a tool connected
   // by a version from before is let use Quadit without asking, silently, in the background too. What is not done
   // now (no quadit answered) is at the next start.
-  // Then the tools are run by themselves (a background start too): those of other servers at once, those of the
-  // server here once it runs (local.onChange).
+  // Then the tools are run by themselves (a background start too), once the app's own server runs (local.onChange);
+  // a tool of another server answers by itself only if the person asked.
   void connections
     .refresh()
     .catch(() => {})
-    .then(() => {
-      proveWaiting(false);
-      return selfRuns.sync();
-    });
+    .then(() => selfRuns.sync());
   if (watchingUpdates) updates.start();
   // Only now that the windows are made: making one can run the system's
   // event loop, which may hand in a link, and handled then it would make

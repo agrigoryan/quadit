@@ -179,14 +179,19 @@ function writableFolder(dir: string): boolean {
   }
 }
 
-/** Runs `binary args` with `env` over the app's environment (undefined removes a variable); gives its output. */
+/**
+ * Runs `binary args` with `env` over the app's environment (undefined removes
+ * a variable); gives its output. None of the app's own QUADIT_ settings (the
+ * person's own servers' address and token) reach it: only those given here.
+ */
 function run(
   binary: string,
   args: string[],
   env: Record<string, string | undefined> = {},
   stdin?: string,
 ): Promise<string> {
-  const merged = { ...process.env, ...env };
+  const own = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("QUADIT_")));
+  const merged = { ...own, ...env };
   for (const [key, value] of Object.entries(env)) if (value === undefined) delete merged[key];
   return new Promise((resolve, reject) => {
     const child = execFile(binary, args, { env: merged, timeout: RUN_TIMEOUT_MS }, (err, stdout, stderr) => {

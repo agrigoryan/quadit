@@ -48,6 +48,38 @@ posixOnly("startChild", () => {
     await until(() => pids.every((pid) => !alive(pid)));
   });
 
+  it("ends all the program started when the program ends by itself: nothing it started outlives it", async () => {
+    const pids: number[] = [];
+    const child = startChild("/bin/sh", ["-c", "sleep 30 & echo $!; exit 0"], {
+      cwd: "/",
+      env: { PATH: "/usr/bin:/bin" },
+      line: (line) => pids.push(Number(line)),
+    });
+    expect(await child.exited).toBe(0);
+    await until(() => pids.length === 1 && pids.every((pid) => !alive(pid)));
+  });
+
+  it("hears what its program says of itself on a channel its output cannot write to", async () => {
+    const lines: string[] = [];
+    const events: string[] = [];
+    const child = startChild(
+      "/bin/sh",
+      [
+        "-c",
+        'echo "started" >> "$QUADIT_APP_LIFECYCLE"; echo started; echo "ended 0" >> "$QUADIT_APP_LIFECYCLE"; sleep 0.3',
+      ],
+      {
+        cwd: "/tmp",
+        env: { PATH: "/usr/bin:/bin" },
+        line: (line) => lines.push(line),
+        lifecycle: (e) => events.push(e),
+      },
+    );
+    await child.exited;
+    expect(lines).toEqual(["started"]);
+    expect(events).toEqual(["started", "ended 0"]);
+  });
+
   it("ends them too when the app is killed without a word, its end of the pipe closing", async () => {
     // A stand-in for the app: it starts a guarded child, says its pid, and is then killed hard.
     const app = spawn(
@@ -71,9 +103,25 @@ posixOnly("startChild", () => {
 });
 
 describe("childEnv", () => {
-  it("gives a child the app's environment without the Quadit settings of the person's own servers, and its own login", () => {
+  it("gives a child the app's environment without the Quadit settings of the person's own servers, its own login and the login shell's PATH", () => {
     expect(
-      childEnv({ PATH: "/bin", HOME: "/h", QUADIT_URL: "u", QUADIT_TOKEN: "t", QUADIT_CONFIG: "/x" }, "/login.json"),
-    ).toEqual({ PATH: "/bin", HOME: "/h", QUADIT_CONFIG: "/login.json" });
+      childEnv(
+        {
+          PATH: "/usr/bin:/bin",
+          HOME: "/h",
+          OPENAI_API_KEY: "k",
+          QUADIT_URL: "u",
+          QUADIT_TOKEN: "t",
+          QUADIT_CONFIG: "/x",
+        },
+        "/login.json",
+        "/opt/homebrew/bin:/usr/bin:/bin",
+      ),
+    ).toEqual({
+      PATH: "/opt/homebrew/bin:/usr/bin:/bin",
+      HOME: "/h",
+      OPENAI_API_KEY: "k",
+      QUADIT_CONFIG: "/login.json",
+    });
   });
 });

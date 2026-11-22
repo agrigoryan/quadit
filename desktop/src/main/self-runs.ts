@@ -2,6 +2,14 @@
 // contract §11, third amendment): the person chose to connect two programs
 // of their own computer, so the app makes them work together.
 //
+//   Only for the app's own server, and only while it runs as the app's
+//   child: a tool is the app's own server's when the login it runs with is
+//   (that server's address, and the app's mark on the login), whatever the
+//   ledger says. A tool of any other server is never run by itself to give
+//   its code back (its card keeps the line to paste), and answers by itself
+//   only when the person asks: words a remote server chose never reach a
+//   tool run without them.
+//
 //   Giving the code back: right after Connect (and at a start, for a
 //   connection still waiting), the tool is run once with its one-prompt
 //   command and "Connect to Quadit CODE", as its own login, in a folder of
@@ -9,9 +17,8 @@
 //   code was used, never the run's exit; otherwise the card falls back to
 //   the line to paste, with the reason.
 //
-//   Answering: for each tool connected to the server on this computer (on
-//   by default; for another server only when the person turns it on), one
-//   listener, `quadit listen --exec`, as the tool's login, whose command
+//   Answering: for each tool of the app's own server (on by default; for
+//   another server only when the person turns it on), one listener, `quadit listen --exec`, as the tool's login, whose command
 //   runs the tool's one-prompt command for each inbox item; it says it is
 //   "the Quadit app" to whoever asks who listens. It is started again when
 //   it ends by itself, waiting longer each time; it steps aside, never
@@ -20,8 +27,11 @@
 //   stopped; more than six runs in a minute pauses the tool (a loop guard);
 //   Pause is remembered.
 //
-// Every program is started through child-guard.ts and stopped on Pause,
-// Disconnect and quit; what each said goes to the tool's log.
+// One program at a time for a tool, of all the app starts for it; each is
+// started through child-guard.ts (a run's start and end come on the guard's
+// lifecycle channel, never out of the tool's output) and stopped on Pause,
+// Disconnect and quit; after every wait the app looks again whether it is
+// quitting and the tool still wanted. What each said goes to the tool's log.
 
 import { appendFileSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -38,8 +48,10 @@ export interface SelfRunTool {
   oneShot: ((prompt: string) => string[]) | null;
   /** Its quadit login file, which every run of it uses. */
   login: string;
-  /** Whether it is connected to the server this app runs on this computer. */
+  /** Whether that login is for the server the app runs on this computer: its address, and the app's mark on it. */
   here: boolean;
+  /** For a tool here: whether that server runs now as the app's own child; runs of it exist only then. */
+  serverRuns: boolean;
   /** Whether it answers by itself, as the person chose; undefined: not chosen, on here and off elsewhere. */
   answering: boolean | undefined;
 }
@@ -49,11 +61,18 @@ export interface SelfRunsParts {
   tools(): Promise<SelfRunTool[]>;
   /** The quadit command the listeners run (on the PATH, else the app's own); null: none. */
   quadit(): Promise<string | null>;
+  /** The login shell's PATH, which every run gets. */
+  loginPath(): Promise<string>;
   /** Starts a program, held to the app (child-guard.ts, startChild). */
   start(
     program: string,
     args: string[],
-    options: { cwd: string; env: NodeJS.ProcessEnv; line: (line: string) => void },
+    options: {
+      cwd: string;
+      env: NodeJS.ProcessEnv;
+      line: (line: string) => void;
+      lifecycle?: (event: string) => void;
+    },
   ): RunningChild;
   /** Whether the server says the tool's connect code was given back. */
   codeGivenBack(id: string): Promise<boolean>;
@@ -83,15 +102,17 @@ const ITEM = "{quadit-item}";
  * The command `quadit listen` runs for each item (after `sh -c`, then
  * "quadit-wake" as $0, then the tool's program and its arguments): it puts
  * the item into the prompt in place of ITEM, without a shell ever reading
- * the item's words, and says when a run starts and ends, for the time limit
- * and the loop guard.
+ * the item's words, and says when a run starts and ends on the lifecycle
+ * channel (child-guard.ts), which it hands on to nothing the tool runs.
  */
-const WAKE_SCRIPT = `p="Quadit woke you for this inbox item: $QUADIT_EVENT. Handle it with the quadit skill, answering where you were asked."
+const WAKE_SCRIPT = `said=\${QUADIT_APP_LIFECYCLE:-/dev/null}
+unset QUADIT_APP_LIFECYCLE
+p="Quadit woke you for this inbox item: $QUADIT_EVENT. Handle it with the quadit skill, answering where you were asked."
 for a do shift; if [ "$a" = "${ITEM}" ]; then set -- "$@" "$p"; else set -- "$@" "$a"; fi; done
-echo "quadit-app: run started"
+echo started >> "$said"
 "$@"
 status=$?
-echo "quadit-app: run ended ($status)"
+echo "ended $status" >> "$said"
 exit "$status"`;
 
 const PROVE_LIMIT_MS = 2 * 60_000;
@@ -110,11 +131,13 @@ const ASIDE_WAIT_MS = 60_000;
 const ASIDE = /already listening from another session|listening_elsewhere|lease_stale|another quadit listen is running/;
 const LOG_LIMIT_BYTES = 2 * 1024 * 1024;
 
-/** What runs, or waits to, for one tool. */
+/** What runs, or waits to, for one tool: one program at most, the run giving its code back or its listener. */
 interface Held {
   proving: SelfRun["proving"];
   prover?: RunningChild;
   listener?: { child: RunningChild; since: number; aside: boolean; stopping: boolean };
+  /** A program stopped and not yet ended: nothing else starts for the tool until it has. */
+  ending?: Promise<unknown>;
   runTimer?: ReturnType<typeof setTimeout>;
   restart?: ReturnType<typeof setTimeout>;
   waits: number;
@@ -165,11 +188,16 @@ export class SelfRuns {
     return held;
   }
 
+  /** Whether the app may run `tool` at all now: the app's own server's while it runs as the app's. */
+  private mayRun(tool: SelfRunTool): boolean {
+    return !this.quitting && tool.here && tool.serverRuns;
+  }
+
   /**
    * Runs the tool once to give `code` back, as its own login; resolves when
    * that run is over. Done is the server's word; else the reason it could
-   * not is kept for its card. A tool without a one-prompt command is left to
-   * the line to paste.
+   * not is kept for its card. A tool of another server, or without a
+   * one-prompt command, is left to the line to paste.
    */
   async prove(id: string, code: string): Promise<void> {
     if (this.quitting) return;
@@ -177,23 +205,33 @@ export class SelfRuns {
     const held = this.heldOf(id);
     held.proving = { state: "running" };
     this.known = await this.parts.tools();
-    const tool = this.known.find((t) => t.id === id);
-    if (!tool?.oneShot) {
+    const path = await this.parts.loginPath();
+    let tool = this.known.find((t) => t.id === id);
+    if (!tool?.oneShot || !this.mayRun(tool)) {
       held.proving = null;
+      this.parts.changed();
       return;
     }
-    held.prover?.stop();
     if (!tool.program) {
       held.proving = { state: "failed", reason: "it was not found on this computer" };
       this.parts.changed();
       return;
     }
-    held.proving = { state: "running" };
+    // One program at a time: the listener steps back meanwhile, and comes after.
+    held.prover?.stop();
+    await this.stopListener(held);
+    await held.ending;
+    tool = this.known.find((t) => t.id === id);
+    if (!tool?.program || !tool.oneShot || !this.mayRun(tool)) {
+      held.proving = null;
+      this.parts.changed();
+      return;
+    }
     this.parts.changed();
     this.log(id, `giving the connect code back: ${tool.program}`);
     const child = this.parts.start(tool.program, tool.oneShot(`Connect to Quadit ${code}`), {
       cwd: this.runDir(id),
-      env: childEnv(this.parts.env, tool.login),
+      env: childEnv(this.parts.env, tool.login, path),
       line: (line) => this.log(id, line),
     });
     held.prover = child;
@@ -206,6 +244,7 @@ export class SelfRuns {
     clearTimeout(timer);
     if (held.prover !== child) return;
     held.prover = undefined;
+    if (this.quitting) return;
     if (await this.parts.codeGivenBack(id)) held.proving = null;
     else
       held.proving = {
@@ -218,6 +257,7 @@ export class SelfRuns {
       };
     this.log(id, held.proving ? `could not give the code back: ${held.proving.reason}` : "the code was given back");
     this.parts.changed();
+    await this.sync();
   }
 
   /** What the app does by itself for a tool now, for its card; null for a tool not set up. */
@@ -230,6 +270,7 @@ export class SelfRuns {
 
   private answering(tool: SelfRunTool, held: Held | undefined): SelfRun["answering"] {
     if (!tool.oneShot || !tool.program || !this.quaditPath) return "none";
+    if (tool.here && !tool.serverRuns) return "none";
     if (held?.guarded) return "guarded";
     if (this.wants(tool)) return "on";
     return tool.here ? "paused" : "off";
@@ -237,10 +278,11 @@ export class SelfRuns {
 
   /** Whether the tool answers by itself: as the person chose, else on for the server here and off elsewhere. */
   private wants(tool: SelfRunTool): boolean {
-    return this.choices.get(tool.id) ?? tool.answering ?? tool.here;
+    const chosen = this.choices.get(tool.id) ?? tool.answering;
+    return tool.here ? tool.serverRuns && (chosen ?? true) : chosen === true;
   }
 
-  /** The person's Pause, Resume or "Answer by itself": remembered, and the listener follows. */
+  /** The person's Pause, Resume or "Answer by itself": remembered, and the listener follows, once the old one ended. */
   async setAnswering(id: string, on: boolean) {
     this.parts.remember(id, on);
     this.choices.set(id, on);
@@ -248,18 +290,27 @@ export class SelfRuns {
     held.guarded = false;
     held.runs = [];
     held.waits = 0;
+    if (!on) {
+      void this.stopListener(held);
+      this.parts.changed();
+      return;
+    }
+    await held.ending;
     await this.sync();
     this.parts.changed();
   }
 
   /**
-   * Starts the listeners that should run and stops those that should not:
-   * a tool disconnected, paused, or turned off.
+   * Starts the listeners that should run and stops what should not: a tool
+   * disconnected, paused, turned off, whose login is no longer the app's
+   * own server's, or whose server no longer runs as the app's.
    */
   async sync() {
     if (this.quitting) return;
     const tools = await this.parts.tools();
     const quadit = await this.parts.quadit();
+    const path = await this.parts.loginPath();
+    if (this.quitting) return;
     this.known = tools;
     this.quaditPath = quadit;
     for (const [id, held] of this.held) {
@@ -271,17 +322,19 @@ export class SelfRuns {
     }
     for (const tool of tools) {
       const held = this.heldOf(tool.id);
+      if (held.prover && !this.mayRun(tool)) held.prover.stop();
       const wanted = !!quadit && !!tool.program && !!tool.oneShot && !held.guarded && this.wants(tool);
       if (!wanted) {
-        this.stopListener(held);
+        void this.stopListener(held);
         clearTimeout(held.restart);
         held.restart = undefined;
-      } else if (quadit && !held.listener && !held.restart) this.listen(tool, quadit, held);
+      } else if (quadit && !held.listener && !held.restart && !held.prover && !held.ending)
+        this.listen(tool, quadit, path, held);
     }
   }
 
-  private listen(tool: SelfRunTool, quadit: string, held: Held) {
-    if (!tool.program || !tool.oneShot) return;
+  private listen(tool: SelfRunTool, quadit: string, path: string, held: Held) {
+    if (!tool.program || !tool.oneShot || this.quitting) return;
     this.log(tool.id, "listening");
     const args = [
       "listen",
@@ -297,18 +350,20 @@ export class SelfRuns {
     const listener = { child: undefined as unknown as RunningChild, since: Date.now(), aside: false, stopping: false };
     listener.child = this.parts.start(quadit, args, {
       cwd: this.runDir(tool.id),
-      env: childEnv(this.parts.env, tool.login),
-      line: (line) => this.heard(tool, held, listener, line),
+      env: childEnv(this.parts.env, tool.login, path),
+      line: (line) => {
+        this.log(tool.id, line);
+        if (ASIDE.test(line)) listener.aside = true;
+      },
+      lifecycle: (event) => this.lifecycle(tool, held, listener, event),
     });
     held.listener = listener;
     void listener.child.exited.then(() => this.ended(tool, held, listener));
   }
 
-  /** A line a listener said: kept in the log; a run's start counted and timed, its end noted. */
-  private heard(tool: SelfRunTool, held: Held, listener: NonNullable<Held["listener"]>, line: string) {
-    this.log(tool.id, line);
-    if (ASIDE.test(line)) listener.aside = true;
-    if (line === "quadit-app: run started") {
+  /** What a listener's run said of itself (its start, its end): the start counted and timed, the end noted. */
+  private lifecycle(tool: SelfRunTool, held: Held, listener: NonNullable<Held["listener"]>, event: string) {
+    if (event === "started") {
       const now = Date.now();
       held.runs = [...held.runs.filter((at) => now - at < GUARD_WINDOW_MS), now];
       if (held.runs.length > GUARD_RUNS) {
@@ -316,7 +371,7 @@ export class SelfRuns {
         held.guarded = true;
         this.parts.remember(tool.id, false);
         this.choices.set(tool.id, false);
-        this.stopListener(held);
+        void this.stopListener(held);
         this.parts.changed();
         return;
       }
@@ -326,7 +381,7 @@ export class SelfRuns {
         // Ended by the app's limit, it is started again as one that ended by itself.
         listener.child.stop();
       }, RUN_LIMIT_MS);
-    } else if (line.startsWith("quadit-app: run ended")) {
+    } else if (event.startsWith("ended")) {
       clearTimeout(held.runTimer);
       held.runTimer = undefined;
     }
@@ -373,16 +428,22 @@ export class SelfRuns {
     }, ASIDE_WAIT_MS);
   }
 
-  private stopListener(held: Held) {
+  /** Stops a tool's listener; resolves once it has ended, which nothing else for the tool starts before. */
+  private stopListener(held: Held): Promise<unknown> {
     const listener = held.listener;
-    if (!listener) return;
+    if (!listener) return held.ending ?? Promise.resolve();
     listener.stopping = true;
     held.listener = undefined;
     listener.child.stop();
+    const ending = listener.child.exited.then(() => {
+      if (held.ending === ending) held.ending = undefined;
+    });
+    held.ending = ending;
+    return ending;
   }
 
   private stopAll(held: Held) {
-    this.stopListener(held);
+    void this.stopListener(held);
     held.prover?.stop();
     held.prover = undefined;
     clearTimeout(held.restart);
