@@ -1,13 +1,17 @@
-// The file beside a login where `quadit listen` keeps its lease's id, held
-// locked for as long as the listen runs, so one login has one companion.
+// The file beside the login file where `quadit listen` keeps its lease's
+// id, one for each login (server and token), held locked for as long as the
+// listen runs, so one login has one companion.
 
 package cli
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -18,10 +22,13 @@ var errAnotherListen = errors.New("another quadit listen is running with this lo
 // leaseFile is the lease file of a login, open and locked.
 type leaseFile struct{ f *os.File }
 
-// openLeaseFile opens and locks the lease file beside the login in use, or
-// refuses when another listen holds it.
-func openLeaseFile() (*leaseFile, error) {
-	f, err := os.OpenFile(configPath()+".lease", os.O_RDWR|os.O_CREATE, 0o600)
+// openLeaseFile opens and locks the lease file of the login c signs in
+// with, or refuses when another listen holds it. Its name is a hash of the
+// server and the token, so logins given in QUADIT_URL and QUADIT_TOKEN have
+// one each too.
+func openLeaseFile(c *Client) (*leaseFile, error) {
+	sum := sha256.Sum256([]byte(c.URL + "\n" + c.Token))
+	f, err := os.OpenFile(filepath.Join(filepath.Dir(configPath()), "listen-"+hex.EncodeToString(sum[:6])+".lease"), os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("the listener's lease file: %w", err)
 	}

@@ -80,7 +80,7 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 		maxItemPause = 5 * time.Minute  // an item's command keeps failing
 	)
 	readPause, itemPause := firstPause, firstPause
-	kept, err := openLeaseFile()
+	kept, err := openLeaseFile(r.c)
 	if err != nil {
 		return err
 	}

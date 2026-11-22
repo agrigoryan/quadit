@@ -369,18 +369,27 @@ func TestConnectSendsTheCodeAsTheServerKeepsIt(t *testing.T) {
 // their command for the same item.
 func TestOneListenPerLogin(t *testing.T) {
 	t.Setenv("QUADIT_CONFIG", filepath.Join(t.TempDir(), "codex.json"))
-	first, err := openLeaseFile()
+	asked := false
+	srv := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { asked = true })
+	c := testClient(t, srv)
+	first, err := openLeaseFile(c)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer first.close()
-	asked := false
-	srv := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { asked = true })
-	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: &bytes.Buffer{}}
+	r := &runner{ctx: context.Background(), c: c, out: &bytes.Buffer{}}
 	err = r.listen(input{rest: []string{"--exec", "true"}})
 	if !errors.Is(err, errAnotherListen) || asked {
 		t.Fatalf("a second listen ended with %v (asked the server: %v)", err, asked)
 	}
+	// Another agent's login beside it, given by QUADIT_URL and QUADIT_TOKEN, has a lease file of its own.
+	other := *c
+	other.Token = "another agent's token"
+	second, err := openLeaseFile(&other)
+	if err != nil {
+		t.Fatalf("a second agent's listen is refused: %v", err)
+	}
+	second.close()
 }
 
 // TestListenKeepsNoLeaseItDoesNotRecognize: a lease id the server sends
