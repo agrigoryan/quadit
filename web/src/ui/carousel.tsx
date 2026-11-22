@@ -40,17 +40,26 @@ export function step(steps: Steps, by: number) {
   if (to !== null && to !== steps.index) steps.onShow(to);
 }
 
+/** Whether the element is one the left and right arrow keys scroll: it scrolls, and is wider inside than out. */
+function scrollsSideways(element: HTMLElement) {
+  const overflow = getComputedStyle(element).overflowX;
+  return (overflow === "auto" || overflow === "scroll") && element.scrollWidth > element.clientWidth;
+}
+
 /**
  * The left and right arrow keys, for the onKeyDown of the box the carousel
- * is in. A video, a field or a slider keeps the keys it has, and so does a
- * key held with a modifier. Says whether it moved.
+ * is in. A video, a field or a slider keeps the keys it has, as do a control
+ * that took them (a group of choices), text that scrolls sideways, and a
+ * key held with a modifier (Shift with an arrow makes a selection longer).
+ * Says whether it moved.
  */
 export function onCarouselKey(e: KeyboardEvent, steps: Steps): boolean {
-  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
+  if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
   if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return false;
   const target = e.target;
   if (target instanceof HTMLVideoElement || target instanceof HTMLInputElement) return false;
   if (target instanceof HTMLElement && target.getAttribute("role") === "slider") return false;
+  if (target instanceof HTMLElement && scrollsSideways(target)) return false;
   e.preventDefault();
   step(steps, e.key === "ArrowLeft" ? -1 : 1);
   return true;

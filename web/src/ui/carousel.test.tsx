@@ -21,6 +21,10 @@ function Box({ wrap, total = 3 }: { wrap: boolean; total?: number }) {
         <CarouselCount index={index} total={total} size="compact" />
         <video data-testid="video" />
         <input data-testid="field" />
+        {/* A control that takes the arrow keys itself, as a group of choices does. */}
+        <button type="button" aria-label="Choices" data-testid="choices" onKeyDown={(e) => e.preventDefault()} />
+        {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- text that scrolls is reached with the keyboard */}
+        <div data-testid="text" tabIndex={0} style={{ overflowX: "auto" }} />
       </div>
     </TooltipProvider>
   );
@@ -100,5 +104,22 @@ describe("onCarouselKey", () => {
     fireEvent.keyDown(screen.getByTestId("field"), { key: "ArrowRight" });
     fireEvent.keyDown(next(), { key: "ArrowRight", metaKey: true });
     expect(shown()).toBe("shown 1");
+  });
+
+  it("leaves the keys to a control that took them", () => {
+    render(<Box wrap />);
+    fireEvent.keyDown(screen.getByTestId("choices"), { key: "ArrowRight" });
+    expect(shown()).toBe("shown 1");
+  });
+
+  it("leaves the keys to text that scrolls sideways, and moves from text that does not", () => {
+    render(<Box wrap />);
+    const text = screen.getByTestId("text");
+    fireEvent.keyDown(text, { key: "ArrowRight" });
+    expect(shown()).toBe("shown 2");
+    Object.defineProperty(text, "scrollWidth", { value: 900 });
+    Object.defineProperty(text, "clientWidth", { value: 300 });
+    fireEvent.keyDown(text, { key: "ArrowRight" });
+    expect(shown()).toBe("shown 2");
   });
 });
