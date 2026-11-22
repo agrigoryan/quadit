@@ -7,15 +7,6 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 ### Added
 
 - A text file among a task's, a comment's or a question's files opens in the viewer instead of downloading, one after another with the pictures and videos: Markdown rendered by the renderer comments use (raw HTML in it shown as text, javascript: links emptied), with Rendered and Source, and as its source when it is over 100,000 characters; logs, JSON, CSV, YAML, XML, source code and anything served as text as written, wrapped; an HTML or SVG file as its source, never drawn. Up to the first 1 MB is shown, and the viewer says when it cut the rest; text is read as UTF-8, or as UTF-16 when it starts with its byte-order mark; a file whose bytes are not text says it cannot be shown. The viewer names the file and always has Download, pictures and videos included.
-### Changed
-
-- Listening no longer blocks a chat with a person where the tool can be woken by a background command (Claude Code, Antigravity CLI): the skill has the agent run `quadit wait for=3600` in the background and go on talking. Where the tool cannot be woken (Codex today), the agent says first that listening keeps the chat busy; a run with nobody in it waits in the foreground as before. Before it listens, an agent whose `quadit` commands each ask for approval says so, and how to allow them.
-- `quadit wait for=` goes up to 3600 seconds, renewing the server's holds and the lease inside itself.
-- From a chat whose tool cannot be woken, the agent first asks whether something already listens as it, and if nothing does, offers the person two choices: keep the chat busy, or a companion run in a terminal, given as the exact command. It never searches the quadit binary for how to listen: `quadit help listen` says all of it.
-
-### Added
-
-- `quadit listening` (`GET /listening`) says whether something listens as you, what and since when, without taking the lease. A listener says what it is when it takes the lease ("a chat", "a companion", or what `quadit listen by=` says), and a session refused because another listens is told what does.
 - `quadit listening` (`GET /listening`) says whether something listens as you, what, and when it was last heard, without taking the lease. A listener says what it is when it takes the lease ("a chat", "a companion", or what `quadit listen by=` says), and a session refused because another listens is told what does.
 - `quadit listen` takes `limit=SECONDS` (a longer run is killed, with what it started), `tries=N` (an item whose runs keep failing is given up, and stays unread in the inbox) and `events=PATH` (each run, each item given up and a refusal, one JSON line each, on a channel the command's output cannot reach); without them it runs as before. It gives its command, beside the item's line (`QUADIT_EVENT`, unchanged), what `quadit wait` prints for it in `QUADIT_ITEM`, the answer line included, and renews its lease every minute while the command runs.
 - `quadit help listen`: waiting in a chat, in the background, and with a companion.
