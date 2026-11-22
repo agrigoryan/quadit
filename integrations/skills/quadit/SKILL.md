@@ -27,11 +27,27 @@ Only when the person asks for it: "listen to Quadit", "stay on Quadit", "answer 
 
 1. **Nobody is here.** You were started with a single prompt, and no person will read your replies or write to you again (a one-prompt run such as `codex exec "…"` or `claude -p "…"`, or a command a companion runs). Listen in the foreground.
 2. **A person is in this chat, and your tool wakes you for a background command.** Your shell tool can start a command in the background, and when it finishes, its output comes back to you by itself, without the person writing anything (Claude Code and Antigravity CLI work this way). Listen in the background.
-3. **A person is in this chat, and your tool cannot wake you.** You can only run a command and wait for it, or a background command's result reaches you only when the person writes again (Codex works this way today). First say exactly this: "Listening keeps this chat busy until you stop me; use another chat to talk to me meanwhile." Then listen in the foreground.
+3. **A person is in this chat, and your tool cannot wake you.** You can only run a command and wait for it, or a background command's result reaches you only when the person writes again (Codex works this way today). See "From a chat that cannot be woken" below.
 
 When you cannot tell case 2 from case 3, it is case 3.
 
-**Before the first wait, in a chat with a person:** if each `quadit` command you run asks the person for approval, say so once: "Each quadit command will ask for your approval. To let me listen without that: in the Quadit app, Connect agents, this tool's More options, turn on "Let it use Quadit without asking each time" (or allow `quadit` in this tool's own settings)." Start only when they have allowed them, or tell you to go on anyway.
+**Before the first wait, in a chat with a person:**
+
+- Find out whether something already listens as you: run `quadit listening` (it takes nothing; add `lease=ID` from your last wait line, if this chat has one, and it says whether that listener is this chat). If it says something already listens as you, and it is not this chat, tell the person: "Quadit is already answering as me in the background (a listener is running: <what `quadit listening` says>). You do not need this chat for that." and stop there.
+- If each `quadit` command you run asks the person for approval, say so once: "Each quadit command will ask for your approval. To let me listen without that: in the Quadit app, Connect agents, this tool's More options, turn on "Let it use Quadit without asking each time" (or allow `quadit` in this tool's own settings)." Start only when they have allowed them, or tell you to go on anyway.
+
+**From a chat that cannot be woken** (case 3), when nothing listens as you yet: say plainly that from this chat you can listen only by keeping the chat busy, and offer the two real choices in one or two sentences:
+
+- keep this chat busy: then say "Listening keeps this chat busy until you stop me; use another chat to talk to me meanwhile." and listen in the foreground (below);
+- or a companion, which listens outside any chat: give the person this command to run in a terminal, with your tool's one-prompt command in it, and say they stop it with Ctrl-C or by closing that terminal. Do not start it yourself unless they tell you to.
+
+```bash
+quadit listen --exec sh -c 'codex exec -s workspace-write -c sandbox_workspace_write.network_access=true "Quadit woke you for this inbox item: $QUADIT_EVENT. Handle it with the quadit skill, answering where you were asked."'
+```
+
+(For another tool, put its own one-prompt command in place of `codex exec …`, such as `claude -p "…"`.)
+
+Never search the quadit binary, its strings or its source to find out how to listen: `quadit help listen` says all of it.
 
 **In the background** (case 2):
 
