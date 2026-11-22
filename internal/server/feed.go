@@ -20,7 +20,7 @@ import (
 
 // feedParams are the feed's own URL parameters; any other parameter is a
 // task filter, so the feed can be narrowed exactly like a task query.
-var feedParams = []string{"after", "cursor", "ack", "wait", "limit", "types", "task", "doc", "mine", "others", "compact", "inbox", "lease"}
+var feedParams = []string{"after", "cursor", "ack", "wait", "limit", "types", "task", "doc", "mine", "others", "compact", "inbox"}
 
 // eventPage is one answer of the feed: the events, the position to read on
 // from, and whether more are already there.
@@ -70,8 +70,7 @@ func (page eventPage) answer(events any) map[string]any {
 // handleReadFeed reads the feed after a position. With wait=N the request is held
 // for up to N seconds until something matching arrives, so an agent waits
 // with one call instead of polling. With cursor=NAME the position is the one
-// the server keeps for the caller; ack=SEQ moves it first (with lease= for
-// a cursor the listener delivers from: listener.go).
+// the server keeps for the caller; ack=SEQ moves it first.
 //
 // It sets the filter from the request (the position; others=, inbox=,
 // task=, doc=; any task filter, or mine=), then reads (waitForEvents).
@@ -83,7 +82,7 @@ func (s *Server) handleReadFeed(x *c) error {
 	cursor := v.Get("cursor")
 	if cursor != "" {
 		if ack := x.intParam("ack", 0); ack > 0 {
-			if err := s.setCursor(x, cursor, int64(ack), v.Get("lease")); err != nil {
+			if err := s.setCursor(x, cursor, int64(ack), ""); err != nil {
 				return err
 			}
 		}
@@ -138,9 +137,6 @@ func (s *Server) handleReadFeed(x *c) error {
 		f.Tasks, f.ProjectIDs = &tf, nil
 	}
 	wait := min(x.intParam("wait", 0), maxFeedWait)
-	if cursor == core.ListenCursor && wait > 0 {
-		s.markOldListener(x, time.Duration(wait)*time.Second)
-	}
 	page, err := s.waitForEvents(x, f, wait, v.Has("after"))
 	if err != nil {
 		return err
@@ -250,23 +246,6 @@ func (s *Server) setCursor(x *c, name string, seq int64, lease string) error {
 	})
 }
 
-// checkCursorMove refuses what setCursor would refuse, without moving
-// anything: a name it cannot keep, a position that is not in the feed, or a
-// move made with a lease another session took over since.
-func (s *Server) checkCursorMove(x *c, name string, seq int64, lease string) error {
-	if err := s.checkCursorPosition(x, name, seq); err != nil {
-		return err
-	}
-	if lease == "" {
-		return nil
-	}
-	var m core.Member
-	if err := x.db.Get(x.ctx(), &m, store.Eq("user_id", x.member.UserID)); err != nil {
-		return err
-	}
-	return leaseLets(m, lease)
-}
-
 // checkCursorPosition refuses a cursor name the server cannot keep, and a
 // position that is not in the feed.
 func (s *Server) checkCursorPosition(x *c, name string, seq int64) error {
@@ -299,7 +278,8 @@ func (s *Server) handleShowFeedCursor(x *c) error {
 }
 
 // handleMoveFeedCursor marks everything up to seq as handled. dry_run=1
-// checks the move and says where the cursor would stand, without moving it.
+// checks the position and says where the cursor would stand, without
+// moving it.
 // The cursor "listen" is moved with its lease, given in the body.
 func (s *Server) handleMoveFeedCursor(x *c) error {
 	var body struct {
@@ -316,7 +296,7 @@ func (s *Server) handleMoveFeedCursor(x *c) error {
 		}
 		return s.handleShowFeedCursor(x)
 	}
-	if err := s.checkCursorMove(x, name, body.Seq, body.Lease); err != nil {
+	if err := s.checkCursorPosition(x, name, body.Seq); err != nil {
 		return err
 	}
 	var cursor core.Cursor
