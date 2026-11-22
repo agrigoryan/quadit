@@ -23,4 +23,24 @@ describe("Avatar", () => {
     expect(size).toBeTruthy();
     expect(wrapper?.classList.contains(size!)).toBe(true);
   });
+
+  it("draws a member's initials on the tint it was given, and one without on a tint of its id", () => {
+    const ground = (tint?: number) => {
+      const { container } = render(<Avatar member={{ user_id: "u1", name: "Ann Lee", kind: "person", tint }} />);
+      const letters = container.querySelector<HTMLElement>("[aria-hidden]");
+      cleanup();
+      return letters?.style.background;
+    };
+    expect(ground(1)).toBe("rgb(3, 122, 192)");
+    expect(ground(2)).toBe("rgb(167, 102, 22)");
+    expect(ground(undefined)).toBe(ground(undefined));
+    expect(ground(undefined)).toMatch(/^rgb\(/);
+  });
+
+  it("draws a picture or an emoji, not a tint", () => {
+    const { container } = render(
+      <Avatar member={{ user_id: "u1", name: "Ann", kind: "person", avatar: "🦊", tint: 3 }} />,
+    );
+    expect(container.querySelector<HTMLElement>("[aria-hidden]")?.style.background).toBe("");
+  });
 });

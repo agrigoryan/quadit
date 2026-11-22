@@ -395,6 +395,7 @@ export interface Member {
   kind: string;
   name: string;
   avatar?: string;
+  tint?: number;
   title?: string;
   scope?: Scope;
   handoff_limit?: number;

@@ -12,12 +12,22 @@ const boxes: Record<Size, string> = {
 };
 const badges: Record<Size, string> = { xs: "size-2", sm: "size-2.5", md: "size-3", lg: "size-3.5" };
 
-// A calm tint per person, picked from their id so it never changes.
-const tints = ["#5b6ee1", "#0f8a8a", "#b0578d", "#7a6ad8", "#2f8f5b", "#b7791f", "#4a7fb5", "#a85b4a"];
+// The colours members' initials are drawn on, in the order the server
+// hands them out (a member's `tint` is its place here, from 1): eight hues
+// set apart around the wheel (OKLCH hues 245, 65, 150, 340, 25, 195, 290,
+// 115), each with white letters at a contrast of at least 4.6 to 1, the
+// same on both themes.
+const tints = ["#037ac0", "#a76616", "#1a8641", "#af5594", "#bd524d", "#138282", "#7866c3", "#717b11"];
 
-function tintOf(seed: string): string {
+/**
+ * The colour of a member's initials: the tint it was given when it joined;
+ * for a row that has none, one picked from its id, so it never changes.
+ */
+function tintOf(member: Pick<Member, "user_id" | "tint">): string {
+  const given = member.tint ? tints[member.tint - 1] : undefined;
+  if (given) return given;
   let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < member.user_id.length; i++) h = (h * 31 + member.user_id.charCodeAt(i)) >>> 0;
   return tints[h % tints.length] as string;
 }
 
@@ -32,7 +42,7 @@ function initials(name: string): string {
 const isPictureAvatar = (avatar: string | undefined): boolean => !!avatar && /^(\/|https?:|data:|blob:)/.test(avatar);
 
 interface Props {
-  member: Pick<Member, "user_id" | "name" | "kind" | "avatar"> | undefined;
+  member: Pick<Member, "user_id" | "name" | "kind" | "avatar" | "tint"> | undefined;
   size?: Size;
   className?: string;
 }
@@ -75,7 +85,7 @@ export function Avatar({ member, size = "sm", className }: Props) {
             agent ? "rounded-[28%]" : "rounded-full",
             !letters && "bg-sunken text-[1.6em] leading-none",
           )}
-          style={letters ? { background: tintOf(member.user_id) } : undefined}
+          style={letters ? { background: tintOf(member) } : undefined}
         >
           {member.avatar ? (letters ? member.avatar.toUpperCase() : member.avatar) : initials(member.name)}
         </span>

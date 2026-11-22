@@ -91,6 +91,8 @@ export type Member = {
   last_action?: string;
   last_seen_at?: number;
   listening_until?: number;
+  /** The colour its initials are drawn on, 1 to 8 (ui/avatar.tsx), chosen when it joined and kept. */
+  tint?: number;
   /** When an agent first proved it reached Quadit from inside its tool; missing: not connected yet. */
   connected_at?: number;
   created_at: number;

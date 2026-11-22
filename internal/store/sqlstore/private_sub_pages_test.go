@@ -121,6 +121,7 @@ var columnsAddedSince = map[int][]string{
 	13: {"comments quote TEXT", "comments detached_at BIGINT"},
 	21: {"projects samples TEXT"},
 	22: {"members connected_at BIGINT", "members listen_lease TEXT", "members listen_heard_at BIGINT"},
+	23: {"members tint INTEGER"},
 }
 
 // openWritableAt opens an empty database at an older schema version that

@@ -1,8 +1,8 @@
 workspace.updated {"changes":{"name":{"from":"Events","to":"Events and more"}},"id":"#1"}
-member.created {"row":{"workspace_id":"#1","user_id":"#2","role":"admin","handle":"artist","kind":"agent","name":"Artist","created_at":1767603603000,"updated_seq":2,"responsible_id":"#3"}}
+member.created {"row":{"workspace_id":"#1","user_id":"#2","role":"admin","handle":"artist","kind":"agent","name":"Artist","tint":2,"created_at":1767603603000,"updated_seq":2,"responsible_id":"#3"}}
 member.updated {"changes":{"title":{"from":null,"to":"draws"}},"id":"#2"}
 member.updated {"changes":{"title":{"from":"draws","to":"Painter"}},"id":"#2"}
-member.created {"row":{"workspace_id":"#1","user_id":"#4","role":"member","handle":"bea","kind":"person","name":"Bea","created_at":1767603607000,"updated_seq":5}}
+member.created {"row":{"workspace_id":"#1","user_id":"#4","role":"member","handle":"bea","kind":"person","name":"Bea","tint":3,"created_at":1767603607000,"updated_seq":5}}
 member.updated {"changes":{"removed_at":{"from":0,"to":1767603608000}},"id":"#4"}
 project.created {"row":{"id":"#5","workspace_id":"#1","key":"SVA","name":"Samurai vs Alien","rank":"00000000sg","settings":{"cycles":true,"cycle_days":7},"created_by":"#3","created_at":1767603609000,"updated_seq":7}}
 status.created {"row":{"id":"#6","project_id":"#5","name":"Backlog","color":"#9ca3af","category":"backlog","rank":"00000000sg","updated_seq":8}}
@@ -87,7 +87,7 @@ session.updated {"changes":{"ended_at":{"from":0,"to":1767603665000},"state":{"f
 task.updated {"changes":{"key":{"from":"SVA-3","to":"OPS-1"},"number":{"from":3,"to":1},"project_id":{"from":"#5","to":"#14"},"status_id":{"from":"#7","to":"#16"}},"from_project_id":"#5","id":"#34","key":"OPS-1","moved_from":"SVA-3"}
 task.updated {"changes":{"deleted_at":{"from":0,"to":1767603667000}},"deleted":true,"id":"#32","key":"SVA-2"}
 task.updated {"changes":{"deleted_at":{"from":1767603667000,"to":0}},"id":"#32","key":"SVA-2","restored":true,"row":{"id":"#32","project_id":"#5","number":2,"key":"SVA-2","title":"Sword sound","status_id":"#7","priority":0,"waiting_on_note":"pick one","rank":"00000001kw","created_by":"#3","created_at":1767603630000,"updated_at":1767603668000,"created_seq":43,"updated_seq":89,"activity_seq":89}}
-member.created {"row":{"workspace_id":"#1","user_id":"#55","role":"member","handle":"helper","kind":"agent","name":"Helper","scope":{"projects":["#5"],"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete","secret.send"]},"created_at":1767603669000,"updated_seq":90,"delegated_by":"#3","delegated_task":"#32","responsible_id":"#3"}}
+member.created {"row":{"workspace_id":"#1","user_id":"#55","role":"member","handle":"helper","kind":"agent","name":"Helper","tint":3,"scope":{"projects":["#5"],"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete","secret.send"]},"created_at":1767603669000,"updated_seq":90,"delegated_by":"#3","delegated_task":"#32","responsible_id":"#3"}}
 task.updated {"changes":{"completed_at":{"from":0,"to":1767603670000},"started_at":{"from":0,"to":1767603670000},"status_id":{"from":"#7","to":"#10"},"waiting_on_note":{"from":"pick one","to":null}},"id":"#32","key":"SVA-2"}
 member.updated {"changes":{"suspended_at":{"from":null,"to":1767603670000}},"id":"#55","reason":"its task SVA-2 is closed","user_id":"#55"}
 rule.created {"row":{"id":"#56","name":"Ping","active":true,"match":{"event_types":["task.updated"]},"action":{"kind":"notify","user_id":"#3","message":"x"},"created_by":"#3","created_at":1767603671000,"updated_seq":93}}

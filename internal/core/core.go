@@ -141,8 +141,11 @@ type Member struct {
 	Kind        string `json:"kind" db:"kind"`
 	Name        string `json:"name" db:"name"`
 	Avatar      string `json:"avatar,omitempty" db:"avatar"`
-	Title       string `json:"title,omitempty" db:"title"`
-	Scope       *Scope `json:"scope,omitempty" db:"scope,json"`
+	// Tint is the colour the member's initials are drawn on, 1 to
+	// MemberTints, chosen when the member is made and kept.
+	Tint  int    `json:"tint,omitempty" db:"tint,null"`
+	Title string `json:"title,omitempty" db:"title"`
+	Scope *Scope `json:"scope,omitempty" db:"scope,json"`
 	// HandoffLimit is how many times an agent may pass work on to another
 	// agent in a week (Monday to Monday, UTC); 0 is no limit.
 	HandoffLimit int    `json:"handoff_limit,omitempty" db:"handoff_limit,null"`
@@ -216,6 +219,10 @@ type ConnectCode struct {
 	ExpiresAt   int64  `json:"expires_at" db:"expires_at"`
 	UsedAt      int64  `json:"used_at,omitempty" db:"used_at,null"`
 }
+
+// MemberTints is how many colours members' initials are drawn on; the web
+// app has one tint for each.
+const MemberTints = 8
 
 // ListenCursor is the cursor an agent's inbox is delivered from, by `quadit
 // wait` and `quadit listen`; one session at a time holds its lease.

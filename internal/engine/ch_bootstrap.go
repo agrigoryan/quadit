@@ -74,7 +74,7 @@ func (e *Engine) Bootstrap(ctx context.Context, a BootstrapArgs) (core.Workspace
 			return err
 		}
 		if err := tx.Insert(ctx, core.Member{WorkspaceID: ws.ID, UserID: owner.ID, Role: core.RoleOwner, Handle: handle,
-			Kind: owner.Kind, Name: owner.Name, Avatar: owner.Avatar, CreatedAt: at}); err != nil {
+			Kind: owner.Kind, Name: owner.Name, Avatar: owner.Avatar, Tint: 1, CreatedAt: at}); err != nil { // the first member: the palette's first tint
 			return err
 		}
 		if a.Install {

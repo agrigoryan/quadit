@@ -10505,6 +10505,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
      "kind": "person",
      "name": "Bea",
      "role": "member",
+     "tint": 2,
      "updated_seq": 45,
      "user_id": "<@bea>",
      "workspace_id": "<id #153>"
@@ -10528,6 +10529,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
      "kind": "person",
      "name": "Cy",
      "role": "member",
+     "tint": 3,
      "updated_seq": 46,
      "user_id": "<@cy>",
      "workspace_id": "<id #153>"
@@ -10551,6 +10553,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
      "kind": "person",
      "name": "Dee",
      "role": "member",
+     "tint": 4,
      "updated_seq": 47,
      "user_id": "<@dee>",
      "workspace_id": "<id #153>"
@@ -10662,6 +10665,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
        "<project SVA>"
       ]
      },
+     "tint": 4,
      "updated_seq": 51,
      "user_id": "<@artist>",
      "workspace_id": "<id #153>"
@@ -10703,6 +10707,7 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
        "secret.send"
       ]
      },
+     "tint": 5,
      "updated_seq": 52,
      "user_id": "<@ops>",
      "workspace_id": "<id #153>"
@@ -19482,6 +19487,7 @@ seq: 280
   "last_seen_at": 1700000000000,
   "name": "Aram",
   "role": "owner",
+  "tint": 1,
   "updated_seq": 0,
   "user_id": "<@aram>",
   "workspace_id": "<id #153>"
@@ -19495,6 +19501,7 @@ seq: 280
    "last_seen_at": 1700000000000,
    "name": "Aram",
    "role": "owner",
+   "tint": 1,
    "updated_seq": 0,
    "user_id": "<@aram>",
    "workspace_id": "<id #153>"
@@ -19530,6 +19537,7 @@ seq: 280
      "<project SVA>"
     ]
    },
+   "tint": 4,
    "updated_seq": 132,
    "user_id": "<@artist>",
    "workspace_id": "<id #153>"
@@ -19547,6 +19555,7 @@ seq: 280
      "<project SVA>"
     ]
    },
+   "tint": 2,
    "updated_seq": 48,
    "user_id": "<@bea>",
    "workspace_id": "<id #153>"
@@ -19560,6 +19569,7 @@ seq: 280
    "scope": {
     "read_only": true
    },
+   "tint": 3,
    "updated_seq": 49,
    "user_id": "<@cy>",
    "workspace_id": "<id #153>"
@@ -19571,6 +19581,7 @@ seq: 280
    "name": "Dee",
    "removed_at": 1700000000000,
    "role": "member",
+   "tint": 4,
    "updated_seq": 50,
    "user_id": "<@dee>",
    "workspace_id": "<id #153>"
@@ -19602,6 +19613,7 @@ seq: 280
      "secret.send"
     ]
    },
+   "tint": 5,
    "updated_seq": 145,
    "user_id": "<@ops>",
    "workspace_id": "<id #153>"
@@ -21538,6 +21550,7 @@ seq: 280
   "last_seen_at": 1700000000000,
   "name": "Aram",
   "role": "owner",
+  "tint": 1,
   "updated_seq": 0,
   "user_id": "<@aram>",
   "workspace_id": "<id #153>"
@@ -21551,6 +21564,7 @@ seq: 280
    "last_seen_at": 1700000000000,
    "name": "Aram",
    "role": "owner",
+   "tint": 1,
    "updated_seq": 0,
    "user_id": "<@aram>",
    "workspace_id": "<id #153>"
@@ -21586,6 +21600,7 @@ seq: 280
      "<project SVA>"
     ]
    },
+   "tint": 4,
    "updated_seq": 132,
    "user_id": "<@artist>",
    "workspace_id": "<id #153>"
@@ -21603,6 +21618,7 @@ seq: 280
      "<project SVA>"
     ]
    },
+   "tint": 2,
    "updated_seq": 48,
    "user_id": "<@bea>",
    "workspace_id": "<id #153>"
@@ -21616,6 +21632,7 @@ seq: 280
    "scope": {
     "read_only": true
    },
+   "tint": 3,
    "updated_seq": 49,
    "user_id": "<@cy>",
    "workspace_id": "<id #153>"
@@ -21627,6 +21644,7 @@ seq: 280
    "name": "Dee",
    "removed_at": 1700000000000,
    "role": "member",
+   "tint": 4,
    "updated_seq": 50,
    "user_id": "<@dee>",
    "workspace_id": "<id #153>"
@@ -21658,6 +21676,7 @@ seq: 280
      "secret.send"
     ]
    },
+   "tint": 5,
    "updated_seq": 145,
    "user_id": "<@ops>",
    "workspace_id": "<id #153>"
@@ -23091,6 +23110,7 @@ seq: 280
   "last_seen_at": 1700000000000,
   "name": "Aram",
   "role": "owner",
+  "tint": 1,
   "updated_seq": 0,
   "user_id": "<@aram>",
   "workspace_id": "<id #153>"
@@ -23841,6 +23861,7 @@ seq: 280
   "last_seen_at": 1700000000000,
   "name": "Aram",
   "role": "owner",
+  "tint": 1,
   "updated_seq": 0,
   "user_id": "<@aram>",
   "workspace_id": "<id #153>"
@@ -24439,6 +24460,7 @@ seq: 280
    "last_seen_at": 1700000000000,
    "name": "Aram",
    "role": "owner",
+   "tint": 1,
    "updated_seq": 0,
    "user_id": "<@aram>",
    "workspace_id": "<id #153>"
@@ -24474,6 +24496,7 @@ seq: 280
      "<project SVA>"
     ]
    },
+   "tint": 4,
    "updated_seq": 132,
    "user_id": "<@artist>",
    "workspace_id": "<id #153>"
@@ -24492,6 +24515,7 @@ seq: 280
      "<project SVA>"
     ]
    },
+   "tint": 2,
    "updated_seq": 48,
    "user_id": "<@bea>",
    "workspace_id": "<id #153>"
@@ -24506,6 +24530,7 @@ seq: 280
    "scope": {
     "read_only": true
    },
+   "tint": 3,
    "updated_seq": 49,
    "user_id": "<@cy>",
    "workspace_id": "<id #153>"
@@ -24518,6 +24543,7 @@ seq: 280
    "name": "Dee",
    "removed_at": 1700000000000,
    "role": "member",
+   "tint": 4,
    "updated_seq": 50,
    "user_id": "<@dee>",
    "workspace_id": "<id #153>"
@@ -24549,6 +24575,7 @@ seq: 280
      "secret.send"
     ]
    },
+   "tint": 5,
    "updated_seq": 145,
    "user_id": "<@ops>",
    "workspace_id": "<id #153>"
@@ -24578,6 +24605,7 @@ seq: 280
    "last_seen_at": 1700000000000,
    "name": "Aram",
    "role": "owner",
+   "tint": 1,
    "updated_seq": 0,
    "user_id": "<@aram>",
    "workspace_id": "<id #153>"
@@ -24613,6 +24641,7 @@ seq: 280
      "<project SVA>"
     ]
    },
+   "tint": 4,
    "updated_seq": 132,
    "user_id": "<@artist>",
    "workspace_id": "<id #153>"
@@ -24631,6 +24660,7 @@ seq: 280
      "<project SVA>"
     ]
    },
+   "tint": 2,
    "updated_seq": 48,
    "user_id": "<@bea>",
    "workspace_id": "<id #153>"
@@ -24645,6 +24675,7 @@ seq: 280
    "scope": {
     "read_only": true
    },
+   "tint": 3,
    "updated_seq": 49,
    "user_id": "<@cy>",
    "workspace_id": "<id #153>"
@@ -24657,6 +24688,7 @@ seq: 280
    "name": "Dee",
    "removed_at": 1700000000000,
    "role": "member",
+   "tint": 4,
    "updated_seq": 50,
    "user_id": "<@dee>",
    "workspace_id": "<id #153>"
@@ -24688,6 +24720,7 @@ seq: 280
      "secret.send"
     ]
    },
+   "tint": 5,
    "updated_seq": 145,
    "user_id": "<@ops>",
    "workspace_id": "<id #153>"
@@ -26863,6 +26896,7 @@ stale  Stale  id=<view Stale>
    "last_seen_at": 1700000000000,
    "name": "Aram",
    "role": "owner",
+   "tint": 1,
    "updated_seq": 0,
    "user_id": "<@aram>",
    "workspace_id": "<id #153>"
@@ -26898,6 +26932,7 @@ stale  Stale  id=<view Stale>
      "<project SVA>"
     ]
    },
+   "tint": 4,
    "updated_seq": 132,
    "user_id": "<@artist>",
    "workspace_id": "<id #153>"
@@ -26916,6 +26951,7 @@ stale  Stale  id=<view Stale>
      "<project SVA>"
     ]
    },
+   "tint": 2,
    "updated_seq": 48,
    "user_id": "<@bea>",
    "workspace_id": "<id #153>"
@@ -26930,6 +26966,7 @@ stale  Stale  id=<view Stale>
    "scope": {
     "read_only": true
    },
+   "tint": 3,
    "updated_seq": 49,
    "user_id": "<@cy>",
    "workspace_id": "<id #153>"
@@ -26942,6 +26979,7 @@ stale  Stale  id=<view Stale>
    "name": "Dee",
    "removed_at": 1700000000000,
    "role": "member",
+   "tint": 4,
    "updated_seq": 50,
    "user_id": "<@dee>",
    "workspace_id": "<id #153>"
@@ -26973,6 +27011,7 @@ stale  Stale  id=<view Stale>
      "secret.send"
     ]
    },
+   "tint": 5,
    "updated_seq": 145,
    "user_id": "<@ops>",
    "workspace_id": "<id #153>"
@@ -26993,6 +27032,7 @@ stale  Stale  id=<view Stale>
    "last_seen_at": 1700000000000,
    "name": "Aram",
    "role": "owner",
+   "tint": 1,
    "updated_seq": 0,
    "user_id": "<@aram>",
    "workspace_id": "<id #153>"
@@ -27028,6 +27068,7 @@ stale  Stale  id=<view Stale>
      "<project SVA>"
     ]
    },
+   "tint": 4,
    "updated_seq": 132,
    "user_id": "<@artist>",
    "workspace_id": "<id #153>"
@@ -27046,6 +27087,7 @@ stale  Stale  id=<view Stale>
      "<project SVA>"
     ]
    },
+   "tint": 2,
    "updated_seq": 48,
    "user_id": "<@bea>",
    "workspace_id": "<id #153>"
@@ -27060,6 +27102,7 @@ stale  Stale  id=<view Stale>
    "scope": {
     "read_only": true
    },
+   "tint": 3,
    "updated_seq": 49,
    "user_id": "<@cy>",
    "workspace_id": "<id #153>"
@@ -27072,6 +27115,7 @@ stale  Stale  id=<view Stale>
    "name": "Dee",
    "removed_at": 1700000000000,
    "role": "member",
+   "tint": 4,
    "updated_seq": 50,
    "user_id": "<@dee>",
    "workspace_id": "<id #153>"
@@ -27103,6 +27147,7 @@ stale  Stale  id=<view Stale>
      "secret.send"
     ]
    },
+   "tint": 5,
    "updated_seq": 145,
    "user_id": "<@ops>",
    "workspace_id": "<id #153>"
@@ -33093,13 +33138,13 @@ id: 44
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #227>","data":{"row":{"category":"canceled","color":"#ef4444","id":"<id #232>","name":"Canceled","project_id":"<project DEL>","rank":"00000004qo","updated_seq":44}},"entity_id":"<id #232>","entity_type":"status","project_id":"<project DEL>","scope_id":"<project DEL>","scope_type":"project","seq":44,"type":"status.created"}
 
 id: 45
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #233>","data":{"row":{"created_at":1700000000000,"handle":"bea","kind":"person","name":"Bea","role":"member","updated_seq":45,"user_id":"<@bea>","workspace_id":"<id #153>"}},"entity_id":"<@bea>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":45,"type":"member.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #233>","data":{"row":{"created_at":1700000000000,"handle":"bea","kind":"person","name":"Bea","role":"member","tint":2,"updated_seq":45,"user_id":"<@bea>","workspace_id":"<id #153>"}},"entity_id":"<@bea>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":45,"type":"member.created"}
 
 id: 46
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #234>","data":{"row":{"created_at":1700000000000,"handle":"cy","kind":"person","name":"Cy","role":"member","updated_seq":46,"user_id":"<@cy>","workspace_id":"<id #153>"}},"entity_id":"<@cy>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":46,"type":"member.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #234>","data":{"row":{"created_at":1700000000000,"handle":"cy","kind":"person","name":"Cy","role":"member","tint":3,"updated_seq":46,"user_id":"<@cy>","workspace_id":"<id #153>"}},"entity_id":"<@cy>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":46,"type":"member.created"}
 
 id: 47
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #235>","data":{"row":{"created_at":1700000000000,"handle":"dee","kind":"person","name":"Dee","role":"member","updated_seq":47,"user_id":"<@dee>","workspace_id":"<id #153>"}},"entity_id":"<@dee>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":47,"type":"member.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #235>","data":{"row":{"created_at":1700000000000,"handle":"dee","kind":"person","name":"Dee","role":"member","tint":4,"updated_seq":47,"user_id":"<@dee>","workspace_id":"<id #153>"}},"entity_id":"<@dee>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":47,"type":"member.created"}
 
 id: 48
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #236>","data":{"changes":{"scope":{"from":null,"to":{"projects":["<project SVA>"]}}},"id":"<@bea>"},"entity_id":"<@bea>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":48,"type":"member.updated"}
@@ -33111,10 +33156,10 @@ id: 50
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #238>","data":{"changes":{"removed_at":{"from":0,"to":1700000000000}},"id":"<@dee>"},"entity_id":"<@dee>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":50,"type":"member.updated"}
 
 id: 51
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #239>","data":{"row":{"created_at":1700000000000,"handle":"artist","handoff_limit":5,"kind":"agent","name":"Artist","responsible_id":"<@aram>","role":"member","scope":{"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete","secret.send"],"projects":["<project SVA>"]},"updated_seq":51,"user_id":"<@artist>","workspace_id":"<id #153>"}},"entity_id":"<@artist>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":51,"type":"member.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #239>","data":{"row":{"created_at":1700000000000,"handle":"artist","handoff_limit":5,"kind":"agent","name":"Artist","responsible_id":"<@aram>","role":"member","scope":{"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete","secret.send"],"projects":["<project SVA>"]},"tint":4,"updated_seq":51,"user_id":"<@artist>","workspace_id":"<id #153>"}},"entity_id":"<@artist>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":51,"type":"member.created"}
 
 id: 52
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #240>","data":{"row":{"created_at":1700000000000,"handle":"ops","kind":"agent","name":"Ops bot","responsible_id":"<@aram>","role":"member","scope":{"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete","secret.send"]},"updated_seq":52,"user_id":"<@ops>","workspace_id":"<id #153>"}},"entity_id":"<@ops>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":52,"type":"member.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #240>","data":{"row":{"created_at":1700000000000,"handle":"ops","kind":"agent","name":"Ops bot","responsible_id":"<@aram>","role":"member","scope":{"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete","secret.send"]},"tint":5,"updated_seq":52,"user_id":"<@ops>","workspace_id":"<id #153>"}},"entity_id":"<@ops>","entity_type":"member","scope_id":"<id #153>","scope_type":"workspace","seq":52,"type":"member.created"}
 
 id: 53
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #241>","data":{"row":{"category":"started","id":"<status Review>","name":"Review","project_id":"<project SVA>","rank":"00000002o","updated_seq":53}},"entity_id":"<status Review>","entity_type":"status","project_id":"<project SVA>","scope_id":"<project SVA>","scope_type":"project","seq":53,"type":"status.created"}
@@ -33824,6 +33869,7 @@ Nothing here needs this product to be read.
   "last_seen_at": 1700000000000,
   "name": "Aram",
   "role": "owner",
+  "tint": 1,
   "updated_seq": 0,
   "user_id": "<@aram>",
   "workspace_id": "<id #153>"
@@ -33841,6 +33887,7 @@ Nothing here needs this product to be read.
     "<project SVA>"
    ]
   },
+  "tint": 2,
   "updated_seq": 48,
   "user_id": "<@bea>",
   "workspace_id": "<id #153>"
@@ -33854,6 +33901,7 @@ Nothing here needs this product to be read.
   "scope": {
    "read_only": true
   },
+  "tint": 3,
   "updated_seq": 49,
   "user_id": "<@cy>",
   "workspace_id": "<id #153>"
@@ -33865,6 +33913,7 @@ Nothing here needs this product to be read.
   "name": "Dee",
   "removed_at": 1700000000000,
   "role": "member",
+  "tint": 4,
   "updated_seq": 50,
   "user_id": "<@dee>",
   "workspace_id": "<id #153>"
@@ -33899,6 +33948,7 @@ Nothing here needs this product to be read.
     "<project SVA>"
    ]
   },
+  "tint": 4,
   "updated_seq": 132,
   "user_id": "<@artist>",
   "workspace_id": "<id #153>"
@@ -33929,6 +33979,7 @@ Nothing here needs this product to be read.
     "secret.send"
    ]
   },
+  "tint": 5,
   "updated_seq": 145,
   "user_id": "<@ops>",
   "workspace_id": "<id #153>"
@@ -37222,6 +37273,7 @@ Nothing here needs this product to be read.
     "kind": "person",
     "name": "Bea",
     "role": "member",
+    "tint": 2,
     "updated_seq": 45,
     "user_id": "<@bea>",
     "workspace_id": "<id #153>"
@@ -37245,6 +37297,7 @@ Nothing here needs this product to be read.
     "kind": "person",
     "name": "Cy",
     "role": "member",
+    "tint": 3,
     "updated_seq": 46,
     "user_id": "<@cy>",
     "workspace_id": "<id #153>"
@@ -37268,6 +37321,7 @@ Nothing here needs this product to be read.
     "kind": "person",
     "name": "Dee",
     "role": "member",
+    "tint": 4,
     "updated_seq": 47,
     "user_id": "<@dee>",
     "workspace_id": "<id #153>"
@@ -37379,6 +37433,7 @@ Nothing here needs this product to be read.
       "<project SVA>"
      ]
     },
+    "tint": 4,
     "updated_seq": 51,
     "user_id": "<@artist>",
     "workspace_id": "<id #153>"
@@ -37420,6 +37475,7 @@ Nothing here needs this product to be read.
       "secret.send"
      ]
     },
+    "tint": 5,
     "updated_seq": 52,
     "user_id": "<@ops>",
     "workspace_id": "<id #153>"

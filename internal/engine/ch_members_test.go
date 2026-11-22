@@ -3,6 +3,7 @@ package engine_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"testing"
 
@@ -49,6 +50,31 @@ func TestNobodyAddsAMemberWhoReachesFurtherThanThey(t *testing.T) {
 		}
 		if err := add(M{"user": person("Olu").ID, "handle": "olu", "role": "owner"}); err == nil {
 			t.Fatal("a credential limited to one project made an owner")
+		}
+	})
+}
+
+// TestANewMemberGetsTheTintUsedLeast: the first members of a workspace
+// each get a tint of their own, in the palette's order; once all are taken
+// the one used least comes next, and a removed member's tint is free again.
+func TestANewMemberGetsTheTintUsedLeast(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		tints := []int{w.member(w.owner.ID).Tint}
+		var agents []string
+		for i := range core.MemberTints + 1 {
+			a := w.agent(fmt.Sprintf("bot%d", i))
+			agents = append(agents, a)
+			tints = append(tints, w.member(a).Tint)
+		}
+		want := []int{1, 2, 3, 4, 5, 6, 7, 8, 1, 2}
+		if !slices.Equal(tints, want) {
+			t.Fatalf("the tints of the first members are %v, want %v", tints, want)
+		}
+		// bot2 (tint 4) goes: 4 is used least now, and the next member gets it.
+		w.do(w.owner.ID, "member.remove", M{"id": agents[2]})
+		if got := w.member(w.agent("late")).Tint; got != 4 {
+			t.Fatalf("the member after a removal got tint %d, want 4", got)
 		}
 	})
 }

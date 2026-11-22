@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"context"
 	"errors"
 	"regexp"
 	"slices"
@@ -117,8 +118,12 @@ func memberAdd(c *cx, a memberAddArgs) error {
 }
 
 func (c *cx) addMember(m core.Member) error {
+	tint, err := leastUsedTint(c.ctx, c.tx)
+	if err != nil {
+		return err
+	}
 	seq := c.tx.NextSeq()
-	m.UpdatedSeq = seq
+	m.UpdatedSeq, m.Tint = seq, tint
 	if err := c.tx.Insert(c.ctx, m); err != nil {
 		if errors.Is(err, store.ErrConflict) {
 			return conflictErr("the handle @%s is taken, or this user is already a member", m.Handle)
@@ -126,6 +131,29 @@ func (c *cx) addMember(m core.Member) error {
 		return err
 	}
 	return c.created(seq, "member", m.UserID, inWorkspace(c.ws), m)
+}
+
+// leastUsedTint is the tint a new member of the workspace gets: the one
+// its current members use least, the first of those in the palette's
+// order on a tie, so that the first members of a workspace all differ.
+func leastUsedTint(ctx context.Context, db store.DB) (int, error) {
+	var members []core.Member
+	if err := db.List(ctx, &members, store.Where(store.Null("removed_at"))); err != nil {
+		return 0, err
+	}
+	used := make([]int, core.MemberTints+1)
+	for _, m := range members {
+		if m.Tint >= 1 && m.Tint <= core.MemberTints {
+			used[m.Tint]++
+		}
+	}
+	best := 1
+	for tint := 2; tint <= core.MemberTints; tint++ {
+		if used[tint] < used[best] {
+			best = tint
+		}
+	}
+	return best, nil
 }
 
 var handleStrip = regexp.MustCompile(`[^a-z0-9_-]+`)
