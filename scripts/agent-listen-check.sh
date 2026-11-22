@@ -30,6 +30,25 @@
 #      the background (Claude Code's stream-json input is meant to; no
 #      chat command is known for Antigravity CLI yet: set one), and that the
 #      tool, so run, takes the chat for a person's.
+#   4. A companion, as the desktop app keeps one for a connected tool (for
+#      every tool; AGENT_CHECK_COMPANION=0 leaves it out): the script runs
+#      `quadit listen by="the check" --exec …` as the agent's login, whose
+#      command runs the tool's one-prompt command with the wake sentence, as
+#      the app does. It passes when the agent shows as listening and
+#      `quadit listening` names "the check"; two comments get exactly one
+#      answer each, with what each asked for; a `quadit wait` meanwhile is
+#      refused, naming "the check"; and once the companion is stopped the
+#      agent stops showing as listening and a third comment gets no answer.
+#      It prints each run's length and the tokens the tool reported, the
+#      cost of one answered comment.
+#
+# The one-prompt commands are the forms the desktop app runs (`codex exec
+# --skip-git-repo-check PROMPT`, `claude -p PROMPT`, `agy -p PROMPT
+# --dangerously-skip-permissions`, `gemini -p PROMPT`, `cursor-agent -p
+# --force PROMPT`), with what this check needs besides: Codex let out of
+# its sandbox's network and kept on this check's login, Claude Code kept
+# to the project's settings and skill and allowed the quadit command,
+# Gemini CLI trusting the check's folder.
 #
 # It prints the tool's version, each wait's length, the tokens the tool
 # spent over the stretch with nothing arriving when it reports them as it
@@ -407,6 +426,28 @@ third=$(say "@$handle and 4 and 4? Answer here in a comment.")
 sleep 90
 check "after stop, the third comment got no answer" "$([ "$(replies "$third" 0)" = 0 ] && echo 0 || echo 1)" "$(replies "$third" 0) answers"
 
+# A companion, as the desktop app runs one: listen as the agent's login (through the wrapper, so its lease file is the
+# check's own), each item a run of the tool's one-prompt command with the wake sentence (WORK/bin/wake, which keeps
+# each run's length and output in WORK/runs).
+companion() {
+	cat >"$work/bin/wake" <<EOF
+#!/bin/sh
+# One run of the tool for one inbox item, as the desktop app makes it.
+n=\$(ls "$work/runs" | wc -l | tr -d ' ')
+start=\$(date +%s)
+sh -c "\$AGENT_CHECK_ONE_PROMPT" sh "Quadit woke you for this inbox item: \$QUADIT_EVENT. Handle it with the quadit skill, answering where you were asked.${steer:+ $steer}" >"$work/runs/\$n.log" 2>&1
+status=\$?
+echo "run \$n: \$((\$(date +%s) - start))s, exit \$status" >>"$work/runs.txt"
+exit \$status
+EOF
+	chmod +x "$work/bin/wake"
+	mkdir -p "$work/runs"
+	AGENT_CHECK_ONE_PROMPT=$command as_tool companion "$wrapper" listen "by=the check" --exec "$work/bin/wake" >"$work/companion.log" 2>&1
+}
+# as_agent ARGS: quadit as the agent, outside any tool, with this check's login.
+as_agent() { QUADIT_URL=$url QUADIT_TOKEN=$agent_token QUADIT_CONFIG=$work/none.json "$real" "$@"; }
+names_the_check() { as_agent listening | grep -q "the check"; }
+
 # 3. Listen in a chat, the wait in the background.
 if [ "$wakes" = 1 ]; then
 	echo "3. Listen to Quadit in a chat with a person"
@@ -435,6 +476,43 @@ if [ "$wakes" = 1 ]; then
 		exec 3>&-
 		kill -TERM -- "-$chat_pid" 2>/dev/null || :
 	fi
+fi
+
+# 4. A companion, as the desktop app keeps one.
+if [ "${AGENT_CHECK_COMPANION:-1}" = 1 ]; then
+	echo "4. A companion, as the Quadit app runs one"
+	check "the sessions before have stopped listening" "$(passed until_true 360 not_listening)" "$(agents)"
+	set -m
+	companion &
+	companion_pid=$!
+	sessions+=("$companion_pid")
+	set +m
+	check "the agent shows as listening, and quadit listening names the check" "$(passed until_true 60 names_the_check)" "$(as_agent listening 2>&1)"
+	sixth=$(say "@$handle what do 2 and 2 make? Answer here in a comment.")
+	check "the first comment was answered" "$(passed until_true "$answer_time" answered "$sixth" 0 4 four)" "$(replies "$sixth" 0) answers after it"
+	seventh=$(say "@$handle and 3 and 3? Answer here in a comment.")
+	check "the second comment was answered" "$(passed until_true "$answer_time" answered "$seventh" 0 6 six)" "$(replies "$seventh" 0) answers after it"
+	refused=$(as_agent wait for=1 2>&1 || :)
+	check "a wait meanwhile is refused, naming the check" "$(printf '%s' "$refused" | grep -q "already listening from another session (the check" && echo 0 || echo 1)" "$refused"
+	sleep 30
+	check "the first comment got exactly one answer, saying 4" "$([ "$(replies "$sixth" "$seventh")" = 1 ] && [ "$(replies "$sixth" "$seventh" 4 four)" = 1 ] && echo 0 || echo 1)" \
+		"$(replies "$sixth" "$seventh") comments by @$handle between it and the second"
+	check "the second comment got exactly one answer, saying 6" "$([ "$(replies "$seventh" 0)" = 1 ] && [ "$(replies "$seventh" 0 6 six)" = 1 ] && echo 0 || echo 1)" \
+		"$(replies "$seventh" 0) comments by @$handle after it"
+	kill -INT -- "-$companion_pid" 2>/dev/null || :
+	sleep 5
+	kill -TERM -- "-$companion_pid" 2>/dev/null || :
+	check "stopped, the companion stops listening" "$(passed until_true 90 not_listening)" "$(agents)"
+	eighth=$(say "@$handle and 4 and 4? Answer here in a comment.")
+	sleep 60
+	check "after stop, the third comment got no answer" "$([ "$(replies "$eighth" 0)" = 0 ] && echo 0 || echo 1)" "$(replies "$eighth" 0) answers"
+	echo "the companion's runs (one for each item, its assignment included):"
+	sed 's/^/  /' "$work/runs.txt" 2>/dev/null || echo "  (none)"
+	for run in "$work"/runs/*.log; do
+		[ -f "$run" ] || continue
+		tokens=$(grep -ihE "tokens?[ _]?(used|usage)|\"(input|output)_tokens\"" "$run" | head -n 3 | tr '\n' ' ' || :)
+		echo "  $(basename "$run" .log): ${tokens:-tokens not reported}"
+	done
 fi
 
 echo "waits of the listening session (seconds, what came):"
