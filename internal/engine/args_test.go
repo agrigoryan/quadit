@@ -29,6 +29,7 @@ import (
 // before anything else wrong. Run with QUADIT_UPDATE_MISSING=1 to write the
 // file again.
 func TestRefusalsOfMissingArguments(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		got := missingScenario(t, st).lines
 		const file = "testdata/missing.golden"
@@ -58,6 +59,7 @@ func TestRefusalsOfMissingArguments(t *testing.T) {
 // request, or could be left out of it, or is needed only sometimes: those
 // are listed here with the reason.
 func TestRequiredArgumentsAreTheOnesRefused(t *testing.T) {
+	t.Parallel()
 	sometimes := map[string]string{
 		"task.create project":      "or the parent's project",
 		"task.create title":        "or the template's title",

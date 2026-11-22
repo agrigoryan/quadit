@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -26,15 +27,16 @@ type world struct {
 	owner core.User
 }
 
-var slugN int
+// slugN numbers the worlds made, so that two in one database differ.
+var slugN atomic.Int64
 
 func newWorld(t *testing.T, st store.Store) *world {
 	t.Helper()
 	e := engine.New(st, nil)
-	slugN++
+	n := slugN.Add(1)
 	ws, owner, err := e.Bootstrap(context.Background(), engine.BootstrapArgs{
-		OwnerName: "Aram", OwnerEmail: fmt.Sprintf("aram%d@example.com", slugN), OwnerHandle: "aram",
-		WorkspaceSlug: fmt.Sprintf("games-%d", slugN), WorkspaceName: "Games"})
+		OwnerName: "Aram", OwnerEmail: fmt.Sprintf("aram%d@example.com", n), OwnerHandle: "aram",
+		WorkspaceSlug: fmt.Sprintf("games-%d", n), WorkspaceName: "Games"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,6 +125,7 @@ func (w *world) agent(handle string) string {
 // owner comments on an option and picks with changes, and the task moves
 // between them by itself, with nothing missed.
 func TestReviewLoop(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
@@ -237,6 +240,7 @@ func TestReviewLoop(t *testing.T) {
 }
 
 func TestTaskUpdate(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -286,6 +290,7 @@ func TestTaskUpdate(t *testing.T) {
 }
 
 func TestBatchDryRunAndResend(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
@@ -335,6 +340,7 @@ func TestBatchDryRunAndResend(t *testing.T) {
 }
 
 func TestRolesScopesAndWalls(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
@@ -411,6 +417,7 @@ func TestRolesScopesAndWalls(t *testing.T) {
 }
 
 func TestConcurrentWrites(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
@@ -458,6 +465,7 @@ func TestConcurrentWrites(t *testing.T) {
 }
 
 func TestPlanning(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
@@ -511,6 +519,7 @@ func TestPlanning(t *testing.T) {
 }
 
 func TestLeasesResourcesAndInbox(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		a, b := w.agent("alpha"), w.agent("beta")
@@ -557,6 +566,7 @@ func TestLeasesResourcesAndInbox(t *testing.T) {
 }
 
 func TestCatalog(t *testing.T) {
+	t.Parallel()
 	cat := engine.Catalog()
 	if len(cat) < 80 {
 		t.Fatalf("catalog has %d change types", len(cat))

@@ -68,6 +68,7 @@ func byID(where []store.Cond, id string) bool {
 // a row a change needs, the change fails with that error, instead of going
 // on as if the row were not there.
 func TestAFailedReadIsNotTakenForAMissingRow(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		faulty := &faultStore{Store: st}
 		w := newWorld(t, faulty)

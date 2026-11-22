@@ -33,6 +33,7 @@ func restoredRow(t *testing.T, results []*engine.Result, typ string, dst any) co
 }
 
 func TestEpicRestore(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()

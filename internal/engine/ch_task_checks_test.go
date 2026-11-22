@@ -17,6 +17,7 @@ import (
 // question, whoever writes it; and they are not told of it when it
 // mentions them. In a project they may read, the same is allowed.
 func TestAMemberWhoCannotReadAProjectIsGivenNoWorkInIt(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -60,6 +61,7 @@ func TestAMemberWhoCannotReadAProjectIsGivenNoWorkInIt(t *testing.T) {
 // project that the member it is given to, waits on or asks cannot read;
 // the refusal names them. Once they are taken off it, it moves.
 func TestATaskIsNotMovedAwayFromWhoseWorkItIs(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -89,6 +91,7 @@ func TestATaskIsNotMovedAwayFromWhoseWorkItIs(t *testing.T) {
 // as naming them: a task of a project that person cannot read is refused,
 // saying so.
 func TestAnAgentsQuestionGoesToItsPersonOnlyWhereTheyMayRead(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

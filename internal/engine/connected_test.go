@@ -37,6 +37,7 @@ func connectedEvents(res []*engine.Result) int {
 }
 
 func TestAnAgentIsConnected(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		t.Run("by its first change, once, which tells the workspace", func(t *testing.T) {
 			w := newWorld(t, st)

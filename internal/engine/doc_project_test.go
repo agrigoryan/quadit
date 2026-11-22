@@ -42,6 +42,7 @@ func (w *world) found(text, projectID, docID string) bool {
 // as it is when they are made. Changing it takes along those that are in
 // the project because the page is; one tied elsewhere on purpose stays.
 func TestPageProjectTakesItsSubPages(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		me := w.owner.ID

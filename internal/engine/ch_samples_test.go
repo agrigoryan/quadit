@@ -54,6 +54,7 @@ func (w *world) labelNames(t core.Task) []string {
 // who asked and the third for the agent named or nobody, remembered on the
 // project in that order.
 func TestSamplesAddMakesGettingStarted(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		coder := w.agent("coder")
@@ -97,6 +98,7 @@ func TestSamplesAddMakesGettingStarted(t *testing.T) {
 // TestSamplesAddTwiceIsOnce: while the samples are there, asking again
 // makes nothing; it gives the third to an agent only while it has nobody.
 func TestSamplesAddTwiceIsOnce(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		coder := w.agent("coder")
@@ -142,6 +144,7 @@ func TestSamplesAddTwiceIsOnce(t *testing.T) {
 // project, may add or remove them, and the third goes only to an agent of
 // the workspace.
 func TestSamplesAreForPeopleWhoAdministerAndTheThirdForAnAgent(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
@@ -187,6 +190,7 @@ func TestSamplesAreForPeopleWhoAdministerAndTheThirdForAnAgent(t *testing.T) {
 // TestSamplesTakeTheNextFreeKey: a project with the key GS, in the trash or
 // not, leaves the samples the next free key.
 func TestSamplesTakeTheNextFreeKey(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "GS", "name": "Game studio"})
@@ -204,6 +208,7 @@ func TestSamplesTakeTheNextFreeKey(t *testing.T) {
 // ones left to the trash, as a person's delete does, and their project
 // with them unless something of the person's own is in it.
 func TestSamplesRemoveLeavesThePersonsOwnWork(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		t.Run("alone", func(t *testing.T) {
 			w := newWorld(t, st)
@@ -323,6 +328,7 @@ func TestSamplesRemoveLeavesThePersonsOwnWork(t *testing.T) {
 // TestSettingAnInstallUpMakesTheSamples: the workspace an install is set up
 // with has the samples from its first moment, the third for nobody.
 func TestSettingAnInstallUpMakesTheSamples(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		ctx := context.Background()
 		e := engine.New(st, nil)
@@ -358,6 +364,7 @@ func TestSettingAnInstallUpMakesTheSamples(t *testing.T) {
 // TestAnInstallIsSetUpOnce: setting an install up is refused once it has
 // a person, and of two set-ups at once one is.
 func TestAnInstallIsSetUpOnce(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		ctx := context.Background()
 		e := engine.New(st, nil)

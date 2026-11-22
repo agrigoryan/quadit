@@ -10,6 +10,7 @@ import (
 )
 
 func TestTheTakerOfATaskWatchesIt(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		a := w.agent("alpha")

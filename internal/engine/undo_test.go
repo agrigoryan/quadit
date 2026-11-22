@@ -29,6 +29,7 @@ func (w *world) undo(userID, undone, typ string, args any) *engine.Result {
 // a moment ago takes the unread inbox items of that change out again and
 // makes none of its own.
 func TestUndoTakesItsNewsBack(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		artist := w.agent("artist")

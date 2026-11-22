@@ -14,6 +14,7 @@ import (
 // and following is recorded in the project of what is followed, so a
 // token kept to other projects is not told of it.
 func TestAMemberWatchesOnlyWhatTheyMaySee(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

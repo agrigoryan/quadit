@@ -16,6 +16,7 @@ import (
 )
 
 func TestGuardRails(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
@@ -73,6 +74,7 @@ func TestGuardRails(t *testing.T) {
 // TestAskedBy checks that work a member gives to an agent runs with that
 // member's access, without the agent having to say whom it works for.
 func TestAskedBy(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
@@ -134,6 +136,7 @@ func TestAskedBy(t *testing.T) {
 // TestBatchSeesItsOwnWrites checks that what a batch remembers of statuses,
 // labels and members never hides what an earlier change of the same batch did.
 func TestBatchSeesItsOwnWrites(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -178,6 +181,7 @@ func TestBatchSeesItsOwnWrites(t *testing.T) {
 // TestNewAgentsAskFirst checks the default: a new agent needs approval for
 // what cannot be taken back or reaches outside, unless its maker says not.
 func TestNewAgentsAskFirst(t *testing.T) {
+	t.Parallel()
 	for _, typ := range engine.AsksFirst {
 		if !slices.Contains(engine.ChangeTypes(), typ) {
 			t.Errorf("%s is not a change type", typ)
@@ -202,6 +206,7 @@ func TestNewAgentsAskFirst(t *testing.T) {
 // At a limit the hand-off is refused, and handing the task to a person
 // still works.
 func TestHandoffLimits(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

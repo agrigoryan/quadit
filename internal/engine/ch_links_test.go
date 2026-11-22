@@ -10,6 +10,7 @@ import (
 )
 
 func TestALinkSetWithoutAnIDAnswersWithItsID(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -33,6 +34,7 @@ func TestALinkSetWithoutAnIDAnswersWithItsID(t *testing.T) {
 // task's context pack lists the page. Removing the link takes the reference
 // away. A page the actor may not see cannot be linked.
 func TestAPageLinkedToATaskIsAReference(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		me := w.owner.ID

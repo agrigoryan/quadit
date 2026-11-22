@@ -13,6 +13,7 @@ import (
 // its arguments in: a request wrong in many ways is told about the first,
 // and once that is put right, about the next.
 func TestTaskCreateNamesTheFirstThingWrong(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -55,6 +56,7 @@ func TestTaskCreateNamesTheFirstThingWrong(t *testing.T) {
 // TestATakenNumberAndAnIDInUseSayWhichTheyAre: two refusals with the code
 // conflict give a reason a caller can act on without reading the message.
 func TestATakenNumberAndAnIDInUseSayWhichTheyAre(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

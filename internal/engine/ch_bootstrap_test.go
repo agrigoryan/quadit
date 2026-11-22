@@ -17,6 +17,7 @@ import (
 // as many as are made; an address that is given must be one, and finds the
 // account that has it.
 func TestBootstrapMakesAnOwnerWithNoEmail(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		ctx := context.Background()
 		e := engine.New(st, nil)

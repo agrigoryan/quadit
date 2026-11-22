@@ -13,6 +13,7 @@ import (
 )
 
 func TestCycleRestore(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()

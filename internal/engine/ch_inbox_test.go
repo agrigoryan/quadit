@@ -11,6 +11,7 @@ import (
 )
 
 func TestInboxItemTakenOutCanBePutBack(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		artist := w.agent("artist")

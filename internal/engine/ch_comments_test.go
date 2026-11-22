@@ -16,6 +16,7 @@ import (
 // TestEditedCommentIsFoundByItsNewText: search knows a comment by the text
 // it has now, on a task and on a page alike.
 func TestEditedCommentIsFoundByItsNewText(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -61,6 +62,7 @@ func TestEditedCommentIsFoundByItsNewText(t *testing.T) {
 // told of a reply in it as a reply, not only the one who started it, on a
 // page and on a task alike. The one who asked in a reply hears the answer.
 func TestAReplyReachesEveryoneInTheThread(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -99,6 +101,7 @@ func TestAReplyReachesEveryoneInTheThread(t *testing.T) {
 // TestAThreadIsResolvedThroughAnyOfItsComments: resolving or opening again
 // asked of a reply is done to its thread, which its first comment carries.
 func TestAThreadIsResolvedThroughAnyOfItsComments(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		page := w.do(w.owner.ID, "doc.create", M{"title": "Art notes"}).Ref
@@ -127,6 +130,7 @@ func TestAThreadIsResolvedThroughAnyOfItsComments(t *testing.T) {
 // thread leaves the replies as the thread, on what it was on: the first
 // reply heads it, with the thread's resolved state, and the rest answer it.
 func TestAThreadOutlivesItsFirstComment(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		page := w.do(w.owner.ID, "doc.create", M{"title": "Art notes", "markdown": "The ring is thin.\n"}).Ref
@@ -168,6 +172,7 @@ func TestAThreadOutlivesItsFirstComment(t *testing.T) {
 // its threads, and they can still be answered; only a new thread needs the
 // block to be there.
 func TestAThreadGoesOnAfterItsBlockIsGone(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		page := w.do(w.owner.ID, "doc.create", M{"title": "Draft", "markdown": "Cut this.\n"}).Ref
@@ -196,6 +201,7 @@ func TestAThreadGoesOnAfterItsBlockIsGone(t *testing.T) {
 // not, so that a page one cannot see is never quoted, answered or told of
 // through one they can.
 func TestACommentIsOnlyOnThePageItNames(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -237,6 +243,7 @@ func TestACommentIsOnlyOnThePageItNames(t *testing.T) {
 // agent the task only waits on, an assignee who stopped following), but
 // never its own author.
 func TestACommentReachesWhomTheTaskIsWith(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		coder := w.agent("coder")
@@ -283,6 +290,7 @@ func TestACommentReachesWhomTheTaskIsWith(t *testing.T) {
 // about is cut at 200 characters, not bytes, so a line in Chinese is as
 // long as one in English.
 func TestAnInboxItemsWordsAreCutByCharacters(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		coder := w.agent("coder")

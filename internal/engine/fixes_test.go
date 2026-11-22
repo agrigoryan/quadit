@@ -30,6 +30,7 @@ func (w *world) sameRefusal(code, userID, typ string, args any) string {
 }
 
 func TestViewWithTwoWrongPeopleIsAlwaysToldTheSame(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		got := w.sameRefusal(engine.CodeInvalid, w.owner.ID, "view.create", M{"name": "Mine",
@@ -42,6 +43,7 @@ func TestViewWithTwoWrongPeopleIsAlwaysToldTheSame(t *testing.T) {
 }
 
 func TestRowWithTwoWrongValuesIsAlwaysToldTheSame(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		db := w.do(w.owner.ID, "doc.create", M{"title": "Sprites", "kind": "database"}).Ref
@@ -55,6 +57,7 @@ func TestRowWithTwoWrongValuesIsAlwaysToldTheSame(t *testing.T) {
 }
 
 func TestStaleUpdateListsTheChangedFieldsInOneOrder(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -69,6 +72,7 @@ func TestStaleUpdateListsTheChangedFieldsInOneOrder(t *testing.T) {
 // A change that would break a uniqueness rule names the value asked for,
 // the same as when the thing is created with it.
 func TestTakenUpdateNamesTheValue(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "ALP", "name": "Alpha"})

@@ -71,10 +71,13 @@ func count(t *testing.T, w *world, conds ...store.Cond) int {
 // cycle away, emptying the trash) change every task of the set, however
 // many there are.
 func TestAChangeToManyTasksReachesEveryOne(t *testing.T) {
-	testdb.Each(t, func(t *testing.T, st store.Store) {
-		ctx := context.Background()
-
-		t.Run("a project's new key reaches every task, the trash included", func(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	// Each case has databases of its own and runs beside the others:
+	// writing thousands of tasks takes a while.
+	t.Run("a project's new key reaches every task, the trash included", func(t *testing.T) {
+		t.Parallel()
+		testdb.Each(t, func(t *testing.T, st store.Store) {
 			w := newWorld(t, st)
 			w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 			addTasks(t, w, "SVA", manyTasks+3, func(i int, task *core.Task) {
@@ -90,8 +93,11 @@ func TestAChangeToManyTasksReachesEveryOne(t *testing.T) {
 				t.Fatalf("the last task is %+v", got)
 			}
 		})
+	})
 
-		t.Run("deleting a status moves every task off it, the trash included", func(t *testing.T) {
+	t.Run("deleting a status moves every task off it, the trash included", func(t *testing.T) {
+		t.Parallel()
+		testdb.Each(t, func(t *testing.T, st store.Store) {
 			w := newWorld(t, st)
 			w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 			addTasks(t, w, "SVA", manyTasks+3, func(i int, task *core.Task) {
@@ -108,8 +114,11 @@ func TestAChangeToManyTasksReachesEveryOne(t *testing.T) {
 				t.Fatalf("%d tasks kept the deleted status", left)
 			}
 		})
+	})
 
-		t.Run("deleting a label takes it off every task", func(t *testing.T) {
+	t.Run("deleting a label takes it off every task", func(t *testing.T) {
+		t.Parallel()
+		testdb.Each(t, func(t *testing.T, st store.Store) {
 			w := newWorld(t, st)
 			w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 			label := w.do(w.owner.ID, "label.create", M{"name": "art", "project": "SVA"}).Ref
@@ -119,8 +128,11 @@ func TestAChangeToManyTasksReachesEveryOne(t *testing.T) {
 				t.Fatalf("%d tasks kept the deleted label (%v)", left, err)
 			}
 		})
+	})
 
-		t.Run("an ended cycle passes every unfinished task on", func(t *testing.T) {
+	t.Run("an ended cycle passes every unfinished task on", func(t *testing.T) {
+		t.Parallel()
+		testdb.Each(t, func(t *testing.T, st store.Store) {
 			w := newWorld(t, st)
 			w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien", "settings": M{"cycles": true, "cycle_days": 7}})
 			ended := w.do(w.owner.ID, "cycle.create", M{"project": "SVA", "starts_on": "2020-01-01", "ends_on": "2020-01-07"}).Ref
@@ -136,8 +148,11 @@ func TestAChangeToManyTasksReachesEveryOne(t *testing.T) {
 				t.Fatalf("the ended cycle is %+v (%v)", cy, err)
 			}
 		})
+	})
 
-		t.Run("emptying the trash empties it of every task", func(t *testing.T) {
+	t.Run("emptying the trash empties it of every task", func(t *testing.T) {
+		t.Parallel()
+		testdb.Each(t, func(t *testing.T, st store.Store) {
 			w := newWorld(t, st)
 			w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 			addTasks(t, w, "SVA", manyTasks, func(_ int, task *core.Task) { task.DeletedAt = 1 })

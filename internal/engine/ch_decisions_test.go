@@ -20,6 +20,7 @@ import (
 // and, when it is used, reaching what it touches, through the membership
 // and the credential they answered with.
 func TestAnApprovalIsGivenByOneWhoCouldMakeTheChange(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()

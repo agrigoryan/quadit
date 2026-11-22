@@ -30,6 +30,7 @@ import (
 // spacing, so there the comparison is of the decoded JSON with every id made
 // alike.
 func TestEventPayloads(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		evs, _ := eventScenario(t, st, false)
 		got := numbered(evs)
@@ -89,6 +90,7 @@ func jsonbForm(t *testing.T, line string) string {
 // lost the mark would. The engine sets the mark on the one type every event's
 // data is, so no event can be written without it.
 func TestQuietEveryEvent(t *testing.T) {
+	t.Parallel()
 	evs, quiet := eventScenario(t, testdb.SQLite(t), true)
 	n := 0
 	for _, ev := range evs {

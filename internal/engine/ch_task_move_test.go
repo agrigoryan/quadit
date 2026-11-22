@@ -13,6 +13,7 @@ import (
 // before takes the number it had there, so undoing a move leaves no third
 // key; the key it leaves still finds it.
 func TestTaskMovedBackGetsItsKeyBack(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		for _, key := range []string{"SVA", "OPS", "ART"} {

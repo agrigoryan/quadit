@@ -14,6 +14,7 @@ import (
 // the page's state like any other, so it moves the feed and says so, and
 // the version is numbered by the event that tells of it.
 func TestKeepingAVersionIsInTheFeed(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()

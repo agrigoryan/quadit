@@ -18,6 +18,7 @@ import (
 // credential limited to some projects is limited to those projects, and
 // such a credential cannot make an owner, who reaches every project.
 func TestNobodyAddsAMemberWhoReachesFurtherThanThey(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
@@ -58,6 +59,7 @@ func TestNobodyAddsAMemberWhoReachesFurtherThanThey(t *testing.T) {
 // each get a tint of their own, in the palette's order; once all are taken
 // the one used least comes next, and a removed member's tint is free again.
 func TestANewMemberGetsTheTintUsedLeast(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		tints := []int{w.member(w.owner.ID).Tint}
@@ -82,6 +84,7 @@ func TestANewMemberGetsTheTintUsedLeast(t *testing.T) {
 // TestAPersonWhoComesBackKeepsTheirTint: someone removed and added again
 // is drawn as before.
 func TestAPersonWhoComesBackKeepsTheirTint(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		u := core.User{ID: id.New(), Kind: core.KindPerson, Name: "Bea", Email: "bea-" + id.New() + "@example.com", CreatedAt: 1, UpdatedAt: 1}

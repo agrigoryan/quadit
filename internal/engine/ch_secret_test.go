@@ -12,6 +12,7 @@ import (
 // TestASecretIsNeverStoredPlain: an engine made without a way to seal
 // secrets refuses to keep one, rather than keep it as it was sent.
 func TestASecretIsNeverStoredPlain(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

@@ -59,6 +59,7 @@ func plainContent(text string) json.RawMessage {
 // of the block. The words are found by themselves, or checked against
 // where the caller says they are, and may run over several blocks.
 func TestAThreadOnWordsMarksThem(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		page := w.do(w.owner.ID, "doc.create", M{"title": "Boss", "markdown": "The boss has three phases.\n\nThen it runs, and a cat and a cat.\n"}).Ref
@@ -141,6 +142,7 @@ func TestAThreadOnWordsMarksThem(t *testing.T) {
 // stays open, on the page as a whole with its quote, and the edit says so.
 // An edit that brings the marker back puts the thread on its words again.
 func TestAnEditKeepsTheMarkers(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		start := func(t *testing.T) (page, block, thread string) {
@@ -269,6 +271,7 @@ func TestAnEditKeepsTheMarkers(t *testing.T) {
 // same words that were in that block already; words that were only taken
 // out detach the thread even when another block the edit changed has them.
 func TestMovedWordsTakeTheMarkerWhereTheyWent(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		start := func(t *testing.T) (page, from, to, thread string) {
@@ -323,6 +326,7 @@ func TestMovedWordsTakeTheMarkerWhereTheyWent(t *testing.T) {
 // thread, with or without the marker. Of two threads on the same words,
 // taking out the words only one of them was on detaches that one alone.
 func TestThreadsThroughSplitsAndMerges(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		start := func(t *testing.T) (page, block, next string) {
@@ -414,6 +418,7 @@ func TestThreadsThroughSplitsAndMerges(t *testing.T) {
 // which stays resolved; a span naming a thread of another page is dropped,
 // and that thread stays where it is.
 func TestASpanPlacesOnlyThisPagesThreads(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		page := w.do(w.owner.ID, "doc.create", M{"title": "Boss", "markdown": "The boss has three phases.\n"}).Ref

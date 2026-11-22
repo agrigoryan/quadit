@@ -10,6 +10,7 @@ import (
 )
 
 func TestARelationAddedWithoutAnIDAnswersWithItsID(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -27,6 +28,7 @@ func TestARelationAddedWithoutAnIDAnswersWithItsID(t *testing.T) {
 // there already changes nothing and answers with its id, whichever side
 // adds it.
 func TestARelationAddedAgainAnswersWithTheOneThere(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

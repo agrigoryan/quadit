@@ -15,6 +15,7 @@ import (
 // that is not in the view's project are each refused, and say what would
 // have been accepted.
 func TestViewQueryIsReadByTheEngine(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -50,6 +51,7 @@ func TestViewQueryIsReadByTheEngine(t *testing.T) {
 }
 
 func TestNearestIgnoresCaseAndGivesUpWhenFarOff(t *testing.T) {
+	t.Parallel()
 	allowed := []string{"assignee", "status", "label"}
 	for got, want := range map[string]string{
 		"asignee":  "assignee", // one letter short

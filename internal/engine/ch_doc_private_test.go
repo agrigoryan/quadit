@@ -37,6 +37,7 @@ func (w *world) searchFinds(viewer, text, docID string) bool {
 // purpose keeps them. A page moved under a private page takes its readers;
 // one moved out stays private.
 func TestPrivacyReachesTheSubPages(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		me := w.owner.ID
@@ -203,6 +204,7 @@ func TestPrivacyReachesTheSubPages(t *testing.T) {
 // their changes on a private page are told only to those who may see it,
 // and someone else cannot put a file on it.
 func TestWhatHappensOnAPrivatePageIsToldToItsReaders(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		ctx := context.Background()
@@ -246,6 +248,7 @@ func TestWhatHappensOnAPrivatePageIsToldToItsReaders(t *testing.T) {
 // then it has the readers it was given, its maker and those named, and not
 // those of the page above as well.
 func TestAPageMadePrivateUnderASharedPageHasTheReadersGiven(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		me := w.owner.ID
@@ -271,6 +274,7 @@ func TestAPageMadePrivateUnderASharedPageHasTheReadersGiven(t *testing.T) {
 // shared with may edit it, but not take it out of private, share it with
 // more people or take people off; its owner may.
 func TestOnlyTheOwnerChangesWhoSeesAPrivatePage(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		me := w.owner.ID

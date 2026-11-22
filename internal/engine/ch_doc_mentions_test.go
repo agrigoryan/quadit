@@ -16,6 +16,7 @@ import (
 // does what one does: the page references the member, who is told. Writing
 // the same Markdown again changes no block.
 func TestMarkdownMentionsInAPageAreMentions(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		w := newWorld(t, st)
 		bea := w.agent("bea")
