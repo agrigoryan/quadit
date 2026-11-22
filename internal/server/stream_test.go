@@ -234,8 +234,12 @@ func TestTwoServersOneDatabase(t *testing.T) {
 		srvB := server.New(ctx, server.Config{DataDir: t.TempDir(), BaseURL: a.url, Version: "test"}, st, files, sealer)
 		hs.Config.Handler = srvB.Handler()
 		hs.Start()
-		go srvB.Run(ctx)
-		t.Cleanup(func() { stop(); hs.Close() })
+		ran := make(chan struct{})
+		go func() {
+			defer close(ran)
+			srvB.Run(ctx)
+		}()
+		t.Cleanup(func() { stop(); <-ran; hs.Close() })
 		b := &site{url: hs.URL, owner: a.owner, srv: srvB}
 
 		a.change(t, a.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -243,12 +247,24 @@ func TestTwoServersOneDatabase(t *testing.T) {
 		a.change(t, a.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 		var tok struct{ Token string }
 		a.call(t, a.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
-		time.Sleep(500 * time.Millisecond) // let the second server start listening
 
-		// A stream held by B hears a write taken by A well inside the 25
-		// seconds its own heartbeat would take.
+		// B hears of A's writes once its listener is up, which nothing
+		// announces: A writes until a stream held by B carries one.
 		sm := b.stream(t, tok.Token)
-		time.Sleep(300 * time.Millisecond)
+		probes := 0
+		eventually(t, "the other server to start hearing the first one", func() bool {
+			probes++
+			said := fmt.Sprintf("probe %d", probes)
+			a.change(t, a.owner, "", "comment.create", M{"task": "SVA-1", "body": said})
+			for wait := time.Now().Add(time.Second); time.Now().Before(wait); time.Sleep(20 * time.Millisecond) {
+				if strings.Contains(sm.all(), said) {
+					return true
+				}
+			}
+			return false
+		})
+		// Then a write taken by A reaches the stream well inside the 25
+		// seconds its own heartbeat would take.
 		start := time.Now()
 		a.change(t, a.owner, "", "comment.create", M{"task": "SVA-1", "body": "said through the other server"})
 		eventually(t, "the other server's stream to carry the comment", func() bool { return strings.Contains(sm.all(), "said through the other server") })
