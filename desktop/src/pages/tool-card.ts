@@ -308,7 +308,11 @@ export class ToolCard {
     const { self } = this;
     // What is drawn from: of what the app does by itself, only what this state shows.
     const shown =
-      stands === "waiting" ? (self?.proving ?? null) : stands === "found" ? null : (self?.answering ?? "none");
+      stands === "waiting"
+        ? (self?.proving ?? null)
+        : stands === "found"
+          ? null
+          : [self?.answering ?? "none", self?.why ?? null, self?.missed ?? null];
     const drawn = JSON.stringify([stands, handshake, shown]);
     if (drawn === this.drawn) return;
     this.drawn = drawn;
@@ -345,9 +349,9 @@ export class ToolCard {
 
   /**
    * Whether it answers by itself while the app is open (desktop contract
-   * §11, third amendment), with Pause or Resume; for another server's tool
-   * not turned on, the button that turns it on; nothing where the app
-   * cannot run it.
+   * §11, third amendment), with Pause or Resume, and an item it could not
+   * answer; nothing where the app does not run it (another server's tool,
+   * one it could not prove, another on the same login).
    */
   private answering(): HTMLElement[] {
     const { name } = this.tool;
@@ -360,27 +364,35 @@ export class ToolCard {
       row.append(make("span", text), control);
       return row;
     };
+    const resume = () => choose("Resume", true, `Resume ${name} answering by itself`);
     switch (this.self?.answering) {
-      case "on":
-        return [
-          line("Answers by itself while Quadit is open", choose("Pause", false, `Pause ${name} answering by itself`)),
-        ];
+      case "on": {
+        const on = line(
+          "Answers by itself while Quadit is open",
+          choose("Pause", false, `Pause ${name} answering by itself`),
+        );
+        const missed = this.self.missed;
+        if (!missed) return [on];
+        // An item it could not answer: said quietly, until it answers the next.
+        const log = button(
+          "Show log",
+          () => void api.showToolLog(this.tool.id),
+          "link-blue",
+          `Show the log of what Quadit ran for ${name}`,
+        );
+        return [on, line(`It could not answer one item (${missed}).`, log)];
+      }
       case "paused":
-        return [
-          line(
-            `Paused. It answers when you ask it in ${name}.`,
-            choose("Resume", true, `Resume ${name} answering by itself`),
-          ),
-        ];
+        return [line(`Paused. It answers when you ask it in ${name}.`, resume())];
       case "guarded":
+        return [line("Paused: it was started more than six times in a minute. Resume when you have looked.", resume())];
+      case "stuck":
         return [
           line(
-            "Paused: it was started six times in a minute. Resume when you have looked.",
-            choose("Resume", true, `Resume ${name} answering by itself`),
+            `Paused: Quadit could not run ${name} (${this.self.why ?? "it stopped"}). Resume when it works again.`,
+            resume(),
           ),
         ];
-      case "off":
-        return [choose("Answer by itself", true, `Let ${name} answer by itself`)];
       default:
         return [];
     }

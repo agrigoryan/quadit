@@ -205,10 +205,19 @@ test("a card says what the app does by itself: Connecting, why it could not, and
   await card.getByRole("button", { name: "Resume Claude Code answering by itself" }).click();
   await expect(card.getByText("Answers by itself while Quadit is open")).toBeVisible();
 
+  await set({ self: { proving: null, answering: "on", missed: "it took too long" } });
+  await expect(card.getByText("It could not answer one item (it took too long).")).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByRole("button", { name: "Show the log of what Quadit ran for Claude Code" })).toBeVisible();
   await set({ self: { proving: null, answering: "guarded" } });
   await expect(
-    card.getByText("Paused: it was started six times in a minute. Resume when you have looked."),
+    card.getByText("Paused: it was started more than six times in a minute. Resume when you have looked."),
   ).toBeVisible({ timeout: 10_000 });
-  await set({ self: { proving: null, answering: "off" } });
-  await expect(card.getByRole("button", { name: "Let Claude Code answer by itself" })).toBeVisible({ timeout: 10_000 });
+  await set({ self: { proving: null, answering: "stuck", why: "it could not be started" } });
+  await expect(
+    card.getByText("Paused: Quadit could not run Claude Code (it could not be started). Resume when it works again."),
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByRole("button", { name: "Resume Claude Code answering by itself" })).toBeVisible();
+  // A tool the app does not run says nothing of answering.
+  await set({ self: { proving: null, answering: "none" } });
+  await expect(card.getByText(/answer/i)).toHaveCount(0, { timeout: 10_000 });
 });

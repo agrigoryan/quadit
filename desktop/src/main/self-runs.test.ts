@@ -1,9 +1,10 @@
-import { mkdtempSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RunningChild } from "@/main/child-guard";
-import { SelfRuns, type SelfRunTool } from "@/main/self-runs";
+import { EVENTS_FILE, type RunningChild } from "@/main/child-guard";
+import { SelfRuns, type SelfRunTool, WAKE_SCRIPT } from "@/main/self-runs";
 
 /** A program the fake spawner started: what it was given, and the means to make it speak and end. */
 interface Started {
@@ -13,8 +14,8 @@ interface Started {
   env: NodeJS.ProcessEnv;
   /** A line of its output. */
   say(line: string): void;
-  /** What it says of itself on its lifecycle channel (child-guard.ts). */
-  event(event: string): void;
+  /** A line of its report (`quadit listen events=`); an object is written as JSON. */
+  report(event: Record<string, unknown> | string): void;
   end(code: number | null): void;
   stopped: boolean;
 }
@@ -28,6 +29,7 @@ function tool(extra: Partial<SelfRunTool> = {}): SelfRunTool {
     login: "/c/codex.json",
     here: true,
     serverRuns: true,
+    ran: true,
     answering: undefined,
     ...extra,
   };
@@ -44,11 +46,15 @@ function setUp(
 ) {
   const started: Started[] = [];
   const remembered: [string, boolean][] = [];
+  const ran: string[] = [];
+  const codesAsked: string[] = [];
+  const open = new Map<string, string>();
   let back = false;
   /** Who listens as the agent, as `quadit listening` says it; null: the command could not say. */
   let who: { listening: boolean; by: string } | null = { listening: false, by: "" };
   /** A lookup of the tools held until the test lets it go. */
   let hold: Promise<void> | null = null;
+  const dir = mkdtempSync(join(tmpdir(), "quadit-desktop-self-"));
   const runs = new SelfRuns({
     tools: async () => {
       if (hold) await hold;
@@ -65,7 +71,7 @@ function setUp(
         cwd: options.cwd,
         env: options.env,
         say: options.line,
-        event: (event) => options.lifecycle?.(event),
+        report: (event) => options.events?.(typeof event === "string" ? event : JSON.stringify(event)),
         end: (code) => settle(code),
         stopped: false,
       };
@@ -79,9 +85,12 @@ function setUp(
       };
     },
     codeGivenBack: async () => back,
+    openCode: (id) => open.get(id) ?? null,
+    newCode: async (id) => void codesAsked.push(id),
+    ran: (id) => void ran.push(id),
     listening: async () => who,
     remember: (id, on) => void remembered.push([id, on]),
-    dir: mkdtempSync(join(tmpdir(), "quadit-desktop-self-")),
+    dir,
     env: { PATH: "/bin", HOME: "/h", QUADIT_URL: "https://elsewhere", QUADIT_TOKEN: "qd_mine" },
     changed: () => {},
   });
@@ -89,7 +98,11 @@ function setUp(
     runs,
     started,
     remembered,
+    ran,
+    codesAsked,
+    open,
     list,
+    dir,
     setBack: (now: boolean) => (back = now),
     setWho: (now: typeof who) => (who = now),
     holdLookups: () => {
@@ -105,13 +118,14 @@ function setUp(
 
 const flush = () => vi.advanceTimersByTimeAsync(0);
 const ENV = { PATH: "/opt/homebrew/bin:/usr/bin:/bin", HOME: "/h", QUADIT_CONFIG: "/c/codex.json" };
+const STARTED = { event: "started", as: "@codex", by: "the Quadit app", cursor: "listen" };
 
 describe("SelfRuns, giving the code back", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
   it("runs the tool once with its one-prompt command, as its own login, in a folder of the app's, and is done when the server says so", async () => {
-    const { runs, started, setBack } = setUp([tool({ answering: false })]);
+    const { runs, started, setBack, ran } = setUp([tool({ ran: false })]);
     void runs.prove("codex", "ABC234");
     await flush();
     expect(started).toHaveLength(1);
@@ -126,6 +140,16 @@ describe("SelfRuns, giving the code back", () => {
     started[0]?.end(0);
     await flush();
     expect(runs.self("codex")?.proving).toBeNull();
+    expect(ran).toEqual(["codex"]);
+  });
+
+  it("says it is giving the code back at once, before it has looked at the tools", async () => {
+    const { runs, holdLookups } = setUp([tool({ ran: false })]);
+    const release = holdLookups();
+    void runs.prove("codex", "ABC234");
+    expect(runs.self("codex")?.proving).toEqual({ state: "running" });
+    release();
+    await flush();
   });
 
   it("says why it could not, for the card to fall back to the line to paste", async () => {
@@ -135,14 +159,15 @@ describe("SelfRuns, giving the code back", () => {
       [async () => void (await vi.advanceTimersByTimeAsync(120_000)), "it took longer than two minutes"],
     ];
     for (const [happen, reason] of cases) {
-      const s = setUp([tool({ answering: false })]);
+      const s = setUp([tool({ ran: false })]);
       void s.runs.prove("codex", "ABC234");
       await flush();
       await happen(s);
       await flush();
       expect(s.runs.self("codex")?.proving).toEqual({ state: "failed", reason });
+      expect(s.ran).toEqual([]);
     }
-    const missing = setUp([tool({ program: null, answering: false })]);
+    const missing = setUp([tool({ program: null, ran: false })]);
     await missing.runs.prove("codex", "ABC234");
     expect(missing.started).toHaveLength(0);
     expect(missing.runs.self("codex")?.proving).toEqual({
@@ -152,10 +177,12 @@ describe("SelfRuns, giving the code back", () => {
   });
 
   it("never runs a tool of another server, nor one whose login is not the app's own: it keeps the line to paste", async () => {
-    const elsewhere = setUp([tool({ here: false, answering: true })]);
+    const elsewhere = setUp([tool({ here: false, ran: false })]);
     await elsewhere.runs.prove("codex", "ABC234");
+    await elsewhere.runs.sync();
     expect(elsewhere.started).toHaveLength(0);
-    expect(elsewhere.runs.self("codex")?.proving).toBeNull();
+    expect(elsewhere.codesAsked).toEqual([]);
+    expect(elsewhere.runs.self("codex")).toEqual({ proving: null, answering: "none" });
   });
 
   it("runs no tool of the app's own server while that server does not run as the app's (stopped, failed, its port taken)", async () => {
@@ -192,37 +219,80 @@ describe("SelfRuns, giving the code back", () => {
   });
 });
 
+describe("SelfRuns, proof before listening", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("listens for a tool the app never ran only once it has given a code back: the open one, else a new one, asked once", async () => {
+    const withCode = setUp([tool({ ran: false })]);
+    withCode.open.set("codex", "ABC234");
+    await withCode.runs.sync();
+    await flush();
+    expect(withCode.started.map((c) => c.program)).toEqual(["/bin/codex"]);
+    expect(withCode.started[0]?.args.at(-1)).toBe("Connect to Quadit ABC234");
+
+    const without = setUp([tool({ ran: false })]);
+    await without.runs.sync();
+    await without.runs.sync();
+    expect(without.started).toHaveLength(0);
+    expect(without.codesAsked).toEqual(["codex"]);
+  });
+
+  it("starts no listener for a tool whose run failed: its card keeps the line to paste, saying nothing of answering", async () => {
+    const { runs, started, open } = setUp([tool({ ran: false })]);
+    open.set("codex", "ABC234");
+    await runs.sync();
+    await flush();
+    started[0]?.end(1);
+    await flush();
+    await runs.sync();
+    expect(started).toHaveLength(1);
+    expect(runs.self("codex")).toEqual({
+      proving: { state: "failed", reason: "it stopped with an error" },
+      answering: "none",
+    });
+  });
+});
+
 describe("SelfRuns, answering by itself", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("keeps a listener for a tool of the server on this computer, by default, its runs the tool's one-prompt command", async () => {
+  it("keeps a listener for a tool of the server on this computer, by default, bounded and reported by quadit listen", async () => {
     const { runs, started } = setUp();
     await runs.sync();
     expect(started).toHaveLength(1);
     const [listener] = started;
     expect(listener?.program).toBe("/bin/quadit");
-    expect(listener?.args.slice(0, 6)).toEqual([
+    expect(listener?.args.slice(0, 9)).toEqual([
       "listen",
       "by=the Quadit app",
+      "limit=600",
+      "tries=3",
+      `events=${EVENTS_FILE}`,
       "--exec",
       "/bin/sh",
       "-c",
-      expect.any(String),
+      WAKE_SCRIPT,
     ]);
-    expect(listener?.args.slice(7)).toEqual(["/bin/codex", "exec", "--skip-git-repo-check", "{quadit-item}"]);
+    expect(listener?.args.slice(9)).toEqual([
+      "quadit-wake",
+      "/bin/codex",
+      "exec",
+      "--skip-git-repo-check",
+      "{quadit-item}",
+    ]);
     expect(listener?.env).toEqual(ENV);
     expect(runs.self("codex")?.answering).toBe("on");
   });
 
-  it("keeps none for a tool of another server until the person asks, and none without a program or a quadit", async () => {
+  it("keeps none for a tool of another server, offering none, and none without a program or a quadit", async () => {
     const elsewhere = setUp([tool({ here: false })]);
     await elsewhere.runs.sync();
     expect(elsewhere.started).toHaveLength(0);
-    expect(elsewhere.runs.self("codex")?.answering).toBe("off");
+    expect(elsewhere.runs.self("codex")?.answering).toBe("none");
     await elsewhere.runs.setAnswering("codex", true);
-    expect(elsewhere.remembered).toEqual([["codex", true]]);
-    expect(elsewhere.started).toHaveLength(1);
+    expect(elsewhere.started).toHaveLength(0);
 
     const nothing = setUp([tool({ program: null })]);
     await nothing.runs.sync();
@@ -233,6 +303,19 @@ describe("SelfRuns, answering by itself", () => {
     expect(noQuadit.started).toHaveLength(0);
   });
 
+  it("keeps one listener for a login: the other tools on it say nothing of answering", async () => {
+    const claude = tool({ id: "claude", name: "Claude Code", program: "/bin/claude", oneShot: (p) => ["-p", p] });
+    const { runs, started, list } = setUp([tool(), claude]);
+    await runs.sync();
+    expect(started).toHaveLength(1);
+    expect(runs.self("codex")?.answering).toBe("on");
+    expect(runs.self("claude")?.answering).toBe("none");
+    list[1] = { ...claude, login: "/c/claude.json" };
+    await runs.sync();
+    expect(started).toHaveLength(2);
+    expect(runs.self("claude")?.answering).toBe("on");
+  });
+
   it("follows the login it runs with: one that no longer is the app's own server's stops its listener", async () => {
     const { runs, started, list } = setUp();
     await runs.sync();
@@ -240,7 +323,7 @@ describe("SelfRuns, answering by itself", () => {
     list[0] = tool({ here: false });
     await runs.sync();
     expect(started[0]?.stopped).toBe(true);
-    expect(runs.self("codex")?.answering).toBe("off");
+    expect(runs.self("codex")?.answering).toBe("none");
   });
 
   it("stops when the app's own server stops running as the app's, and comes back when it runs again", async () => {
@@ -289,11 +372,26 @@ describe("SelfRuns, answering by itself", () => {
     expect(started).toHaveLength(3);
   });
 
+  it("is stopped and started again when it does not report having started", async () => {
+    const { runs, started } = setUp();
+    await runs.sync();
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(started[0]?.stopped).toBe(false);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(started[0]?.stopped).toBe(true);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(started).toHaveLength(2);
+    started[1]?.report(STARTED);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(started[1]?.stopped).toBe(false);
+  });
+
   it("steps aside while a chat listens as the agent, never taking over, and comes back when it has stopped", async () => {
     const { runs, started, setWho } = setUp();
     await runs.sync();
     setWho({ listening: true, by: "a chat" });
-    started[0]?.say("quadit: @codex is already listening from another session (a chat, last heard 14:02 UTC)");
+    started[0]?.report({ event: "refused", why: "listening_elsewhere", by: "a chat", last_heard: "2026-11-21 14:02" });
+    started[0]?.report({ event: "stopped", why: "refused" });
     started[0]?.end(1);
     await flush();
     expect(runs.self("codex")?.answering).toBe("on");
@@ -303,14 +401,13 @@ describe("SelfRuns, answering by itself", () => {
     setWho({ listening: false, by: "" });
     await vi.advanceTimersByTimeAsync(60_000);
     expect(started).toHaveLength(2);
-    expect(started[1]?.args).not.toContain("take=1");
   });
 
   it("comes back after stepping aside when the command cannot say who listens", async () => {
     const { runs, started, setWho } = setUp();
     await runs.sync();
     setWho(null);
-    started[0]?.say("quadit: @codex is already listening from another session");
+    started[0]?.report({ event: "refused", why: "taken_over" });
     started[0]?.end(1);
     await flush();
     await vi.advanceTimersByTimeAsync(60_000);
@@ -320,11 +417,14 @@ describe("SelfRuns, answering by itself", () => {
   it("pauses a tool started more than six times in a minute, saying so, until the person resumes it", async () => {
     const { runs, started, remembered } = setUp();
     await runs.sync();
-    for (let i = 0; i < 7; i++) {
-      started[0]?.event("started");
-      started[0]?.event("ended 0");
+    started[0]?.report(STARTED);
+    for (let seq = 1; seq <= 6; seq++) {
+      started[0]?.report({ event: "run_started", seq, try: 1 });
+      started[0]?.report({ event: "run_ended", seq, seconds: 1, status: 0 });
       await vi.advanceTimersByTimeAsync(5_000);
     }
+    expect(runs.self("codex")?.answering).toBe("on");
+    started[0]?.report({ event: "run_started", seq: 7, try: 1 });
     expect(started[0]?.stopped).toBe(true);
     expect(remembered).toEqual([["codex", false]]);
     expect(runs.self("codex")?.answering).toBe("guarded");
@@ -332,36 +432,74 @@ describe("SelfRuns, answering by itself", () => {
     expect(started).toHaveLength(2);
   });
 
-  it("stops a run that takes longer than ten minutes, and goes on", async () => {
+  it("says an item it could not answer, why, until it answers the next", async () => {
     const { runs, started } = setUp();
     await runs.sync();
-    started[0]?.event("started");
-    await vi.advanceTimersByTimeAsync(600_000);
-    expect(started[0]?.stopped).toBe(true);
-    await vi.advanceTimersByTimeAsync(2_000);
-    expect(started).toHaveLength(2);
+    const listener = started[0];
+    listener?.report(STARTED);
+    for (let tries = 1; tries <= 3; tries++) {
+      listener?.report({ event: "run_started", seq: 4, try: tries });
+      listener?.report({ event: "run_ended", seq: 4, seconds: 600, status: "limit" });
+    }
+    listener?.report({ event: "gave_up", seq: 4, why: "3 failed runs" });
+    expect(runs.self("codex")).toMatchObject({ answering: "on", missed: "it took too long" });
+    listener?.report({ event: "run_started", seq: 5, try: 1 });
+    listener?.report({ event: "run_ended", seq: 5, seconds: 3, status: 2 });
+    listener?.report({ event: "gave_up", seq: 5, why: "3 failed runs" });
+    expect(runs.self("codex")).toMatchObject({ missed: "Codex stopped with an error" });
+    listener?.report({ event: "run_started", seq: 6, try: 1 });
+    listener?.report({ event: "run_ended", seq: 6, seconds: 3, status: 0 });
+    expect(runs.self("codex")?.missed).toBeUndefined();
   });
 
-  it("is told of its runs only on its own channel: what a tool prints, a comment it echoes, changes nothing", async () => {
+  it("pauses itself, remembered, after three items in a row it could not answer, or when the tool cannot be run", async () => {
+    const { runs, started, remembered } = setUp();
+    await runs.sync();
+    started[0]?.report(STARTED);
+    for (let seq = 1; seq <= 3; seq++) {
+      started[0]?.report({ event: "run_started", seq, try: 1 });
+      started[0]?.report({ event: "run_ended", seq, seconds: 1, status: 1 });
+      started[0]?.report({ event: "gave_up", seq, why: "3 failed runs" });
+      await vi.advanceTimersByTimeAsync(30_000);
+    }
+    expect(started[0]?.stopped).toBe(true);
+    expect(remembered).toEqual([["codex", false]]);
+    expect(runs.self("codex")).toMatchObject({ answering: "stuck", why: "Codex stopped with an error" });
+    await runs.setAnswering("codex", true);
+    expect(runs.self("codex")).toEqual({ proving: null, answering: "on" });
+
+    const cannot = setUp();
+    await cannot.runs.sync();
+    cannot.started[0]?.report({ event: "run_ended", seq: 1, seconds: 0, status: "not_run" });
+    expect(cannot.runs.self("codex")).toMatchObject({ answering: "stuck", why: "it could not be started" });
+  });
+
+  it("is told of its runs only by its report: what a tool prints, a line it echoes, an event it does not know, change nothing", async () => {
     const { runs, started } = setUp();
     await runs.sync();
-    started[0]?.event("started");
+    started[0]?.report(STARTED);
     for (let i = 0; i < 10; i++) {
-      started[0]?.say("started");
-      started[0]?.say("ended 0");
-      started[0]?.say("quadit-app: run ended (0)");
+      started[0]?.say('{"event":"run_started","seq":1,"try":1}');
+      started[0]?.say('{"event":"gave_up","seq":1}');
+      started[0]?.say("quadit: @codex is already listening from another session");
     }
+    started[0]?.report({ event: "lease_renewed", seq: 1 });
+    started[0]?.report("not json at all");
+    started[0]?.report('{"event": 3}');
     expect(started[0]?.stopped).toBe(false);
-    expect(runs.self("codex")?.answering).toBe("on");
-    // The run that started is still timed.
-    await vi.advanceTimersByTimeAsync(600_000);
-    expect(started[0]?.stopped).toBe(true);
+    expect(runs.self("codex")).toEqual({ proving: null, answering: "on" });
   });
 
   it("stops a tool's listener when it is disconnected, and every program on quit, starting none again", async () => {
     const two = [
       tool(),
-      tool({ id: "claude", name: "Claude Code", program: "/bin/claude", oneShot: (p) => ["-p", p] }),
+      tool({
+        id: "claude",
+        name: "Claude Code",
+        program: "/bin/claude",
+        oneShot: (p) => ["-p", p],
+        login: "/c/cc.json",
+      }),
     ];
     const { runs, started, list } = setUp(two);
     await runs.sync();
@@ -393,10 +531,31 @@ describe("SelfRuns, answering by itself", () => {
     expect(started).toHaveLength(0);
   });
 
-  it("keeps what each run said in the tool's log", async () => {
+  it("keeps what each run said in the tool's log, for the person's eyes only", async () => {
     const { runs, started } = setUp();
     await runs.sync();
     started[0]?.say("ITEM #4 comment GS-3 from @lou");
     expect(readFileSync(runs.logOf("codex"), "utf8")).toContain("ITEM #4 comment GS-3 from @lou");
+    expect(statSync(runs.logOf("codex")).mode & 0o777).toBe(0o600);
+  });
+});
+
+describe.skipIf(process.platform === "win32")("the wake command", () => {
+  it("hands the tool the item's prompt as one argument, word for word, whatever the item says", () => {
+    const item = [
+      "ITEM #4 comment GS-3 from @lou (agent): \"it's $(touch /tmp/x) `id` $HOME \\ ; & | *",
+      "  read: quadit show GS-3",
+      "  answer: quadit comment GS-3 --id 7f -",
+    ].join("\n");
+    const out = execFileSync(
+      "/bin/sh",
+      ["-c", WAKE_SCRIPT, "quadit-wake", "/usr/bin/printf", "%s\\0", "a b", "{quadit-item}", "*"],
+      { env: { PATH: "/usr/bin:/bin", QUADIT_ITEM: item, QUADIT_EVENT: "ignored" }, cwd: "/" },
+    ).toString();
+    expect(out.split("\0").slice(0, -1)).toEqual([
+      "a b",
+      `Quadit woke you for this inbox item:\n${item}\nHandle it with the quadit skill, answering where you were asked.`,
+      "*",
+    ]);
   });
 });

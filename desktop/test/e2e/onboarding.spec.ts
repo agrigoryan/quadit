@@ -189,9 +189,18 @@ test("a tool the app can run gives its code back by itself in the first run, and
     await expect(page.getByText(/is for Claude Code/)).toBeVisible({ timeout: 20_000 });
     // A comment on its task is answered with no chat open: the app's listener woke the tool.
     await page.goto(`${origin}/personal/task/GS-3`);
+    const answer = page.getByText(/^Answered by the stand-in to: ITEM .*GS-3.*@lou/);
+    // Nothing answered before the comment: the answer is to it, fresh.
+    await expect(page.getByText(/Answered by the stand-in/)).toHaveCount(0);
     await page.getByRole("textbox", { name: "New comment" }).fill("Hello, are you there?");
     await page.getByRole("button", { name: "Send", exact: true }).click();
-    await expect(page.getByText("Answered by the stand-in")).toBeVisible({ timeout: 60_000 });
+    const asked = page.getByText("Hello, are you there?", { exact: true });
+    await expect(asked).toBeVisible({ timeout: 20_000 });
+    await expect(answer).toBeVisible({ timeout: 60_000 });
+    // Woken by that comment (its item's line), and below it in the thread.
+    await expect(answer).toHaveCount(1);
+    const [askedAt, answerAt] = await Promise.all([asked.boundingBox(), answer.boundingBox()]);
+    expect(answerAt?.y ?? 0).toBeGreaterThan(askedAt?.y ?? Infinity);
     await screen(page, "08b-answered-by-itself.png");
   } finally {
     await desktop.close();

@@ -133,6 +133,8 @@ interface Connection {
   allowed?: boolean;
   /** Whether the tool answers by itself (self-runs.ts), as the person chose; absent: not chosen. */
   answering?: boolean;
+  /** The app ran the tool and saw it give its connect code back (self-runs.ts): only then does it answer by itself. */
+  ran?: true;
   at: number;
 }
 
@@ -851,7 +853,7 @@ export class Connections {
    * (self-runs.ts): the server, the login file each uses (its own, or the
    * computer's default one), and whether it answers by itself as chosen.
    */
-  async selfRunTools(): Promise<{ id: string; serverId: string; login: string; answering?: boolean }[]> {
+  async selfRunTools(): Promise<{ id: string; serverId: string; login: string; ran: boolean; answering?: boolean }[]> {
     const connections = Object.entries(this.ledger().harnesses).filter(([, c]) => c.methods.includes("cli"));
     let defaultLogin: string | null = null;
     if (connections.some(([, c]) => !c.token)) {
@@ -862,7 +864,15 @@ export class Connections {
     return connections.flatMap(([id, c]) => {
       const login = c.token?.config ?? defaultLogin;
       return login
-        ? [{ id, serverId: c.serverId, login, ...(c.answering === undefined ? {} : { answering: c.answering }) }]
+        ? [
+            {
+              id,
+              serverId: c.serverId,
+              login,
+              ran: c.ran === true,
+              ...(c.answering === undefined ? {} : { answering: c.answering }),
+            },
+          ]
         : [];
     });
   }
@@ -872,6 +882,15 @@ export class Connections {
     return Object.entries(this.ledger().harnesses).flatMap(([id, c]) =>
       c.code && Date.now() - c.code.at < CODE_LIFE_MS ? [{ id, code: c.code.code }] : [],
     );
+  }
+
+  /** Marks a tool the app ran and saw give its connect code back. */
+  markRan(harnessId: string) {
+    const ledger = this.ledger();
+    const connection = ledger.harnesses[harnessId];
+    if (!connection) return;
+    connection.ran = true;
+    this.saveLedger(ledger);
   }
 
   /** Remembers whether a tool answers by itself (its card's Pause and Resume). */

@@ -341,7 +341,9 @@ export function slowToStart(binary: string, seconds: number): string {
  * other command (connect, listen, comment…), and a stand-in `claude` on the
  * PATH acts as a one-prompt tool (`claude -p PROMPT`): told "Connect to
  * Quadit CODE" it gives the code back; woken for an inbox item, it answers
- * the item's task with "Answered by the stand-in". Without it, the app
+ * the item's task with "Answered by the stand-in to: " and the item's line
+ * of its prompt (ITEM #… from @…), so a test sees which item woke it.
+ * Without it, the app
  * finds no program to run Claude Code with.
  */
 export function fakeComputer({ claudeCode = true, quadit = "" }: { claudeCode?: boolean; quadit?: string } = {}) {
@@ -385,8 +387,9 @@ ${
 case "$2" in
   "Connect to Quadit "*) exec quadit connect "\${2#Connect to Quadit }" ;;
   "Quadit woke you"*)
-    key=$(printf '%s' "$2" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -n 1)
-    exec quadit comment "$key" "Answered by the stand-in" ;;
+    item=$(printf '%s\n' "$2" | sed -n 2p)
+    key=$(printf '%s' "$item" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -n 1)
+    exec quadit comment "$key" "Answered by the stand-in to: $item" ;;
 esac
 exit 3
 `,

@@ -277,6 +277,7 @@ function start() {
             oneShot: harness.oneShot ?? null,
             login: tool.login,
             here: loginIsHere(tool.login),
+            ran: tool.ran,
             // Runs for the app's own server exist only while it runs as the app's child (never another program on its port).
             serverRuns: local.state().kind === "running",
             answering: tool.answering,
@@ -288,6 +289,9 @@ function start() {
     loginPath: async () => (await lookNow()).path.join(":"),
     start: (program, args, options) => startChild(program, args, options),
     codeGivenBack: async (id) => (await connections.handshake(id))?.state === "connected",
+    openCode: (id) => connections.waitingCodes().find((open) => open.id === id)?.code ?? null,
+    newCode: async (id) => void (await connections.newCode(id)),
+    ran: (id) => connections.markRan(id),
     listening: (tool) => whoListens(tool.login),
     remember: (id, on) => connections.setAnswering(id, on),
     dir: join(dataDir, "tools"),
@@ -318,10 +322,6 @@ function start() {
       return null;
     }
   }
-  /** Runs once each tool still waiting to be proven connected (only those of the app's own server are: self-runs.ts). */
-  const proveWaiting = () => {
-    for (const { id, code } of connections.waitingCodes()) void selfRuns.prove(id, code);
-  };
   // A login changed by hand (another server, another account) is followed within a minute.
   setInterval(() => void selfRuns.sync(), 60_000).unref();
   const connect = new ConnectPage({
@@ -451,10 +451,9 @@ function start() {
       // Its set-up unfinished (the app quit during the first run, or an older version started it): the first run sets
       // it up, over its window, once the person has the app before them.
       quiet.say(() => void local.setupNeeded().then((needed) => needed && firstRun.show()));
-      // Its tools still waiting are run to give their codes back, and their listeners follow it.
-      proveWaiting();
     }
-    // Whatever it became (running, stopped on purpose, failed, its port taken), the tools' runs follow it.
+    // Whatever it became (running, stopped on purpose, failed, its port taken), the tools' runs follow it: those
+    // the app never ran give their codes back first.
     void selfRuns.sync();
   });
   refreshMenu();

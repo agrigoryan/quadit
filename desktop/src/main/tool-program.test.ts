@@ -74,7 +74,6 @@ describe("the one-prompt commands", () => {
     expect(Object.fromEntries(HARNESSES.filter((h) => h.oneShot).map((h) => [h.id, h.oneShot?.(prompt)]))).toEqual({
       claude: ["-p", prompt],
       codex: ["exec", "--skip-git-repo-check", prompt],
-      gemini: ["-p", prompt],
       antigravity: ["-p", prompt, "--dangerously-skip-permissions"],
       cursor: ["-p", "--force", prompt],
     });

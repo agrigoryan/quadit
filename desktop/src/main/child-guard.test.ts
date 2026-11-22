@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { childEnv, GUARD_SCRIPT, startChild } from "@/main/child-guard";
+import { childEnv, EVENTS_FILE, GUARD_SCRIPT, startChild } from "@/main/child-guard";
 
 const posixOnly = describe.skipIf(process.platform === "win32");
 
@@ -59,26 +59,52 @@ posixOnly("startChild", () => {
     await until(() => pids.length === 1 && pids.every((pid) => !alive(pid)));
   });
 
-  it("hears what its program says of itself on a channel its output cannot write to", async () => {
+  it("hands its program a file the app reads, which its output never reaches", async () => {
     const lines: string[] = [];
     const events: string[] = [];
     const child = startChild(
       "/bin/sh",
-      [
-        "-c",
-        'echo "started" >> "$QUADIT_APP_LIFECYCLE"; echo started; echo "ended 0" >> "$QUADIT_APP_LIFECYCLE"; sleep 0.3',
-      ],
+      ["-c", 'echo started >> "$1"; echo noise; echo "ended 0" >> "$1"', "sh", EVENTS_FILE],
       {
         cwd: "/tmp",
         env: { PATH: "/usr/bin:/bin" },
         line: (line) => lines.push(line),
-        lifecycle: (e) => events.push(e),
+        events: (e) => events.push(e),
       },
     );
     await child.exited;
-    expect(lines).toEqual(["started"]);
+    expect(lines).toEqual(["noise"]);
     expect(events).toEqual(["started", "ended 0"]);
   });
+
+  it("ends a program that ignores being asked to stop, and is over only once it is gone", async () => {
+    const pids: number[] = [];
+    const child = startChild("/bin/sh", ["-c", "trap '' TERM; echo $$; while :; do sleep 0.1; done"], {
+      cwd: "/",
+      env: { PATH: "/usr/bin:/bin" },
+      line: (line) => pids.push(Number(line)),
+    });
+    await until(() => pids.length === 1);
+    child.stop();
+    await child.exited;
+    expect(alive(pids[0] ?? 0)).toBe(false);
+  }, 15_000);
+
+  it("ends what a program left behind ignoring being asked to stop, once the program ended by itself", async () => {
+    const pids: number[] = [];
+    const child = startChild(
+      "/bin/sh",
+      ["-c", "sh -c \"trap '' TERM; while :; do sleep 0.1; done\" & echo $!; sleep 0.5; exit 0"],
+      {
+        cwd: "/",
+        env: { PATH: "/usr/bin:/bin" },
+        line: (line) => pids.push(Number(line)),
+      },
+    );
+    expect(await child.exited).toBe(0);
+    expect(pids).toHaveLength(1);
+    expect(alive(pids[0] ?? 0)).toBe(false);
+  }, 15_000);
 
   it("ends them too when the app is killed without a word, its end of the pipe closing", async () => {
     // A stand-in for the app: it starts a guarded child, says its pid, and is then killed hard.
@@ -88,7 +114,7 @@ posixOnly("startChild", () => {
         "-e",
         `const { spawn } = require("node:child_process");
          const guard = ${JSON.stringify(GUARD_SCRIPT)};
-         const c = spawn("/bin/sh", ["-c", guard, "guard", "/bin/sh", "-c", "echo $$; exec sleep 30"], { detached: true, stdio: ["pipe", "pipe", "ignore"] });
+         const c = spawn("/bin/sh", ["-c", guard, "guard", "/bin/sh", "-c", "trap '' TERM; echo $$; while :; do sleep 0.1; done"], { detached: true, stdio: ["pipe", "pipe", "ignore"] });
          c.stdout.on("data", (d) => process.stdout.write(d));`,
       ],
       { stdio: ["ignore", "pipe", "inherit"] },
@@ -98,8 +124,9 @@ posixOnly("startChild", () => {
     );
     expect(alive(pid)).toBe(true);
     app.kill("SIGKILL");
-    await until(() => !alive(pid));
-  });
+    // Asked to stop, it does not: it is killed outright five seconds after.
+    await until(() => !alive(pid), 10_000);
+  }, 15_000);
 });
 
 describe("childEnv", () => {

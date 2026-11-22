@@ -190,7 +190,15 @@ export type Handshake =
  */
 export interface SelfRun {
   proving: { state: "running" } | { state: "failed"; reason: string } | null;
-  answering: "on" | "paused" | "guarded" | "off" | "none";
+  /**
+   * on; paused by the person; paused by the loop guard (guarded) or because
+   * the app could not run it (stuck, `why`); none: the app does not run it.
+   */
+  answering: "on" | "paused" | "guarded" | "stuck" | "none";
+  /** stuck: why, in a few words. */
+  why?: string;
+  /** on: why the last item it could not answer failed, until it answers one. */
+  missed?: string;
 }
 
 /**

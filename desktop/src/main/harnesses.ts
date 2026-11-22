@@ -191,7 +191,8 @@ export const HARNESSES: readonly Harness[] = [
     name: "Gemini CLI",
     command: "gemini",
     trace: ".gemini/settings.json",
-    oneShot: (prompt) => ["-p", prompt],
+    // No one-prompt form the app runs: whether `gemini -p` runs quadit, with no one there to approve a shell
+    // command and without a flag that turns every check off, is not confirmed. Its card keeps the line to paste.
     skills: ".agents/skills",
     listenVerified: false,
     mcp: {
