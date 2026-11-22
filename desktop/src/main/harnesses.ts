@@ -92,6 +92,7 @@ export const HARNESSES: readonly Harness[] = [
       { kind: "json", path: join(home, ".claude", "settings.json"), keyPath: ["env", "QUADIT_CONFIG"], value: config },
     ],
     allowCli: {
+      // Its ask rules win over its allow rules: what can start another program asks first.
       changes: (home) => [
         {
           kind: "json-item",
@@ -99,8 +100,14 @@ export const HARNESSES: readonly Harness[] = [
           keyPath: ["permissions", "allow"],
           value: "Bash(quadit:*)",
         },
+        ...STARTS_PROGRAMS.map((sub) => ({
+          kind: "json-item" as const,
+          path: join(home, ".claude", "settings.json"),
+          keyPath: ["permissions", "ask"],
+          value: `Bash(quadit ${sub}:*)`,
+        })),
       ],
-      said: "Claude Code may run quadit commands without asking.",
+      said: "Claude Code may run quadit commands without asking, but asks before quadit starts another program.",
     },
     mcp: {
       changes: (home, url) => [
@@ -158,13 +165,13 @@ export const HARNESSES: readonly Harness[] = [
           intoExisting: true,
         },
         { kind: "folder", path: join(home, ".codex", "rules") },
-        ...["quadit", ...(quadit ? [quadit] : [])].map((command) => ({
-          kind: "line" as const,
-          path: join(home, ".codex", "rules", "default.rules"),
-          line: codexRule(command),
-        })),
+        ...["quadit", ...(quadit ? [quadit] : [])].flatMap((command) =>
+          [codexRule([command], "allow"), ...STARTS_PROGRAMS.map((sub) => codexRule([command, sub], "prompt"))].map(
+            (line) => ({ kind: "line" as const, path: join(home, ".codex", "rules", "default.rules"), line }),
+          ),
+        ),
       ],
-      said: "Codex may run quadit without asking, and its sandbox may reach the network (every command it runs, not only quadit).",
+      said: "Codex may run quadit without asking, but asks before quadit starts another program, and its sandbox may reach the network (every command it runs, not only quadit).",
     },
     rules: { folder: ".codex/rules", file: ".codex/rules/default.rules" },
     mcp: {
@@ -288,9 +295,18 @@ function opencodeConfig(home: string): string {
 }
 
 /**
- * A Codex command rule that lets `command` (and whatever follows it) run
- * without asking, with the app's mark, so Disconnect takes out exactly it.
+ * The quadit commands that start any program the agent names (`quadit
+ * listen --exec`, `quadit run`): the permissions that let quadit run
+ * without asking make these ask first. The app's own listener is started by
+ * the app, not the agent, and is not concerned.
  */
-function codexRule(command: string): string {
-  return `prefix_rule(pattern=[${JSON.stringify(command)}], decision="allow")  # Added by the Quadit app: Disconnect in the app takes it out.`;
+const STARTS_PROGRAMS = ["listen", "run"];
+
+/**
+ * A Codex command rule for the commands starting with `pattern` (the
+ * program, then any words), "allow" or "prompt" (the most restrictive rule
+ * that matches wins), with the app's mark, so Disconnect takes out exactly it.
+ */
+function codexRule(pattern: string[], decision: "allow" | "prompt"): string {
+  return `prefix_rule(pattern=[${pattern.map((word) => JSON.stringify(word)).join(", ")}], decision="${decision}")  # Added by the Quadit app: Disconnect in the app takes it out.`;
 }

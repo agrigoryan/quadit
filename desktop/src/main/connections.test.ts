@@ -413,7 +413,10 @@ posixOnly("Connect and Disconnect", () => {
     expect(JSON.parse(readFileSync(config, "utf8"))).toEqual({ url: ORIGIN, token: "qd_secret1" });
     expect(statSync(config).mode & 0o777).toBe(0o600);
     expect(json(".claude/settings.json")).toEqual({
-      permissions: { allow: ["Read", "Bash(quadit:*)", "mcp__quadit"] },
+      permissions: {
+        allow: ["Read", "Bash(quadit:*)", "mcp__quadit"],
+        ask: ["Bash(quadit listen:*)", "Bash(quadit run:*)"],
+      },
       env: { QUADIT_CONFIG: config },
     });
     expect(json(".claude.json")).toEqual({ mcpServers: { quadit: { type: "http", url: `${ORIGIN}/mcp` } } });
@@ -747,8 +750,16 @@ posixOnly("letting each tool use Quadit without asking (desktop contract §11, s
     await connect(choice("codex"));
     expect(read(".codex/config.toml")).toContain("[sandbox_workspace_write]\nnetwork_access = true");
     expect(read(".codex/rules/default.rules")).toBe(
-      `${mine}prefix_rule(pattern=["quadit"], decision="allow")${MARK}\n` +
-        `prefix_rule(pattern=[${JSON.stringify(join(bin, "quadit"))}], decision="allow")${MARK}\n`,
+      [
+        'prefix_rule(pattern=["git", "status"], decision="allow")',
+        ...["quadit", join(bin, "quadit")].flatMap((command) => [
+          `prefix_rule(pattern=[${JSON.stringify(command)}], decision="allow")${MARK}`,
+          // What starts another program asks first: the most restrictive rule wins.
+          `prefix_rule(pattern=[${JSON.stringify(command)}, "listen"], decision="prompt")${MARK}`,
+          `prefix_rule(pattern=[${JSON.stringify(command)}, "run"], decision="prompt")${MARK}`,
+        ]),
+        "",
+      ].join("\n"),
     );
     await disconnect("codex");
     expect(read(".codex/config.toml")).toBe('model = "o9"\n');
@@ -801,11 +812,10 @@ posixOnly("letting each tool use Quadit without asking (desktop contract §11, s
     mkdirSync(join(home, ".claude"));
     writeFileSync(join(home, ".claude", "settings.json"), JSON.stringify({ permissions: { allow: ["Read"] } }));
     await connect(choice("claude", { methods: ["cli", "mcp"] }));
-    expect((json(".claude/settings.json").permissions as { allow: string[] }).allow).toEqual([
-      "Read",
-      "Bash(quadit:*)",
-      "mcp__quadit",
-    ]);
+    expect(json(".claude/settings.json").permissions).toEqual({
+      allow: ["Read", "Bash(quadit:*)", "mcp__quadit"],
+      ask: ["Bash(quadit listen:*)", "Bash(quadit run:*)"],
+    });
     await disconnect("claude");
     expect(json(".claude/settings.json")).toEqual({ permissions: { allow: ["Read"] } });
 
@@ -826,11 +836,13 @@ posixOnly("letting each tool use Quadit without asking (desktop contract §11, s
       ["~/.codex/rules/default.rules", "rules", "new"],
     ]);
     expect(planned.plan.warnings).toContain(
-      "Codex may run quadit without asking, and its sandbox may reach the network (every command it runs, not only quadit).",
+      "Codex may run quadit without asking, but asks before quadit starts another program, and its sandbox may reach the network (every command it runs, not only quadit).",
     );
     const claude = await connections.planConnect(choice("claude"));
     if (!claude.ok) throw new Error(claude.error);
-    expect(claude.plan.warnings).toContain("Claude Code may run quadit commands without asking.");
+    expect(claude.plan.warnings).toContain(
+      "Claude Code may run quadit commands without asking, but asks before quadit starts another program.",
+    );
     expect((await connections.state()).harnesses.map((h) => [h.id, h.allows])).toEqual([
       ["claude", true],
       ["codex", true],
@@ -853,7 +865,9 @@ posixOnly("letting each tool use Quadit without asking (desktop contract §11, s
     const old = JSON.parse(readFileSync(file, "utf8"));
     const claude = old.harnesses.claude;
     delete claude.allowed;
-    claude.edits = claude.edits.filter((r: { kind: string; value?: string }) => r.value !== "Bash(quadit:*)");
+    claude.edits = claude.edits.filter(
+      (r: { kind: string; keyPath?: string[] }) => !(r.kind === "json-item" && r.keyPath?.[0] === "permissions"),
+    );
     writeFileSync(file, JSON.stringify(old));
     writeFileSync(
       join(home, ".claude", "settings.json"),

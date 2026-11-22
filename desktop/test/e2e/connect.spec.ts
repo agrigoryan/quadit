@@ -108,7 +108,10 @@ test("Connect agents opens over the server's window from the menu, sets Claude C
     await expect(card.getByText("Waiting for Claude Code…")).toBeVisible();
     expect(JSON.parse(readFileSync(settings, "utf8"))).toEqual({
       // Connect also lets it run quadit, and use Quadit's MCP tools, without asking (desktop contract §11).
-      permissions: { allow: ["Read", "Bash(quadit:*)", "mcp__quadit"] },
+      permissions: {
+        allow: ["Read", "Bash(quadit:*)", "mcp__quadit"],
+        ask: ["Bash(quadit listen:*)", "Bash(quadit run:*)"],
+      },
       env: { QUADIT_CONFIG: config },
     });
     const login = JSON.parse(readFileSync(config, "utf8")) as { url: string; token: string };
