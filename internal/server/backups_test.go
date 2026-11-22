@@ -197,10 +197,17 @@ func TestAPurgedFileStaysInStorageADay(t *testing.T) {
 		if err := st.Insert(ctx, core.Job{ID: id.New(), Kind: "trash.purge", RunAt: time.Now().UnixMilli(), CreatedAt: time.Now().UnixMilli()}); err != nil {
 			t.Fatal(err)
 		}
-		eventually(t, "the trash to be emptied of the file's row", func() bool {
-			n, err := st.Count(ctx, "files", store.Eq("id", f.ID))
+		// A purge takes the rows out first and queues the removal of their
+		// bytes at the end of its pass, so it is waited for until its job is
+		// done; every purge, as the server's daily one may be the one that
+		// takes the file.
+		eventually(t, "the trash to be emptied", func() bool {
+			n, err := st.Count(ctx, "jobs", store.Eq("kind", "trash.purge"), store.Null("done_at"))
 			return err == nil && n == 0
 		})
+		if n, err := st.Count(ctx, "files", store.Eq("id", f.ID)); err != nil || n != 0 {
+			t.Fatalf("after the purge the file's row is there %d times (%v)", n, err)
+		}
 		if !stored() {
 			t.Fatal("the file's bytes went with its row")
 		}
