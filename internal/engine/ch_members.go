@@ -114,16 +114,20 @@ func memberAdd(c *cx, a memberAddArgs) error {
 		scope = nil
 	}
 	return c.addMember(core.Member{WorkspaceID: c.ws, UserID: u.ID, Role: role, Handle: handle, Kind: u.Kind, Name: u.Name,
-		Avatar: u.Avatar, Title: a.Title, Scope: c.capScope(scope), CreatedAt: c.at})
+		Avatar: u.Avatar, Tint: old.Tint, Title: a.Title, Scope: c.capScope(scope), CreatedAt: c.at})
 }
 
 func (c *cx) addMember(m core.Member) error {
-	tint, err := leastUsedTint(c.ctx, c.tx)
-	if err != nil {
-		return err
+	// A member coming back keeps the tint it had; anyone else gets the one used least.
+	if m.Tint == 0 {
+		tint, err := leastUsedTint(c.ctx, c.tx)
+		if err != nil {
+			return err
+		}
+		m.Tint = tint
 	}
 	seq := c.tx.NextSeq()
-	m.UpdatedSeq, m.Tint = seq, tint
+	m.UpdatedSeq = seq
 	if err := c.tx.Insert(c.ctx, m); err != nil {
 		if errors.Is(err, store.ErrConflict) {
 			return conflictErr("the handle @%s is taken, or this user is already a member", m.Handle)

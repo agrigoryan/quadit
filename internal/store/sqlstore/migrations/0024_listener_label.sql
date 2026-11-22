@@ -3,3 +3,5 @@
 -- and since when it has held it.
 ALTER TABLE members ADD COLUMN listen_by TEXT;
 ALTER TABLE members ADD COLUMN listen_since {{TS}};
+-- A lease held already has held it at least since its holder last waited.
+UPDATE members SET listen_since = listen_heard_at WHERE listen_lease IS NOT NULL;

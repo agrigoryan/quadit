@@ -590,3 +590,36 @@ func TestWhatListensIsToldWithoutTakingTheLease(t *testing.T) {
 		s.call(t, nil, coder, "GET", w+"/listen?wait=0&lease="+held.Lease+"&by=a+companion%3B+rm+-rf", nil, 400, nil)
 	})
 }
+
+// TestAnOlderListenerShowsAsListeningToTheCheckToo: while a quadit listen
+// from before the lease holds its wait, GET /listening says the agent
+// listens, as its pages do.
+func TestAnOlderListenerShowsAsListeningToTheCheckToo(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		coder := s.agentToken(t, "coder")
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			req, _ := http.NewRequest(http.MethodGet, s.url+w+"/events?cursor=listen&inbox=1&wait=3&limit=1&types=notification.created&compact=1", nil)
+			req.Header.Set("Authorization", "Bearer "+coder)
+			if resp, err := http.DefaultClient.Do(req); err == nil {
+				resp.Body.Close()
+			}
+		}()
+		for deadline := time.Now().Add(3 * time.Second); !s.listening(t, "coder"); time.Sleep(20 * time.Millisecond) {
+			if time.Now().After(deadline) {
+				t.Fatal("the older listener never showed as listening")
+			}
+		}
+		var check struct {
+			Listening bool
+			By        string
+		}
+		s.call(t, nil, coder, "GET", w+"/listening", nil, 200, &check)
+		if !check.Listening || check.By != "a quadit listen from before the lease" {
+			t.Fatalf("while an older listener waits, the check says %+v", check)
+		}
+		<-done
+	})
+}

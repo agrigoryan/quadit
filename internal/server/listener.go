@@ -321,10 +321,15 @@ func (s *Server) handleShowListener(x *c) error {
 		return err
 	}
 	now := time.Now()
-	out := map[string]any{"listening": leaseLives(m, now)}
-	if leaseLives(m, now) {
+	// Listening as the agent's pages show it: a live lease, or the held wait
+	// of a quadit listen from before the lease, which takes none.
+	out := map[string]any{"listening": m.ListeningUntil > now.UnixMilli()}
+	switch {
+	case leaseLives(m, now):
 		given := x.r.URL.Query().Get("lease")
 		out["by"], out["since"], out["last_heard"], out["yours"] = m.ListenBy, formatTime(m.ListenSince), formatTime(m.ListenHeardAt), given != "" && given == m.ListenLease
+	case m.ListeningUntil > now.UnixMilli():
+		out["by"], out["yours"] = "a quadit listen from before the lease", false
 	}
 	reach, err := x.agentReach(x.ctx())
 	if err != nil {

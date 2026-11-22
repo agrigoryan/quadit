@@ -78,3 +78,25 @@ func TestANewMemberGetsTheTintUsedLeast(t *testing.T) {
 		}
 	})
 }
+
+// TestAPersonWhoComesBackKeepsTheirTint: someone removed and added again
+// is drawn as before.
+func TestAPersonWhoComesBackKeepsTheirTint(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		u := core.User{ID: id.New(), Kind: core.KindPerson, Name: "Bea", Email: "bea-" + id.New() + "@example.com", CreatedAt: 1, UpdatedAt: 1}
+		if err := st.Insert(context.Background(), u); err != nil {
+			t.Fatal(err)
+		}
+		bea := u.ID
+		w.do(w.owner.ID, "member.add", M{"user": bea})
+		before := w.member(bea).Tint
+		w.agent("bot")
+		w.do(w.owner.ID, "member.remove", M{"id": bea})
+		w.agent("other") // takes the tint used least, which may be bea's freed one
+		w.do(w.owner.ID, "member.add", M{"user": bea})
+		if after := w.member(bea).Tint; after != before {
+			t.Fatalf("a person who came back has tint %d, had %d", after, before)
+		}
+	})
+}
