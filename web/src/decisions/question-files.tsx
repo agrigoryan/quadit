@@ -1,10 +1,11 @@
 // The files on a question itself, shown above its options and laid out like
 // them: pictures and videos side by side in boxes of one shape, anything else
-// as a named link. A picture opens over the whole screen.
+// by name. A picture, or a text file, opens over the whole screen, with the
+// others that can a step away.
 
 import { useState } from "react";
 import { cx } from "@/lib/cx";
-import { isMedia, isVideo } from "@/data/files";
+import { isMedia, isVideo, shownAs } from "@/data/files";
 import { t } from "@/lib/i18n";
 import type { FileRow } from "@/types/core";
 import { Lightbox } from "@/ui/media";
@@ -70,8 +71,13 @@ export function QuestionFiles({ files }: { files: OptionFile[] }) {
           ))}
         </ul>
       )}
-      <OptionDocs files={docs} />
-      <Lightbox file={shown} files={media} onShow={setShown} onClose={() => setShown(null)} />
+      <OptionDocs files={docs} onOpen={setShown} />
+      <Lightbox
+        file={shown}
+        files={[...media, ...docs.filter((f) => shownAs(f))]}
+        onShow={setShown}
+        onClose={() => setShown(null)}
+      />
     </div>
   );
 }

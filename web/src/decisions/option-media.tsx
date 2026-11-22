@@ -7,7 +7,7 @@
 
 import { useCallback, useState } from "react";
 import { FileText, Maximize2 } from "lucide-react";
-import { isVideo } from "@/data/files";
+import { isVideo, shownAs } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { useMember } from "@/data/selectors";
 import type { FileRow } from "@/types/core";
@@ -145,25 +145,45 @@ export function OptionMedia({ files, label, aspect, onOpen }: Props) {
   );
 }
 
-/** Files of an option that are not pictures or video: plain links. */
-export function OptionDocs({ files }: { files: OptionFile[] }) {
+const docLook =
+  "inline-flex min-w-0 items-center gap-1.5 text-xs text-ink-2 underline-offset-2 hover:text-ink hover:underline";
+
+/**
+ * Files of an option or a question that are not pictures or video, by name.
+ * Given onOpen, one the viewer can show (text) is opened with it; any other
+ * is a plain link.
+ */
+export function OptionDocs({ files, onOpen }: { files: OptionFile[]; onOpen?: (file: OptionFile) => void }) {
   if (files.length === 0) return null;
   return (
     <ul className="mt-2 flex flex-col gap-1">
-      {files.map((file) => (
-        <li key={file.attachmentId} className="flex min-w-0 items-baseline">
-          <a
-            href={file.url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex min-w-0 items-center gap-1.5 text-xs text-ink-2 underline-offset-2 hover:text-ink hover:underline"
-          >
+      {files.map((file) => {
+        const name = (
+          <>
             <FileText className="size-3.5 shrink-0" aria-hidden />
             <span className="truncate">{file.name}</span>
-          </a>
-          <DocBy file={file} />
-        </li>
-      ))}
+          </>
+        );
+        return (
+          <li key={file.attachmentId} className="flex min-w-0 items-baseline">
+            {onOpen && shownAs(file) ? (
+              <button
+                type="button"
+                aria-label={t("detail.files.open", { name: file.name })}
+                onClick={() => onOpen(file)}
+                className={docLook}
+              >
+                {name}
+              </button>
+            ) : (
+              <a href={file.url} target="_blank" rel="noreferrer" className={docLook}>
+                {name}
+              </a>
+            )}
+            <DocBy file={file} />
+          </li>
+        );
+      })}
     </ul>
   );
 }
