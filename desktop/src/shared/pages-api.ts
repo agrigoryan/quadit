@@ -181,6 +181,19 @@ export type Handshake =
   | { state: "unknown" };
 
 /**
+ * What the app does by itself for a tool Connect set up (desktop contract
+ * §11, third amendment, main/self-runs.ts): `proving`, giving its connect
+ * code back by running it once, while it runs, or why it could not (the
+ * card then shows the line to paste), null otherwise; `answering`, its
+ * listener: on, paused by the person, paused by the loop guard, off (a tool
+ * of another server, not turned on), or none (the app cannot run it).
+ */
+export interface SelfRun {
+  proving: { state: "running" } | { state: "failed"; reason: string } | null;
+  answering: "on" | "paused" | "guarded" | "off" | "none";
+}
+
+/**
  * The window Connect agents is laid over: its server, the workspace its page
  * shows (null: none yet, or signed out), and whether that server's page
  * asked for Connect (`openedByPage`), not the person.
@@ -354,6 +367,12 @@ export interface PagesApi {
   toolHandshake(id: string): Promise<Handshake | null>;
   /** Makes a new connect code for a tool Connect has set up, replacing the one it had. */
   newConnectCode(id: string): Promise<{ ok: true } | Refused>;
+  /** What the app does by itself for a tool Connect set up (main/self-runs.ts); null when it is not set up. */
+  toolSelf(id: string): Promise<SelfRun | null>;
+  /** The person's Pause, Resume or "Answer by itself": whether the tool answers by itself. */
+  setAnswering(id: string, on: boolean): Promise<void>;
+  /** Opens the log of what the app ran for a tool. */
+  showToolLog(id: string): Promise<void>;
   /** Writes the app's Quadit skill over a connected tool's one the person changed by hand. */
   updateSkill(id: string): Promise<{ ok: true } | Refused>;
   /** Puts `text` on the clipboard (a connect code's line). */

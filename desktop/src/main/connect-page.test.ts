@@ -44,6 +44,8 @@ function harness({ covered = "", front = new Set<string>() }: { covered?: string
       summary: null,
     }),
     copy: async () => {},
+    selfRuns: { self: () => null, setAnswering: async () => {}, logOf: (id) => `/logs/${id}.log` },
+    showLog: async () => {},
     showBackups: async () => {},
   });
   /** Calls the page's method `name` as the page in the view `view` (its number) would. */

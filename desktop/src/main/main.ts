@@ -12,7 +12,7 @@
 // running, it opens no window, as at login.
 
 import { execFile, spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, hostname, userInfo } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -32,19 +32,22 @@ import {
 import { accountName } from "@/main/account-name";
 import { AppPages } from "@/main/app-pages";
 import { Capture } from "@/main/capture";
+import { startChild } from "@/main/child-guard";
 import { ConnectPage } from "@/main/connect-page";
+import { Connections } from "@/main/connections";
+import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
 import { FirstConnect } from "@/main/first-connect";
 import { FirstRun } from "@/main/first-run";
-import { Connections } from "@/main/connections";
-import { LocalServer, loopbackPorts } from "@/main/local-server";
-import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
 import { SignInFlows } from "@/main/handoff";
+import { HARNESSES } from "@/main/harnesses";
 import { ActivateAfterStart, coldStart, Quiet, secondStart } from "@/main/launch";
-import { QuitGuard } from "@/main/quit";
+import { LocalServer, loopbackPorts } from "@/main/local-server";
 import { menuTemplate } from "@/main/menu";
 import { Panel } from "@/main/panel";
 import { loginShellPath, QuaditCli } from "@/main/quadit-cli";
+import { QuitGuard } from "@/main/quit";
 import { Requests } from "@/main/requests";
+import { SelfRuns } from "@/main/self-runs";
 import { ServerChecks } from "@/main/server-checks";
 import { ServerList } from "@/main/server-list";
 import { ServerWindows } from "@/main/server-windows";
@@ -53,6 +56,7 @@ import { Settings } from "@/main/settings";
 import { Setup } from "@/main/setup-page";
 import { StoppedMark } from "@/main/stopped-mark";
 import { refusedSwitches } from "@/main/switches";
+import { toolProgram } from "@/main/tool-program";
 import { Unread } from "@/main/unread";
 import { isReleasePage, type Release, UpdateWatch } from "@/main/updates";
 import { BRIDGE_REQUEST } from "@/shared/bridge";
@@ -230,7 +234,56 @@ function start() {
     // The running app itself, which the quadit command starts: an AppImage by its own file, not where it is mounted.
     appFor: (id) => (id === list.localServer()?.id ? process.env.APPIMAGE || app.getPath("exe") : null),
     ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
+    connected: (id, code) => {
+      if (code) void selfRuns.prove(id, code);
+      void selfRuns.sync();
+    },
+    disconnected: () => void selfRuns.sync(),
   });
+  // What the app runs by itself for the tools connected (desktop contract §11, third amendment): each tool's program
+  // on the login shell's PATH, else its desktop app's copy; the listeners' quadit the one on the PATH, else the app's.
+  const selfRuns = new SelfRuns({
+    tools: async () => {
+      const look = await cli.look();
+      const here = list.localServer()?.id;
+      const where = {
+        home: homedir(),
+        path: look.path,
+        applications: ["/Applications", join(homedir(), "Applications")],
+      };
+      return (await connections.selfRunTools()).flatMap((tool) => {
+        const harness = HARNESSES.find((h) => h.id === tool.id);
+        if (!harness) return [];
+        return [
+          {
+            id: tool.id,
+            name: harness.name,
+            program: toolProgram(harness, where),
+            oneShot: harness.oneShot ?? null,
+            login: tool.login,
+            here: tool.serverId === here,
+            answering: tool.answering,
+          },
+        ];
+      });
+    },
+    quadit: async () => (await cli.look()).found?.path ?? cli.bundled,
+    start: (program, args, options) => startChild(program, args, options),
+    codeGivenBack: async (id) => (await connections.handshake(id))?.state === "connected",
+    remember: (id, on) => connections.setAnswering(id, on),
+    dir: join(dataDir, "tools"),
+    env: process.env,
+    changed: () => pages.changed(),
+  });
+  /** Runs once each tool still waiting to be proven connected, of the server here (`here`) or of the others. */
+  const proveWaiting = (here: boolean) => {
+    const local = list.localServer()?.id;
+    void connections.selfRunTools().then((tools) => {
+      for (const { id, code } of connections.waitingCodes()) {
+        if (tools.some((tool) => tool.id === id && (tool.serverId === local) === here)) void selfRuns.prove(id, code);
+      }
+    });
+  };
   const connect = new ConnectPage({
     pages,
     connections,
@@ -242,6 +295,12 @@ function start() {
       return { serverId, serverName: server.name, summary: page === undefined ? null : requests.summaryOf(page) };
     },
     copy: (text) => clipboard.writeText(text),
+    selfRuns,
+    showLog: async (path) => {
+      mkdirSync(dirname(path), { recursive: true });
+      if (!existsSync(path)) writeFileSync(path, "");
+      await shell.openPath(path);
+    },
     showBackups: async () => {
       mkdirSync(connections.backupsDir, { recursive: true });
       await shell.openPath(connections.backupsDir);
@@ -352,6 +411,9 @@ function start() {
       // Its set-up unfinished (the app quit during the first run, or an older version started it): the first run sets
       // it up, over its window, once the person has the app before them.
       quiet.say(() => void local.setupNeeded().then((needed) => needed && firstRun.show()));
+      // Its tools still waiting are run to give their codes back, and their listeners follow it.
+      proveWaiting(true);
+      void selfRuns.sync();
     }
   });
   refreshMenu();
@@ -392,7 +454,11 @@ function start() {
   // and finishes on its own (local-server.ts). Only now that the windows
   // have closed: one may still keep the app (a page's beforeunload, during
   // an upload) after before-quit, and the server must not go under it.
-  app.on("will-quit", () => local.stopWithoutWaiting());
+  app.on("will-quit", () => {
+    // Every program the app started for its tools stops with it (child-guard.ts), as its server does.
+    selfRuns.quit();
+    local.stopWithoutWaiting();
+  });
   // Server windows hide rather than close, so this only runs when quitting
   // or when the server list was the last window on Windows and Linux. With
   // a server on this computer the app stays, in the menu bar or the tray,
@@ -422,7 +488,15 @@ function start() {
   // The app may have been updated, and its quadit with it: the skills Connect wrote follow, and a tool connected
   // by a version from before is let use Quadit without asking, silently, in the background too. What is not done
   // now (no quadit answered) is at the next start.
-  void connections.refresh().catch(() => {});
+  // Then the tools are run by themselves (a background start too): those of other servers at once, those of the
+  // server here once it runs (local.onChange).
+  void connections
+    .refresh()
+    .catch(() => {})
+    .then(() => {
+      proveWaiting(false);
+      return selfRuns.sync();
+    });
   if (watchingUpdates) updates.start();
   // Only now that the windows are made: making one can run the system's
   // event loop, which may hand in a link, and handled then it would make

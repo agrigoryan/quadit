@@ -103,6 +103,8 @@ function setUp({
   standIn(script, join(configDir, "config.json"));
   if (quaditOnPath) copyFileSync(script, join(bin, "quadit"));
   const asked: DesktopRequest[] = [];
+  /** What the app was told of tools connected (with their open code) and disconnected. */
+  const told: string[] = [];
   let tokens = 0;
   // What the server knows of the connect codes it made, and of the agents it counts connected and listening.
   const server = {
@@ -158,6 +160,8 @@ function setUp({
       },
     ],
     server: (id) => (id === "s1" ? { name: "Work", origin: ORIGIN } : undefined),
+    connected: (id, code) => void told.push(`connected ${id} ${code ?? "-"}`),
+    disconnected: (id) => void told.push(`disconnected ${id}`),
     appFor: (id) => (ownServer && id === "s1" ? "/Applications/Quadit.app/Contents/MacOS/Quadit" : null),
     ask: async (_server, _workspace, request) => {
       asked.push(request);
@@ -213,7 +217,22 @@ function setUp({
   const read = (path: string) => readFileSync(join(home, path), "utf8");
   const json = (path: string) => JSON.parse(read(path)) as Record<string, unknown>;
   const ledger = () => readFileSync(join(root, "data", "connections.json"), "utf8");
-  return { root, home, bin, configDir, connections, asked, server, choice, connect, disconnect, read, json, ledger };
+  return {
+    root,
+    home,
+    bin,
+    configDir,
+    connections,
+    asked,
+    told,
+    server,
+    choice,
+    connect,
+    disconnect,
+    read,
+    json,
+    ledger,
+  };
 }
 
 posixOnly("Connect plans", () => {
@@ -861,6 +880,32 @@ posixOnly("letting each tool use Quadit without asking (desktop contract §11, s
     expect((json(".claude/settings.json").permissions as { allow: string[] }).allow).toEqual(["Read"]);
     await disconnect("claude");
     expect(json(".claude/settings.json")).toEqual({ permissions: { allow: ["Read"] } });
+  });
+});
+
+posixOnly("what the app runs by itself for a connected tool (desktop contract §11, third amendment)", () => {
+  it("is told of a tool connected, with its open code, and disconnected", async () => {
+    const { connections, connect, disconnect, choice, told } = setUp();
+    await connect(choice("claude"));
+    expect(await connections.newCode("claude")).toEqual({ ok: true });
+    await disconnect("claude");
+    expect(told).toEqual(["connected claude ABCDE2", "connected claude ABCDE3", "disconnected claude"]);
+  });
+
+  it("knows each connected tool's login, its server, whether it answers by itself as chosen, and the codes still waiting", async () => {
+    const { connections, connect, choice, configDir } = setUp();
+    await connect(choice("claude"));
+    await connect(choice("pi"));
+    expect(await connections.selfRunTools()).toEqual([
+      { id: "claude", serverId: "s1", login: join(configDir, "claude.json"), answering: undefined },
+      { id: "pi", serverId: "s1", login: join(configDir, "config.json"), answering: undefined },
+    ]);
+    expect(connections.waitingCodes()).toEqual([
+      { id: "claude", code: "ABCDE2" },
+      { id: "pi", code: "ABCDE3" },
+    ]);
+    connections.setAnswering("claude", false);
+    expect((await connections.selfRunTools())[0]?.answering).toBe(false);
   });
 });
 

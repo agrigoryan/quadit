@@ -64,7 +64,7 @@ import {
   targetOf,
   writeEdits,
 } from "@/main/config-edits";
-import { handshakeOf, type OpenCode } from "@/main/handshake";
+import { CODE_LIFE_MS, handshakeOf, type OpenCode } from "@/main/handshake";
 import { HARNESSES, type Harness } from "@/main/harnesses";
 import type { QuaditCli } from "@/main/quadit-cli";
 import { type DesktopOutcome, type DesktopRequest, type DesktopSummary, isConnectCode } from "@/shared/bridge";
@@ -99,6 +99,10 @@ export interface ConnectionsParts {
    * when that server is not running; null for any other server.
    */
   appFor(serverId: string): string | null;
+  /** A tool was connected, or given a new code (`code`: the open one, null when none was made): the app may run it to give the code back. */
+  connected(harnessId: string, code: string | null): void;
+  /** A tool was disconnected: what the app ran for it stops. */
+  disconnected(harnessId: string): void;
   /** Asks the page that speaks for a workspace (Requests.toWorkspace). */
   ask(serverId: string, workspaceId: string, request: DesktopRequest): Promise<DesktopOutcome>;
 }
@@ -126,6 +130,8 @@ interface Connection {
    * again, even after the person takes it away. Absent in ledgers from before.
    */
   allowed?: boolean;
+  /** Whether the tool answers by itself (self-runs.ts), as the person chose; absent: not chosen. */
+  answering?: boolean;
   at: number;
 }
 
@@ -689,6 +695,7 @@ export class Connections {
       const hint = connectedHint(harness, choice.methods, worksAs.handle, agent?.handle ?? worksAs.handle);
       // The login PATH changed (a folder of the person's own, or the line that puts it there): open terminals keep the old one.
       const newPath = plan.applied.some((record) => record.kind === "line" || record.kind === "folder");
+      this.parts.connected(harness.id, code?.ok ? code.code.code : null);
       return {
         ok: true,
         hint: newPath ? `${hint} Terminals opened from now on find quadit; reopen any that are open now.` : hint,
@@ -755,8 +762,46 @@ export class Connections {
       if (!now) return { ok: false, error: `${harness.name} is not connected.` };
       now.code = made.code;
       this.saveLedger(ledger);
+      this.parts.connected(harnessId, made.code.code);
       return { ok: true };
     });
+  }
+
+  /**
+   * The tools connected through the quadit command, as the app runs them
+   * (self-runs.ts): the server, the login file each uses (its own, or the
+   * computer's default one), and whether it answers by itself as chosen.
+   */
+  async selfRunTools(): Promise<{ id: string; serverId: string; login: string; answering?: boolean }[]> {
+    const connections = Object.entries(this.ledger().harnesses).filter(([, c]) => c.methods.includes("cli"));
+    let defaultLogin: string | null = null;
+    if (connections.some(([, c]) => !c.token)) {
+      const look = await this.parts.cli.look();
+      const binary = look.found?.path ?? this.parts.cli.bundled;
+      defaultLogin = binary ? await this.parts.cli.defaultConfig(binary).catch(() => null) : null;
+    }
+    return connections.flatMap(([id, c]) => {
+      const login = c.token?.config ?? defaultLogin;
+      return login
+        ? [{ id, serverId: c.serverId, login, ...(c.answering === undefined ? {} : { answering: c.answering }) }]
+        : [];
+    });
+  }
+
+  /** The connect codes still open, of the tools waiting to be proven connected. */
+  waitingCodes(): { id: string; code: string }[] {
+    return Object.entries(this.ledger().harnesses).flatMap(([id, c]) =>
+      c.code && Date.now() - c.code.at < CODE_LIFE_MS ? [{ id, code: c.code.code }] : [],
+    );
+  }
+
+  /** Remembers whether a tool answers by itself (its card's Pause and Resume). */
+  setAnswering(harnessId: string, on: boolean) {
+    const ledger = this.ledger();
+    const connection = ledger.harnesses[harnessId];
+    if (!connection) return;
+    connection.answering = on;
+    this.saveLedger(ledger);
   }
 
   /**
@@ -871,6 +916,7 @@ export class Connections {
           };
         }
       }
+      this.parts.disconnected(plan.harness.id);
       return { ok: true, notes: plan.notes, unrevoked };
     });
   }

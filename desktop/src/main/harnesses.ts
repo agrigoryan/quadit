@@ -59,6 +59,20 @@ export interface Harness {
     /** How the person signs the harness in to the server. */
     signIn: string;
   };
+  /**
+   * Its one-prompt command's arguments for `prompt` (desktop contract §11,
+   * third amendment): the app runs it to give a connect code back and to
+   * answer an inbox item. An argument list, never a shell's line. Absent
+   * where the form is not confirmed: such a tool keeps the line to paste.
+   */
+  oneShot?: (prompt: string) => string[];
+  /**
+   * Where its desktop app carries a copy of its program, for when it is not
+   * on the login shell's PATH: under an applications folder (`apps`) or the
+   * home folder (`home`), `*` standing for any one folder's name. Found
+   * there in 2026 and documented nowhere, so looked for, never assumed.
+   */
+  appCopies?: { apps?: string; home?: string }[];
   /** Where it keeps command rules the app adds to (allowCli), under the home folder: so a plan names them plainly. */
   rules?: { folder: string; file: string };
 }
@@ -70,6 +84,8 @@ export const HARNESSES: readonly Harness[] = [
     name: "Claude Code",
     command: "claude",
     trace: ".claude",
+    oneShot: (prompt) => ["-p", prompt],
+    appCopies: [{ home: "Library/Application Support/Claude/claude-code/*/*/claude.app/Contents/MacOS/claude" }],
     skills: ".claude/skills",
     listenVerified: true,
     env: (home, config) => [
@@ -115,6 +131,8 @@ export const HARNESSES: readonly Harness[] = [
     name: "Codex",
     command: "codex",
     trace: ".codex",
+    oneShot: (prompt) => ["exec", "--skip-git-repo-check", prompt],
+    appCopies: [{ apps: "ChatGPT.app/Contents/Resources/codex-cli/bin/codex" }],
     skills: ".agents/skills",
     listenVerified: true,
     env: (home, config) => [
@@ -162,6 +180,7 @@ export const HARNESSES: readonly Harness[] = [
     name: "Gemini CLI",
     command: "gemini",
     trace: ".gemini/settings.json",
+    oneShot: (prompt) => ["-p", prompt],
     skills: ".agents/skills",
     listenVerified: false,
     mcp: {
@@ -195,6 +214,7 @@ export const HARNESSES: readonly Harness[] = [
     name: "Antigravity CLI",
     command: "agy",
     trace: ".gemini/antigravity-cli",
+    oneShot: (prompt) => ["-p", prompt, "--dangerously-skip-permissions"],
     skills: ".gemini/config/skills",
     listenVerified: true,
     mcp: {
@@ -215,6 +235,7 @@ export const HARNESSES: readonly Harness[] = [
     name: "Cursor",
     command: "cursor-agent",
     trace: ".cursor",
+    oneShot: (prompt) => ["-p", "--force", prompt],
     skills: ".agents/skills",
     listenVerified: false,
     mcp: {

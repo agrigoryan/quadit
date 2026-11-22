@@ -27,6 +27,7 @@
 import type { WebContents, WebContentsView } from "electron";
 import type { AppPages } from "@/main/app-pages";
 import type { Connections } from "@/main/connections";
+import type { SelfRuns } from "@/main/self-runs";
 import type { ServerWindows } from "@/main/server-windows";
 import type { ConnectChoice, ConnectTarget } from "@/shared/pages-api";
 
@@ -49,6 +50,10 @@ export interface ConnectPageParts {
   target(serverId: string): Omit<ConnectTarget, "openedByPage"> | null;
   /** Puts text on the clipboard. */
   copy(text: string): Promise<void>;
+  /** What the app runs by itself for the tools (self-runs.ts). */
+  selfRuns: Pick<SelfRuns, "self" | "setAnswering" | "logOf">;
+  /** Opens a log file. */
+  showLog(path: string): Promise<void>;
   /** Shows the folder of the backups Connect keeps. */
   showBackups(): Promise<void>;
 }
@@ -91,6 +96,9 @@ export class ConnectPage {
       toolHandshake: (_sender, harness) => connections.handshake(String(harness)),
       newConnectCode: (_sender, harness) => connections.newCode(String(harness)),
       updateSkill: (_sender, harness) => connections.updateSkill(String(harness)),
+      toolSelf: (_sender, harness) => parts.selfRuns.self(String(harness)),
+      setAnswering: (_sender, harness, on) => parts.selfRuns.setAnswering(String(harness), on === true),
+      showToolLog: (_sender, harness) => parts.showLog(parts.selfRuns.logOf(String(harness))),
       copyText: (_sender, text) => parts.copy(String(text)),
     });
   }
