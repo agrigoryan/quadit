@@ -78,8 +78,7 @@ func NewClient() (*Client, error) {
 			}
 		}
 		c.URL, c.Token = sc.URL, sc.Token
-		// The app is started only for a login file nobody else could have written (systemStarter).
-		if sc.App != nil && loginIsPrivate(configPath()) {
+		if sc.App != nil {
 			c.app = &appStart{login: *sc.App, dir: filepath.Dir(configPath()), starter: systemStarter{}, within: appStartWithin, stderr: os.Stderr}
 		}
 	}

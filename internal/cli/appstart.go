@@ -57,15 +57,7 @@ type appStarter interface {
 }
 
 // systemStarter starts the app with the command appCommand gives, never
-// through a shell.
-//
-// What it guards against, and what not: the app it starts is named by the
-// login file, so a login file anyone else could write, or an app path
-// anyone else could replace, would let another account on the computer
-// have this one run its program. Those are refused (loginIsPrivate,
-// appPathIsSafe), and macOS's commands are run by their full paths, not
-// found on PATH. A program that can already write this person's own files
-// can do anything they can, and is not something a check here could stop.
+// through a shell; macOS's commands by their full paths, not found on PATH.
 type systemStarter struct{}
 
 // running reports whether the app runs: on macOS, whether the system knows
@@ -94,11 +86,6 @@ func (systemStarter) start(ctx context.Context, app appLogin) error {
 	argv, err := appCommand(runtime.GOOS, app)
 	if err != nil {
 		return err
-	}
-	if runtime.GOOS != "darwin" {
-		if err := appPathIsSafe(argv[0]); err != nil {
-			return err
-		}
 	}
 	// Detached from the command's end: the app goes on running after it.
 	cmd := exec.CommandContext(context.WithoutCancel(ctx), argv[0], argv[1:]...) //nolint:gosec // the argument list of appCommand: a fixed command, or the app's own path as the app recorded it
@@ -141,22 +128,6 @@ type appStart struct {
 	// answering, said again on every later failure of the run (a change
 	// sent again after the first try ended).
 	note string
-}
-
-// appPathIsSafe refuses an app to start that another account could have
-// put there: not a full path, not a regular file, not one that can be run,
-// or one that others than its owner may write.
-func appPathIsSafe(path string) error {
-	info, err := os.Stat(path)
-	switch {
-	case err != nil:
-		return err
-	case !filepath.IsAbs(path) || !info.Mode().IsRegular() || info.Mode()&0o111 == 0:
-		return fmt.Errorf("%s is not an app to run", path)
-	case info.Mode()&0o022 != 0:
-		return fmt.Errorf("%s may be changed by others than its owner, so it is not run", path)
-	}
-	return nil
 }
 
 // appStartWithin is how long the command waits for the server once it
