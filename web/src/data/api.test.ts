@@ -1,5 +1,6 @@
 // When to try again (data/api.ts): whenReachable's waits, and what ends them early; a
-// request called off is not a network failure; and a read left unanswered is one.
+// request called off is not a network failure; a read left unanswered is one;
+// and a read of a file's first bytes.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError, NetworkError, noteReachable, onReachableAgain, whenReachable } from "@/data/api";
@@ -248,5 +249,52 @@ describe("a read the server does not begin to answer", () => {
     expect(slow.calls[0]?.aborted).toBe(false);
     slow.calls[0]?.answer({ done: true });
     expect(await write).toEqual({ done: true });
+  });
+});
+
+describe("a read of a file's first bytes", () => {
+  /** A fetch that answers with these bytes, or with a body that never ends; it notes what it was asked. */
+  function answersBytes(bytes: Uint8Array<ArrayBuffer> | "never ends", status = 200) {
+    const seen = { headers: {} as Record<string, string>, signal: undefined as AbortSignal | undefined };
+    vi.spyOn(globalThis, "fetch").mockImplementationOnce((_path, init) => {
+      seen.headers = (init?.headers ?? {}) as Record<string, string>;
+      const signal = init?.signal ?? undefined;
+      seen.signal = signal;
+      const body =
+        bytes === "never ends"
+          ? new ReadableStream<Uint8Array>({
+              start(stream) {
+                stream.enqueue(new Uint8Array([104, 105]));
+                // As a real fetch does: the body ends with an AbortError when the request is called off.
+                signal?.addEventListener("abort", () =>
+                  stream.error(new DOMException("The operation was aborted.", "AbortError")),
+                );
+              },
+            })
+          : bytes;
+      return Promise.resolve(new Response(body, { status }));
+    });
+    return seen;
+  }
+
+  it("asks for only those bytes, and keeps no more than them if the server sends more", async () => {
+    const seen = answersBytes(new TextEncoder().encode("hello world"));
+    const got = await api.bytes("/f/1/notes.txt", 5);
+    expect(seen.headers.Range).toBe("bytes=0-4");
+    expect(new TextDecoder().decode(got)).toBe("hello");
+  });
+
+  it("fails as any read does when the server refuses", async () => {
+    answersBytes(new TextEncoder().encode(JSON.stringify({ error: { message: "file not found" } })), 404);
+    await expect(api.bytes("/f/1/notes.txt", 5)).rejects.toMatchObject({ status: 404, message: "file not found" });
+  });
+
+  it("is given up when the whole answer has not arrived in thirty seconds, as the server not reached", async () => {
+    const seen = answersBytes("never ends");
+    const read = api.bytes("/f/1/notes.txt", 5).catch((err: unknown) => err);
+    await later(29_999);
+    expect(seen.signal?.aborted).toBe(false);
+    await later(1);
+    expect(await read).toBeInstanceOf(NetworkError);
   });
 });

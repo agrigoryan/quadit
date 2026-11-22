@@ -55,6 +55,13 @@ interface RequestOptions {
   plain?: boolean;
   /** How long a read's answer has to begin, in milliseconds, when the server needs longer for it than for other reads. */
   startsWithin?: number;
+  /**
+   * The answer is a file's bytes, the first this many of them (all of them
+   * when it has fewer), handed over as they are. A refusal is JSON still.
+   * The whole answer must arrive within BYTES_ARRIVE_WITHIN_MS, not only
+   * begin: it is small, and someone is waiting to see it.
+   */
+  firstBytes?: number;
 }
 
 const request = <T>(method: string, path: string, opts: RequestOptions = {}) =>
@@ -69,6 +76,13 @@ const request = <T>(method: string, path: string, opts: RequestOptions = {}) =>
  * wait out and try again.
  */
 const READ_STARTS_WITHIN_MS = 20_000;
+
+/**
+ * How long a read of a file's first bytes (a megabyte or so) has to arrive
+ * whole: long enough for a slow phone connection, short enough that nobody
+ * is left looking at a spinner over a connection that died.
+ */
+const BYTES_ARRIVE_WITHIN_MS = 30_000;
 
 /**
  * The time a read's answer has to begin. Its signal is the one the request
@@ -100,7 +114,12 @@ function startLimit(ms: number, caller?: AbortSignal) {
 }
 
 async function fetchAnswer<T>(method: string, path: string, opts: RequestOptions): Promise<T> {
+  const bytes = opts.firstBytes;
   const headers: Record<string, string> = { Accept: opts.plain ? "text/plain" : "application/json" };
+  if (bytes !== undefined) {
+    headers.Accept = "*/*";
+    headers.Range = `bytes=0-${bytes - 1}`;
+  }
   let body: BodyInit | undefined;
   if (opts.raw) {
     body = opts.raw;
@@ -111,7 +130,8 @@ async function fetchAnswer<T>(method: string, path: string, opts: RequestOptions
   }
 
   // A write is left to end by itself: whether it arrived is not known, and saying it did not would be a guess.
-  const limit = method === "GET" ? startLimit(opts.startsWithin ?? READ_STARTS_WITHIN_MS, opts.signal) : null;
+  const within = bytes === undefined ? (opts.startsWithin ?? READ_STARTS_WITHIN_MS) : BYTES_ARRIVE_WITHIN_MS;
+  const limit = method === "GET" ? startLimit(within, opts.signal) : null;
   try {
     let res: Response;
     try {
@@ -126,17 +146,20 @@ async function fetchAnswer<T>(method: string, path: string, opts: RequestOptions
       if (!limit?.passed() && calledOff(err, opts.signal)) throw err;
       throw new NetworkError(err);
     }
-    limit?.met();
+    if (bytes === undefined) limit?.met();
 
     // A gateway in front of a stopped server answers 502-504: same as offline.
     if (res.status >= 502 && res.status <= 504) throw new NetworkError();
 
     let text: string;
     try {
+      // A server that sends more than was asked for is not taken at its word.
+      if (bytes !== undefined && res.status >= 200 && res.status < 300)
+        return new Uint8Array(await res.arrayBuffer()).subarray(0, bytes) as T;
       text = await res.text();
     } catch (err) {
-      // The connection went away while the answer was arriving.
-      if (calledOff(err, opts.signal)) throw err;
+      // The connection went away while the answer was arriving, or the time for all of it passed.
+      if (!limit?.passed() && calledOff(err, opts.signal)) throw err;
       throw new NetworkError(err);
     }
     return answer<T>(res.status, text, opts);
@@ -310,6 +333,9 @@ export function whenReachable(attempt: number, signal?: AbortSignal): Promise<vo
 export const api = {
   get: <T>(path: string, signal?: AbortSignal, opts?: Pick<RequestOptions, "startsWithin">) =>
     request<T>("GET", path, { ...opts, signal }),
+  /** The first `count` bytes of a file (its /f/ address), or all of them when it has fewer. */
+  bytes: (path: string, count: number, signal?: AbortSignal) =>
+    request<Uint8Array>("GET", path, { signal, firstBytes: count }),
   /** A read in its plain-text form, as an agent or the CLI reads it. */
   getText: (path: string, signal?: AbortSignal) => request<string>("GET", path, { signal, plain: true }),
   post: <T>(path: string, body?: unknown, opts?: RequestOptions) => request<T>("POST", path, { ...opts, body }),
