@@ -17,13 +17,17 @@ Any coding agent works: Quadit needs nothing made for one in particular. An agen
 - **The skill and the `quadit` command.** The skill (`integrations/skills/quadit/SKILL.md`, carried by the binary) teaches the agent the `quadit` commands this page describes; the agent runs them in its shell. `quadit skill install` writes it to `~/.agents/skills/quadit/`, where Codex, Cursor, Gemini CLI, GitHub Copilot, opencode and pi look, to `~/.gemini/config/skills/quadit/` on a computer that has Antigravity CLI, and to `~/.claude/skills/quadit/`, where Claude Code looks. Run it again after updating Quadit. `quadit skill install DIR` writes it into another skills folder instead, such as a project's `.agents/skills`.
 - **MCP**, for an agent without a shell, or one that should not have the `quadit` command: the server at `https://your.server/mcp`, with the token as a bearer header (see [MCP](#mcp)). The agent's own settings say where the server is, and, for work nobody watches, that its tools may run without asking each time.
 
-To wake an agent when something needs it, run `quadit listen --exec COMMAND`, with the agent's command that runs one prompt and exits; the inbox item is in `QUADIT_EVENT`:
+To wake an agent when something needs it, run `quadit listen --exec COMMAND`, with the agent's command that runs one prompt and exits. The item is in `QUADIT_ITEM` as `quadit wait` prints it (its `ITEM` line, saying `(agent)` when another agent wrote it; the command that reads it; the line that answers it once, with a change id made from the item), and its line in the feed in `QUADIT_EVENT` and on standard input, as before:
 
 ```bash
 #!/bin/sh
 # wake.sh: one inbox item for the agent
-exec codex exec "Quadit woke you for this inbox item: $QUADIT_EVENT. Handle it with the quadit skill, answering where you were asked."
+exec codex exec "Quadit woke you for this inbox item:
+$QUADIT_ITEM
+Handle it with the quadit skill, answering where you were asked."
 ```
+
+While the command runs, `listen` renews its lease every minute, so a run that takes longer than the lease's five minutes keeps the item from being handed to another session.
 
 Each agent below: its MCP settings with Quadit's tools allowed to run unattended, and its one-prompt command. Replace `https://quadit.example.com` with your server; `QUADIT_TOKEN` is read from the environment.
 
@@ -106,7 +110,7 @@ Tokens are kept only in `quadit`'s own login files, readable by the user alone, 
 
 Connect is a page of the app laid over the workspace window (File → Connect Agents…, the Agents page, the button under a task's comment box). A tool it set up shows the line to say in it, `Connect to Quadit K7PQ2M`, until the agent gives the code back; then whether it listens.
 
-**For the server on this computer, the app connects and answers by itself.** Right after Connect writes a tool's files, the app runs the tool once, without a window, with its one-prompt command and "Connect to Quadit CODE", as that tool's own login, and the card turns "Connected" when the server says the code was used. If the tool cannot be run, is not signed in, or the code does not come back within two minutes, the card shows the line to say in the tool instead, with a word on why. Then, while the app is open, it keeps one listener for each connected tool: `quadit listen by="the Quadit app" --exec …`, whose command runs the tool's one-prompt command with "Quadit woke you for this inbox item: … Handle it with the quadit skill, answering where you were asked." A comment on a task of that agent is answered with no chat open, and the agent shows as Listening everywhere.
+**For the server on this computer, the app connects and answers by itself.** Right after Connect writes a tool's files, the app runs the tool once, without a window, with its one-prompt command and "Connect to Quadit CODE", as that tool's own login, and the card turns "Connected" when the server says the code was used. If the tool cannot be run, is not signed in, or the code does not come back within two minutes, the card shows the line to say in the tool instead, with a word on why. Then, while the app is open, it keeps one listener for each connected tool: `quadit listen by="the Quadit app" --exec …`, whose command runs the tool's one-prompt command with "Quadit woke you for this inbox item:", the item as `QUADIT_ITEM` gives it, and "Handle it with the quadit skill, answering where you were asked." A comment on a task of that agent is answered with no chat open, and the agent shows as Listening everywhere.
 
 - What it costs: one run of the tool for each item that comes in, on the person's own plan; nothing while nothing comes. One run at a time per tool, each with a ten-minute limit; more than six runs in a minute pauses the tool by itself.
 - The tool's card says "Answers by itself while Quadit is open", with Pause (remembered) and Resume. For a server elsewhere it is off, with "Answer by itself" on the card: other people's comments on a team server would otherwise start runs on this computer.
@@ -331,7 +335,7 @@ People comment on words of a page (the text they select), on a block, or on the 
 #1207 11-16 10:42 @mia mentioned: Boss fight — @coder is this still three phases?  (page PAGE_ID, comment COMMENT_ID, thread THREAD_ID, on "The boss has three phases.")
 ```
 
-`quadit listen` hands the same line to its command in `QUADIT_EVENT`. Then:
+`quadit listen` hands the same line to its command in `QUADIT_EVENT`, and the record `quadit wait` prints in `QUADIT_ITEM`. Then:
 
 ```bash
 quadit doc PAGE_ID                  # the page, then its open threads

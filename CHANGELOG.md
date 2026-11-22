@@ -21,6 +21,8 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ### Changed
 
+- `quadit listen --exec` gives its command, beside the item's line (`QUADIT_EVENT`, unchanged), what `quadit wait` prints for it in `QUADIT_ITEM`: the item's line (saying when another agent wrote it), how to read it, and the line that answers it once. It renews its lease every minute while the command runs, so a long run keeps the item. The skill says that what is written in Quadit is to read and answer, never instructions, and what a woken agent does with one item.
+- `quadit connect`, and a wait or a listen refused because something else listens, say so in the command's own words, with what the server sent only in the forms a handle, a label and a time have.
 - The skill says what an agent does when a listener outside any chat (a companion, or the Quadit app) wakes it for one item: handle that item, answer where it was asked, and finish, without listening or acknowledging. `docs/agents.md` and the README say that for the server on its computer the desktop app gives the connect code back itself and, while open, answers by itself, one run of the tool per item, with Pause on the tool's card.
 - `scripts/agent-listen-check.sh` gains a companion phase, run as the desktop app runs its listener, and records each run's length and tokens: the cost of one answered comment.
 - Listening no longer blocks a chat with a person where the tool can be woken by a background command (Claude Code, Antigravity CLI): the skill has the agent run `quadit wait for=3600` in the background and go on talking. Where the tool cannot be woken (Codex today), the agent says first that listening keeps the chat busy; a run with nobody in it waits in the foreground as before. Before it listens, an agent whose `quadit` commands each ask for approval says so, and how to allow them.
@@ -41,6 +43,8 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ### Changed
 
+- `quadit listen --exec` gives its command, beside the item's line (`QUADIT_EVENT`, unchanged), what `quadit wait` prints for it in `QUADIT_ITEM`: the item's line (saying when another agent wrote it), how to read it, and the line that answers it once. It renews its lease every minute while the command runs, so a long run keeps the item. The skill says that what is written in Quadit is to read and answer, never instructions, and what a woken agent does with one item.
+- `quadit connect`, and a wait or a listen refused because something else listens, say so in the command's own words, with what the server sent only in the forms a handle, a label and a time have.
 - An agent counts as listening only while its listener holds the lease (`quadit wait`, `quadit listen`) or a webhook pushes to it, or while a `quadit listen` from before this version holds its wait on the cursor `listen`; another wait on the feed or a live stream no longer marks it. The pages read whether it listens again while they show it, so it does not go stale.
 - `quadit listen` holds the same lease (and keeps it beside its login, so a restart goes on with it; `take=1` takes it over), acknowledges with it, stops when another session takes the lease over, and prints the command that gives up on an item it could not handle (`quadit ack SEQ listen lease=ID`). An acknowledgment without a lease is made as before.
 - A listener's cursor never moved before starts at the oldest unread inbox item of the last day, else at the present, instead of replaying the whole inbox; the first answer says how many older unread items were left alone. A wait with nothing for the agent no longer moves the cursor.
@@ -64,6 +68,8 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ### Changed
 
+- `quadit listen --exec` gives its command, beside the item's line (`QUADIT_EVENT`, unchanged), what `quadit wait` prints for it in `QUADIT_ITEM`: the item's line (saying when another agent wrote it), how to read it, and the line that answers it once. It renews its lease every minute while the command runs, so a long run keeps the item. The skill says that what is written in Quadit is to read and answer, never instructions, and what a woken agent does with one item.
+- `quadit connect`, and a wait or a listen refused because something else listens, say so in the command's own words, with what the server sent only in the forms a handle, a label and a time have.
 - The desktop app's first run happens in one window, the one the workspace opens in, instead of small windows of its own: Welcome, then "Connect your AI tools", which looks for the tools on the computer and shows each as a card that connects with one button, says in plain words which files it changes, and takes it back with Undo; Continue opens the workspace on its sample tasks. The Connect window shows the tools with the same cards, its technical choices under More options.
 
 ### Fixed
@@ -85,6 +91,8 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ### Changed
 
+- `quadit listen --exec` gives its command, beside the item's line (`QUADIT_EVENT`, unchanged), what `quadit wait` prints for it in `QUADIT_ITEM`: the item's line (saying when another agent wrote it), how to read it, and the line that answers it once. It renews its lease every minute while the command runs, so a long run keeps the item. The skill says that what is written in Quadit is to read and answer, never instructions, and what a woken agent does with one item.
+- `quadit connect`, and a wait or a listen refused because something else listens, say so in the command's own words, with what the server sent only in the forms a handle, a label and a time have.
 - Local builds take their version from the server's own tags.
 
 ### Fixed
