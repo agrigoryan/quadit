@@ -1,15 +1,21 @@
 // @vitest-environment jsdom
-// The lightbox (ui/media.tsx): one file over the whole screen, and, when it
-// is one of several, the way from it to the ones beside it.
+// The lightbox (ui/media.tsx): one file over the whole screen, picture,
+// video or text, with its name and its download; and, when it is one of
+// several, the way from it to the ones beside it.
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { MemoryRouter } from "react-router";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { WithQuery } from "@/test/query";
 import type { FileRow } from "@/types/core";
 import { Lightbox } from "@/ui/media";
 import { TooltipProvider } from "@/ui/tooltip";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function picture(name: string, content_type = "image/png"): FileRow {
   return {
@@ -28,9 +34,13 @@ function picture(name: string, content_type = "image/png"): FileRow {
 function Open({ files }: { files: FileRow[] }) {
   const [file, setFile] = useState<FileRow | null>(files[0] ?? null);
   return (
-    <TooltipProvider>
-      <Lightbox file={file} files={files} onShow={setFile} onClose={() => setFile(null)} />
-    </TooltipProvider>
+    <MemoryRouter>
+      <WithQuery>
+        <TooltipProvider>
+          <Lightbox file={file} files={files} onShow={setFile} onClose={() => setFile(null)} />
+        </TooltipProvider>
+      </WithQuery>
+    </MemoryRouter>
   );
 }
 
@@ -79,5 +89,65 @@ describe("Lightbox", () => {
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
     expect(screen.queryByText("1 / 1")).toBeNull();
+  });
+});
+
+describe("Lightbox with text files", () => {
+  /** The server, answering each file's address with its text. */
+  function serves(texts: Record<string, string>) {
+    vi.stubGlobal("fetch", (path: string) => Promise.resolve(new Response(texts[path] ?? "")));
+  }
+  const text = (name: string, content_type = "text/plain; charset=utf-8") => picture(name, content_type);
+
+  it("moves across pictures and text alike, in their order", async () => {
+    serves({ "/files/plan.md": "# The plan\n\nShip it.", "/files/data.json": '{"ok": true}' });
+    render(<Open files={[text("plan.md"), text("data.json", "application/json"), picture("a.png")]} />);
+    const dialog = screen.getByRole("dialog");
+    expect(await within(dialog).findByRole("heading", { name: "The plan" })).toBeTruthy();
+    expect(within(dialog).getByText("1 / 3")).toBeTruthy();
+
+    fireEvent.keyDown(dialog, { key: "ArrowRight" });
+    expect(await within(dialog).findByText('{"ok": true}')).toBeTruthy();
+    expect(within(dialog).queryByRole("radiogroup")).toBeNull();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Next" }));
+    expect(shown()).toBe("/files/a.png");
+    fireEvent.keyDown(dialog, { key: "ArrowRight" });
+    expect(await within(dialog).findByRole("heading", { name: "The plan" })).toBeTruthy();
+  });
+
+  it("names the file and always offers its download, a picture as much as text", () => {
+    render(<Open files={[picture("a.png"), picture("b.png")]} />);
+    const dialog = screen.getByRole("dialog", { name: "a.png" });
+    const download = within(dialog).getByRole("link", { name: "Download" });
+    expect(download.getAttribute("href")).toBe("/files/a.png");
+    expect(download.getAttribute("download")).toBe("a.png");
+  });
+
+  it("shows Markdown rendered or as its source, at a choice", async () => {
+    serves({ "/files/plan.md": "# The plan" });
+    render(<Open files={[text("plan.md")]} />);
+    const dialog = screen.getByRole("dialog", { name: "plan.md" });
+    expect(await within(dialog).findByRole("heading", { name: "The plan" })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Source" }));
+    expect(within(dialog).getByText("# The plan").tagName).toBe("PRE");
+    expect(within(dialog).queryByRole("heading", { name: "The plan" })).toBeNull();
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Rendered" }));
+    expect(within(dialog).getByRole("heading", { name: "The plan" })).toBeTruthy();
+  });
+
+  it("starts on the text, so the keys scroll it", async () => {
+    serves({ "/files/run.log": "one\ntwo" });
+    render(<Open files={[text("run.log")]} />);
+    expect(document.activeElement).toBe(screen.getByRole("region", { name: "run.log" }));
+  });
+
+  it("does not move when the arrow keys pick between Rendered and Source", async () => {
+    serves({ "/files/plan.md": "# The plan", "/files/b.md": "# B" });
+    render(<Open files={[text("plan.md"), text("b.md")]} />);
+    const dialog = screen.getByRole("dialog");
+    const source = within(dialog).getByRole("radio", { name: "Rendered" });
+    fireEvent.keyDown(source, { key: "ArrowRight" });
+    expect(within(dialog).getByText("1 / 2")).toBeTruthy();
   });
 });

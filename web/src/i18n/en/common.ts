@@ -90,6 +90,15 @@ export const common = {
   "common.lostProjectHint": "Your access to this workspace was changed while you had it open.",
   "common.loadFailed": "Could not load the workspace",
 
+  "viewer.download": "Download",
+  "viewer.showAs": "Show as",
+  "viewer.rendered": "Rendered",
+  "viewer.source": "Source",
+  "viewer.cut": "Showing the first 1 MB",
+  "viewer.notText": "This file cannot be shown",
+  "viewer.notTextHint": "It is not text. Download it to open it in another app.",
+  "viewer.failed": "Could not load this file",
+
   "time.now": "just now",
   "time.minutes": "{n}m",
   "time.hours": "{n}h",

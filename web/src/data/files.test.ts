@@ -1,8 +1,9 @@
-// Uploading a file (data/files.ts): what happens while the server cannot be reached.
+// Files (data/files.ts): what happens to an upload while the server cannot be
+// reached, and how the viewer shows a file, if it can.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, NetworkError, noteReachable } from "@/data/api";
-import { uploadFile, useTransfers } from "@/data/files";
+import { shownAs, uploadFile, useTransfers } from "@/data/files";
 
 const file = new File(["hello"], "note.txt", { type: "text/plain" });
 const stored = {
@@ -59,5 +60,61 @@ describe("uploadFile", () => {
     await later(60_000);
     expect(send).toHaveBeenCalledTimes(1);
     expect(useTransfers.getState().items).toEqual([]);
+  });
+});
+
+describe("shownAs", () => {
+  const as = (name: string, content_type = "application/octet-stream") => shownAs({ name, content_type });
+
+  it("shows pictures and videos by their type, as before", () => {
+    expect(as("cat.png", "image/png")).toBe("image");
+    expect(as("clip", "video/mp4")).toBe("video");
+  });
+
+  it("renders Markdown, known by its name or its type", () => {
+    expect(as("PLAN.md", "text/plain; charset=utf-8")).toBe("markdown");
+    expect(as("notes.Markdown")).toBe("markdown");
+    expect(as("notes", "text/markdown; charset=utf-8")).toBe("markdown");
+  });
+
+  it("shows text a person reads as text, by its name whatever type it was given", () => {
+    for (const name of ["run.log", "a.txt", "data.json", "t.csv", "t.tsv", "c.yaml", "c.yml", "c.toml", "f.xml"])
+      expect(as(name), name).toBe("text");
+    for (const name of [
+      "main.go",
+      "app.ts",
+      "view.tsx",
+      "x.js",
+      "x.py",
+      "x.sh",
+      "q.sql",
+      "s.css",
+      "fix.diff",
+      "fix.patch",
+    ])
+      expect(as(name), name).toBe("text");
+    // A system's table may call a TypeScript file an MPEG stream.
+    expect(as("app.ts", "video/mp2t")).toBe("text");
+  });
+
+  it("shows anything served as text, JSON, XML or YAML as text", () => {
+    expect(as("README", "text/plain; charset=utf-8")).toBe("text");
+    expect(as("out", "application/json")).toBe("text");
+    expect(as("feed", "application/atom+xml")).toBe("text");
+    expect(as("compose", "application/yaml")).toBe("text");
+  });
+
+  it("shows a page or a drawing as its source, never as itself", () => {
+    expect(as("page.html", "text/html; charset=utf-8")).toBe("text");
+    expect(as("page.htm")).toBe("text");
+    expect(as("logo.svg", "image/svg+xml")).toBe("text");
+    expect(as("logo", "image/svg+xml")).toBe("text");
+  });
+
+  it("leaves anything else to download", () => {
+    expect(as("handbook.zip", "application/zip")).toBeNull();
+    expect(as("report.pdf", "application/pdf")).toBeNull();
+    expect(as("sheet.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).toBeNull();
+    expect(as("Makefile")).toBeNull();
   });
 });

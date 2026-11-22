@@ -191,6 +191,34 @@ export const isImage = (f: Pick<FileRow, "content_type"> | undefined) => !!f?.co
 export const isVideo = (f: Pick<FileRow, "content_type"> | undefined) => !!f?.content_type.startsWith("video/");
 export const isMedia = (f: Pick<FileRow, "content_type"> | undefined) => isImage(f) || isVideo(f);
 
+/** How the viewer (ui/media.tsx) shows a file: Markdown rendered, other text as it is written. */
+export type Shown = "image" | "video" | "markdown" | "text";
+
+const MARKDOWN_NAME = /\.(md|markdown)$/i;
+
+// Text a person reads: notes, logs, data, configuration and the source code
+// an agent hands over. Known by the name first, because the type a file
+// arrives with says little for these: the CLI sends none, so the server
+// guesses (text/plain, or whatever the system's table says for the
+// extension, which for .ts is an MPEG video). A page and a drawing (.html,
+// .svg) are on the list so that they are shown as their source: what they
+// would draw or run never reaches the page.
+const TEXT_NAME =
+  /\.(txt|text|log|json|jsonl|ndjson|csv|tsv|ya?ml|toml|ini|cfg|conf|env|xml|html?|svg|go|mod|sum|ts|tsx|js|jsx|mjs|cjs|py|rb|rs|java|kt|swift|c|h|cc|cpp|hpp|cs|php|lua|sh|bash|zsh|fish|ps1|sql|graphql|proto|css|scss|less|diff|patch)$/i;
+
+/** A type served as text, or as a text format: JSON, XML, YAML and the like ("application/atom+xml"). */
+const TEXT_TYPE = /^(text\/|application\/(json|xml|ya?ml|toml|javascript|x-sh|sql)$|[^/]+\/[^/]+\+(json|xml|yaml)$)/;
+
+/** How the viewer shows this file, or null when it cannot and the file downloads. */
+export function shownAs(f: Pick<FileRow, "name" | "content_type">): Shown | null {
+  const type = (f.content_type.split(";")[0] ?? "").trim().toLowerCase();
+  if (MARKDOWN_NAME.test(f.name) || type === "text/markdown") return "markdown";
+  if (TEXT_NAME.test(f.name) || type === "image/svg+xml") return "text";
+  if (isImage(f)) return "image";
+  if (isVideo(f)) return "video";
+  return TEXT_TYPE.test(type) ? "text" : null;
+}
+
 export function fileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 ** 2) return `${Math.round(bytes / 1024)} KB`;

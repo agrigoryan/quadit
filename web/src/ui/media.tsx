@@ -1,11 +1,13 @@
-import { useRef } from "react";
-import { FileText, Play, X } from "lucide-react";
-import { Dialog as RDialog, VisuallyHidden } from "radix-ui";
+import { useLayoutEffect, useRef, useState } from "react";
+import { Download, FileText, Play, X } from "lucide-react";
+import { Dialog as RDialog } from "radix-ui";
 import { cx } from "@/lib/cx";
-import { fileSize, isImage, isVideo } from "@/data/files";
+import { fileSize, isImage, isVideo, shownAs } from "@/data/files";
 import { t } from "@/lib/i18n";
 import type { FileRow } from "@/types/core";
 import { CarouselArrows, CarouselCount, onCarouselKey, type Steps } from "@/ui/carousel";
+import { Segmented } from "@/ui/segmented";
+import { TextFile } from "@/ui/text-file";
 
 interface ThumbProps {
   file: FileRow;
@@ -86,24 +88,31 @@ function MediaFull({ file, className }: { file: FileRow; className?: string }) {
 interface LightboxProps {
   /** The file shown; null while it is closed. */
   file: FileRow | null;
-  /** The pictures and videos it is one of, in their order. */
+  /** The files it is one of, in their order: those it can show (shownAs in data/files.ts). */
   files: FileRow[];
   /** Asked for another of them. */
   onShow: (file: FileRow) => void;
   onClose: () => void;
 }
 
-/** The close button, in the look of the carousel's arrows. */
-const round =
-  "flex size-10 items-center justify-center rounded-full bg-black/55 text-white ring-1 ring-white/25 hover:bg-black/75";
+/** The close button and the download link, in the look of the carousel's arrows. */
+const dark = "rounded-full bg-black/55 text-white ring-1 ring-white/25 hover:bg-black/75 focus-visible:outline-white";
+const round = cx("flex size-10 shrink-0 items-center justify-center", dark);
 
 /**
- * One file over the whole screen. Escape or a click outside closes it. When
- * it is one of several, the arrows on its sides and the arrow keys go to the
- * ones beside it, and round from the last to the first.
+ * One file over the whole screen, with its name and a link that downloads
+ * it: a picture, a video, or a text file read and shown as text (Markdown
+ * rendered, or its source at a choice). Escape or a click outside closes it.
+ * When it is one of several, the arrows on its sides (below it on a phone)
+ * and the arrow keys go to the ones beside it, and round from the last to
+ * the first. In a text file the up and down keys scroll, and the left and
+ * right ones keep moving: the text wraps, so they have nothing to scroll,
+ * except in rendered Markdown wide enough (a table) to scroll sideways.
  */
 export function Lightbox({ file, files, onShow, onClose }: LightboxProps) {
   const box = useRef<HTMLDivElement | null>(null);
+  const textBox = useRef<HTMLElement | null>(null);
+  const [markdownAs, setMarkdownAs] = useState<"rendered" | "source">("rendered");
   const at = file ? files.findIndex((f) => f.id === file.id) : -1;
   const steps: Steps = {
     index: Math.max(at, 0),
@@ -114,6 +123,15 @@ export function Lightbox({ file, files, onShow, onClose }: LightboxProps) {
       if (next) onShow(next);
     },
   };
+  const shown = file ? shownAs(file) : null;
+  const text = shown === "markdown" || shown === "text";
+
+  // The text box stays from one text file to the next, so the keys that
+  // scroll it keep working; each file starts at its top.
+  const fileId = file?.id;
+  useLayoutEffect(() => {
+    if (fileId && textBox.current) textBox.current.scrollTop = 0;
+  }, [fileId]);
 
   return (
     <RDialog.Root open={file !== null} onOpenChange={(open) => !open && onClose()}>
@@ -121,28 +139,80 @@ export function Lightbox({ file, files, onShow, onClose }: LightboxProps) {
         <RDialog.Overlay className="fixed inset-0 z-[70] bg-black/85 animate-fade" />
         <RDialog.Content
           ref={box}
+          data-backdrop
           tabIndex={-1}
           aria-describedby={undefined}
           onOpenAutoFocus={(e) => {
-            // Start on the box, not on an arrow, whose tooltip would come up with it.
+            // Start on the text, which the keys then scroll, or on the box: not on an arrow, whose tooltip would come up with it.
             e.preventDefault();
-            box.current?.focus();
+            (textBox.current ?? box.current)?.focus();
           }}
-          // On a narrow window without a title bar (lib/window-inset.ts) a video's controls stay clear of the window's buttons.
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 outline-none max-sm:window-inset:pt-(--window-inset-height) sm:p-10"
-          onClick={(e) => e.target === e.currentTarget && onClose()}
+          className="fixed inset-0 z-[70] flex flex-col outline-none"
+          // A click on the dark around the file, not on the file or a control.
+          onClick={(e) => e.target instanceof HTMLElement && e.target.hasAttribute("data-backdrop") && onClose()}
           onKeyDown={(e) => onCarouselKey(e, steps)}
         >
-          <VisuallyHidden.Root>
-            <RDialog.Title>{file?.name}</RDialog.Title>
-          </VisuallyHidden.Root>
-          {/* Keyed, so the picture before does not stay up while the next one loads. */}
-          {file && (isImage(file) || isVideo(file)) && <MediaFull key={file.id} file={file} className="rounded-md" />}
-          <CarouselArrows {...steps} size="large" keys={{ previous: "←", next: "→" }} />
-          <CarouselCount index={steps.index} total={steps.total} size="large" />
-          <RDialog.Close aria-label={t("common.close")} className={cx("absolute top-3 right-3", round)}>
-            <X className="size-5" />
-          </RDialog.Close>
+          {/* In a window without a title bar (lib/window-inset.ts) the name stays clear of the window's buttons. */}
+          <div data-backdrop className="flex items-center gap-2 p-3 window-inset:pl-(--window-inset-left)">
+            <RDialog.Title className="min-w-0 flex-1 truncate text-sm font-medium text-white" title={file?.name}>
+              {file?.name}
+            </RDialog.Title>
+            {shown === "markdown" && (
+              <Segmented
+                label={t("viewer.showAs")}
+                value={markdownAs}
+                onChange={setMarkdownAs}
+                options={[
+                  { value: "rendered", label: t("viewer.rendered") },
+                  { value: "source", label: t("viewer.source") },
+                ]}
+              />
+            )}
+            {file && (
+              <a
+                href={file.url}
+                download={file.name}
+                className={cx(
+                  "flex h-10 shrink-0 items-center gap-1.5 px-3 text-sm max-sm:w-10 max-sm:justify-center max-sm:px-0",
+                  dark,
+                )}
+              >
+                <Download className="size-4" aria-hidden />
+                <span className="max-sm:sr-only">{t("viewer.download")}</span>
+              </a>
+            )}
+            <RDialog.Close aria-label={t("common.close")} className={round}>
+              <X className="size-5" />
+            </RDialog.Close>
+          </div>
+          <div
+            data-backdrop
+            className={cx(
+              "relative flex min-h-0 flex-1 items-center justify-center px-4 sm:px-16 sm:pb-10",
+              steps.total > 1 ? "pb-16" : "pb-4",
+            )}
+          >
+            {/* Keyed, so the picture before does not stay up while the next one loads. */}
+            {file && (shown === "image" || shown === "video") && (
+              <MediaFull key={file.id} file={file} className="rounded-md" />
+            )}
+            {file && text && (
+              <section
+                ref={textBox}
+                // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- text that scrolls is reached with the keyboard
+                tabIndex={0}
+                aria-label={file.name}
+                className="size-full max-w-4xl overflow-y-auto overscroll-contain rounded-md bg-surface text-ink shadow-pop"
+              >
+                <TextFile file={file} rendered={shown === "markdown" && markdownAs === "rendered"} />
+              </section>
+            )}
+            {/* Over the sides of the stage; on a phone in a strip below it, off the text. */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 sm:inset-y-0 sm:h-auto [&_button]:pointer-events-auto">
+              <CarouselArrows {...steps} size="large" keys={{ previous: "←", next: "→" }} />
+              <CarouselCount index={steps.index} total={steps.total} size="large" />
+            </div>
+          </div>
         </RDialog.Content>
       </RDialog.Portal>
     </RDialog.Root>

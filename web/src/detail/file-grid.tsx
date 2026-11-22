@@ -1,11 +1,11 @@
-// Files as a grid of thumbnails: pictures and videos open over the whole
-// screen, with the others of the grid a step away; anything else downloads. Used for the task's own files and for
-// the files of a comment.
+// Files as a grid of thumbnails: pictures, videos and text open over the
+// whole screen, with the others of the grid a step away; anything else
+// downloads. Used for the task's own files and for the files of a comment.
 
 import { useState } from "react";
 import { X } from "lucide-react";
 import { cx } from "@/lib/cx";
-import { isMedia } from "@/data/files";
+import { shownAs } from "@/data/files";
 import { t } from "@/lib/i18n";
 import type { FileRow } from "@/types/core";
 import type { Attached } from "@/detail/data";
@@ -36,7 +36,7 @@ export function FileGrid({ files, pending = [], canRemove, onRemove, small, clas
       <ul className={cx("grid gap-2", small ? "grid-cols-3 sm:grid-cols-5" : "grid-cols-3 sm:grid-cols-4", className)}>
         {files.map((a) => (
           <li key={a.id} className={cx("group", tile)}>
-            {isMedia(a.file) ? (
+            {shownAs(a.file) ? (
               <button
                 type="button"
                 aria-label={t("detail.files.open", { name: a.file.name })}
@@ -82,7 +82,7 @@ export function FileGrid({ files, pending = [], canRemove, onRemove, small, clas
       </ul>
       <Lightbox
         file={shown}
-        files={files.filter((a) => isMedia(a.file)).map((a) => a.file)}
+        files={files.filter((a) => shownAs(a.file)).map((a) => a.file)}
         onShow={setShown}
         onClose={() => setShown(null)}
       />

@@ -32,8 +32,12 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   ref?: Ref<HTMLButtonElement>;
 }
 
+/** A button's look, for a link that acts as one (a download). */
+export const buttonLook = (variant: Variant = "secondary", size: Size = "md") =>
+  cx(base, variants[variant], sizes[size]);
+
 export function Button({ variant = "secondary", size = "md", className, type = "button", ...rest }: ButtonProps) {
-  return <button type={type} className={cx(base, variants[variant], sizes[size], className)} {...rest} />;
+  return <button type={type} className={cx(buttonLook(variant, size), className)} {...rest} />;
 }
 
 const iconSizes: Record<Size, string> = { sm: "size-6", md: "size-7", lg: "size-10" };
