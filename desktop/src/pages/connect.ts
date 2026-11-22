@@ -199,7 +199,7 @@ function drawMore(shown: Shown, h: HarnessView) {
   shown.more = drawn;
   const form = h.connected ? null : optionsForm(h);
   shown.fill = form?.fill ?? null;
-  const options = form?.form ?? connectedHow(h.connected);
+  const options = form?.form ?? connectedHow(h);
   options.hidden = true;
   const toggle = button(
     "More options",
@@ -229,11 +229,18 @@ function skillChanged(h: HarnessView): HTMLParagraphElement {
   return line;
 }
 
-function connectedHow(connected: HarnessView["connected"]): HTMLParagraphElement {
-  if (!connected) return make("p");
+/** A connected tool's More options: where and as whom it is connected, and the log of what the app ran for it. */
+function connectedHow(h: HarnessView): HTMLDivElement {
+  const box = make("div", "", "options");
+  const { connected } = h;
+  if (!connected) return box;
   const how = connected.methods.map((m) => (m === "cli" ? "quadit command" : "MCP")).join(" and ");
   const where = [connected.server, connected.workspace].filter(Boolean).join(" · ");
-  return make("p", `Connected (${how}) to ${where} as ${connected.agent}`, "where-to");
+  box.append(
+    make("p", `Connected (${how}) to ${where} as ${connected.agent}`, "where-to"),
+    button("Show log", () => void api.showToolLog(h.id), "link-blue", `Show the log of what Quadit ran for ${h.name}`),
+  );
+  return box;
 }
 
 /**

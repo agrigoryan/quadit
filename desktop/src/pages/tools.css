@@ -409,6 +409,20 @@ button.link-blue:hover {
   }
 }
 
+/* Whether it answers by itself, with its Pause or Resume beside. */
+.answers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.set-up-line.quiet {
+  color: var(--ink-2);
+}
+
 .listen.on {
   color: var(--ok);
   font-weight: 550;

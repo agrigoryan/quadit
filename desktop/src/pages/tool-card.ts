@@ -9,6 +9,10 @@
 //              "Waiting for Codex…", "New code" when it has none, and Undo;
 //   connected  the server says the agent gave the code back: "Connected",
 //              and whether it listens or how to have it listen; Disconnect;
+// and what the app does by itself (desktop contract §11, third amendment):
+// "Connecting…" while it gives the code back, the reason when it could not
+// (above the line to paste), and whether the tool answers by itself, with
+// Pause and Resume;
 // and, set up but where it stands not known here (it works as another
 // server's login, or no answer came yet), a plain line saying so, never
 // "Connected". A set-up card asks the app where its tool stands every couple
@@ -20,7 +24,7 @@
 import { button, lineIcon, make } from "@/pages/dom";
 import { isConnectCode } from "@/shared/bridge";
 import { diskLine, unrevokedWords } from "@/shared/change-words";
-import type { Disconnected, Handshake, PagesApi, Refused } from "@/shared/pages-api";
+import type { Disconnected, Handshake, PagesApi, Refused, SelfRun } from "@/shared/pages-api";
 
 const api = window.quaditPages as PagesApi;
 
@@ -78,6 +82,8 @@ export class ToolCard {
   private setUp = false;
   /** Where it stands with Quadit once set up; null until the app has said. */
   private handshake: Handshake | null = null;
+  /** What the app does by itself for it (giving its code back, answering); null until the app has said. */
+  private self: SelfRun | null = null;
   /** What the card's buttons and its standing lines were last drawn from: they are drawn anew only when it changes. */
   private drawn = "";
   private addsCommand: boolean;
@@ -204,7 +210,9 @@ export class ToolCard {
   private async ask() {
     if (this.asking || !this.setUp) return;
     this.asking = true;
-    const now = await api.toolHandshake(this.tool.id).finally(() => (this.asking = false));
+    const [now, self] = await Promise.all([api.toolHandshake(this.tool.id), api.toolSelf(this.tool.id)]).finally(
+      () => (this.asking = false),
+    );
     if (!this.setUp) return;
     if (now === null) {
       // Taken back elsewhere (another page of the app).
@@ -212,8 +220,9 @@ export class ToolCard {
       this.actions.changed();
       return;
     }
-    if (JSON.stringify(now) === JSON.stringify(this.handshake)) return;
+    if (JSON.stringify([now, self]) === JSON.stringify([this.handshake, this.self])) return;
     this.handshake = now;
+    this.self = self;
     this.show();
     this.actions.changed();
   }
@@ -296,7 +305,11 @@ export class ToolCard {
     setText(this.diskText, diskLine(tool, this.addsCommand && !setUp, setUp));
 
     // Its nodes are replaced only when what they show changes: focus, a selection or a click in them survive the rest.
-    const drawn = JSON.stringify([stands, handshake]);
+    const { self } = this;
+    // What is drawn from: of what the app does by itself, only what this state shows.
+    const shown =
+      stands === "waiting" ? (self?.proving ?? null) : stands === "found" ? null : (self?.answering ?? "none");
+    const drawn = JSON.stringify([stands, handshake, shown]);
     if (drawn === this.drawn) return;
     this.drawn = drawn;
     if (stands === "found") {
@@ -313,15 +326,71 @@ export class ToolCard {
       badge.setAttribute("role", "status");
       badge.append(lineIcon(["M20 6 9 17l-5-5"]), document.createTextNode("Connected"));
       this.act.replaceChildren(badge, back);
-      this.stand.replaceChildren(this.listening(handshake.listening));
+      this.stand.replaceChildren(this.listening(handshake.listening), ...this.answering());
       return;
     }
     this.act.replaceChildren(back);
     if (handshake?.state === "unknown")
       this.stand.replaceChildren(
         make("p", `Set up on ${HERE}. Whether it reached Quadit is not known here.`, "set-up-line"),
+        ...this.answering(),
       );
-    else this.stand.replaceChildren(...this.waitingLines(handshake));
+    else if (self?.proving?.state === "running") {
+      const connecting = make("p", "", "waiting");
+      connecting.setAttribute("role", "status");
+      connecting.append(make("span", "", "pulse"), document.createTextNode("Connecting…"));
+      this.stand.replaceChildren(connecting);
+    } else this.stand.replaceChildren(...this.waitingLines(handshake));
+  }
+
+  /**
+   * Whether it answers by itself while the app is open (desktop contract
+   * §11, third amendment), with Pause or Resume; for another server's tool
+   * not turned on, the button that turns it on; nothing where the app
+   * cannot run it.
+   */
+  private answering(): HTMLElement[] {
+    const { name } = this.tool;
+    const choose = (text: string, on: boolean, label: string) => {
+      const control = button(text, () => void this.setAnswering(control, on), "btn btn-line btn-sm", label);
+      return control;
+    };
+    const line = (text: string, control: HTMLButtonElement) => {
+      const row = make("p", "", "answers");
+      row.append(make("span", text), control);
+      return row;
+    };
+    switch (this.self?.answering) {
+      case "on":
+        return [
+          line("Answers by itself while Quadit is open", choose("Pause", false, `Pause ${name} answering by itself`)),
+        ];
+      case "paused":
+        return [
+          line(
+            `Paused. It answers when you ask it in ${name}.`,
+            choose("Resume", true, `Resume ${name} answering by itself`),
+          ),
+        ];
+      case "guarded":
+        return [
+          line(
+            "Paused: it was started six times in a minute. Resume when you have looked.",
+            choose("Resume", true, `Resume ${name} answering by itself`),
+          ),
+        ];
+      case "off":
+        return [choose("Answer by itself", true, `Let ${name} answer by itself`)];
+      default:
+        return [];
+    }
+  }
+
+  /** The person's Pause, Resume or "Answer by itself"; the card shows the result once the app says it. */
+  private async setAnswering(control: HTMLButtonElement, on: boolean) {
+    control.disabled = true;
+    await api.setAnswering(this.tool.id, on);
+    await this.ask();
   }
 
   /**
@@ -334,7 +403,15 @@ export class ToolCard {
   private waitingLines(handshake: Extract<Handshake, { state: "waiting" }> | null): HTMLElement[] {
     const { name } = this.tool;
     if (!handshake) return [make("p", `Set up on ${HERE}.`, "set-up-line")];
-    const lead = make("p", `Set up on ${HERE}. Now open ${name} and say:`, "set-up-line");
+    // The app could not give the code back itself: why, quietly, and the line to say instead.
+    const failed = this.self?.proving?.state === "failed" ? this.self.proving.reason : null;
+    const lead = failed
+      ? make(
+          "p",
+          `Quadit could not run ${name} by itself (${failed}). Say this in ${name} instead:`,
+          "set-up-line quiet",
+        )
+      : make("p", `Set up on ${HERE}. Now open ${name} and say:`, "set-up-line");
     const { code, refused } = handshake;
     if (!isConnectCode(code)) {
       if (!refused) {

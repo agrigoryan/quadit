@@ -336,8 +336,15 @@ export function slowToStart(binary: string, seconds: number): string {
  * runs; with Claude Code's config folder in that home unless `claudeCode`
  * is false, when no agent tool is found there. Given to the app as HOME and
  * SHELL; nothing outside the test's folders is touched.
+ *
+ * With `quadit` (the run's real quadit), the stand-in quadit hands it every
+ * other command (connect, listen, comment…), and a stand-in `claude` on the
+ * PATH acts as a one-prompt tool (`claude -p PROMPT`): told "Connect to
+ * Quadit CODE" it gives the code back; woken for an inbox item, it answers
+ * the item's task with "Answered by the stand-in". Without it, the app
+ * finds no program to run Claude Code with.
  */
-export function fakeComputer({ claudeCode = true }: { claudeCode?: boolean } = {}) {
+export function fakeComputer({ claudeCode = true, quadit = "" }: { claudeCode?: boolean; quadit?: string } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
   const home = join(root, "home");
   const bin = join(root, "bin");
@@ -362,9 +369,30 @@ case "$1" in
     mkdir -p "$(dirname "$config")"
     printf '{"url":"%s","token":"%s"}\\n' "$2" "$token" > "$config"
     chmod 600 "$config" ;;
-esac
+${
+  quadit
+    ? `  *) exec '${quadit}' "$@" ;;
+`
+    : ""
+}esac
 `,
   );
+  if (quadit) {
+    writeFileSync(
+      join(bin, "claude"),
+      `#!/bin/sh
+[ "$1" = "-p" ] || exit 2
+case "$2" in
+  "Connect to Quadit "*) exec quadit connect "\${2#Connect to Quadit }" ;;
+  "Quadit woke you"*)
+    key=$(printf '%s' "$2" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -n 1)
+    exec quadit comment "$key" "Answered by the stand-in" ;;
+esac
+exit 3
+`,
+    );
+    chmodSync(join(bin, "claude"), 0o755);
+  }
   chmodSync(shell, 0o755);
   chmodSync(join(bin, "quadit"), 0o755);
   if (claudeCode)

@@ -14,6 +14,8 @@ const PAGE = `file://${join(__dirname, "../../out/pages/connect.html")}`;
 interface Stand {
   connected: boolean;
   handshake: unknown;
+  /** What the app does by itself for the tool (SelfRun); absent: nothing. */
+  self?: unknown;
   /** How long connectState takes, as the app's does while it asks the login shell and quadit. */
   slowMs: number;
   asks: number;
@@ -71,6 +73,10 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
               },
             ],
           };
+        },
+        toolSelf: async () => (state.connected ? (state.self ?? { proving: null, answering: "none" }) : null),
+        setAnswering: async (_id: string, on: boolean) => {
+          state.self = { proving: null, answering: on ? "on" : "paused" };
         },
         toolHandshake: async () => {
           state.asks++;
@@ -167,4 +173,42 @@ test("a card says that connecting lets the tool run quadit without asking, and o
   await expect(card.getByRole("form", { name: "How to connect Claude Code" })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /without asking/ })).toHaveCount(0);
   await expect(page.getByText(/without asking each time/)).toHaveCount(0);
+});
+
+test("a card says what the app does by itself: Connecting, why it could not, and answering with Pause and Resume", async ({
+  page,
+}) => {
+  await open(page, {
+    connected: true,
+    handshake: { state: "waiting", code: "K7QX4M" },
+    self: { proving: { state: "running" }, answering: "on" },
+    slowMs: 0,
+  });
+  const card = page.getByRole("article", { name: "Claude Code" });
+  await expect(card.getByText("Connecting…")).toBeVisible();
+  await expect(card.getByText(/^Connect to Quadit/)).toHaveCount(0);
+
+  const set = (stand: Partial<Stand>) =>
+    page.evaluate((s) => Object.assign((window as unknown as { stand: Stand }).stand, s), stand);
+  await set({ self: { proving: { state: "failed", reason: "it took longer than two minutes" }, answering: "on" } });
+  await expect(
+    card.getByText(
+      "Quadit could not run Claude Code by itself (it took longer than two minutes). Say this in Claude Code instead:",
+    ),
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByText("Connect to Quadit K7QX4M")).toBeVisible();
+
+  await set({ handshake: { state: "connected", listening: true }, self: { proving: null, answering: "on" } });
+  await expect(card.getByText("Answers by itself while Quadit is open")).toBeVisible({ timeout: 10_000 });
+  await card.getByRole("button", { name: "Pause Claude Code answering by itself" }).click();
+  await expect(card.getByText("Paused. It answers when you ask it in Claude Code.")).toBeVisible();
+  await card.getByRole("button", { name: "Resume Claude Code answering by itself" }).click();
+  await expect(card.getByText("Answers by itself while Quadit is open")).toBeVisible();
+
+  await set({ self: { proving: null, answering: "guarded" } });
+  await expect(
+    card.getByText("Paused: it was started six times in a minute. Resume when you have looked."),
+  ).toBeVisible({ timeout: 10_000 });
+  await set({ self: { proving: null, answering: "off" } });
+  await expect(card.getByRole("button", { name: "Let Claude Code answer by itself" })).toBeVisible({ timeout: 10_000 });
 });

@@ -92,10 +92,15 @@ test("the first run sets Quadit up on this computer in one window, connects the 
     await sheet.getByRole("button", { name: "Close" }).first().click();
     await expect(sheet).toBeHidden();
 
-    // Set up with nothing asked (the command and its skill, as an agent of the tool's own name), waiting for the tool
-    // to give its code back (desktop contract §11).
+    // Set up with nothing asked (the command and its skill, as an agent of the tool's own name). The app cannot run
+    // Claude Code here (no program for it on this computer), so it says why and waits for the line to be said in it
+    // (desktop contract §11).
     await card.getByRole("button", { name: "Connect Claude Code" }).click();
-    await expect(card.getByText("Set up on this Mac. Now open Claude Code and say:")).toBeVisible({ timeout: 20_000 });
+    await expect(
+      card.getByText(
+        "Quadit could not run Claude Code by itself (it was not found on this computer). Say this in Claude Code instead:",
+      ),
+    ).toBeVisible({ timeout: 20_000 });
     await expect(card.getByText(/^Connect to Quadit \S{6}$/)).toBeVisible();
     await expect(card.getByText("Waiting for Claude Code…")).toBeVisible();
     await expect(first.getByText("Joined just now")).toBeVisible();
@@ -152,6 +157,42 @@ test("the first run sets Quadit up on this computer in one window, connects the 
     expect(await page.evaluate(async () => (await fetch("/api/v1/auth/me")).status)).toBe(200);
     expect(desktop.firstRunShown()).toBe(false);
     expect(desktop.app.windows().some((p) => p.url().includes("/connect.html"))).toBe(false);
+  } finally {
+    await desktop.close();
+  }
+});
+
+test("a tool the app can run gives its code back by itself in the first run, and answers a comment on its task with no chat open", async ({
+  run,
+}) => {
+  test.slow();
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  const computer = fakeComputer({ quadit: run.binary });
+  const env = { QUADIT_DESKTOP_QUADIT: run.binary, HOME: computer.home, SHELL: computer.shell };
+  const desktop = await Desktop.launch(data, run, [], { env, firstStart: true });
+  try {
+    const first = await desktop.firstRun();
+    await first.getByLabel("Your name").fill("Lou Local");
+    await first.getByRole("button", { name: "Set up on this computer" }).click();
+    const card = first.getByRole("article", { name: "Claude Code" });
+    await card.getByRole("button", { name: "Connect Claude Code" }).click({ timeout: 30_000 });
+    // No line to paste: the app ran the tool, which gave the code back; the server's word turns the card.
+    await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 60_000 });
+    await expect(card.getByText(/^Connect to Quadit/)).toHaveCount(0);
+    await expect(card.getByText("Answers by itself while Quadit is open")).toBeVisible({ timeout: 20_000 });
+    await screen(first, "07b-connected-by-itself.png");
+
+    await first.getByRole("button", { name: "Continue" }).click();
+    await expect.poll(() => desktop.firstRunShown(), { timeout: 20_000 }).toBe(false);
+    const origin = await desktop.localOrigin();
+    const page = await desktop.pageOf(origin);
+    await expect(page.getByText(/is for Claude Code/)).toBeVisible({ timeout: 20_000 });
+    // A comment on its task is answered with no chat open: the app's listener woke the tool.
+    await page.goto(`${origin}/personal/task/GS-3`);
+    await page.getByRole("textbox", { name: "New comment" }).fill("Hello, are you there?");
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(page.getByText("Answered by the stand-in")).toBeVisible({ timeout: 60_000 });
+    await screen(page, "08b-answered-by-itself.png");
   } finally {
     await desktop.close();
   }
