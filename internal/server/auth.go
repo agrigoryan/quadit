@@ -312,7 +312,7 @@ func (s *Server) handleSignIn(x *c) error {
 	}
 	if !there || u.Kind != core.KindPerson || u.PasswordHash == "" || !auth.CheckPassword(u.PasswordHash, b.Password) {
 		if !there {
-			auth.CheckPassword("$argon2id$v=19$m=65536,t=3,p=2$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", b.Password) // same time as a real check
+			auth.CheckNoPassword(b.Password)
 		}
 		s.audit(x.r, "", core.User{ID: u.ID, Name: email}, "signin.failed", "user", u.ID, nil)
 		return errUnauthorized("wrong email or password")

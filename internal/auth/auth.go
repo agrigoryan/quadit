@@ -16,28 +16,59 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"testing"
 
 	"golang.org/x/crypto/argon2"
 )
 
-// Argon2id parameters: 64 MB, 3 passes, as OWASP suggests for 2024 onward
-// with memory to spare. They are written into each hash, so they can change.
-const (
-	argonTime    = 3
-	argonMemory  = 64 * 1024
-	argonThreads = 2
-	argonKeyLen  = 32
-)
+// argonCost is the work and memory one Argon2id hash takes. It is written
+// into each hash, so a hash is checked at the cost it was made with, and
+// the cost of new hashes can change.
+type argonCost struct {
+	time    uint32
+	memory  uint32 // in KiB
+	threads uint8
+}
+
+// serverCost is 64 MB and 3 passes, as OWASP suggests for 2024 onward with
+// memory to spare.
+var serverCost = argonCost{time: 3, memory: 64 * 1024, threads: 2}
+
+// testCost is what a test binary hashes with: under the race detector one
+// hash at serverCost takes half a second, and the tests make hundreds.
+var testCost = argonCost{time: 1, memory: 64, threads: 2}
+
+// cost is what new hashes take: testCost only in a test binary, which is
+// the one place testing.Testing reports true.
+func cost() argonCost {
+	if testing.Testing() {
+		return testCost
+	}
+	return serverCost
+}
+
+const argonKeyLen = 32
 
 // HashPassword returns an Argon2id hash in the standard encoded form.
-func HashPassword(password string) (string, error) {
+func HashPassword(password string) (string, error) { return hashAt(password, cost()) }
+
+// hashAt is HashPassword at a cost.
+func hashAt(password string, c argonCost) (string, error) {
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
 		return "", err
 	}
-	key := argon2.IDKey([]byte(password), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
-	return fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s", argonMemory, argonTime, argonThreads,
+	key := argon2.IDKey([]byte(password), salt, c.time, c.memory, c.threads, argonKeyLen)
+	return fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s", c.memory, c.time, c.threads,
 		base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(key)), nil
+}
+
+// CheckNoPassword takes as long as checking a password against a hash
+// HashPassword made, and matches nothing: a sign-in as someone who is not
+// there takes as long as one with a wrong password.
+func CheckNoPassword(password string) {
+	c := cost()
+	argon2.IDKey([]byte(password), make([]byte, 16), c.time, c.memory, c.threads, argonKeyLen)
 }
 
 // CheckPassword reports whether password matches an encoded hash.
