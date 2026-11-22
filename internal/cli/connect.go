@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"unicode"
 )
 
 // connect gives back a connect code with this login and says what to tell
@@ -43,11 +44,33 @@ func (r *runner) connect(in input) error {
 	var said struct {
 		Agent     struct{ Handle string }
 		Workspace struct{ Name string }
-		Next      string
 	}
 	if err := json.Unmarshal(raw, &said); err != nil {
 		return err
 	}
-	fmt.Fprintf(r.out, "Connected as %s in %s.\n%s\n", said.Agent.Handle, said.Workspace.Name, said.Next)
+	// What is printed goes to a model as it is: the command's own sentences, with only a handle of its form and the
+	// workspace's name on one line, never text the server chose.
+	who := "this agent"
+	if handleForm.MatchString(said.Agent.Handle) {
+		who = said.Agent.Handle
+	}
+	fmt.Fprintf(r.out, "Connected as %s in the workspace %s.\n%s\n", who, plainName(said.Workspace.Name), connectedOffer)
 	return nil
+}
+
+// connectedOffer is what an agent tells the person once connected.
+const connectedOffer = `Tell the person it is connected, and offer: say "listen to Quadit" and I will answer what comes in while this run stays active.`
+
+// plainName is a name the server sent, on one line, without quotes or
+// control characters, at most 60 characters, quoted.
+func plainName(name string) string {
+	name = strings.Map(func(r rune) rune {
+		switch {
+		case r == '"' || unicode.IsControl(r) || unicode.Is(unicode.Zl, r) || unicode.Is(unicode.Zp, r):
+			return ' '
+		}
+		return r
+	}, name)
+	runes := []rune(strings.Join(strings.Fields(name), " "))
+	return `"` + string(runes[:min(len(runes), 60)]) + `"`
 }

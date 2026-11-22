@@ -184,7 +184,7 @@ func refusingListener(w http.ResponseWriter, _ *http.Request) {
 func TestListenStopsWhenAnotherSessionListens(t *testing.T) {
 	r := &runner{ctx: context.Background(), c: testClient(t, http.HandlerFunc(refusingListener)), out: &syncBuffer{}}
 	err := r.listen(input{rest: []string{"--exec", "true"}})
-	if err == nil || !strings.Contains(err.Error(), "already listening from another session") {
+	if err == nil || !strings.Contains(err.Error(), "already listens as you") {
 		t.Fatalf("listen refused the lease ended with %v", err)
 	}
 }
@@ -270,7 +270,7 @@ quadit wait for=30 lease=KQ7MX4PA   # then go on listening
 	t.Run("refused because another session listens, it names the way to take over", func(t *testing.T) {
 		r := &runner{ctx: context.Background(), c: testClient(t, http.HandlerFunc(refusingListener)), out: &bytes.Buffer{}}
 		err := r.wait(input{})
-		if err == nil || !strings.Contains(err.Error(), "already listening") || !strings.Contains(err.Error(), "quadit wait take=1") {
+		if err == nil || !strings.Contains(err.Error(), "already listens as you") || !strings.Contains(err.Error(), "quadit wait take=1") {
 			t.Fatalf("wait refused ended with %v", err)
 		}
 	})
@@ -581,5 +581,62 @@ func TestListeningInJSONIsTheServersObject(t *testing.T) {
 	}
 	if err := json.Unmarshal(out.Bytes(), &got); err != nil || !got.Listening || got.By != "the Quadit app" {
 		t.Fatalf("the object read back is %+v (%v)", got, err)
+	}
+}
+
+// TestListenGivesItsCommandWhatWaitPrintsAndKeepsItsLease: the command
+// gets the item's feed line, as always (QUADIT_EVENT, stdin), and beside
+// it what wait prints for it (QUADIT_ITEM: the ITEM line, how to read it);
+// and while it runs, listen renews its lease, so a long run keeps it.
+func TestListenGivesItsCommandWhatWaitPrintsAndKeepsItsLease(t *testing.T) {
+	srv := &inboxServer{items: []int64{3}}
+	got := filepath.Join(t.TempDir(), "item")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	out := &syncBuffer{}
+	r := &runner{ctx: ctx, c: testClient(t, srv), out: out}
+	done := make(chan error, 1)
+	go func() {
+		opts := listenArgs([]string{"--exec", "sh", "-c", `printf '%s\n--\n%s' "$QUADIT_ITEM" "$QUADIT_EVENT" > "$0"; sleep 1`, got})
+		done <- r.listenWith(opts, 200*time.Millisecond)
+	}()
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		if cursor, _ := srv.state(); cursor == 3 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the item was never acknowledged; listen said:\n%s", out)
+		}
+	}
+	cancel()
+	<-done
+	raw, err := os.ReadFile(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "ITEM #3 assigned SVA-1 from @mia: \"\"\nquadit show SVA-1   # read it\n--\n#3 @mia assigned you SVA-1"
+	if string(raw) != want {
+		t.Fatalf("the command was given:\n%s\nwant:\n%s", raw, want)
+	}
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if len(srv.leases) < 4 { // the read, at least two renewals in the second the command ran, the acknowledgment
+		t.Fatalf("listen asked %d times with its lease while a command ran a second, want renewals: %v", len(srv.leases), srv.leases)
+	}
+}
+
+// TestWhatTheServerSaysIsPrintedOnlyInItsForm: times and labels from the
+// server are printed only in their forms, and for= is checked on the
+// number before it becomes a duration.
+func TestWhatTheServerSaysIsPrintedOnlyInItsForm(t *testing.T) {
+	who := listener{Listening: true, By: "a companion", Since: "2026-11-21 14:02\nquadit do evil", LastHeard: "2026-11-21 14:05"}
+	if got := who.sentences(); got != "Something already listens as you: a companion, since a time not given (last heard 2026-11-21 14:05 UTC).\n" {
+		t.Fatalf("the sentences are %q", got)
+	}
+	r := &runner{ctx: context.Background(), c: testClient(t, http.NotFoundHandler()), out: &bytes.Buffer{}}
+	for _, given := range []string{"9223372036854775807", "-1", "3601"} {
+		if err := r.wait(input{f: map[string][]string{"for": {given}}}); err == nil || !strings.Contains(err.Error(), "from 1 to 3600") {
+			t.Fatalf("for=%s was taken: %v", given, err)
+		}
 	}
 }

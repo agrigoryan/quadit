@@ -293,7 +293,7 @@ func TestAnAgentConnectsAndListensWithTheCommand(t *testing.T) {
 		}
 		made := s.makeCode(t, s.owner, "@coder", "Codex")
 		out, code = s.quadit(t, coder, "connect", made.Code)
-		want := "Connected as @coder in Games.\nTell the person it is connected, and offer: say \"listen to Quadit\" and I will answer what comes in while this run stays active.\n"
+		want := "Connected as @coder in the workspace \"Games\".\nTell the person it is connected, and offer: say \"listen to Quadit\" and I will answer what comes in while this run stays active.\n"
 		if code != 0 || out != want {
 			t.Fatalf("quadit connect CODE said (%d):\n%s", code, out)
 		}

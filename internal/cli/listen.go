@@ -44,7 +44,18 @@ import (
 // beside the login file, so a companion stopped or restarted goes on with
 // the lease it held.
 func (r *runner) listen(in input) error {
-	opts := listenArgs(in.rest)
+	return r.listenWith(listenArgs(in.rest), leaseRenewal)
+}
+
+// leaseRenewal is how often listen renews its lease while an item's
+// command runs: well inside the lease's five minutes, so a command that
+// runs ten minutes keeps it, and no other session is handed the item
+// meanwhile.
+const leaseRenewal = time.Minute
+
+// listenWith is listen, once its arguments are read, renewing the lease
+// every renewEvery while a command runs.
+func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error {
 	if len(opts.command) == 0 {
 		return errors.New("usage: quadit listen [cursor=NAME] [take=1] [by=WORDS] --exec COMMAND [ARG ...]")
 	}
@@ -66,13 +77,13 @@ func (r *runner) listen(in input) error {
 	defer kept.close()
 	lease := kept.kept()
 	for {
-		page, err := r.nextItem(listenAsk{cursor: cursor, lease: lease, take: take, by: opts.by}, waitHold)
+		page, err := r.nextItem(r.ctx, listenAsk{cursor: cursor, lease: lease, take: take, by: opts.by}, waitHold)
 		if err != nil {
 			if r.ctx.Err() != nil {
 				return r.ctx.Err()
 			}
 			if lostTheLease(err) {
-				return err
+				return r.lostLease(err)
 			}
 			fmt.Fprintln(r.out, "retrying:", err)
 			if err := pause(r.ctx, readPause); err != nil {
@@ -94,7 +105,20 @@ func (r *runner) listen(in input) error {
 			continue
 		}
 		fmt.Fprintln(r.out, page.Line)
-		if err := r.wake(opts.command, opts.secrets, page.Line); err != nil {
+		renew := func(ctx context.Context) {
+			ticker := time.NewTicker(renewEvery)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					// A short hold with the lease renews it; what it answers (the same item, not acknowledged yet) is not wanted.
+					_, _ = r.nextItem(ctx, listenAsk{cursor: cursor, lease: lease, by: opts.by}, time.Second) // a renewal that fails leaves the lease to its five minutes
+				}
+			}
+		}
+		if err := r.wake(opts.command, opts.secrets, wakeItem{line: page.Line, record: page.Item.record()}, renew); err != nil {
 			if r.ctx.Err() != nil {
 				return r.ctx.Err()
 			}
@@ -112,7 +136,7 @@ func (r *runner) listen(in input) error {
 				return r.ctx.Err()
 			}
 			if lostTheLease(err) {
-				return err
+				return r.lostLease(err)
 			}
 			fmt.Fprintln(r.out, "ack failed, the item will come again:", err)
 		}
@@ -164,19 +188,34 @@ func listenArgs(args []string) listenOptions {
 	return opts
 }
 
-// wake runs the command for one inbox item and says whether it handled it:
-// an error is the secrets not being given (the command did not run) or the
-// command failing.
-func (r *runner) wake(command, secrets []string, line string) error {
+// wakeItem is one inbox item as listen hands it to its command: the line the
+// feed writes (QUADIT_EVENT, and on stdin, as it always was), and the
+// record wait prints for it (QUADIT_ITEM: the ITEM line, the command that
+// reads it, the one that answers it once).
+type wakeItem struct{ line, record string }
+
+// wake runs the command for one inbox item, with alongside running beside
+// it until it ends, and says whether it handled it: an error is the
+// secrets not being given (the command did not run) or the command
+// failing.
+func (r *runner) wake(command, secrets []string, it wakeItem, alongside func(context.Context)) error {
 	// Secrets are fetched for each run, so a changed or withdrawn one
 	// takes effect at once.
 	env, err := r.secretEnv(secrets)
 	if err != nil {
 		return fmt.Errorf("the secrets could not be had, so the command did not run: %w", err)
 	}
-	cmd, out := r.secretCommand(command, env, "QUADIT_EVENT="+line)
-	cmd.Stdin = strings.NewReader(line + "\n")
+	cmd, out := r.secretCommand(command, env, "QUADIT_EVENT="+it.line, "QUADIT_ITEM="+it.record)
+	cmd.Stdin = strings.NewReader(it.line + "\n")
+	ctx, stop := context.WithCancel(r.ctx)
+	beside := make(chan struct{})
+	go func() {
+		defer close(beside)
+		alongside(ctx)
+	}()
 	runErr := cmd.Run()
+	stop()
+	<-beside
 	if err := out.Flush(); err != nil {
 		fmt.Fprintln(os.Stderr, "the command's output could not be printed:", err)
 	}
@@ -198,6 +237,17 @@ func giveUp(cursor string, seq int64, lease string) string {
 func lostTheLease(err error) bool {
 	var ae *APIError
 	return errors.As(err, &ae) && (ae.Reason == "listening_elsewhere" || ae.Reason == "lease_stale")
+}
+
+// lostLease says, in the command's own words, why listen stops: another
+// session listens (and what, as quadit listening reads it), or took the
+// lease over.
+func (r *runner) lostLease(err error) error {
+	var ae *APIError
+	if errors.As(err, &ae) && ae.Reason == "lease_stale" {
+		return errors.New("another session took the lease over; this listen stops")
+	}
+	return errors.New(r.whoListens())
 }
 
 // waitHold is the longest the server holds one wait; a longer wait is
@@ -267,7 +317,7 @@ type listenAsk struct {
 // nextItem asks for the next item, holding the lease (or taking one, from
 // another session with take) for up to hold. The request is given up
 // a little after its hold, whatever the client's own time limit.
-func (r *runner) nextItem(ask listenAsk, hold time.Duration) (listened, error) {
+func (r *runner) nextItem(ctx context.Context, ask listenAsk, hold time.Duration) (listened, error) {
 	q := url.Values{"wait": {strconv.Itoa(max(int(hold.Round(time.Second).Seconds()), 1))}, "by": {ask.by}}
 	if ask.cursor != "listen" {
 		q.Set("cursor", ask.cursor)
@@ -278,7 +328,7 @@ func (r *runner) nextItem(ask listenAsk, hold time.Duration) (listened, error) {
 	if ask.take {
 		q.Set("take", "1")
 	}
-	ctx, cancel := context.WithTimeout(r.ctx, hold+holdSlack)
+	ctx, cancel := context.WithTimeout(ctx, hold+holdSlack)
 	defer cancel()
 	var page listened
 	raw, err := r.c.JSON(ctx, "/listen", q)
@@ -300,9 +350,10 @@ func (r *runner) wait(in input) error {
 	total := waitHold
 	goOn := "quadit wait"
 	if v := in.f["for"]; len(v) > 0 {
+		// The range is checked on the number, before it is made a duration that could overflow.
 		n, err := strconv.Atoi(v[0])
-		if err != nil || n < 1 || time.Duration(n)*time.Second > maxWait {
-			return fmt.Errorf("for= is a number of seconds, from 1 to %d", int(maxWait.Seconds()))
+		if err != nil || n < 1 || n > int(maxWait/time.Second) {
+			return fmt.Errorf("for= is a number of seconds, from 1 to %d", int(maxWait/time.Second))
 		}
 		total = time.Duration(n) * time.Second
 		goOn += " for=" + strconv.Itoa(n)
@@ -327,11 +378,12 @@ func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) er
 	deadline := time.Now().Add(span.total)
 	skipped := 0
 	for {
-		page, err := r.nextItem(listenAsk{cursor: "listen", lease: lease, take: take, by: "a chat"}, min(span.hold, time.Until(deadline)))
+		page, err := r.nextItem(r.ctx, listenAsk{cursor: "listen", lease: lease, take: take, by: "a chat"}, min(span.hold, time.Until(deadline)))
 		if err != nil {
 			var ae *APIError
 			if errors.As(err, &ae) && ae.Reason == "listening_elsewhere" {
-				return fmt.Errorf("%w\n  only when the person says this session should listen instead: quadit wait take=1", err)
+				// Said in the command's own words, from what quadit listening reads, not in the server's.
+				return fmt.Errorf("%s\n  only when the person says this session should listen instead: quadit wait take=1", r.whoListens())
 			}
 			return err
 		}
@@ -371,6 +423,7 @@ func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) er
 var (
 	leaseForm  = regexp.MustCompile(`^[A-HJKMNP-Z2-9]{8}$`)
 	labelForm  = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} '-]{0,39}$`)
+	timeForm   = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$`)
 	taskForm   = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,9}-[0-9]{1,9}$`)
 	pageForm   = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 	handleForm = regexp.MustCompile(`^@[a-z0-9_-]{2,32}$`)
@@ -414,6 +467,24 @@ func (item listenItem) line() string {
 	}, text)
 	runes := []rune(strings.Join(strings.Fields(text), " "))
 	return strings.Join(parts, " ") + `: "` + string(runes[:min(len(runes), 200)]) + `"`
+}
+
+// record is what wait prints of the item for an agent to act on, without
+// the commands to acknowledge it and wait again (a companion does those):
+// its line, the command that reads it, and the one that answers it once.
+// Nothing for no item.
+func (item *listenItem) record() string {
+	if item == nil {
+		return ""
+	}
+	lines := []string{item.line()}
+	if reading, err := item.reading(); err == nil {
+		lines = append(lines, reading+"   # read it")
+	}
+	if answering := item.answering(); answering != "" {
+		lines = append(lines, answering+"   # answer with this line, your words in the quotes")
+	}
+	return strings.Join(lines, "\n")
 }
 
 // answering is the command that answers the item where it was asked: in
@@ -477,29 +548,58 @@ func (r *runner) listening(in input) error {
 		fmt.Fprintln(r.out, strings.TrimSpace(string(raw)))
 		return nil
 	}
-	var who struct {
-		Listening, Yours, Webhook bool
-		By, Since                 string
-		LastHeard                 string `json:"last_heard"`
-	}
+	var who listener
 	if err := json.Unmarshal(raw, &who); err != nil {
 		return err
 	}
-	// What the holder said it is is printed only in the form a label has.
+	fmt.Fprint(r.out, who.sentences())
+	return nil
+}
+
+// listener is what GET /listening answers.
+type listener struct {
+	Listening, Yours, Webhook bool
+	By, Since                 string
+	LastHeard                 string `json:"last_heard"`
+}
+
+// sentences say it, in the command's own words: what the holder said it
+// is, and when, only in the forms a label and a time have.
+func (who listener) sentences() string {
 	by := "another session"
 	if labelForm.MatchString(who.By) {
 		by = who.By
 	}
+	at := func(t string) string {
+		if timeForm.MatchString(t) {
+			return t + " UTC"
+		}
+		return "a time not given"
+	}
+	var out string
 	switch {
 	case who.Listening && who.Yours:
-		fmt.Fprintf(r.out, "This session listens, since %s UTC.\n", who.Since)
+		out = fmt.Sprintf("This session listens, since %s.\n", at(who.Since))
+	case who.Listening && who.Since == "":
+		out = fmt.Sprintf("Something already listens as you: %s.\n", by)
 	case who.Listening:
-		fmt.Fprintf(r.out, "Something already listens as you: %s, since %s UTC (last heard %s UTC).\n", by, who.Since, who.LastHeard)
+		out = fmt.Sprintf("Something already listens as you: %s, since %s (last heard %s).\n", by, at(who.Since), at(who.LastHeard))
 	default:
-		fmt.Fprintln(r.out, "Nothing listens as you.")
+		out = "Nothing listens as you.\n"
 	}
 	if who.Webhook {
-		fmt.Fprintln(r.out, "A webhook delivers your inbox too.")
+		out += "A webhook delivers your inbox too.\n"
 	}
-	return nil
+	return out
+}
+
+// whoListens says what already listens as the caller, in one line, for a
+// wait refused because of it.
+func (r *runner) whoListens() string {
+	raw, err := r.c.JSON(r.ctx, "/listening", url.Values{})
+	var who listener
+	if err != nil || json.Unmarshal(raw, &who) != nil {
+		return "Another session already listens as you."
+	}
+	return strings.TrimSpace(who.sentences())
 }
