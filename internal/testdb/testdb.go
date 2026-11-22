@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -90,7 +91,21 @@ func SQLite(t *testing.T) store.Store {
 // sqliteAt is SQLite with the schema at a version (0 = the newest).
 func sqliteAt(t *testing.T, version int) store.Store {
 	t.Helper()
-	st, err := sqlite.OpenAt(context.Background(), filepath.Join(t.TempDir(), "quadit.sqlite"), version)
+	path := filepath.Join(t.TempDir(), "quadit.sqlite")
+	if version == 0 {
+		// The newest schema starts as a copy of a database migrated once
+		// per test binary: migrating takes a second under the race
+		// detector, and leaves the same file every time. Opening it below
+		// still goes the whole way a server's start does.
+		fresh, err := newestSQLite()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, fresh, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	st, err := sqlite.OpenAt(context.Background(), path, version)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,3 +116,29 @@ func sqliteAt(t *testing.T, version int) store.Store {
 	})
 	return st
 }
+
+// newestSQLite is the file of a fresh SQLite database with the newest
+// schema, made the first time it is asked for.
+var newestSQLite = sync.OnceValues(func() ([]byte, error) {
+	dir, err := os.MkdirTemp("", "quadit-testdb-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(dir)
+	ctx := context.Background()
+	st, err := sqlite.Open(ctx, filepath.Join(dir, "migrated.sqlite"))
+	if err != nil {
+		return nil, err
+	}
+	// VACUUM INTO writes the whole database to one file, with nothing left
+	// in the write-ahead log beside it.
+	fresh := filepath.Join(dir, "fresh.sqlite")
+	err = st.Exec(ctx, "VACUUM INTO '"+strings.ReplaceAll(fresh, "'", "''")+"'")
+	if cerr := st.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadFile(fresh)
+})
