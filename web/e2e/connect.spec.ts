@@ -51,9 +51,9 @@ test("the comment box says what happens to a comment in each of the agent's stat
     ),
   ).toBeVisible();
 
-  // The person asked it to listen: its first wait takes the lease. Nothing in the feed says so: the line is read
-  // again while it is shown.
+  // The person asked it to listen: its first wait takes the lease, and starts at the present, so the assignment
+  // from before is not handed over again. Nothing in the feed says so: the line is read again while it is shown.
   const waited = await agent("wait", "for=1");
-  expect(waited).toMatch(/^ITEM #\d+ assigned /);
+  expect(waited).toMatch(/^IDLE\n/);
   await expect(activity.getByText(`@${handle} is listening and will see this.`)).toBeVisible({ timeout: 30_000 });
 });
