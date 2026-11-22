@@ -55,12 +55,10 @@ import {
   diffOf,
   EditRefused,
   type FileEdit,
-  inPlace,
   planChanges,
   planReverts,
   readText,
   realPath,
-  recordInPlace,
   sha256,
   targetOf,
   writeEdits,
@@ -138,22 +136,8 @@ interface Connection {
   at: number;
 }
 
-/**
- * Changes under way for a tool, written down before they are made (and the
- * token as soon as it is made), so a start after the app stopped midway
- * finishes them: a Connect is taken back (what of it is in place, its token
- * revoked), an upgrade kept as the connection's (what of it is in place).
- * Never the person's: a half-made change is the app's to finish.
- */
-interface Pending {
-  kind: "connect" | "upgrade";
-  records: Applied[];
-  token: { id: string; serverId: string; workspaceId: string } | null;
-}
-
 interface Ledger {
   harnesses: Record<string, Connection>;
-  pending?: Record<string, Pending>;
 }
 
 type Plan =
@@ -276,17 +260,6 @@ export class Connections {
   }
 
   /**
-   * Brings the skill of every tool Connect set up up to date with the skill
-   * the quadit it uses carries now (the one on the PATH, else the app's
-   * own). A skill file that still says what Connect wrote is rewritten,
-   * backed up first, and the ledger records the new text, so Disconnect
-   * takes back exactly what is there; one changed by hand since is left as
-   * it is (its tool's card offers updateSkill); a skill the app did not
-   * install is never touched. Run at every start of the app, in the
-   * background too: the person agreed to these files when connecting. Gives
-   * the files rewritten, and those left for being changed by hand.
-   */
-  /**
    * What the app does for the tools Connect set up at every start of the
    * app, in the background too, saying nothing: their skills follow the
    * quadit they run (refreshSkills), and a tool connected by a version from
@@ -294,28 +267,7 @@ export class Connections {
    * (allowConnected). Gives what was done.
    */
   refresh(): Promise<{ skills: { updated: string[]; changedByHand: string[] }; allowed: string[] }> {
-    return this.inTurn(async () => {
-      this.finishPending();
-      return { skills: await this.refreshSkills(), allowed: await this.allowConnected() };
-    });
-  }
-
-  /** Finishes what the app left midway when it stopped (Pending): a Connect taken back, an upgrade kept. */
-  private finishPending() {
-    const ledger = this.ledger();
-    for (const [id, pending] of Object.entries(ledger.pending ?? {})) {
-      if (pending.kind === "connect") this.takeBack(pending);
-      else ledger.harnesses[id]?.edits.push(...pending.records.filter(recordInPlace));
-      delete ledger.pending?.[id];
-    }
-    this.saveLedger(ledger);
-  }
-
-  /** Takes back what of a Connect stopped midway is in place, and revokes its token (on a server that answers). */
-  private takeBack(pending: Pending) {
-    writeEdits(planReverts(pending.records).edits);
-    const { token } = pending;
-    if (token) void this.parts.ask(token.serverId, token.workspaceId, { kind: "revoke-token", token: token.id });
+    return this.inTurn(async () => ({ skills: await this.refreshSkills(), allowed: await this.allowConnected() }));
   }
 
   /**
@@ -325,8 +277,9 @@ export class Connections {
    * what is there already is the person's and left alone. Marked once done,
    * it is never written again for that connection, even after the person
    * takes it away, or kept part of it (a setting of theirs in the way).
-   * Each tool is written down before its files are written (Pending), and
-   * saved before the next. Gives the tools written to.
+   * A tool whose files cannot all be written gets back what was, and is
+   * tried again at the next start. Saved tool by tool. Gives the tools
+   * written to.
    */
   private async allowConnected(): Promise<string[]> {
     const ledger = this.ledger();
@@ -349,23 +302,12 @@ export class Connections {
       const others = this.recordsByTarget({
         harnesses: Object.fromEntries(Object.entries(ledger.harnesses).filter(([other]) => other !== id)),
       });
-      const { make } = allowable(groups, others, []);
+      const make = allowable(groups, []);
       const own = make.filter((change) => !others.has(targetOf(change)));
       const { edits, applied } = planChanges(own);
       const records = hashed(applied, edits, backUp(edits, this.backupDir(id)));
-      (ledger.pending ??= {})[id] = { kind: "upgrade", records, token: null };
-      this.saveLedger(ledger);
-      try {
-        writeEdits(edits);
-      } finally {
-        // Done or stopped midway: what is in place is the connection's.
-        connection.edits.push(
-          ...records.filter(recordInPlace),
-          ...make.flatMap((change) => others.get(targetOf(change)) ?? []),
-        );
-        delete ledger.pending[id];
-        this.saveLedger(ledger);
-      }
+      writeOrTakeBack(edits, records);
+      connection.edits.push(...records, ...make.flatMap((change) => others.get(targetOf(change)) ?? []));
       if (edits.length > 0) done.push(id);
       // Once, whatever the person had in the way: never again after.
       connection.allowed = true;
@@ -374,26 +316,34 @@ export class Connections {
     return done;
   }
 
+  /**
+   * Brings the skill of every tool Connect set up up to date with the skill
+   * the quadit it uses carries now (the one on the PATH, else the app's
+   * own). A skill file that still says what Connect wrote is rewritten,
+   * backed up first, and the ledger records the new text, so Disconnect
+   * takes back exactly what is there; one changed by hand since is left as
+   * it is (its tool's card offers updateSkill); a skill the app did not
+   * install is never touched. Gives the files rewritten, and those left for
+   * being changed by hand.
+   */
   private async refreshSkills(): Promise<{ updated: string[]; changedByHand: string[] }> {
-    {
-      const done = { updated: [] as string[], changedByHand: [] as string[] };
-      const ledger = this.ledger();
-      if (this.parts.platform === "win32" || Object.keys(ledger.harnesses).length === 0) return done;
-      const skill = await this.currentSkill();
-      if (skill === null) return done;
-      const seen = new Set<string>();
-      for (const id of Object.keys(ledger.harnesses)) {
-        const harness = HARNESSES.find((h) => h.id === id);
-        const path = harness && this.skillPath(ledger, harness);
-        if (!harness || !path || seen.has(path)) continue;
-        seen.add(path);
-        const state = this.skillState(ledger, harness, skill);
-        if (state === "by hand") done.changedByHand.push(path);
-        else if (state === "outdated" && this.rewriteSkill(ledger, path, skill)) done.updated.push(path);
-      }
-      if (done.updated.length > 0) this.saveLedger(ledger);
-      return done;
+    const done = { updated: [] as string[], changedByHand: [] as string[] };
+    const ledger = this.ledger();
+    if (this.parts.platform === "win32" || Object.keys(ledger.harnesses).length === 0) return done;
+    const skill = await this.currentSkill();
+    if (skill === null) return done;
+    const seen = new Set<string>();
+    for (const id of Object.keys(ledger.harnesses)) {
+      const harness = HARNESSES.find((h) => h.id === id);
+      const path = harness && this.skillPath(ledger, harness);
+      if (!harness || !path || seen.has(path)) continue;
+      seen.add(path);
+      const state = this.skillState(ledger, harness, skill);
+      if (state === "by hand") done.changedByHand.push(path);
+      else if (state === "outdated" && this.rewriteSkill(ledger, path, skill)) done.updated.push(path);
     }
+    if (done.updated.length > 0) this.saveLedger(ledger);
+    return done;
   }
 
   /** Writes the skill the tools' quadit carries now over a tool's skill the person changed by hand (its card's "Update it"). */
@@ -592,7 +542,7 @@ export class Connections {
       const { allow: mcpAllow } = harness.mcp;
       if (mcpAllow) allow.push({ changes: mcpAllow.changes(home, `${origin}/mcp`), said: mcpAllow.said });
     }
-    changes.push(...allowable(allow, others, warnings).make);
+    changes.push(...allowable(allow, warnings));
     if (harness.id === "claude" && claudePluginInstalled(home)) {
       warnings.push(
         "The Quadit plugin for Claude Code is installed. Its MCP entry needs QUADIT_URL and QUADIT_TOKEN in the environment, " +
@@ -687,29 +637,11 @@ export class Connections {
       if (!worksAs) return { ok: false, error: "Pick an agent you may connect as." };
 
       const backups = backUp(plan.edits, plan.backupDir);
-      // Written down before anything is made (Pending), so a start after the app stopped midway takes it back.
-      const pending: Pending = { kind: "connect", records: hashed(plan.applied, plan.edits, backups), token: null };
-      const journal = () => {
-        const now = this.ledger();
-        (now.pending ??= {})[harness.id] = pending;
-        this.saveLedger(now);
-      };
-      const forget = () => {
-        const now = this.ledger();
-        delete now.pending?.[harness.id];
-        this.saveLedger(now);
-      };
-      journal();
       let token = plan.sharedToken;
       if (plan.login) {
         const label = `${harness.name} on ${this.parts.hostName}`;
         const issued = await ask({ kind: "agent-token", agent: worksAs.id, label });
-        if (!issued.ok || !issued.token) {
-          forget();
-          return { ok: false, error: issued.ok ? "No token was made." : issued.message };
-        }
-        pending.token = { id: issued.token.id, serverId: choice.serverId, workspaceId: choice.workspaceId };
-        journal();
+        if (!issued.ok || !issued.token) return { ok: false, error: issued.ok ? "No token was made." : issued.message };
         try {
           await this.parts.cli.login(
             plan.login.binary,
@@ -719,13 +651,9 @@ export class Connections {
             this.parts.appFor(choice.serverId),
           );
         } catch (err) {
-          this.takeBack(pending);
-          forget();
+          void ask({ kind: "revoke-token", token: issued.token.id });
           return { ok: false, error: (err as Error).message };
         }
-        // What `quadit login` wrote is known now: the login is the app's, to take back.
-        pending.records = hashed(plan.applied, plan.edits, backups);
-        journal();
         token = {
           id: issued.token.id,
           label,
@@ -734,11 +662,12 @@ export class Connections {
           workspaceId: choice.workspaceId,
         };
       }
+      // What `quadit login` wrote is known now: the login is the app's, to take back.
+      const records = hashed(plan.applied, plan.edits, backups);
       try {
-        writeEdits(plan.edits);
+        writeOrTakeBack(plan.edits, records);
       } catch (err) {
-        this.takeBack(pending);
-        forget();
+        if (plan.login && token) void ask({ kind: "revoke-token", token: token.id });
         return {
           ok: false,
           error: `Connect stopped midway, and took back what it had done: ${(err as Error).message}`,
@@ -754,9 +683,7 @@ export class Connections {
           ? await this.makeCode(choice.serverId, choice.workspaceId, member.id, harness.name)
           : null;
 
-      const records = pending.records;
       const ledger = this.ledger();
-      delete ledger.pending?.[harness.id];
       ledger.harnesses[harness.id] = {
         serverId: choice.serverId,
         workspaceId: choice.workspaceId,
@@ -1082,8 +1009,7 @@ export class Connections {
   private ledger(): Ledger {
     try {
       const parsed = JSON.parse(readFileSync(this.ledgerFile, "utf8")) as Partial<Ledger>;
-      if (parsed.harnesses && typeof parsed.harnesses === "object")
-        return { harnesses: parsed.harnesses, ...(parsed.pending && { pending: parsed.pending }) };
+      if (parsed.harnesses && typeof parsed.harnesses === "object") return { harnesses: parsed.harnesses };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== "ENOENT")
         throw new Error(`${this.ledgerFile} cannot be read`, { cause: err });
@@ -1094,9 +1020,7 @@ export class Connections {
   private saveLedger(ledger: Ledger) {
     mkdirSync(dirname(this.ledgerFile), { recursive: true });
     const next = `${this.ledgerFile}.next`;
-    const { pending, ...rest } = ledger;
-    const kept = pending && Object.keys(pending).length > 0 ? { ...rest, pending } : rest;
-    writeFileSync(next, JSON.stringify(kept, null, 2), { mode: 0o600 });
+    writeFileSync(next, JSON.stringify(ledger, null, 2), { mode: 0o600 });
     renameSync(next, this.ledgerFile);
   }
 }
@@ -1119,27 +1043,16 @@ interface AllowGroup {
 }
 
 /**
- * Of what lets a tool use Quadit without asking, the changes to make: not
- * one in place already by the person's hand (one another connection made is
- * made again, to be shared with it), nor one the app cannot make (a table of
- * the person's in the way), which is said in `warnings` for them to make by
- * hand. Each group's statement is said too, when any of it holds. `refused`:
- * some change could not be made.
+ * Of what lets a tool use Quadit without asking, the changes to make (one
+ * in place already makes nothing when planned), not one the app cannot make
+ * (a setting of the person's in the way), which is said in `warnings`. Each
+ * group's statement is said too, when any of it holds.
  */
-function allowable(
-  groups: AllowGroup[],
-  others: Map<string, Applied>,
-  warnings: string[],
-): { make: Change[]; refused: boolean } {
+function allowable(groups: AllowGroup[], warnings: string[]): Change[] {
   const make: Change[] = [];
-  let refused = false;
   for (const group of groups) {
     let holds = false;
     for (const change of group.changes) {
-      if (inPlace(change) && !others.has(targetOf(change))) {
-        holds = true;
-        continue;
-      }
       try {
         planChanges([change]);
         make.push(change);
@@ -1147,12 +1060,11 @@ function allowable(
       } catch (err) {
         if (!(err instanceof EditRefused)) throw err;
         warnings.push(err.message);
-        refused = true;
       }
     }
     if (holds) warnings.push(group.said);
   }
-  return { make, refused };
+  return make;
 }
 
 /**
@@ -1250,4 +1162,18 @@ function hashed(applied: Applied[], edits: FileEdit[], backups: Map<string, stri
     const text = edit?.writtenBy ? readText(record.path) : edit?.after;
     return { ...record, sha256: sha256(text ?? ""), backup: backups.get(record.path) ?? null };
   });
+}
+
+/**
+ * Writes `edits`; when one cannot be written, takes back what of `records`
+ * is in place (what it wrote so far) and throws: a half-made change is
+ * never left for the person's.
+ */
+function writeOrTakeBack(edits: FileEdit[], records: Applied[]) {
+  try {
+    writeEdits(edits);
+  } catch (err) {
+    writeEdits(planReverts(records).edits);
+    throw err;
+  }
 }

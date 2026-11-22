@@ -19,9 +19,7 @@ import {
   changedSince,
   diffOf,
   EditRefused,
-  inPlace,
   planChanges,
-  recordInPlace,
   planReverts,
   sha256,
   writeEdits,
@@ -381,27 +379,7 @@ posixOnly("Profile lines and folders", () => {
   });
 });
 
-posixOnly("what is in place, and taking back in turn", () => {
-  it("says whether a change's result is in its file already", () => {
-    const dir = folder();
-    const json = join(dir, "settings.json");
-    const toml = join(dir, "config.toml");
-    const rules = join(dir, "rules", "default.rules");
-    const item = { kind: "json-item" as const, path: json, keyPath: ["permissions", "allow"], value: "Bash(quadit:*)" };
-    const table = { kind: "toml" as const, path: toml, table: ["sandbox"], entries: { network_access: true } };
-    const line = { kind: "line" as const, path: rules, line: 'prefix_rule(pattern=["quadit"], decision="allow")' };
-    expect([inPlace(item), inPlace(table), inPlace(line)]).toEqual([false, false, false]);
-    writeFileSync(json, JSON.stringify({ permissions: { allow: ["Read", "Bash(quadit:*)"] } }));
-    writeFileSync(toml, "[sandbox]\nnetwork_access = true\nother = 1\n");
-    apply([line]);
-    expect([inPlace(item), inPlace(table), inPlace(line)]).toEqual([true, true, true]);
-    writeFileSync(toml, "[sandbox]\nnetwork_access = false\n");
-    expect(inPlace(table)).toBe(false);
-    // A file that cannot be read as what it should be holds nothing in place.
-    writeFileSync(json, "{ not json");
-    expect(inPlace(item)).toBe(false);
-  });
-
+posixOnly("taking back in turn", () => {
   it("takes back the last change to a key first, so a key changed twice goes back to before both", () => {
     const path = join(folder(), "settings.json");
     const first = apply([{ kind: "json", path, keyPath: ["mcpServers", "quadit"], value: { httpUrl: "u" } }]);
@@ -410,29 +388,5 @@ posixOnly("what is in place, and taking back in turn", () => {
     ]);
     expect(revert([...first, ...second])).toEqual([]);
     expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({});
-  });
-});
-
-posixOnly("what a record wrote, still there", () => {
-  it("says whether each kind of record still shows what it wrote", () => {
-    const dir = folder();
-    const json = join(dir, "settings.json");
-    const toml = join(dir, "config.toml");
-    const rules = join(dir, "rules", "default.rules");
-    writeFileSync(toml, "[sandbox]\nother = 1\n");
-    const records = apply([
-      { kind: "json-item", path: json, keyPath: ["permissions", "allow"], value: "Bash(quadit:*)" },
-      { kind: "json", path: json, keyPath: ["env", "X"], value: "1" },
-      { kind: "toml", path: toml, table: ["sandbox"], entries: { network_access: true }, intoExisting: true },
-      { kind: "folder", path: join(dir, "rules") },
-      { kind: "line", path: rules, line: "allow quadit" },
-      { kind: "file", path: join(dir, "SKILL.md"), content: "skill" },
-    ]);
-    expect(records.map(recordInPlace)).toEqual([true, true, true, true, true, true]);
-    writeFileSync(json, "{}");
-    writeFileSync(toml, "[sandbox]\nother = 1\n");
-    writeFileSync(rules, "");
-    writeFileSync(join(dir, "SKILL.md"), "mine");
-    expect(records.map(recordInPlace)).toEqual([false, false, false, true, false, false]);
   });
 });

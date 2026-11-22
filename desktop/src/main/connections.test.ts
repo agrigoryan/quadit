@@ -919,7 +919,7 @@ posixOnly("what the app runs by itself for a connected tool (desktop contract §
 
 posixOnly("a change stopped midway (desktop contract §11 review)", () => {
   it("takes back a Connect stopped midway, the login and its token among it, and is not connected", async () => {
-    const { connections, choice, home, configDir, asked, ledger } = setUp();
+    const { connections, choice, home, configDir, asked, root } = setUp();
     mkdirSync(join(home, ".claude", "skills"), { recursive: true });
     writeFileSync(join(home, ".claude", "settings.json"), "{}");
     // The settings cannot be written: the skill and the login are, before it fails.
@@ -937,10 +937,10 @@ posixOnly("a change stopped midway (desktop contract §11 review)", () => {
     expect(existsSync(join(home, ".claude", "skills", "quadit", "SKILL.md"))).toBe(false);
     expect(existsSync(join(configDir, "claude.json"))).toBe(false);
     expect(asked.at(-1)).toEqual({ kind: "revoke-token", token: "t1" });
-    expect(JSON.parse(ledger())).toEqual({ harnesses: {} });
+    expect(existsSync(join(root, "data", "connections.json"))).toBe(false);
   });
 
-  it("keeps what an upgrade stopped between files wrote as the app's, and finishes it at the next start", async () => {
+  it("takes back what an upgrade stopped between files wrote, and does all of it at the next start", async () => {
     const { connections, connect, disconnect, choice, home, root, read } = setUp();
     await connect(choice("codex"));
     // As an older version left it: no network, no rules, nothing recorded of them.
@@ -956,11 +956,12 @@ posixOnly("a change stopped midway (desktop contract §11 review)", () => {
     // The rules cannot be written: the network is, before it fails.
     mkdirSync(join(home, ".codex", "rules"), { mode: 0o500 });
     await expect(connections.refresh()).rejects.toThrow();
-    expect(read(".codex/config.toml")).toContain("network_access = true");
+    expect(read(".codex/config.toml")).not.toContain("network_access");
     chmodSync(join(home, ".codex", "rules"), 0o700);
     expect((await connections.refresh()).allowed).toEqual(["codex"]);
+    expect(read(".codex/config.toml")).toContain("network_access = true");
     expect(read(".codex/rules/default.rules")).toContain("quadit");
-    // What the stopped upgrade wrote is the app's: Disconnect takes it back with the rest.
+    // All of it is the app's: Disconnect takes it back with the rest.
     await disconnect("codex");
     expect(read(".codex/config.toml").trim()).toBe("");
     expect(existsSync(join(home, ".codex", "rules", "default.rules"))).toBe(false);
