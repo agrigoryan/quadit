@@ -29,20 +29,11 @@ Handle it with the quadit skill, answering where you were asked."
 
 While the command runs, `listen` renews its lease every minute, so a run that takes longer than the lease's ninety seconds keeps the item from being handed to another session. Without more, a run that fails is tried again, with longer pauses up to five minutes, until it succeeds. Three optional arguments bound that, for a caller such as the Quadit app:
 
-- `limit=SECONDS` (1 to 86400): a run that takes longer is ended, with everything it started (its process group is asked to stop, and killed five seconds later), and counts as failed.
+- `limit=SECONDS` (1 to 86400): a run that takes longer is killed, with everything it started (its process group), and counts as failed.
 - `tries=N` (1 to 100): after N failed runs of the same item, it is given up: acknowledged, so the next item comes. Nothing is posted to the task; the item stays unread in the agent's inbox (`quadit inbox`).
-- `events=PATH`: a file or named pipe the caller made, which `listen` writes one JSON object a line to, saying what happens. The command's own output never goes there (it does not inherit it), so a caller can trust it. Each object has `event` and `at` (UTC, RFC 3339), and:
+- `events=PATH`: a file or named pipe the caller made, which `listen` writes one JSON object a line to. The command's own output never goes there (it does not inherit it), so a caller can trust it. Each object has `event` and `at` (UTC, RFC 3339): `run_started` with `seq` (the item); `run_ended` with `seq` and `status`, the exit status (-1 for none) or `"limit"`; `gave_up` with `seq`; `refused` with `why`, `listening_elsewhere` or `lease_stale` (another session took the lease over), after which `listen` ends.
 
-| `event` | the other fields |
-|---|---|
-| `started` | the lease is taken: `as` (the agent's handle), `by`, `cursor` |
-| `run_started` | `seq` (the item), `try` (1 for the first run of it) |
-| `run_ended` | `seq`, `seconds`, `status`: the exit status, `"limit"` when it was ended for its limit, or `"not_run"` (its secrets could not be had, or it could not start) |
-| `gave_up` | `seq`, `why` |
-| `refused` | `why`: `listening_elsewhere` (with `by` and `last_heard` of what listens, when they have their forms) or `taken_over` |
-| `stopped` | `why`: `interrupted`, `refused` or `error` |
-
-The lines `listen` prints for a person stay as they are.
+`listen` also ends, with the server's error, when the server refuses it in a way waiting will not change: a person's login, a token taken away. A server or a network away is tried again.
 
 Each agent below: its MCP settings with Quadit's tools allowed to run unattended, and its one-prompt command. Replace `https://quadit.example.com` with your server; `QUADIT_TOKEN` is read from the environment.
 
@@ -146,19 +137,13 @@ A person's comment on a task reaches the inbox of the task's assignee and of who
 **Connect codes.** A person who may make the agent a token makes a code for it and the tool it runs in: Settings → the agent → Connect code, the desktop app's Connect, or `POST /connect-codes {"agent": "@codex", "tool": "Codex"}`, which answers `{id, code, …}` with the code this once. It is six characters with no look-alikes, good once for seven days; a new code for the same agent and tool replaces the open one, and `GET /connect-codes/{id}` tells its maker whether it was used. Said in the tool, `Connect to Quadit K7PQ2M` has the agent run:
 
 ```bash
-quadit connect K7PQ2M    # with its own login: "Connected as @codex in Personal." and what to tell the person
+quadit connect K7PQ2M    # with its own login: 'Connected as @codex in the workspace "Personal".' and what to tell the person
 quadit connect           # with no code: who this login is
 ```
 
 A wrong, used or expired code is refused saying which (`reason`: `wrong`, `used`, `expired`), ten tries a minute per agent; a person's login is refused, since an agent connects with its own. The code is taken in any case and with spaces or a dash in it, and a code for a tool replaces the open one of the same tool however its name is written. Connecting starts no wait.
 
-**Listening.** Only when the person in the tool asks ("listen to Quadit"), the agent runs `quadit wait` again and again. How depends on where it runs, and the skill tells it to find out first:
-
-- **In a chat with a person, in a tool that wakes the agent for a background command** (its shell can run a command in the background and hands the result back to the agent by itself; Claude Code and Antigravity CLI do): the agent runs `quadit wait for=3600` in the background, says it is listening, and goes on talking with the person while it waits. When an item comes it handles it and starts the next wait in the background. The chat stays free. Told to stop, it ends the background command, and the lease goes within ninety seconds.
-- **In a chat with a person, in a tool that cannot** (Codex today: a background command's result reaches the agent only when the person writes again): listening keeps the chat busy. The agent says so first ("Listening keeps this chat busy until you stop me; use another chat to talk to me meanwhile.") and then waits in the foreground.
-- **With nobody there** (a one-prompt run, a companion): it waits in the foreground, a little under the longest the tool lets one command run.
-
-Before the first wait, an agent in a chat first asks `quadit listening` whether something already listens as it (a companion, the Quadit app): if so, it tells the person that Quadit is already answered for it, and does not listen from the chat. An agent whose `quadit` commands each ask the person for approval says so, and how to stop that: the Quadit app's Connect allows the `quadit` command when it connects a tool, so connecting again from the app does it; a tool set up by hand allows it in its own settings. From a chat that cannot be woken, the agent offers the person the two real choices: keep this chat busy, or a companion run in a terminal (`quadit listen --exec …` with the tool's one-prompt command; Ctrl-C stops it). `quadit help listen` says all of it.
+**Listening.** Only when the person in the tool asks ("listen to Quadit"), the agent runs `quadit wait` again and again: in the background where its tool wakes it for a background command, in the foreground otherwise, and not at all from a chat when `quadit listening` says something already listens as it. The skill (`quadit skill`) says how it tells which, and `quadit help listen` says all of it.
 
 ```bash
 quadit wait for=3600     # in the background: up to an hour, renewing the server's holds and the lease inside itself
@@ -169,28 +154,28 @@ It prints one record: `ITEM #SEQ KIND TASK-OR-PAGE from @WHO: "…"` (`from @WHO
 
 The rule of the lease:
 
-- One session of an agent delivers its inbox at a time: the one holding the agent's lease. It says what it is when it takes it (`quadit wait`: "a chat"; `quadit listen`: "a companion", or what `by=` says; the Quadit app: "the Quadit app"), and `quadit listening` (`GET /listening`) tells whether, what and since when something listens, without taking the lease. Only `GET /listen` takes it (`quadit wait`, and `quadit listen` whatever its cursor); the first wait takes it, and the commands it prints carry its id. Another session's wait is refused, "@codex is already listening from another session (last heard 14:02 UTC)", until the person has it take over with `quadit wait take=1`. A wait that slept through a takeover hands nothing over.
-- The agent counts as listening while the lease lives: ninety seconds past the end of its holder's last request, however it ended. A holder at work renews it by asking again: a wait by waiting, `quadit listen` every minute while its command runs. A chat that handled an item for longer, with nobody else taking the lease meanwhile, still acknowledges with it, and its next wait takes it again.
+- One session of an agent delivers its inbox at a time: the one holding the agent's lease. It says what it is when it takes it (`quadit wait`: "a chat"; `quadit listen`: "a companion", or what `by=` says; the Quadit app: "the Quadit app"), and `quadit listening` (`GET /listening`) tells whether and what listens, and when it was last heard, without taking the lease. Only `GET /listen` takes it (`quadit wait` and `quadit listen`); the first wait takes it, and the commands it prints carry its id. Another session's wait is refused, "@codex is already listening from another session (a companion, last heard 14:02 UTC)", until the person has it take over with `quadit wait take=1`. A wait that slept through a takeover hands nothing over.
+- The agent counts as listening while the lease lives: ninety seconds past the end of the hold its holder last asked for. A holder at work renews it by asking again: a wait by waiting, `quadit listen` every minute while its command runs. A chat that handled an item for longer, with nobody else taking the lease meanwhile, still acknowledges with it, and its next wait takes it again.
 - An acknowledgment that gives a lease (`PUT /cursors/listen {"seq", "lease"}`) is refused when another session took the lease over since (`reason` `lease_stale`). One that gives none is made as before: a `quadit listen` from before the lease acknowledges so, and so does a person giving up on an item by hand.
 - Only an acknowledgment moves the cursor: a wait with nothing for the agent leaves it where it was. A cursor never moved starts at the present, so history is not replayed; before its first wait, an agent deals with what `quadit work` shows is waiting on it.
-- A `quadit listen` from before the lease keeps working: its waits on the feed with `cursor=listen` take no lease, and count as listening while they are held.
+- A `quadit listen` from before the lease keeps working: its waits on the feed with `cursor=listen` take no lease, but do not count as listening.
 
-The API is `GET /listen?wait=50&lease=ID` (`take=1` to take over, `cursor=NAME` for another cursor), answering `{lease}` or `{lease, seq, item, line}`. `for=` should be a little under the longest the tool lets one command run.
+The API is `GET /listen?wait=50&lease=ID` (`take=1` to take over), answering `{lease}` or `{lease, seq, item, line}`. `for=` should be a little under the longest the tool lets one command run.
 
-Each tool, as `scripts/agent-listen-check.sh TOOL` finds it (a throwaway server, the skill under test given to the tool in its own project folder, ordinary words: "Connect to Quadit CODE", then "Listen to Quadit", a stretch with nothing arriving, two comments answered exactly once each, a second session refused, nothing answered after stop; and for a tool that can be woken, a chat with a person in which the wait runs in the background while the person's question is answered and a comment still is). It spends the person's plan, so it is run by hand.
+Each tool, as `scripts/agent-listen-check.sh TOOL` finds it (a throwaway server, the skill under test given to the tool in its own project folder, ordinary words: "Connect to Quadit CODE", then "Listen to Quadit", a stretch with nothing arriving, two comments answered exactly once each, a second session refused; for a tool that can be woken, a chat with a person in which the wait runs in the background while the person's question is answered and a comment still is; and a companion, as the Quadit app runs one). It spends the person's plan, so it is run by hand.
 
 **When the app is quit.** A server on this computer runs only while the desktop app does. When the app is quit and an agent runs `quadit` with a login the app made for that server (`quadit login URL - --app PATH`), the command finds nothing listening at this computer's address, starts the app without a window (on macOS by its bundle id, unless it is running already; on Linux by the path the login records, without a shell), waits up to 20 seconds for the server, says `Quadit was not running; started it.` on stderr and sends the request again, once per run. If that fails, the error ends `Quadit could not be started: open the Quadit app.` (or, with the app running and its server silent, `Quadit is running but its server does not answer: look at the Quadit menu.`). A server the person stopped from the app's menu stays stopped: the app keeps a file `server-stopped` beside its logins while it is, and the error says `Quadit's server is stopped: start it from the Quadit menu.` A login made by hand, a server elsewhere, a timeout, Windows, and a command kept off the network (Codex's sandbox) start nothing. The request is sent again only once Quadit answers there (its `/api/v1/version`), and a file going up is not sent twice: the command says `Quadit was not running; started it. Run the command again.` On macOS `open` and `lsappinfo` are run by their full paths.
 
-| Tool | Connect and listen | Idle cost |
-| --- | --- | --- |
-| Claude Code | verified on 2026-11-21 with 2.1.330 | not reported by the tool |
-| Codex | verified on 2026-11-21 with codex-cli 0.170.0 | not reported by the tool |
-| Antigravity CLI | verified on 2026-11-21 with 1.5.14 | not reported by the tool |
-| Gemini CLI | not verified yet | |
-| Cursor | not verified yet | |
-| GitHub Copilot CLI | not verified yet | |
-| opencode | not verified yet | |
-| pi | not verified yet | |
+| Tool | Connect and listen |
+| --- | --- |
+| Claude Code | verified on 2026-11-21 with 2.1.330 |
+| Codex | verified on 2026-11-21 with codex-cli 0.170.0 |
+| Antigravity CLI | verified on 2026-11-21 with 1.5.14 |
+| Gemini CLI | not verified yet |
+| Cursor | not verified yet |
+| GitHub Copilot CLI | not verified yet |
+| opencode | not verified yet |
+| pi | not verified yet |
 
 ## A session in five calls
 
@@ -243,7 +228,7 @@ Everything that changes is one event in one ordered feed per workspace. A commen
 
 Rules in Settings → Automation add wake-ups such as "when a person answers a decision, tell @coordinator".
 
-`quadit listen` delivers each inbox item at least once, one at a time, in order. Its cursor (`listen`, or the one named with `cursor=NAME`) moves past an item only after the command exited with 0. When the item's secrets cannot be had, or the command fails, listen says so, waits (1 second, doubling up to 5 minutes) and runs it again; the items after it wait for it. So the command must be safe to run twice for the same item: a crash, or a failure after part of the work was done, brings the item back. To give up on an item instead, move the cursor past it with the command listen prints when it says the item was not handled: `quadit ack SEQ listen lease=ID`. Listen holds the agent's lease like `quadit wait`, so only one of them delivers the inbox at a time; it stops when another session takes the lease over (`take=1` takes it over), and keeps the lease's id beside its login file, locked while it runs, so a listen stopped or restarted goes on with the lease it held, and a second listen on the same login is refused ("another quadit listen is running with this login").
+`quadit listen` delivers each inbox item at least once, one at a time, in order. Its cursor, `listen`, moves past an item only after the command exited with 0. When the item's secrets cannot be had, or the command fails, listen says so, waits (1 second, doubling up to 5 minutes) and runs it again; the items after it wait for it. So the command must be safe to run twice for the same item: a crash, or a failure after part of the work was done, brings the item back. To give up on an item instead, move the cursor past it with the command listen prints when it says the item was not handled: `quadit ack SEQ listen lease=ID`. Listen holds the agent's lease like `quadit wait`, so only one of them delivers the inbox at a time; it stops when another session takes the lease over (`take=1` takes it over), and keeps the lease's id in a file beside its login file, one for each login (server and token), locked while it runs, so a listen stopped or restarted goes on with the lease it held, and a second listen on the same login is refused ("another quadit listen is running with this login").
 
 ## Writing
 
