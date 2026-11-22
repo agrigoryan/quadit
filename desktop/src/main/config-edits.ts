@@ -194,20 +194,23 @@ function applyChange(edit: FileEdit, change: Change): Applied | null {
 /**
  * The edits that take back what `applied` did, where each file still says
  * what was written, and a note for each that no longer does. A file that
- * is gone, or a key or block no longer there, needs nothing.
+ * is gone, or a key or block no longer there, needs nothing. The last
+ * record is taken back first: a key written twice (a setting added to it
+ * later) goes back through each value it had.
  */
 export function planReverts(applied: Applied[]): { edits: FileEdit[]; notes: string[] } {
+  // A folder last, as shown and as written: what is in it goes first. Otherwise the files in the order they were
+  // written, each taken back last record first.
+  const folderLast = [...applied.filter((r) => r.kind !== "folder"), ...applied.filter((r) => r.kind === "folder")];
   const edits = new Map<string, FileEdit>();
+  for (const record of folderLast)
+    if (!edits.has(record.path)) edits.set(record.path, editOf(record.path, record.kind));
   const notes: string[] = [];
-  // A folder last: what is in it goes first.
-  const ordered = [...applied.filter((r) => r.kind !== "folder"), ...applied.filter((r) => r.kind === "folder")];
+  const last = [...applied].reverse();
+  const ordered = [...last.filter((r) => r.kind !== "folder"), ...last.filter((r) => r.kind === "folder")];
   for (const record of ordered) {
-    let edit = edits.get(record.path);
-    if (!edit) {
-      edit = editOf(record.path, record.kind);
-      edits.set(record.path, edit);
-    }
-    if (edit.after === null) continue;
+    const edit = edits.get(record.path);
+    if (!edit || edit.after === null) continue;
     const kept = revertOne(edit, record, edits);
     if (kept) notes.push(`${record.path}: ${kept}; left as it is.`);
   }
@@ -289,6 +292,48 @@ function prune(text: string, record: { path: string; keyPath: string[]; existed:
     text = applyEdits(text, modify(text, keyPath, undefined, JSON_FORMAT));
   }
   return text;
+}
+
+/**
+ * Whether the result of `change` is in its file already, whoever wrote it:
+ * the key holds the value, the list has the item, the table has the
+ * entries, the file has the line, the folder or the link is there. A file
+ * that cannot be read as what it should be holds nothing.
+ */
+export function inPlace(change: Change): boolean {
+  const path = changedPath(change);
+  try {
+    switch (change.kind) {
+      case "json": {
+        const { value, existed } = lookUp(readJson(readText(path) ?? "", path), change.keyPath);
+        return existed === change.keyPath.length && same(value, change.value);
+      }
+      case "json-item": {
+        const { value } = lookUp(readJson(readText(path) ?? "", path), change.keyPath);
+        return Array.isArray(value) && value.includes(change.value);
+      }
+      case "toml": {
+        const { value } = lookUp(readToml(readText(path) ?? "", path), change.table);
+        if (typeof value !== "object" || value === null) return false;
+        return Object.entries(change.entries).every(([key, wanted]) =>
+          same((value as Record<string, unknown>)[key], wanted),
+        );
+      }
+      case "line":
+        return (readText(path) ?? "").split("\n").includes(change.line);
+      case "folder":
+        return statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
+      case "link":
+        return readLink(path) === change.target;
+      case "file":
+        return readText(path) === change.content;
+      case "written-by":
+        return false;
+    }
+  } catch (err) {
+    if (err instanceof EditRefused) return false;
+    throw err;
+  }
 }
 
 /** The first edit whose file is no longer as it was when planned, or null when none is. */

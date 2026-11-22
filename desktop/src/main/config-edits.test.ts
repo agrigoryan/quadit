@@ -19,6 +19,7 @@ import {
   changedSince,
   diffOf,
   EditRefused,
+  inPlace,
   planChanges,
   planReverts,
   sha256,
@@ -347,5 +348,37 @@ posixOnly("Profile lines and folders", () => {
     revert(again);
     expect(statSync(bin).isDirectory()).toBe(true);
     expect(lstatSync(join(bin, "quadit"), { throwIfNoEntry: false })).toBeUndefined();
+  });
+});
+
+posixOnly("what is in place, and taking back in turn", () => {
+  it("says whether a change's result is in its file already", () => {
+    const dir = folder();
+    const json = join(dir, "settings.json");
+    const toml = join(dir, "config.toml");
+    const rules = join(dir, "rules", "default.rules");
+    const item = { kind: "json-item" as const, path: json, keyPath: ["permissions", "allow"], value: "Bash(quadit:*)" };
+    const table = { kind: "toml" as const, path: toml, table: ["sandbox"], entries: { network_access: true } };
+    const line = { kind: "line" as const, path: rules, line: 'prefix_rule(pattern=["quadit"], decision="allow")' };
+    expect([inPlace(item), inPlace(table), inPlace(line)]).toEqual([false, false, false]);
+    writeFileSync(json, JSON.stringify({ permissions: { allow: ["Read", "Bash(quadit:*)"] } }));
+    writeFileSync(toml, "[sandbox]\nnetwork_access = true\nother = 1\n");
+    apply([line]);
+    expect([inPlace(item), inPlace(table), inPlace(line)]).toEqual([true, true, true]);
+    writeFileSync(toml, "[sandbox]\nnetwork_access = false\n");
+    expect(inPlace(table)).toBe(false);
+    // A file that cannot be read as what it should be holds nothing in place.
+    writeFileSync(json, "{ not json");
+    expect(inPlace(item)).toBe(false);
+  });
+
+  it("takes back the last change to a key first, so a key changed twice goes back to before both", () => {
+    const path = join(folder(), "settings.json");
+    const first = apply([{ kind: "json", path, keyPath: ["mcpServers", "quadit"], value: { httpUrl: "u" } }]);
+    const second = apply([
+      { kind: "json", path, keyPath: ["mcpServers", "quadit"], value: { httpUrl: "u", trust: true } },
+    ]);
+    expect(revert([...first, ...second])).toEqual([]);
+    expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({});
   });
 });
