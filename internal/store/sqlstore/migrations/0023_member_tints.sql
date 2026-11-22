@@ -1,4 +1,4 @@
--- The colour a member's initials are drawn on: one of the web app's
+-- The color a member's initials are drawn on: one of the web app's
 -- MemberTints tints, 1 to 8, chosen when the member is made as the one
 -- used least among the workspace's members, and kept. Members there
 -- already get theirs in the order they joined, by the same rule: the

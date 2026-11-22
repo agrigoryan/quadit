@@ -141,7 +141,7 @@ type Member struct {
 	Kind        string `json:"kind" db:"kind"`
 	Name        string `json:"name" db:"name"`
 	Avatar      string `json:"avatar,omitempty" db:"avatar"`
-	// Tint is the colour the member's initials are drawn on, 1 to
+	// Tint is the color the member's initials are drawn on, 1 to
 	// MemberTints, chosen when the member is made and kept.
 	Tint  int    `json:"tint,omitempty" db:"tint,null"`
 	Title string `json:"title,omitempty" db:"title"`
@@ -225,7 +225,7 @@ type ConnectCode struct {
 	UsedAt      int64  `json:"used_at,omitempty" db:"used_at,null"`
 }
 
-// MemberTints is how many colours members' initials are drawn on; the web
+// MemberTints is how many colors members' initials are drawn on; the web
 // app has one tint for each.
 const MemberTints = 8
 

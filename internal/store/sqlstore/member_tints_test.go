@@ -17,7 +17,7 @@ import (
 // TestUpgradeGivesMembersTintsInTheOrderTheyJoined: members from before
 // version 23 get their tints by the rule new members get theirs: the
 // current members one after another through the palette in the order they
-// joined, so a workspace of a person and one agent has two colours; the
+// joined, so a workspace of a person and one agent has two colors; the
 // removed members likewise, apart.
 func TestUpgradeGivesMembersTintsInTheOrderTheyJoined(t *testing.T) {
 	for _, d := range []sqlstore.Dialect{sqlstore.SQLite, sqlstore.Postgres} {
