@@ -128,6 +128,7 @@ func finishURL(s *site, code, verifier string) string {
 // Continue, the browser hands the app a one-time code, and the app trades
 // the code and its verifier at /desktop/finish for a session of its own.
 func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		ownerID := s.ownerID(t)
@@ -393,6 +394,7 @@ func TestTheDesktopAppSignsInThroughTheBrowser(t *testing.T) {
 // and from a browser session of one it owes the second step, as a password
 // sign-in does.
 func TestTheDesktopAppsSessionTookTheBrowsersSteps(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		ownerID := s.ownerID(t)

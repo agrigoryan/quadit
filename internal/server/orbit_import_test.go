@@ -105,6 +105,7 @@ func orbitAsItAnswers(t *testing.T, fetched *int) *httptest.Server {
 }
 
 func TestImportFromOrbitAsItAnswers(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		var fetched int
@@ -272,6 +273,7 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 // ordinary comment tells them and the rest as usual. Only an admin may send
 // a change quiet.
 func TestImportIsHistoryNotNews(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
 	for _, from := range []string{"server", "command line"} {
 		t.Run(from, func(t *testing.T) {
 			st := testdb.SQLite(t)

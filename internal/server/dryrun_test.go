@@ -17,6 +17,7 @@ import (
 // without being made is refused rather than made; and an MCP argument of
 // the wrong type is refused rather than dropped.
 func TestDryRunWritesNothingOnAnyPath(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

@@ -14,6 +14,7 @@ import (
 // say what was given and what is needed, and so is a key of a kind Google's
 // library does not read.
 func TestGoogleStorageRefusesAnOAuthClientFile(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	for name, c := range map[string]struct{ key, says string }{
 		"an installed app's client": {`{"installed":{"client_id":"1.apps.googleusercontent.com","client_secret":"s","redirect_uris":["http://localhost"]}}`, "OAuth client"},

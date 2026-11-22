@@ -16,6 +16,7 @@ import (
 // without a title bar its web app lays itself out for; the desktop app asks
 // before it adds a server.
 func TestTheVersionSaysWhatTheServerIs(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	var v struct {
 		Name    string
@@ -32,6 +33,7 @@ func TestTheVersionSaysWhatTheServerIs(t *testing.T) {
 // TestTheLicensesAreServed: /licenses gives Quadit's own license and the
 // notices of the work of others it contains, to anyone.
 func TestTheLicensesAreServed(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		text := s.call(t, nil, "", "GET", "/licenses", nil, 200, nil)
@@ -47,6 +49,7 @@ func TestTheLicensesAreServed(t *testing.T) {
 // as text (what the command-line tool and the MCP changes tool show) and in
 // the OpenAPI document, marks the arguments a change is refused without.
 func TestChangeCatalogSaysWhatIsRequired(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	t.Run("json", func(t *testing.T) {
 		var cat struct {
@@ -114,6 +117,7 @@ func TestChangeCatalogSaysWhatIsRequired(t *testing.T) {
 // says what goes there. (Two routes with one pattern fail every test: the
 // mux panics when the server is made.)
 func TestEveryRouteIsDescribed(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	var spec struct {
 		Paths map[string]map[string]struct {
@@ -145,6 +149,7 @@ func TestEveryRouteIsDescribed(t *testing.T) {
 // TestAListsTrashIsTheDeletedRowsAlone: /list/{kind}?trash=1 lists the rows
 // in the trash instead of the live ones, as the page and file trash do.
 func TestAListsTrashIsTheDeletedRowsAlone(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	s.change(t, s.owner, "", "label.create", M{"name": "kept"})
 	gone := s.change(t, s.owner, "", "label.create", M{"name": "gone"})["ref"].(string)
@@ -165,6 +170,7 @@ func TestAListsTrashIsTheDeletedRowsAlone(t *testing.T) {
 // task or from the other one. Asked by a task the caller may not read, it
 // is not found: the list would say which task the blank end is.
 func TestRelationsOfATaskAreListedFromEitherEnd(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

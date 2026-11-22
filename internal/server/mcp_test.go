@@ -20,6 +20,7 @@ import (
 )
 
 func TestMCPWithOAuth(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -298,6 +299,7 @@ func (d feedReadsDB) Events(ctx context.Context, f store.EventFilter) ([]core.Ev
 }
 
 func TestAToolCallEndsWhenItsClientGoesAway(t *testing.T) {
+	t.Parallel()
 	reads := &feedReads{Store: testdb.SQLite(t)}
 	s := newSite(t, reads)
 	token := s.agentToken(t, "artist")

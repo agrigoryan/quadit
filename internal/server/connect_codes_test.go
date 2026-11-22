@@ -66,6 +66,7 @@ func (s *site) connectedAt(t *testing.T, handle string) string {
 // connected; a wrong, used, replaced, expired or another agent's code is
 // refused saying which, and guessing is limited.
 func TestConnectCodes(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		coder := s.agentToken(t, "coder")
@@ -225,6 +226,7 @@ func TestConnectCodes(t *testing.T) {
 // login reads /me) proves nothing about the tool, and leaves the agent not
 // connected yet.
 func TestAReadDoesNotConnectAnAgent(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		coder := s.agentToken(t, "coder")

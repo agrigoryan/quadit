@@ -13,6 +13,7 @@ import (
 // its words and its comments too, and by nobody else; a page of no project
 // is found with a credential limited to some projects, as it opens with one.
 func TestSearchFindsWhatTheReaderMayOpen(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

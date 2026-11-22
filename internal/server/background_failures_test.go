@@ -97,6 +97,7 @@ func (s *site) tasksWebhook(t *testing.T, st store.Store, url string) string {
 }
 
 func TestADeliveryOutlivesABriefOutage(t *testing.T) {
+	// Not in parallel: it reads the process's default logger (captureLogs).
 	t.Run("a webhook that cannot be read for a moment is not given up", func(t *testing.T) {
 		logs := captureLogs(t)
 		st := newFaultyStore(testdb.SQLite(t))
@@ -131,6 +132,7 @@ func TestADeliveryOutlivesABriefOutage(t *testing.T) {
 }
 
 func TestAJobOutlivesABriefOutage(t *testing.T) {
+	// Not in parallel: it times the background work against a fault, which a busy machine delays.
 	// queueJob puts a notify job for an inbox item in the queue, due now.
 	queueJob := func(t *testing.T, st store.Store, jobID, wsID, itemID string) {
 		t.Helper()
@@ -180,6 +182,7 @@ func TestAJobOutlivesABriefOutage(t *testing.T) {
 }
 
 func TestAWakeUpOutlivesABriefOutage(t *testing.T) {
+	// Not in parallel: it times the background work against a fault, which a busy machine delays.
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
 	jobs := func(kind string) int {
@@ -203,6 +206,7 @@ func TestAWakeUpOutlivesABriefOutage(t *testing.T) {
 }
 
 func TestARequestThatMeetsAnOutageSaysSo(t *testing.T) {
+	// Not in parallel: it reads the process's default logger (captureLogs).
 	logs := captureLogs(t)
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
@@ -263,6 +267,7 @@ func TestARequestThatMeetsAnOutageSaysSo(t *testing.T) {
 }
 
 func TestAFileOnAPageThatCannotBeReadIsNotShown(t *testing.T) {
+	// Not in parallel: on a busy machine, the background work may meet the fault armed for the request.
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
 	var file struct{ ID string }
@@ -322,6 +327,7 @@ func (g *pullsGitHub) said() []string {
 }
 
 func TestAGitHubSyncOutlivesABriefOutage(t *testing.T) {
+	// Not in parallel: it times the background work against a fault, which a busy machine delays.
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
 	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -368,6 +374,7 @@ func TestAGitHubSyncOutlivesABriefOutage(t *testing.T) {
 }
 
 func TestARepositorySyncThatCannotRememberSaysSo(t *testing.T) {
+	// Not in parallel: it times the background work against a fault, which a busy machine delays.
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
@@ -405,6 +412,7 @@ func TestARepositorySyncThatCannotRememberSaysSo(t *testing.T) {
 }
 
 func TestAToolCallWhoseParamsDoNotReadIsToldSo(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 	var tok struct{ Token string }
@@ -422,6 +430,7 @@ func TestAToolCallWhoseParamsDoNotReadIsToldSo(t *testing.T) {
 }
 
 func TestADeliveryInFlightAtShutdownIsKeptForTheNextStart(t *testing.T) {
+	// Not in parallel: it times the background work against a fault, which a busy machine delays.
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -465,6 +474,7 @@ func TestADeliveryInFlightAtShutdownIsKeptForTheNextStart(t *testing.T) {
 // webhooks' deliveries, that cannot read its queue says so in the log, and
 // the next round goes on.
 func TestAQueueThatCannotBeReadIsLogged(t *testing.T) {
+	// Not in parallel: it reads the process's default logger (captureLogs).
 	for _, c := range []struct{ name, fails, logged string }{
 		{"the due jobs", "list jobs", "jobs: the due jobs could not be read"},
 		{"the webhooks", "list webhooks", "webhook deliveries: the webhooks could not be read"},
@@ -489,6 +499,7 @@ func TestAQueueThatCannotBeReadIsLogged(t *testing.T) {
 // that is not there any more is ended and says why; one whose workspace
 // cannot be read for a moment is tried again.
 func TestADeliveryWhoseWorkspaceIsGoneIsEnded(t *testing.T) {
+	// Not in parallel: it times the background work against a fault, which a busy machine delays.
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
 	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

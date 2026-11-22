@@ -17,6 +17,7 @@ import (
 // nothing; rows of the same moment come in the order of their ids, not in
 // the order the database happens to hold them.
 func TestRowsMadeInTheSameMillisecondComeInOneOrder(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		ctx := context.Background()

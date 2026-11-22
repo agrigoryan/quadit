@@ -47,6 +47,7 @@ func limitedToSVA(t *testing.T, s *site) map[string]string {
 // names the pages that mention it, and a page of a project the caller may
 // not read is not one of them, as it is not in the page tree.
 func TestContextPackLeavesOutPagesOfOtherProjects(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		narrow := oneProjectOnly(t, s)
@@ -66,6 +67,7 @@ func TestContextPackLeavesOutPagesOfOtherProjects(t *testing.T) {
 // caller may not read is not theirs to open, by slug, by id or by name, and
 // is not among the views a wrong name is answered with.
 func TestAViewOfAnotherProjectIsNotThere(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		narrow := oneProjectOnly(t, s)
@@ -90,6 +92,7 @@ func TestAViewOfAnotherProjectIsNotThere(t *testing.T) {
 // starting copy or a task, nor in the feed, which leaves out its key too.
 // A relation between two tasks the caller may not read is not theirs.
 func TestARelationRowDoesNotNameATaskTheCallerMayNotRead(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
@@ -193,6 +196,7 @@ func TestARelationRowDoesNotNameATaskTheCallerMayNotRead(t *testing.T) {
 // relation's id and type, and nothing of the far end: not its id, not its
 // key. Someone who may read both ends is told the far end.
 func TestAReaderOfOneEndIsToldOfTheRelationWithTheFarEndBlank(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
@@ -252,6 +256,7 @@ func TestAReaderOfOneEndIsToldOfTheRelationWithTheFarEndBlank(t *testing.T) {
 // and nothing of a sub-page of another project or someone else's private
 // one.
 func TestARestoreFromTheTrashCarriesTheRowsEachReaderMaySee(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
@@ -320,6 +325,7 @@ func TestARestoreFromTheTrashCarriesTheRowsEachReaderMaySee(t *testing.T) {
 // feed nor the live stream gives a reader the id of a sub-page of another
 // project or of someone else's private one.
 func TestTrashingAPageTellsEachReaderOfThePagesTheyMaySee(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
@@ -393,6 +399,7 @@ func TestTrashingAPageTellsEachReaderOfThePagesTheyMaySee(t *testing.T) {
 // caller may not read by its kind alone, marked hidden, and in text as "a
 // task you can't see": not the task's key, title, status or id.
 func TestATaskShowsARelatedTaskTheCallerMayNotReadAsOneTheyCannotSee(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
@@ -462,6 +469,7 @@ func TestATaskShowsARelatedTaskTheCallerMayNotReadAsOneTheyCannotSee(t *testing.
 // nothing of the linked row: a formula does not get its title, a rollup
 // not its values. They read as they do for a database that is gone.
 func TestARelationColumnDoesNotShowRowsOfADatabaseTheCallerMayNotSee(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
@@ -500,6 +508,7 @@ func TestARelationColumnDoesNotShowRowsOfADatabaseTheCallerMayNotSee(t *testing.
 // The page is built when it is read and never stored: someone else's
 // reading leaves nothing for search or the feed to give, and moves nothing.
 func TestAPageBuiltFromDataShowsEachReaderWhatTheyMayRead(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
@@ -564,6 +573,7 @@ func TestAPageBuiltFromDataShowsEachReaderWhatTheyMayRead(t *testing.T) {
 // for those who run the workspace. Anyone else's dashboard has no health
 // part at all, in neither form: an empty one would read as all well.
 func TestTheDashboardTellsOnlyAdminsOfTheWholeWorkspaceItsHealth(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
@@ -605,6 +615,7 @@ func textForm(path string) string {
 // a page only to those who may see the page. One on someone's private
 // page, or on a page of a project the caller may not read, is not listed.
 func TestListedAttachmentsFollowTheirPage(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		narrow := oneProjectOnly(t, s)
@@ -643,6 +654,7 @@ func TestListedAttachmentsFollowTheirPage(t *testing.T) {
 // Someone who may not read the page's project, or whose page it is not,
 // gets none of it.
 func TestAFileOnACommentOnAPageFollowsThePage(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
@@ -700,6 +712,7 @@ func TestAFileOnACommentOnAPageFollowsThePage(t *testing.T) {
 // membership and the token allow; a token made for a project outside the
 // membership is served none.
 func TestAFileIsServedWithinBothTheMembersAndTheTokensProjects(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		oneProjectOnly(t, s) // SVA and OPS, a task in each
@@ -752,6 +765,7 @@ func TestAFileIsServedWithinBothTheMembersAndTheTokensProjects(t *testing.T) {
 // comment, as they are on a task, and are seen by those who may see the
 // page and by no one else.
 func TestAFileGivenWithACommentOnAPageIsAttachedAndFollowsThePage(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)
@@ -793,6 +807,7 @@ func TestAFileGivenWithACommentOnAPageIsAttachedAndFollowsThePage(t *testing.T) 
 // whole workspace, so an admin's token made for some projects is refused
 // one; the admin's token for every project, and the admin signed in, get it.
 func TestAnExportIsNotForATokenLimitedToSomeProjects(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		oneProjectOnly(t, s)
@@ -812,6 +827,7 @@ func TestAnExportIsNotForATokenLimitedToSomeProjects(t *testing.T) {
 // private, and the page under it, are in it like any other: as rows in
 // data/, and written out in docs/. Its README says so.
 func TestAnAdminsExportHoldsEveryMembersPrivatePages(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "agent.create", M{"name": "Other", "handle": "other"})
@@ -850,6 +866,7 @@ func TestAnAdminsExportHoldsEveryMembersPrivatePages(t *testing.T) {
 // them afterwards, and does not see them among what mentions a page or a
 // task, or among a page's sub-pages.
 func TestAPrivatePagesSubPagesAreNotSeenByOthers(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -943,6 +960,7 @@ func unzipped(t *testing.T, archive, prefix string) string {
 // counted among those the caller may see: newer ones of a project they may
 // not read do not crowd out older ones of a project they may.
 func TestTheStartingCopyFillsItsLatestWithWhatTheCallerMaySee(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		callers := limitedToSVA(t, s)

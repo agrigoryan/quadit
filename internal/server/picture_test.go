@@ -16,6 +16,7 @@ import (
 // workspace, the projects its credential is limited to, and reading only.
 // What it is sent to is a page of the workspace the caller may read.
 func TestAPictureShowsOnlyWhatTheCallerMayRead(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		var targets []string
 		s := newSiteWith(t, st, func(cfg *server.Config) {

@@ -21,6 +21,8 @@ import (
 // it said before in the same sync, here that the source's folder is not in
 // the repository yet.
 func TestSyncKeepsEveryNote(t *testing.T) {
+	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
+	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
@@ -83,6 +85,7 @@ func TestSyncKeepsEveryNote(t *testing.T) {
 // TestDashboardOfOneProjectAsksOnlyItsQuestions: a dashboard narrowed to a
 // project lists only the questions asked on that project's tasks.
 func TestDashboardOfOneProjectAsksOnlyItsQuestions(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 	s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
@@ -114,6 +117,7 @@ func TestDashboardOfOneProjectAsksOnlyItsQuestions(t *testing.T) {
 // TestDashboardSameEveryTime: epics and statuses whose order would tie
 // (the same name, the same rank) come in the same order on every call.
 func TestDashboardSameEveryTime(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 	s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
@@ -146,6 +150,7 @@ func TestDashboardSameEveryTime(t *testing.T) {
 // gone is named in files/NOT-INCLUDED.txt, and the rest of the export is
 // still written.
 func TestExportNamesWhatItLeftOut(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	upload := func(name, body string) string {
 		var f struct{ ID, State string }

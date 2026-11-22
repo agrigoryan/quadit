@@ -71,6 +71,7 @@ func (s *site) stream(t *testing.T, token string) *stream {
 // TestStreamsEndWithAccess checks that a connection held open does not
 // outlive the access it was opened with.
 func TestStreamsEndWithAccess(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -160,6 +161,7 @@ func TestStreamsEndWithAccess(t *testing.T) {
 // TestCompression checks that text answers shrink for those who ask, and
 // that files and the live stream are left alone.
 func TestCompression(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -218,6 +220,7 @@ func TestCompression(t *testing.T) {
 // page see each other across servers, an upload sent in parts to different
 // servers comes together, and a caller's request count is shared.
 func TestTwoServersOneDatabase(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		if st.Dialect() != "postgres" {
 			t.Skip("several servers need Postgres")
@@ -279,6 +282,7 @@ func TestTwoServersOneDatabase(t *testing.T) {
 // TestBootstrapInParts checks that the open work and the rest add up to
 // everything, with nothing in both.
 func TestBootstrapInParts(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

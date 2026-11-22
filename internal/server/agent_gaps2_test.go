@@ -23,6 +23,7 @@ func fileNames(files []struct{ Name, URL string }) string {
 // TestQuestionFilesShowWithTheDecision: files on the question itself come
 // with the decision wherever its options' files do, in JSON and in text.
 func TestQuestionFilesShowWithTheDecision(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -98,6 +99,7 @@ func mcpTool(t *testing.T, s *site, token, name string, args M) (string, bool) {
 // is one call to ask, with files stored first by upload; so is a yes or no
 // to an exact change.
 func TestMCPAsk(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -168,6 +170,7 @@ func TestMCPAsk(t *testing.T) {
 // TestQuietInBothForms: a change sent bare is read as one in a list is:
 // quiet from an admin, refused from anyone else, in either form.
 func TestQuietInBothForms(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -203,6 +206,7 @@ func TestQuietInBothForms(t *testing.T) {
 // search; webhooks, which mirror the feed, still get them, marked quiet. A
 // change made afterwards sets all three off as before.
 func TestQuietHistorySetsNothingOff(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

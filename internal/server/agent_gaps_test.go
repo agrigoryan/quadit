@@ -99,6 +99,7 @@ func (s *site) askedFiles(t *testing.T, token, key string) (question []string, o
 // file on what it was typed after, and the same --id sent again does
 // nothing twice.
 func TestAskWithFiles(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -193,6 +194,7 @@ func TestAskWithFiles(t *testing.T) {
 // files with them, on a task and on a page, and nothing is sent when a file
 // cannot be read.
 func TestCommentsWithFiles(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -267,6 +269,7 @@ func TestCommentsWithFiles(t *testing.T) {
 // TestUnassign: "none", "nobody", "-" and nothing at all clear the
 // assignee, with assign and with update alike.
 func TestUnassign(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -380,6 +383,8 @@ func hashOf(text string) string {
 // and an unchanged file stays unchanged. A page synced before this keeps
 // its title until its file changes.
 func TestSyncTitleFromHeading(t *testing.T) {
+	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
+	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
 	st := testdb.SQLite(t)
 	s := newSite(t, st)
 	r := newSyncedRepo(t, s, map[string]string{
@@ -453,6 +458,8 @@ func TestSyncTitleFromHeading(t *testing.T) {
 // with the last commit and that folder only, and still commits and proposes
 // from it. A working copy made whole before stays whole and keeps working.
 func TestSyncClonesOnlyWhatItNeeds(t *testing.T) {
+	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
+	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
 	s := newSite(t, testdb.SQLite(t))
 	r := newSyncedRepo(t, s, map[string]string{"docs/plan.md": "Plan.\n", "assets/big.bin": "pretend this is 420 MB\n", "README.md": "readme\n"})
 	r.write("assets/more.bin", "and more\n")

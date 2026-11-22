@@ -13,6 +13,7 @@ import (
 // may write, by the credential and by the membership alike, for the first
 // part of an upload and for each part after it.
 func TestUploadsNeedACallerWhoMayWrite(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "agent.create", M{"name": "Reader", "handle": "reader", "scope": M{"read_only": true}})
@@ -33,6 +34,7 @@ func TestUploadsNeedACallerWhoMayWrite(t *testing.T) {
 // bytes, but asks the server each time it shows them, so one who signed
 // out, or lost access, is not shown it from the browser's cache.
 func TestAFileIsCheckedAgainEachTimeItIsShown(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		var f struct{ URL string }

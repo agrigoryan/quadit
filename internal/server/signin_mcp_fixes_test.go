@@ -63,6 +63,7 @@ func fakeOIDCSaying(t *testing.T, subject, email string, verified *bool) *httpte
 // address is verified does not get to sign in as the account with that
 // address, unless the admin said its addresses can be trusted.
 func TestOIDCUnsaidVerificationIsNotTrusted(t *testing.T) {
+	t.Parallel()
 	yes, no := true, false
 	refused := "/login?error=" + url.QueryEscape("Your Company SSO account has no verified email address.")
 	for _, tc := range []struct {
@@ -109,6 +110,7 @@ func TestOIDCUnsaidVerificationIsNotTrusted(t *testing.T) {
 // already connected to the provider signs in with it, whatever the provider
 // says of the address, as before.
 func TestOIDCConnectedAccountNeedsNoVerifiedAddress(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		idp := fakeOIDCSaying(t, "subject-owner", "someone@elsewhere.org", nil)
@@ -140,6 +142,7 @@ func TestOIDCConnectedAccountNeedsNoVerifiedAddress(t *testing.T) {
 // who it belongs to ends the sign-in, as any other failure to confirm who
 // signed in does, within the time GitHub is given.
 func TestGitHubSignInGivesUp(t *testing.T) {
+	// Not in parallel: it shortens the GitHub timeout every server shares.
 	was := *server.GitHubTimeout
 	*server.GitHubTimeout = 300 * time.Millisecond
 	t.Cleanup(func() { *server.GitHubTimeout = was })
@@ -209,6 +212,7 @@ func mcpAgentToken(t *testing.T, s *site) string {
 // TestMCPToolListIsStable: tools/list answers the same, byte for byte,
 // every time it is asked, so a client can tell nothing changed.
 func TestMCPToolListIsStable(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	token := mcpAgentToken(t, s)
 	_, first := mcpPost(t, s, token, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
@@ -225,6 +229,7 @@ func TestMCPToolListIsStable(t *testing.T) {
 // TestMCPParseErrorIsJSON: a body that is not JSON-RPC is answered with the
 // parse error, as JSON.
 func TestMCPParseErrorIsJSON(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	resp, body := mcpPost(t, s, mcpAgentToken(t, s), `this is not json`)
 	if !strings.Contains(body, "-32700") {

@@ -16,6 +16,7 @@ import (
 // or workspace is not valid (401, 404): a database outage is never
 // answered as "not found".
 func TestSignInDoesNotTakeAnOutageForARefusal(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)

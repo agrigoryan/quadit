@@ -98,6 +98,7 @@ func (l *loopbacks) Close() error {
 }
 
 func TestLocalhostServerAnswersOnBothLoopbacks(t *testing.T) {
+	t.Parallel()
 	hs, base := localhostServer(t)
 	hs.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "it is me") })
 	hs.Start()

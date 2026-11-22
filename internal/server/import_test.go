@@ -48,6 +48,7 @@ func (k siteSink) Upload(_, path string) (string, bool, error) {
 func (k siteSink) Logf(string, ...any) {}
 
 func TestImports(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		sink := siteSink{s, t}
@@ -256,6 +257,7 @@ func TestImports(t *testing.T) {
 // same file name, make two pages, while the same export imported again
 // under its name adds nothing. An uploaded folder must be named.
 func TestImportsFromDifferentPlacesDoNotMeet(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		upload := func(t *testing.T, readme string) string {

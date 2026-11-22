@@ -72,6 +72,7 @@ func sumOf(data []byte) string {
 // thrown away; asking again once storage is back finishes it, with the
 // bytes that were sent.
 func TestAnUploadWhoseStoringFailsCanBeFinishedLater(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		disk, err := blob.NewDisk(t.TempDir())
 		if err != nil {
@@ -133,6 +134,7 @@ func TestAnUploadWhoseStoringFailsCanBeFinishedLater(t *testing.T) {
 // would be, not taken for a request sent wrong; once the store can be
 // used, the part sent again goes on from the same place.
 func TestAPartSentWhileFileStorageCannotBeUsedIsAskedForLater(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		disk, err := blob.NewDisk(t.TempDir())
 		if err != nil {
@@ -168,6 +170,7 @@ func TestAPartSentWhileFileStorageCannotBeUsedIsAskedForLater(t *testing.T) {
 // upload in parts that carries no bytes makes the upload, at 0, and stores
 // nothing; the parts sent after it make the file.
 func TestAnUploadStartedWithNoBytesKeepsItsPlace(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		disk, err := blob.NewDisk(t.TempDir())
 		if err != nil {
@@ -232,6 +235,7 @@ func (f *meetingFiles) Put(ctx context.Context, key string, r io.Reader, ct stri
 // told where to continue from, and the file ends as the bytes that were
 // kept, every one counted once.
 func TestPartsOfOneUploadSentAtOnceTakeTurns(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		disk, err := blob.NewDisk(t.TempDir())
 		if err != nil {
@@ -288,6 +292,7 @@ func TestPartsOfOneUploadSentAtOnceTakeTurns(t *testing.T) {
 // disk that was lost or restored without them) is not stuck: the caller is
 // told to send it again from the start, and that makes the file.
 func TestAnUploadWhoseBytesAreGoneStartsAgain(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		disk, err := blob.NewDisk(t.TempDir())
 		if err != nil {
@@ -342,6 +347,7 @@ func TestAnUploadWhoseBytesAreGoneStartsAgain(t *testing.T) {
 // checksum when one was given. When they do not, what was kept is let go
 // and the caller is told to send the file again from the start.
 func TestAnUploadIsCheckedBeforeItIsReady(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		disk, err := blob.NewDisk(t.TempDir())
 		if err != nil {
@@ -400,6 +406,7 @@ func TestAnUploadIsCheckedBeforeItIsReady(t *testing.T) {
 // upload; the other is told how far it has got. When storing the file then
 // fails, asking again finishes it from what the first request brought.
 func TestFirstRequestsUnderOneIDDoNotShareWhatTheyReceive(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		disk, err := blob.NewDisk(t.TempDir())
 		if err != nil {
@@ -498,6 +505,7 @@ func (f *heldFiles) Put(ctx context.Context, key string, r io.Reader, ct string)
 // them: the file served is the bytes its checksum says, and the late copy
 // is not left behind in file storage.
 func TestAnUploadStartedAgainIsNotOverwrittenByOneStillBeingStored(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		disk, err := blob.NewDisk(t.TempDir())
 		if err != nil {

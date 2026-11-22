@@ -69,6 +69,7 @@ func (s *site) listening(t *testing.T, handle string) bool {
 // take over, a lease taken over or run out can no longer acknowledge, and
 // nothing but an acknowledgment moves the cursor.
 func TestTheListener(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		coder := s.agentToken(t, "coder")
@@ -181,6 +182,7 @@ func TestTheListener(t *testing.T) {
 // another session takes the lease over is refused when its item comes, so
 // only the session that holds the lease delivers it.
 func TestAWaitThatSleptThroughATakeoverHandsNothingOver(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		coder := s.agentToken(t, "coder")
@@ -236,6 +238,7 @@ func TestAWaitThatSleptThroughATakeoverHandsNothingOver(t *testing.T) {
 // every agent, when it connected, whether it listens and the tool of the
 // last code it gave back.
 func TestHowFarAgentsAreConnectedIsACheapRead(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		coder := s.agentToken(t, "coder")
@@ -269,6 +272,7 @@ func TestHowFarAgentsAreConnectedIsACheapRead(t *testing.T) {
 // starts no wait; quadit wait hands it its item with the lines to go on,
 // which work as printed; a second session is refused.
 func TestAnAgentConnectsAndListensWithTheCommand(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		coder := s.agentToken(t, "coder")
@@ -342,6 +346,7 @@ func TestAnAgentConnectsAndListensWithTheCommand(t *testing.T) {
 // {seq}, never a lease) takes no lease, is refused nothing and moves its
 // cursor; it does not show as listening.
 func TestAListenerFromBeforeTheLeaseKeepsWorking(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		coder := s.agentToken(t, "coder")
@@ -375,6 +380,7 @@ func TestAListenerFromBeforeTheLeaseKeepsWorking(t *testing.T) {
 // TestTheFirstWaitStartsAtThePresent: an agent with a history does not have
 // it replayed when it first listens: only what comes after is handed over.
 func TestTheFirstWaitStartsAtThePresent(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		coder := s.agentToken(t, "coder")
@@ -399,6 +405,7 @@ func TestTheFirstWaitStartsAtThePresent(t *testing.T) {
 // or makes it refused: it never lands between the check of the lease and
 // the move of the cursor.
 func TestAnAcknowledgmentCannotSlipPastATakeover(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, plain store.Store) {
 		fs := newFaultyStore(plain)
 		s := newSite(t, fs)
@@ -452,6 +459,7 @@ func TestAnAcknowledgmentCannotSlipPastATakeover(t *testing.T) {
 // heard, without taking the lease, so a chat can learn that a companion
 // already answers for it; the refusal of a second session says it too.
 func TestWhatListensIsToldWithoutTakingTheLease(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		coder := s.agentToken(t, "coder")

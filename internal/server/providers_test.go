@@ -62,6 +62,7 @@ func fakeGitHub(t *testing.T, seen *[]string) *httptest.Server {
 // TestSignInWithGitHub walks sign-in with GitHub from the first redirect to
 // a signed-in member, against a stand-in that speaks as GitHub does.
 func TestSignInWithGitHub(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		var seen []string
@@ -111,6 +112,7 @@ func TestSignInWithGitHub(t *testing.T) {
 //
 //	QUADIT_TEST_GOOGLE=1  QUADIT_TEST_GITHUB_TOKEN=$(gh auth token)
 func TestRealProviders(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("QUADIT_TEST_GOOGLE") == "" && os.Getenv("QUADIT_TEST_GITHUB_TOKEN") == "" {
 		t.Skip("QUADIT_TEST_GOOGLE and QUADIT_TEST_GITHUB_TOKEN are not set")
 	}

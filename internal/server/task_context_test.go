@@ -11,6 +11,7 @@ import (
 // TestContextPackListsLinkedPagesByTitle: the pages a task's context pack
 // links come in the order of their titles, the same on every read.
 func TestContextPackListsLinkedPagesByTitle(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

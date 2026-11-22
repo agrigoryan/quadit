@@ -156,6 +156,7 @@ func (s *site) change(t *testing.T, hc *http.Client, token, typ string, args any
 type M = map[string]any
 
 func TestAPI(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -295,6 +296,7 @@ func TestAPI(t *testing.T) {
 // delivery log, the audit log pages without skipping, and the one who runs
 // the install can step into a workspace they are not in.
 func TestLooseEnds(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -405,6 +407,7 @@ func TestLooseEnds(t *testing.T) {
 // invitation) is refused to a credential or a membership that may only
 // read, as every change is.
 func TestAnAdminWhoMayOnlyReadStartsNothing(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		var ro struct{ Token string }

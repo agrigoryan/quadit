@@ -59,6 +59,7 @@ func (ownPage) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func TestSecondStepInvitesAndSettings(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 
@@ -197,6 +198,7 @@ func fakeOIDC(t *testing.T, email string) *httptest.Server {
 }
 
 func TestSingleSignOn(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		idp := fakeOIDC(t, "eve@example.com")
@@ -254,6 +256,7 @@ func TestSingleSignOn(t *testing.T) {
 // windows that still run: a sign-in does not wipe the count of password
 // reset requests made in the hour.
 func TestALimitsWindowsAreClearedOnlyWhenOver(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		reset := M{"email": "owner@example.com"}
@@ -276,6 +279,7 @@ func TestALimitsWindowsAreClearedOnlyWhenOver(t *testing.T) {
 // address is the last one in the list that no such proxy added, so a
 // caller cannot pick its own by writing the header.
 func TestTheCallersAddressIsTakenFromTrustedProxiesOnly(t *testing.T) {
+	t.Parallel()
 	// Failed sign-ins, each for another account and with its own
 	// X-Forwarded-For: the limit for one address is 30 in 15 minutes. The
 	// counts start again each window, and a run may cross into the next:
@@ -341,6 +345,7 @@ func postFrom127(t *testing.T, s *site, path string, body any, forwarded string)
 // security alike. A person with nothing set up reaches only what sets a
 // second step up, and gets in once they have.
 func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		ctx := context.Background()
@@ -531,6 +536,7 @@ func TestTwoStepsRequiredMeansThisSignInTookTwo(t *testing.T) {
 // password cannot be written leaves the install as it was, and trying again
 // sets it up with that password.
 func TestTheFormsSetUpIsOneWrite(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, plain store.Store) {
 		st := newFaultyStore(plain)
 		s := startSite(t, st, nil, nil)

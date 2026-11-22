@@ -25,6 +25,7 @@ import (
 // asked for the check (its stored state says "preferred") is held to it
 // when it is finished.
 func TestAPasskeyCountsOnlyWhenItsDeviceCheckedWhoHoldsIt(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		dev := newPasskeyDevice(t)

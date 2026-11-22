@@ -23,6 +23,7 @@ import (
 // unless whoever runs the server opened that network. Nothing there is
 // even connected to.
 func TestAddressesUsersGiveAreReachedOnlyWhenPublic(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSiteWith(t, st, func(*server.Config) {})
 		var reached atomic.Int32

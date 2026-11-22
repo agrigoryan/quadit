@@ -15,6 +15,7 @@ import (
 // the watched things in the starting copy say nothing of another project's
 // tasks, though the member's other ways in show them.
 func TestATokenForSomeProjectsReadsItsMembersOwnListsOfThoseOnly(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		oneProjectOnly(t, s)
@@ -85,6 +86,7 @@ func TestATokenForSomeProjectsReadsItsMembersOwnListsOfThoseOnly(t *testing.T) {
 // on in a project they were since kept out of is not told of that task by
 // their inbox, My work or the unread count.
 func TestAnInboxItemOfAProjectAMemberWasKeptOutOfIsNotShown(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

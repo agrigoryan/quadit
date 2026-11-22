@@ -21,6 +21,7 @@ import (
 // testdata/reads/view-queries.golden (see TestEveryReadAnswersEachCallerTheSame
 // for how the file is written and compared).
 func TestAViewIsSavedOnlyWithAQueryThatReads(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		rw := newRichWorkspace(t, s, st)

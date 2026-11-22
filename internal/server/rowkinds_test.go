@@ -28,6 +28,7 @@ var notRowKinds = map[string]string{
 // row kinds to the tables there are: a new table of a workspace is given a
 // rule for who may see its rows (rowKinds), or says here where it is read.
 func TestEveryWorkspaceTableIsARowKindOrSaysWhereItIsRead(t *testing.T) {
+	t.Parallel()
 	kindOf := map[string]string{}
 	for _, kind := range rowKinds {
 		if _, twice := kindOf[kind.name]; twice {
@@ -63,6 +64,7 @@ func TestEveryWorkspaceTableIsARowKindOrSaysWhereItIsRead(t *testing.T) {
 // whole workspace's: it is never given to /list or the starting copy, which
 // limited callers read.
 func TestOnlyAKindWithARuleIsListedOrCopied(t *testing.T) {
+	t.Parallel()
 	for _, kind := range rowKinds {
 		if kind.visible == nil && (kind.list != nil || kind.copyQuery != nil) {
 			t.Errorf("row kind %s has no rule for who may see its rows, and is listed or copied", kind.name)

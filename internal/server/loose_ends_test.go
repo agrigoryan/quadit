@@ -22,6 +22,7 @@ import (
 // TestDecisionLogHasTheFiles: the decision log carries the files on each
 // question and on each of its options, as the task does, in JSON and text.
 func TestDecisionLogHasTheFiles(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -137,6 +138,7 @@ func gitHubRoutes(mux *http.ServeMux, base string) {
 // signed in), the sign-in gives up within the limit and the person is told
 // the provider could not confirm who they are.
 func TestSignInGivesUpOnASilentProvider(t *testing.T) {
+	// Not in parallel: it shortens the GitHub timeout every server shares.
 	was := *server.GitHubTimeout
 	*server.GitHubTimeout = 300 * time.Millisecond
 	t.Cleanup(func() { *server.GitHubTimeout = was })
@@ -192,6 +194,8 @@ func TestSignInGivesUpOnASilentProvider(t *testing.T) {
 // that line only, and its front matter comes back byte for byte, in each
 // of three styles.
 func TestSyncKeepsFrontMatter(t *testing.T) {
+	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
+	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
 	files := map[string]string{
 		"docs/plain.md":  "---\nowner: aram\nstatus:   draft\n---\n\n# Plain\n\nText.\n",
 		"docs/quoted.md": "---\ntitle: \"Boss: the return\"\nwhen: '10:30'\nnote: \"*not* emphasis\"\n---\nText.\n",
@@ -227,6 +231,7 @@ func TestSyncKeepsFrontMatter(t *testing.T) {
 // dashboard still lists every agent, but shows each one working, and its
 // last action, only from that project.
 func TestDashboardOfOneProjectShowsAgentsThere(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 	s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})

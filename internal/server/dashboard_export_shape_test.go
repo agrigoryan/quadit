@@ -53,6 +53,7 @@ func shapeJSON(t *testing.T, raw string) string {
 // and SHA-256. It runs on SQLite only: several of the lists in the export
 // are read in whatever order the database keeps them.
 func TestDashboardAndExportShape(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	const owner = "@aram"
 

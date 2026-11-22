@@ -22,6 +22,7 @@ import (
 // write made with the cookie must say it is JSON. A token is not sent by
 // the browser on its own, so a request made with one is not held to this.
 func TestWritesWithTheCookieComeOnlyFromTheServersOwnPages(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		var tok struct{ Token string }

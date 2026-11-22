@@ -86,6 +86,7 @@ func eventually(t *testing.T, what string, ok func() bool) {
 }
 
 func TestWakeUps(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -161,6 +162,7 @@ func TestWakeUps(t *testing.T) {
 }
 
 func TestWatchedView(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -191,6 +193,7 @@ func TestWatchedView(t *testing.T) {
 // TestAFailingWebhookDoesNotHoldUpTheOthers: one webhook that cannot be
 // reached, with a backlog of thousands, takes nothing from another's queue.
 func TestAFailingWebhookDoesNotHoldUpTheOthers(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Talked about"})
@@ -213,6 +216,7 @@ func TestAFailingWebhookDoesNotHoldUpTheOthers(t *testing.T) {
 // as a reader of that project alone reads it, with the far end blank; a
 // webhook for the whole workspace is sent both ends.
 func TestAProjectsWebhookIsNotToldOfTasksOfOtherProjects(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

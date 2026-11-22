@@ -13,6 +13,7 @@ import (
 // it, nor its values in the raw cells, nor its title and values through a
 // relation and a rollup of another database.
 func TestADatabaseShowsOnlyTheRowsTheReaderMaySee(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		agent := s.agentToken(t, "writer")

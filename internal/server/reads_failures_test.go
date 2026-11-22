@@ -21,6 +21,7 @@ import (
 // outage must not tell an agent that a page is gone, that its cursor stands
 // at the start, or make it read the whole feed again.
 func TestReadsAnswerAFailedReadAsAnErrorNotAsNotFound(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
@@ -54,6 +55,7 @@ func TestReadsAnswerAFailedReadAsAnErrorNotAsNotFound(t *testing.T) {
 // A part of an answer that cannot be read fails the answer, instead of
 // being given as 0 or as nothing there.
 func TestReadsDoNotGiveAFailedCountAsZero(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
@@ -96,6 +98,7 @@ func TestReadsDoNotGiveAFailedCountAsZero(t *testing.T) {
 // The context pack reports a parent it could not read as an error, instead
 // of failing on the missing answer.
 func TestContextPackReportsAFailedParentRead(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := &readsTasksByIDFault{Store: st}
 		s, logs := readsSiteWithLog(t, fs)

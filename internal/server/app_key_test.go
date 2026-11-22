@@ -60,6 +60,7 @@ type signInOptions struct {
 // else is taken on the key. The owner can add a password and an email to
 // sign in from a browser.
 func TestTheAppThatRunsTheServerSetsItUp(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := startSite(t, st, nil, func(cfg *server.Config) { cfg.AppKey = appKey })
 		body := M{"name": "Aram Grigoryan", "workspace_name": "Personal"}
@@ -165,6 +166,7 @@ func (s *site) signedInAs(t *testing.T, client *http.Client) *http.Client {
 // refused; the right key is never counted, nor held back by the sign-ins
 // counted from the same address.
 func TestAWrongAppKeyIsCountedAsAFailedSignIn(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := startSite(t, st, nil, func(cfg *server.Config) { cfg.AppKey = appKey })
 		s.call(t, theApp(appKey, ""), "", "POST", "/api/v1/auth/setup", M{"name": "Aram", "workspace_name": "Personal"}, 201, nil)
@@ -184,6 +186,7 @@ func TestAWrongAppKeyIsCountedAsAFailedSignIn(t *testing.T) {
 // options; one set up with the form before an app ran it has no local
 // owner to sign in.
 func TestAppSessionNeedsAnAppThatSetTheServerUp(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		formed := newSite(t, st)
 		var options signInOptions
@@ -205,6 +208,7 @@ func TestAppSessionNeedsAnAppThatSetTheServerUp(t *testing.T) {
 // test mail asks where to go, the export is made, and signing in with no
 // address finds nobody.
 func TestAnOwnerWithNoEmail(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := startSite(t, st, nil, func(cfg *server.Config) { cfg.AppKey = appKey })
 		app := theApp(appKey, "")
@@ -243,6 +247,7 @@ func TestAnOwnerWithNoEmail(t *testing.T) {
 // form makes an owner who signs in with an email and a password, and one
 // without an email is refused rather than made unable to sign in.
 func TestTheFormStillSetsUpWithAnEmail(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := startSite(t, st, nil, nil)
 		form := M{"name": "Aram", "email": " ", "password": "correct-horse-battery", "workspace_name": "Games"}
@@ -261,6 +266,7 @@ func TestTheFormStillSetsUpWithAnEmail(t *testing.T) {
 // written leaves the install as it was, not set up, and trying again sets
 // it up.
 func TestTheAppsSetUpIsOneWrite(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, plain store.Store) {
 		st := newFaultyStore(plain)
 		s := startSite(t, st, nil, func(cfg *server.Config) { cfg.AppKey = appKey })
@@ -288,6 +294,7 @@ func TestTheAppsSetUpIsOneWrite(t *testing.T) {
 // person who is there; a local owner who was deleted, or an id that is not
 // a person's, is answered as an install with no local owner.
 func TestTheLocalOwnerMustBeALivePerson(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := startSite(t, st, nil, func(cfg *server.Config) { cfg.AppKey = appKey })
 		var made struct{ User struct{ ID string } }
@@ -318,6 +325,7 @@ func TestTheLocalOwnerMustBeALivePerson(t *testing.T) {
 // a session, from anywhere; a nonce out of bounds is refused, and a server
 // no app runs has nothing to prove.
 func TestTheServerProvesItHoldsTheAppKey(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := startSite(t, st, nil, func(cfg *server.Config) { cfg.AppKey = appKey })
 		nonce := "bm9uY2Utb2YtdGhlLWFwcC10aGF0LXJ1bnMtdGhlLXNlcnZlcg"
@@ -351,6 +359,7 @@ func TestTheServerProvesItHoldsTheAppKey(t *testing.T) {
 // other write to those addresses from another site's page is refused as
 // every such write is.
 func TestOnlyTheKeyedPostsSkipThePageCheck(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := startSite(t, st, nil, func(cfg *server.Config) { cfg.AppKey = appKey })
 		for _, path := range []string{"/api/v1/auth/setup", "/api/v1/auth/app-session", "/api/v1/auth/app-proof"} {
@@ -365,6 +374,7 @@ func TestOnlyTheKeyedPostsSkipThePageCheck(t *testing.T) {
 // runs always has a way in, the app, so changing the sign-in methods never
 // locks them out; anyone else still needs one of the methods left on.
 func TestTheAppIsADoorForItsLocalOwner(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := startSite(t, st, nil, func(cfg *server.Config) { cfg.AppKey = appKey })
 		app := theApp(appKey, "")

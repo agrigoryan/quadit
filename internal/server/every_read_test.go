@@ -45,6 +45,7 @@ import (
 // directory for them in QUADIT_READS_DIR: its answers are written there,
 // and compared with the lines of each answer in the order of their text.
 func TestEveryReadAnswersEachCallerTheSame(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		rw := newRichWorkspace(t, s, st)

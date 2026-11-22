@@ -27,6 +27,7 @@ import (
 
 // TestVault checks that an agent can use a secret and never get it back.
 func TestVault(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		const key = "sk-live-9f3b7c21d4"
@@ -158,6 +159,7 @@ func TestVault(t *testing.T) {
 // TestAgentsCannotWidenThemselves checks that an agent with limits cannot
 // lift them, hand out more than it has, or point a cursor past the feed.
 func TestAgentsCannotWidenThemselves(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -220,6 +222,7 @@ func TestAgentsCannotWidenThemselves(t *testing.T) {
 // TestSmallGuards covers a handful of refusals that keep people and agents
 // out of trouble.
 func TestSmallGuards(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -271,6 +274,7 @@ func TestSmallGuards(t *testing.T) {
 // TestDeleteWorkspace checks that an owner can delete a workspace, that it
 // can be brought back for a while, and that afterwards nothing of it is left.
 func TestDeleteWorkspace(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -333,6 +337,7 @@ func TestDeleteWorkspace(t *testing.T) {
 // TestCheapReads checks that list reads take a field selector and a
 // "changed since" form.
 func TestCheapReads(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -373,6 +378,7 @@ func TestCheapReads(t *testing.T) {
 
 // TestNamesNotIDs checks that an agent can say what it means by name.
 func TestNamesNotIDs(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -416,6 +422,7 @@ func TestNamesNotIDs(t *testing.T) {
 
 // TestRestoreAFile checks that a removed file can be put back.
 func TestRestoreAFile(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -442,6 +449,7 @@ func TestRestoreAFile(t *testing.T) {
 // TestSubAgents checks delegation: an agent makes a helper for one task,
 // which is held to that task's project and ends with the task.
 func TestSubAgents(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -500,6 +508,7 @@ func TestSubAgents(t *testing.T) {
 // out is a breaking change, made by hand together with a new major version
 // of engine.Surface.
 func TestSurfaceOnlyGrows(t *testing.T) {
+	t.Parallel()
 	var now []string
 	for _, ci := range engine.Catalog() {
 		now = append(now, "change "+ci.Type)
@@ -610,6 +619,7 @@ func TestSurfaceOnlyGrows(t *testing.T) {
 // TestImportThroughTheAPI checks that an export uploaded to the server can
 // be imported there, as the web app does it.
 func TestImportThroughTheAPI(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		csv := "\ufeffID,Team,Title,Description,Status,Estimate,Priority,Project,Assignee,Labels,Due Date,Parent issue,Completed,Canceled\n" +
@@ -659,6 +669,7 @@ func TestImportThroughTheAPI(t *testing.T) {
 // TestPagesDoNotShift checks paging by cursor: a task added between two
 // pages neither repeats one nor skips one.
 func TestPagesDoNotShift(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -745,6 +756,7 @@ func TestPagesDoNotShift(t *testing.T) {
 // TestRestoreOneThingFromTheAdminArea checks that one task can be brought
 // back from a backup without a shell.
 func TestRestoreOneThingFromTheAdminArea(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -772,6 +784,7 @@ func TestRestoreOneThingFromTheAdminArea(t *testing.T) {
 
 // TestSecondAuditFindings pins what a second independent check found.
 func TestSecondAuditFindings(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -879,6 +892,7 @@ func TestSecondAuditFindings(t *testing.T) {
 // before it is cut; and the audit log has the address as the agent wrote
 // it, not with the value in it.
 func TestTheVaultBlanksTheValueInEveryFormItSends(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		const key = `pa/ss+w"rd?&=é 42`
@@ -997,6 +1011,7 @@ func must[T any](v T, err error) T {
 // held as a change is: not by a member who may only read, and only with an
 // approval from an agent that must ask before it. A GET only looks.
 func TestARequestThatChangesSomethingIsHeldAsAChangeIs(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

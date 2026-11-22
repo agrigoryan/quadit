@@ -15,6 +15,7 @@ import (
 // someone else's private page: not the link, not the reference, not the
 // link's event in the feed, and not a page in the pack.
 func TestAPageLinkedToATaskIsSeenFromBothSides(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		narrow := oneProjectOnly(t, s)
@@ -108,6 +109,7 @@ func TestAPageLinkedToATaskIsSeenFromBothSides(t *testing.T) {
 // page to a task, and the agent then reads it on the task and in its
 // context pack, as a page it may see.
 func TestAnAgentLinksAPageFromTheCommandLine(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		narrow := oneProjectOnly(t, s)

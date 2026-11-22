@@ -14,6 +14,7 @@ import (
 // the body word for word: what a caller is told about a missing row does
 // not depend on how the handler finds out it is missing.
 func TestNotFoundAnswersKeepTheirWords(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		bea, _ := s.invitedPerson(t)

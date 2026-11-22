@@ -22,6 +22,7 @@ import (
 // backup a newer Quadit made is refused, with words that say which Quadit
 // can read it, and not as a task that is not found.
 func TestABackupOfANewerQuaditIsRefusedInWords(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -71,6 +72,7 @@ func TestABackupOfANewerQuaditIsRefusedInWords(t *testing.T) {
 // fails on the way is a failure, not a task that is not found, that leaves
 // the task as it was.
 func TestBringingAnItemBackAnswersWhatWentWrong(t *testing.T) {
+	t.Parallel()
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
 	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -144,6 +146,7 @@ func TestBringingAnItemBackAnswersWhatWentWrong(t *testing.T) {
 // is taken in; a second one in that same second gets its own file instead of
 // writing over the first.
 func TestTwoBackupsInOneSecondAreTwoFiles(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	var first, second struct{ Location string }
 	s.call(t, s.owner, "", "POST", "/api/v1/admin/backups", M{}, 201, &first)
@@ -162,6 +165,7 @@ func TestTwoBackupsInOneSecondAreTwoFiles(t *testing.T) {
 // rows out at once and its bytes a day later, so a backup that read the
 // rows before they went still finds the bytes to copy.
 func TestAPurgedFileStaysInStorageADay(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		ctx := context.Background()
 		disk, err := blob.NewDisk(t.TempDir())
@@ -231,6 +235,7 @@ func TestAPurgedFileStaysInStorageADay(t *testing.T) {
 // when the copy got there; and only the newest the setting keeps are kept
 // there, as they are beside the data.
 func TestEachBackupIsCopiedWhereTheSettingSays(t *testing.T) {
+	t.Parallel()
 	for _, to := range []struct {
 		name, dir string
 		copyTo    func(folder string) M
@@ -285,6 +290,7 @@ func TestEachBackupIsCopiedWhereTheSettingSays(t *testing.T) {
 // in the list, in the install's health and on the workspace dashboard; and
 // the copies made before are not dropped for it.
 func TestACopyThatFailsLeavesTheBackupAndSaysWhy(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		folder := filepath.Join(t.TempDir(), "drive")
@@ -343,6 +349,7 @@ func TestACopyThatFailsLeavesTheBackupAndSaysWhy(t *testing.T) {
 // such as the empty mount point of a drive that is not mounted, and writes
 // nothing into it.
 func TestACopyRefusesAFolderNotMarkedForBackups(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	folder := filepath.Join(t.TempDir(), "drive")
 	if err := os.Mkdir(folder, 0o750); err != nil {
@@ -375,6 +382,7 @@ func TestACopyRefusesAFolderNotMarkedForBackups(t *testing.T) {
 // there, not absolute or cannot be written, and a bucket that does not
 // answer.
 func TestADestinationThatCannotBeUsedIsRefused(t *testing.T) {
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	locked := t.TempDir()
 	if err := os.Chmod(locked, 0o500); err != nil {

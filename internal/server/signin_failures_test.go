@@ -83,6 +83,7 @@ func secondServer(t *testing.T, st store.Store) *site {
 }
 
 func TestSignInIsRefusedWhenAttemptsCannotBeCounted(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
@@ -108,6 +109,7 @@ func TestSignInIsRefusedWhenAttemptsCannotBeCounted(t *testing.T) {
 }
 
 func TestRequiredSecondStepHoldsWhenSettingsCannotBeRead(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
@@ -122,6 +124,7 @@ func TestRequiredSecondStepHoldsWhenSettingsCannotBeRead(t *testing.T) {
 }
 
 func TestAccessSettingsFailClosedWhenTheyCannotBeRead(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
@@ -141,6 +144,7 @@ func TestAccessSettingsFailClosedWhenTheyCannotBeRead(t *testing.T) {
 }
 
 func TestMetricsAreClosedWhenTheirTokenCannotBeRead(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
@@ -154,6 +158,7 @@ func TestMetricsAreClosedWhenTheirTokenCannotBeRead(t *testing.T) {
 }
 
 func TestPasswordChangesFailWhenOtherSessionsCannotBeEnded(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
@@ -193,6 +198,7 @@ func TestPasswordChangesFailWhenOtherSessionsCannotBeEnded(t *testing.T) {
 }
 
 func TestDisablingAPersonFailsWhenTheirAccessCannotBeEnded(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
@@ -210,6 +216,7 @@ func TestDisablingAPersonFailsWhenTheirAccessCannotBeEnded(t *testing.T) {
 }
 
 func TestSavingASettingKeepsItsSecretsWhenTheOldValueCannotBeRead(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
@@ -291,6 +298,7 @@ func (s *site) tokenCall(t *testing.T, form url.Values, want int, out any) {
 }
 
 func TestARefreshFailsWhenTheOldTokenCannotBeRevoked(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
@@ -307,6 +315,7 @@ func TestARefreshFailsWhenTheOldTokenCannotBeRevoked(t *testing.T) {
 }
 
 func TestAccountChecksFailWhenTheyCannotCount(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)
@@ -351,6 +360,7 @@ func TestAccountChecksFailWhenTheyCannotCount(t *testing.T) {
 }
 
 func TestAnInvitationDoesNotSayNoAccountWhenItCannotLook(t *testing.T) {
+	t.Parallel()
 	fs := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, fs)
 	var inv struct{ Link string }
@@ -369,6 +379,7 @@ func TestAnInvitationDoesNotSayNoAccountWhenItCannotLook(t *testing.T) {
 }
 
 func TestASecretRequestWhoseAnswerBreaksOffIsNotOK(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		api := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
@@ -413,6 +424,7 @@ func (s *spendFirst) Update(ctx context.Context, table string, set map[string]an
 }
 
 func TestARefreshTokenSpentByAnotherRefreshIsRefused(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		racing := &spendFirst{Store: st}
 		s := newSite(t, racing)
@@ -423,6 +435,7 @@ func TestARefreshTokenSpentByAnotherRefreshIsRefused(t *testing.T) {
 }
 
 func TestSignInReadsDoNotTakeAnOutageForAbsence(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		s := newSite(t, fs)

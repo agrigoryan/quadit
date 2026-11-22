@@ -18,6 +18,7 @@ import (
 // TestThirdAuditFindings holds what a third independent check of the build
 // found, each as the smallest case that showed it.
 func TestThirdAuditFindings(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -308,6 +309,8 @@ func TestThirdAuditFindings(t *testing.T) {
 // anywhere on the server. Sync reads none of them as pages, takes no folder
 // through one, and writes nothing through one.
 func TestSyncDoesNotFollowLinks(t *testing.T) {
+	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
+	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
@@ -388,6 +391,8 @@ func TestSyncDoesNotFollowLinks(t *testing.T) {
 // plain file standing where a page's folder would be holds back only that
 // page: the sync goes on, says so, and loses nobody's edit.
 func TestSyncAwkwardRepositories(t *testing.T) {
+	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
+	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}

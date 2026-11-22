@@ -9,6 +9,7 @@ import (
 // characters from A to Z and 2 to 9 without O, I and L, the form the
 // desktop app takes a code in; a lease id is eight of the same.
 func TestConnectCodesAreOfTheFormTheAppAccepts(t *testing.T) {
+	t.Parallel()
 	code := regexp.MustCompile(`^[A-HJKMNP-Z2-9]{6}$`)
 	lease := regexp.MustCompile(`^[A-HJKMNP-Z2-9]{8}$`)
 	for range 5000 {

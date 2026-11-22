@@ -13,6 +13,7 @@ import (
 )
 
 func TestDocs(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -160,6 +161,7 @@ func TestDocs(t *testing.T) {
 }
 
 func TestSharedPagesChipsAndUndo(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -250,6 +252,7 @@ func TestSharedPagesChipsAndUndo(t *testing.T) {
 }
 
 func TestRenameOption(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		db := s.change(t, s.owner, "", "doc.create", M{"title": "Sprites", "kind": "database"})["ref"].(string)
@@ -306,6 +309,7 @@ func TestRenameOption(t *testing.T) {
 // members change the same block the last one wins, and the other's words
 // can still be found in the page's history.
 func TestOverwrittenEditStaysInHistory(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "agent.create", M{"name": "Writer", "handle": "writer"})
@@ -349,6 +353,7 @@ func TestOverwrittenEditStaysInHistory(t *testing.T) {
 // TestDecisionsAndTitlesAsLinks checks that a decision and a page title can
 // be mentioned, and that the task says where it and its decisions are named.
 func TestDecisionsAndTitlesAsLinks(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -392,6 +397,7 @@ func TestDecisionsAndTitlesAsLinks(t *testing.T) {
 // told of neither a task of another project, a page of another project, nor
 // someone else's private page, in either direction.
 func TestAPageTellsOfMentionsOnlyWhatTheReaderMaySee(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		narrow := oneProjectOnly(t, s)

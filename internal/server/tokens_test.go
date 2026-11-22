@@ -14,6 +14,7 @@ import (
 // person who does not run the workspace. Another person's agent, or a
 // person, stays theirs.
 func TestThePersonResponsibleForAnAgentMayMakeItsTokens(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		bea, beaID := s.invitedPerson(t)
@@ -45,6 +46,7 @@ func TestThePersonResponsibleForAnAgentMayMakeItsTokens(t *testing.T) {
 // so the desktop app's Disconnect works for someone who does not run the
 // workspace. A token someone else made for that agent stays the admins'.
 func TestTheMakerOfAnAgentsTokenMayRevokeIt(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		bea, beaID := s.invitedPerson(t)

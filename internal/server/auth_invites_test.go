@@ -16,6 +16,7 @@ import (
 // those projects only, never as an owner. An approval is spent only on an
 // invitation made.
 func TestAnInvitationIsAllowedAsAddingTheMemberWouldBe(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, plain store.Store) {
 		st := newFaultyStore(plain)
 		s := newSite(t, st)

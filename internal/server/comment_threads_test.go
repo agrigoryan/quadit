@@ -57,6 +57,7 @@ func newPageWithThreads(t *testing.T, st store.Store) pageWithThreads {
 // with its open threads: each with its id, what it is on, and its comments
 // by whom and when, replies under the comment they answer.
 func TestAPageReadShowsItsThreads(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		p := newPageWithThreads(t, st)
 		s := p.s
@@ -148,6 +149,7 @@ func TestAPageReadShowsItsThreads(t *testing.T) {
 // agent reads its threads, answers in one, starts one on a block and on
 // the page, and resolves one, all with the quadit command.
 func TestAnAgentWorksAPageThreadFromTheCommandLine(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		p := newPageWithThreads(t, st)
 		s := p.s
@@ -235,6 +237,7 @@ func TestAnAgentWorksAPageThreadFromTheCommandLine(t *testing.T) {
 // it, names the page, the comment, its thread and the text it is on; the
 // agent's answer reaches the one who asked as a reply.
 func TestAnAgentAskedOnAPageHasWhatItNeedsToAnswer(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		p := newPageWithThreads(t, st)
 		s := p.s
@@ -291,6 +294,7 @@ func TestAnAgentAskedOnAPageHasWhatItNeedsToAnswer(t *testing.T) {
 // thread's id, keeps them marked when it writes the page back without the
 // span, and is told when a write takes the words out.
 func TestAnAgentWorksAThreadOnWords(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		p := newPageWithThreads(t, st)
 		s := p.s
@@ -369,6 +373,7 @@ func TestAnAgentWorksAThreadOnWords(t *testing.T) {
 // nothing in an inbox item: the block's text may be of a page the reader
 // cannot see.
 func TestAnInboxItemQuotesOnlyItsOwnPage(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		p := newPageWithThreads(t, st)
 		s := p.s

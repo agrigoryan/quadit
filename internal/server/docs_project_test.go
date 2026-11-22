@@ -12,6 +12,7 @@ import (
 // its project in the outline where it is not its parent's, and someone
 // limited to a project sees the pages that are moved into it.
 func TestProjectPages(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})

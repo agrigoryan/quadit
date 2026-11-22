@@ -63,6 +63,7 @@ func sampleTasks(owner string) [][3]string {
 // starts with "Getting started" and its three sample tasks, the third for
 // nobody yet; a workspace made later starts empty.
 func TestSettingAnInstallUpMakesTheSamples(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := startSite(t, st, nil, nil)
 		s.setUp(t)
@@ -85,6 +86,7 @@ func TestSettingAnInstallUpMakesTheSamples(t *testing.T) {
 // TestTheAppsSetUpMakesTheSamples: an install the app sets up starts with
 // the same samples.
 func TestTheAppsSetUpMakesTheSamples(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := startSite(t, st, nil, func(cfg *server.Config) { cfg.AppKey = appKey })
 		app := theApp(appKey, "")
@@ -100,6 +102,7 @@ func TestTheAppsSetUpMakesTheSamples(t *testing.T) {
 // owner or admin may ask or remove them, and removing them leaves the
 // person's own work where it is.
 func TestTheSamplesAreAskedForAndRemoved(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := startSite(t, st, nil, nil)
 		s.setUp(t)

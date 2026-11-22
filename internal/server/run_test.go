@@ -26,6 +26,7 @@ import (
 // stores nothing on its local disk instead; it says so, it does not quietly
 // carry on with the wrong store.
 func TestAFileStoreThatCannotBeReachedIsNotReplacedByTheDisk(t *testing.T) {
+	// Not in parallel: the file store is set through the process's environment (t.Setenv).
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		t.Setenv("QUADIT_SETTING_FILES", `{"kind":"s3","bucket":"quadit","endpoint":"http://127.0.0.1:1","access_key":"a","secret_key":"b","region":"us-east-1"}`)
 		s := newSite(t, st)
@@ -76,6 +77,7 @@ func TestAFileStoreThatCannotBeReachedIsNotReplacedByTheDisk(t *testing.T) {
 // ready, and an upload is answered "try again later" and goes nowhere:
 // not to the local disk in its place.
 func TestNoFileIsTakenWhileTheStoreThatIsSetIsBeingOpened(t *testing.T) {
+	// Not in parallel: the file store is set through the process's environment (t.Setenv).
 	silent, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -132,6 +134,7 @@ func TestNoFileIsTakenWhileTheStoreThatIsSetIsBeingOpened(t *testing.T) {
 // answered "try again later") rather than taking the local disk for it.
 // Once the setting can be read, the store it names is used.
 func TestFileStorageWaitsForItsSettingToBeRead(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		if err := st.Upsert(context.Background(), &core.Setting{Name: "files", Value: json.RawMessage(`{"kind":"disk"}`)}, "name"); err != nil {
 			t.Fatal(err)
@@ -192,6 +195,7 @@ func TestFileStorageWaitsForItsSettingToBeRead(t *testing.T) {
 // does not go on with the disk: another server may have set a cloud store
 // meanwhile. It stores and reads no file until the setting can be read.
 func TestFileStorageStopsWhenRunCannotReadItsSetting(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		fs := newFaultyStore(st)
 		dir := t.TempDir()

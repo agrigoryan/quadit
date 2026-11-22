@@ -21,6 +21,7 @@ var notForListeners = map[string]string{
 // list or says here why not, and the list names no type that is never
 // written.
 func TestEventTypesAreTheOnesTheEngineWrites(t *testing.T) {
+	t.Parallel()
 	raw, err := os.ReadFile("../engine/testdata/events.golden")
 	if err != nil {
 		t.Fatal(err)

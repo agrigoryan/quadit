@@ -18,6 +18,7 @@ import (
 //
 //	QUADIT_PERF=1 go test -run TestSpeed -v ./internal/server
 func TestSpeedAtTenThousandTasks(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("QUADIT_PERF") == "" {
 		t.Skip("set QUADIT_PERF=1 to run")
 	}
@@ -92,6 +93,7 @@ func TestSpeedAtTenThousandTasks(t *testing.T) {
 //
 //	QUADIT_PERF=1 go test -run TestSpeedOfADatabase -v ./internal/server
 func TestSpeedOfADatabaseWhoseRowsLinkManyRows(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("QUADIT_PERF") == "" {
 		t.Skip("set QUADIT_PERF=1 to run")
 	}

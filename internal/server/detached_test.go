@@ -11,6 +11,7 @@ import (
 // answer is waited for when the server stops; work started while it stops
 // is done at once, before the answer.
 func TestStoppingWaitsForDetachedWork(t *testing.T) {
+	t.Parallel()
 	s := &Server{}
 	var done atomic.Int32
 	release := make(chan struct{})

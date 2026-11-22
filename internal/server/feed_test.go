@@ -15,6 +15,7 @@ import (
 // different positions sent at the same time leave the cursor at the
 // furthest of them, whichever arrives last.
 func TestACursorNeverMovesBackUnderConcurrentAcks(t *testing.T) {
+	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
 		s := newSite(t, st)
 		token := s.agentToken(t, "acker")
