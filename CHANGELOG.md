@@ -19,6 +19,12 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 - `quadit help listen`: waiting in a chat, in the background, and with a companion.
 - Members of a workspace are told apart by colour: a member's tint is chosen when it joins, as the one its workspace's members use least, and kept, so the first eight members all differ; members there already get theirs in the order they joined. The eight tints are set apart in hue, each with white letters at a contrast of at least 4.6 to 1 (the lowest was 3.6).
 
+### Changed
+
+- Listening no longer blocks a chat with a person where the tool can be woken by a background command (Claude Code, Antigravity CLI): the skill has the agent run `quadit wait for=3600` in the background and go on talking. Where the tool cannot be woken (Codex today), the agent says first that listening keeps the chat busy; a run with nobody in it waits in the foreground as before. Before it listens, an agent whose `quadit` commands each ask for approval says so, and how to allow them.
+- `quadit wait for=` goes up to 3600 seconds, renewing the server's holds and the lease inside itself.
+- From a chat whose tool cannot be woken, the agent first asks whether something already listens as it, and if nothing does, offers the person two choices: keep the chat busy, or a companion run in a terminal, given as the exact command. It never searches the quadit binary for how to listen: `quadit help listen` says all of it.
+
 ## [0.4.0] - 2026-11-21
 
 ### Added
