@@ -22131,15 +22131,7 @@ SVA Done: 1
 === GET /api/v1/w/games/listening
 200
 {
- "listening": false,
- "webhook": false
-}
-
-=== GET /api/v1/w/games/listening?lease=NOTALEAS
-200
-{
- "listening": false,
- "webhook": false
+ "listening": false
 }
 
 === GET /api/v1/w/games/files/<file notes.txt>
