@@ -466,7 +466,8 @@ describe("SelfRuns, answering by itself", () => {
     await runs.sync();
     started[0]?.say("ITEM #4 comment GS-3 from @lou");
     expect(readFileSync(runs.logOf("codex"), "utf8")).toContain("ITEM #4 comment GS-3 from @lou");
-    expect(statSync(runs.logOf("codex")).mode & 0o777).toBe(0o600);
+    // Windows keeps no such modes.
+    if (process.platform !== "win32") expect(statSync(runs.logOf("codex")).mode & 0o777).toBe(0o600);
   });
 });
 
