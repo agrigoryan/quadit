@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/agrigoryan/quadit/internal/store/sqlite"
 )
@@ -75,4 +76,26 @@ func describe(t *testing.T, path string) []string {
 		rows.Close()
 	}
 	return out
+}
+
+func TestOneTestAtATimeHasTheTurn(t *testing.T) {
+	var q turn
+	first := q.take("TestA")
+	again := q.take("TestA") // a test with the turn takes it at once
+	took := make(chan func())
+	go func() { took <- q.take("TestB") }()
+
+	first()
+	select {
+	case <-took:
+		t.Fatal("another test had the turn while the first still held it once")
+	case <-time.After(50 * time.Millisecond):
+	}
+	again()
+	select {
+	case giveBack := <-took:
+		giveBack()
+	case <-time.After(5 * time.Second):
+		t.Fatal("the turn given back did not go to the test waiting for it")
+	}
 }

@@ -6,7 +6,9 @@
 //
 //	QUADIT_TEST_POSTGRES=postgres://postgres:quadit@127.0.0.1:54329/quadit go test ./...
 //
-// Each Postgres test gets its own schema, dropped when the test ends.
+// Each Postgres test gets its own schema, dropped when the test ends, and
+// one test at a time in a test binary has any (postgresTurn), though the
+// tests themselves may run in parallel.
 package testdb
 
 import (
@@ -53,6 +55,8 @@ func postgresAt(t *testing.T, version int) store.Store {
 	if url == "" {
 		t.Skip("QUADIT_TEST_POSTGRES is not set")
 	}
+	giveBack := postgresTurn.take(topLevel(t))
+	t.Cleanup(giveBack) // after the cleanup below: the last to run
 	schema := fmt.Sprintf("t%d", time.Now().UnixNano())
 	ctx := context.Background()
 	admin, err := sql.Open("pgx", url)
@@ -80,6 +84,54 @@ func postgresAt(t *testing.T, version int) store.Store {
 		admin.Close()
 	})
 	return st
+}
+
+// postgresTurn lets one test at a time in a test binary have Postgres
+// databases, though the tests themselves run in parallel. Its databases are
+// schemas of one database, and a server listening there hears every
+// other's notifications: servers side by side would wake each other, and
+// open more connections than the database takes.
+var postgresTurn turn
+
+// turn is had by one test at a time, for as long as it holds any of what
+// it took the turn for.
+type turn struct {
+	mu     sync.Mutex
+	holder string        // the test whose turn it is, or ""
+	held   int           // how many times it took the turn without giving it back
+	given  chan struct{} // closed when holder gives the turn back
+}
+
+// take waits until it is test's turn, and returns what gives it back. A
+// test that has the turn may take it again: each take is given back.
+func (q *turn) take(test string) (giveBack func()) {
+	q.mu.Lock()
+	for q.holder != "" && q.holder != test {
+		given := q.given
+		q.mu.Unlock()
+		<-given
+		q.mu.Lock()
+	}
+	if q.holder == "" {
+		q.holder, q.given = test, make(chan struct{})
+	}
+	q.held++
+	q.mu.Unlock()
+	return func() {
+		q.mu.Lock()
+		defer q.mu.Unlock()
+		q.held--
+		if q.held == 0 {
+			q.holder = ""
+			close(q.given)
+		}
+	}
+}
+
+// topLevel is the name of the test t is, or is a subtest of.
+func topLevel(t *testing.T) string {
+	name, _, _ := strings.Cut(t.Name(), "/")
+	return name
 }
 
 // SQLite opens a fresh SQLite database in a temporary directory.
