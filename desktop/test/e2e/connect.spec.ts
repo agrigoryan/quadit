@@ -103,8 +103,10 @@ test("Connect agents opens over the server's window from the menu, sets Claude C
     await plan.getByRole("button", { name: "Connect Claude Code" }).click();
     await expect(plan).toBeHidden();
 
-    // Set up, waiting for the tool to give its code back.
-    await expect(card.getByText(/Say this in Claude Code instead:$/)).toBeVisible({ timeout: 20_000 });
+    // Set up, waiting for the tool to give its code back: a server other than the app's own, so the app never runs the
+    // tool by itself, and the card goes straight to the line to paste (desktop contract §11).
+    await expect(card.getByText(/Now open Claude Code and say:$/)).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByText(/Quadit could not run/)).toHaveCount(0);
     await expect(card.getByText("Waiting for Claude Code…")).toBeVisible();
     expect(JSON.parse(readFileSync(settings, "utf8"))).toEqual({
       // Connect also lets it run quadit, and use Quadit's MCP tools, without asking (desktop contract §11).

@@ -180,6 +180,9 @@ test("a tool the app can run gives its code back by itself in the first run, and
     await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(card.getByText(/^Connect to Quadit/)).toHaveCount(0);
     await expect(card.getByText("Answers by itself while Quadit is open")).toBeVisible({ timeout: 20_000 });
+    // The server's word that the app's listener holds the lease: a comment from now on wakes it (a listener is handed
+    // only what comes after it first waits).
+    await expect(card.getByText("Listening", { exact: true })).toBeVisible({ timeout: 60_000 });
     await screen(first, "07b-connected-by-itself.png");
 
     await first.getByRole("button", { name: "Continue" }).click();

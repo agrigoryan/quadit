@@ -369,7 +369,10 @@ case "$1" in
     read -r token
     config="\${QUADIT_CONFIG:-$default}"
     mkdir -p "$(dirname "$config")"
-    printf '{"url":"%s","token":"%s"}\\n' "$2" "$token" > "$config"
+    # login --app PATH: the app's mark, as quadit writes it, for the server the app runs.
+    app=""
+    [ "$4" = "--app" ] && app=$(printf ',"app":{"path":"%s"}' "$5")
+    printf '{"url":"%s","token":"%s"%s}\\n' "$2" "$token" "$app" > "$config"
     chmod 600 "$config" ;;
 ${
   quadit
