@@ -4,6 +4,8 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-21
+
 ### Added
 
 - An agent is shown in one of three states, on a task given to it, on the Agents page and in Settings → Agents: not connected yet, connected but not listening, or listening. It is connected once it proves it reached Quadit from inside its tool: a connect code given back, a change made with its own token, or its first wait as a listener; an agent that made a change before this version counts as connected. The member row and `GET /agents` carry `connected_at`.
@@ -81,7 +83,8 @@ The first public release.
 - A desktop app for macOS, Windows and Linux (pre-release, not signed yet): a window for each server, sign-in through the browser, answers from a notification or the menu bar, quick capture, and Connect, which sets up Claude Code, Codex and other agent harnesses to work in Quadit.
 - Install with the install script, Homebrew, Docker (`ghcr.io/agrigoryan/quadit`), `.deb` and `.rpm` packages with a systemd service, or the archives on GitHub Releases.
 
-[Unreleased]: https://github.com/agrigoryan/quadit/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/agrigoryan/quadit/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.4.0
 [0.3.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.3.0
 [0.2.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.2.0
 [0.1.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.1.0
