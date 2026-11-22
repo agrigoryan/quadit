@@ -38,6 +38,8 @@ export interface CardTool {
   worksAs: string | null;
   /** Whether an agent in it was seen to listen; if not, the card says so. */
   listenVerified: boolean;
+  /** Whether connecting also lets it run quadit without asking each time (its card's line says so). */
+  allows: boolean;
 }
 
 export interface CardActions {

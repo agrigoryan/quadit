@@ -3,7 +3,7 @@
 // this computer as the same cards and the same sheet as the first run's tools
 // step (tool-card.ts, files-sheet.ts). A card's Connect uses the defaults and
 // asks nothing; "See the files" shows what it changes first; "More options"
-// holds the technical choices (MCP, which agent, without asking each time),
+// holds the technical choices (MCP, which agent, a new agent's name),
 // whose plan the sheet shows before anything is written, and, once a tool is
 // connected, where and as whom. Disconnect shows what taking it back does
 // first. "Done" and Escape take the page away, showing the one under it.
@@ -237,8 +237,8 @@ function connectedHow(connected: HarnessView["connected"]): HTMLParagraphElement
 }
 
 /**
- * The technical choices for connecting `h`: how, as whom, and without asking
- * each time; reviewed in the sheet. `fill` offers the agents of the
+ * The technical choices for connecting `h`: how, and as whom; reviewed in
+ * the sheet. `fill` offers the agents of the
  * workspace shown, again when it changes.
  */
 function optionsForm(h: HarnessView): { form: HTMLFormElement; fill: () => void } {
@@ -278,16 +278,11 @@ function optionsForm(h: HarnessView): { form: HTMLFormElement; fill: () => void 
   const agentName = field("New agent's name", h.name);
   const agentHandle = field("Handle", handleOf(h.name));
   const identity = make("p", "", "hint");
-  const unattended = check(
-    "unattended",
-    "Let it use Quadit without asking each time, where it has a setting for that",
-    false,
-  );
   const error = make("p", "", "card-error");
   error.setAttribute("role", "alert");
   const review = make("button", "Review changes", "btn btn-line btn-sm");
   review.type = "submit";
-  form.append(how, workAs, newAgent, identity, unattended.label, error, review);
+  form.append(how, workAs, newAgent, identity, error, review);
 
   const fillAgents = () => {
     const summary = chosen()?.summary;
@@ -351,7 +346,6 @@ function optionsForm(h: HarnessView): { form: HTMLFormElement; fill: () => void 
         : agents.value === NEW_AGENT
           ? { create: { name: agentName.value, handle: agentHandle.value } }
           : { id: agents.value },
-      allowUnattended: unattended.box.checked,
     };
     reviewConnect(h, () => api.planConnect(choice));
   });

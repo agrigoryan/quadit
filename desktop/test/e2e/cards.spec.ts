@@ -63,6 +63,7 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
                 mcp: true,
                 cliIdentity: "own",
                 listenVerified: true,
+                allows: true,
                 skillChangedByHand: false,
                 connected: state.connected
                   ? { methods: ["cli"], server: "Work", workspace: "E2E", agent: "@claude-code" }
@@ -154,4 +155,16 @@ test("the page's redraw after a Disconnect keeps the card and the Connect button
     .toBeGreaterThan(targets);
   await expect(page.locator('article[data-test-mark="card"]')).toHaveCount(1);
   await expect(page.locator('button[data-test-mark="again"]')).toBeVisible();
+});
+
+test("a card says that connecting lets the tool run quadit without asking, and offers no switch for it", async ({
+  page,
+}) => {
+  await open(page, { connected: false, handshake: null, slowMs: 0 });
+  const card = page.getByRole("article", { name: "Claude Code" });
+  await expect(card.getByText(/and lets Claude Code run quadit without asking/)).toBeVisible();
+  await card.getByRole("button", { name: "More options for Claude Code" }).click();
+  await expect(card.getByRole("form", { name: "How to connect Claude Code" })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /without asking/ })).toHaveCount(0);
+  await expect(page.getByText(/without asking each time/)).toHaveCount(0);
 });

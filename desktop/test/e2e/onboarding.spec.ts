@@ -107,8 +107,13 @@ test("the first run sets Quadit up on this computer in one window, connects the 
     expect(existsSync(skill)).toBe(true);
     const settings = JSON.parse(readFileSync(join(computer.home, ".claude", "settings.json"), "utf8")) as {
       env?: { QUADIT_CONFIG?: string };
+      permissions?: { allow?: string[] };
     };
     expect(settings.env?.QUADIT_CONFIG).toBe(join(computer.configDir, "claude.json"));
+    // Connected, it may run quadit without asking: nothing to choose, and the card said so.
+    expect(settings.permissions?.allow).toEqual(["Read", "Bash(quadit:*)"]);
+    await expect(card.getByText(/and let Claude Code run quadit without asking/)).toBeVisible();
+    await expect(first.getByRole("checkbox")).toHaveCount(0);
     const ledger = () =>
       JSON.parse(readFileSync(join(data, "connections.json"), "utf8")) as {
         harnesses: Record<string, { methods: string[]; agent: { handle: string } }>;

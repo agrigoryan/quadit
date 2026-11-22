@@ -179,6 +179,7 @@ function fileIcon(role: PlanFile["role"]): SVGSVGElement {
       return lineIcon(["M2 18.5a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0 -11 0", "m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"]);
     case "settings":
     case "profile":
+    case "rules":
       return lineIcon([
         "M12.5 22H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v9.5",
         "M14 2v4a2 2 0 0 0 2 2h4M13.4 12.6a2 2 0 1 1 3 3L11 21l-4 1 1-4Z",
@@ -186,6 +187,7 @@ function fileIcon(role: PlanFile["role"]): SVGSVGElement {
     case "command":
       return lineIcon(["m4 17 6-6-6-6", "M12 19h8"]);
     case "folder":
+    case "rules-folder":
       return lineIcon([
         "M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z",
       ]);
