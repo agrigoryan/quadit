@@ -18,7 +18,8 @@ find      tasks [filter=value ...]   assignee=me status=todo label=art open=1 q=
 follow    events [after=SEQ] [wait=50] [cursor=NAME] [mine=1] [others=1] [task=KEY]
           ack SEQ [NAME] [lease=ID]  mark the feed handled up to SEQ (the cursor listen takes its lease)
           wait [for=SECONDS] [lease=ID] [take=1]
-                                     wait for the next inbox item (50 seconds unless for= says);
+                                     wait for the next inbox item (50 seconds unless for= says, up to
+                                     3600: an hour, for a wait in the background);
                                      prints ITEM or IDLE and the exact commands to go on. One session
                                      at a time listens; take=1 takes over, only when the person says so
           listen --exec CMD          run CMD for each inbox item, again until it succeeds

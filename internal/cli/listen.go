@@ -184,10 +184,12 @@ func lostTheLease(err error) bool {
 }
 
 // waitHold is the longest the server holds one wait; a longer wait is
-// several, each renewing the lease. A request may take holdSlack more than
-// its hold before it is given up.
+// several, each renewing the lease, up to maxWait in all (a wait in the
+// background). A request may take holdSlack more than its hold before it
+// is given up.
 const (
 	waitHold  = 50 * time.Second
+	maxWait   = time.Hour
 	holdSlack = 10 * time.Second
 )
 
@@ -261,22 +263,23 @@ func (r *runner) nextItem(cursor, lease string, take bool, hold time.Duration) (
 }
 
 // wait blocks until the caller's next inbox item, for= seconds at most (50
-// when not given), and prints one record for an agent to act on: the item
-// and the exact commands to read it, acknowledge it and go on, or IDLE and
-// the command to go on. The first wait takes the listener's lease, and the
-// commands it prints carry it; take=1 takes it from another session.
+// when not given, up to maxWait), and prints one record for an agent to act
+// on: the item and the exact commands to read it, acknowledge it and go on,
+// or IDLE and the command to go on. The first wait takes the listener's
+// lease, and the commands it prints carry it; take=1 takes it from another
+// session. A long wait is many holds of the server's, each renewing the
+// lease, so an agent that waits in the background for an hour costs
+// nothing while nothing comes.
 func (r *runner) wait(in input) error {
 	total := waitHold
+	goOn := "quadit wait"
 	if v := in.f["for"]; len(v) > 0 {
 		n, err := strconv.Atoi(v[0])
-		if err != nil || n < 1 {
-			return errors.New("for= is a number of seconds, 1 or more")
+		if err != nil || n < 1 || time.Duration(n)*time.Second > maxWait {
+			return fmt.Errorf("for= is a number of seconds, from 1 to %d", int(maxWait.Seconds()))
 		}
 		total = time.Duration(n) * time.Second
-	}
-	goOn := "quadit wait"
-	if len(in.f["for"]) > 0 {
-		goOn += " for=" + in.f["for"][0]
+		goOn += " for=" + strconv.Itoa(n)
 	}
 	take := slices.Contains([]string{"1", "true", "yes"}, strings.ToLower(firstValue(in.f["take"])))
 	return r.waitFor(waitSpan{total: total, hold: waitHold}, firstValue(in.f["lease"]), take, goOn)

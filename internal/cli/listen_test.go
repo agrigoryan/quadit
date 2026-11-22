@@ -432,3 +432,59 @@ func TestWaitGivesTheLineThatAnswersAnItemOnce(t *testing.T) {
 		t.Fatalf("an item with no id of its own was given an answering line: %q", lines)
 	}
 }
+
+// lateServer answers GET /listen as the API does when an item arrives a
+// while after the first ask: until then each request is held for its
+// wait= (at most a second here) and answered with nothing.
+type lateServer struct {
+	mu      sync.Mutex
+	arrives time.Time
+	asked   []url.Values
+}
+
+func (s *lateServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	s.mu.Lock()
+	s.asked = append(s.asked, q)
+	s.mu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	if time.Now().Before(s.arrives) {
+		wait, _ := strconv.Atoi(q.Get("wait"))
+		time.Sleep(min(time.Duration(wait)*time.Second, time.Until(s.arrives)))
+	}
+	if time.Now().Before(s.arrives) {
+		_, _ = io.WriteString(w, `{"lease":"`+testLease+`"}`)
+		return
+	}
+	_, _ = io.WriteString(w, `{"lease":"`+testLease+`","seq":7,"item":{"seq":7,"type":"comment","by":"@ann","task":"SVA-1","snippet":"Still there?"}}`)
+}
+
+// TestALongWaitRenewsItsHoldsAndTakesWhatComesLate: a wait longer than one
+// hold of the server's is several, each with the lease, and hands over an
+// item that comes late in it; for= goes up to an hour, and no further.
+func TestALongWaitRenewsItsHoldsAndTakesWhatComesLate(t *testing.T) {
+	srv := &lateServer{arrives: time.Now().Add(2500 * time.Millisecond)}
+	out := &bytes.Buffer{}
+	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: out}
+	if err := r.waitFor(waitSpan{total: time.Hour, hold: time.Second}, "", false, "quadit wait for=3600"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(out.String(), "ITEM #7 comment SVA-1 from @ann: ") || !strings.Contains(out.String(), "quadit wait for=3600 lease="+testLease) {
+		t.Fatalf("the long wait printed:\n%s", out)
+	}
+	if len(srv.asked) < 3 {
+		t.Fatalf("the long wait asked %d times, want a hold renewed each second", len(srv.asked))
+	}
+	for _, q := range srv.asked[1:] {
+		if q.Get("lease") != testLease {
+			t.Fatalf("a later hold asked %v, without the lease it was given", q)
+		}
+	}
+
+	for _, given := range []string{"3601", "0", "1h"} {
+		r := &runner{ctx: context.Background(), c: testClient(t, srv), out: &bytes.Buffer{}}
+		if err := r.wait(input{f: map[string][]string{"for": {given}}}); err == nil || !strings.Contains(err.Error(), "from 1 to 3600") {
+			t.Fatalf("for=%s was taken: %v", given, err)
+		}
+	}
+}
