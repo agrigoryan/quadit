@@ -32,7 +32,7 @@ import {
 import { accountName } from "@/main/account-name";
 import { AppPages } from "@/main/app-pages";
 import { Capture } from "@/main/capture";
-import { startChild } from "@/main/child-guard";
+import { childEnv, startChild } from "@/main/child-guard";
 import { ConnectPage } from "@/main/connect-page";
 import { Connections } from "@/main/connections";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
@@ -270,11 +270,36 @@ function start() {
     quadit: async () => (await cli.look()).found?.path ?? cli.bundled,
     start: (program, args, options) => startChild(program, args, options),
     codeGivenBack: async (id) => (await connections.handshake(id))?.state === "connected",
+    listening: (tool) => whoListens(tool.login),
     remember: (id, on) => connections.setAnswering(id, on),
     dir: join(dataDir, "tools"),
     env: process.env,
     changed: () => pages.changed(),
   });
+  /**
+   * Who listens as the agent of the quadit login `login`: `quadit --json listening`, which takes no lease, as
+   * that login; null when it cannot say (an older quadit, a server away) within its time.
+   */
+  async function whoListens(login: string): Promise<{ listening: boolean; by: string } | null> {
+    const quadit = (await cli.look()).found?.path ?? cli.bundled;
+    if (!quadit) return null;
+    const said: string[] = [];
+    const child = startChild(quadit, ["--json", "listening"], {
+      cwd: dataDir,
+      env: childEnv(process.env, login),
+      line: (line) => void said.push(line),
+    });
+    const timer = setTimeout(() => child.stop(), 20_000);
+    const exit = await child.exited;
+    clearTimeout(timer);
+    try {
+      const answer = JSON.parse(said.join("\n")) as { listening?: unknown; by?: unknown };
+      if (exit !== 0 || typeof answer.listening !== "boolean") return null;
+      return { listening: answer.listening, by: typeof answer.by === "string" ? answer.by : "" };
+    } catch {
+      return null;
+    }
+  }
   /** Runs once each tool still waiting to be proven connected, of the server here (`here`) or of the others. */
   const proveWaiting = (here: boolean) => {
     const local = list.localServer()?.id;

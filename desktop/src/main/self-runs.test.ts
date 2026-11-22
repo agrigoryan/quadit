@@ -34,6 +34,8 @@ function setUp(list: SelfRunTool[] = [tool()], { quadit = "/bin/quadit" }: { qua
   const started: Started[] = [];
   const remembered: [string, boolean][] = [];
   let back = false;
+  /** Who listens as the agent, as `quadit listening` says it; null: the command could not say. */
+  let who: { listening: boolean; by: string } | null = { listening: false, by: "" };
   const runs = new SelfRuns({
     tools: async () => list,
     quadit: async () => quadit,
@@ -59,12 +61,20 @@ function setUp(list: SelfRunTool[] = [tool()], { quadit = "/bin/quadit" }: { qua
       };
     },
     codeGivenBack: async () => back,
+    listening: async () => who,
     remember: (id, on) => void remembered.push([id, on]),
     dir: mkdtempSync(join(tmpdir(), "quadit-desktop-self-")),
     env: { PATH: "/bin", HOME: "/h", QUADIT_URL: "https://elsewhere", QUADIT_TOKEN: "qd_mine" },
     changed: () => {},
   });
-  return { runs, started, remembered, list, setBack: (now: boolean) => (back = now) };
+  return {
+    runs,
+    started,
+    remembered,
+    list,
+    setBack: (now: boolean) => (back = now),
+    setWho: (now: typeof who) => (who = now),
+  };
 }
 
 const flush = () => vi.advanceTimersByTimeAsync(0);
@@ -132,8 +142,15 @@ describe("SelfRuns, answering by itself", () => {
     expect(started).toHaveLength(1);
     const [listener] = started;
     expect(listener?.program).toBe("/bin/quadit");
-    expect(listener?.args.slice(0, 5)).toEqual(["listen", "--exec", "/bin/sh", "-c", expect.any(String)]);
-    expect(listener?.args.slice(6)).toEqual(["/bin/codex", "exec", "--skip-git-repo-check", "{quadit-item}"]);
+    expect(listener?.args.slice(0, 6)).toEqual([
+      "listen",
+      "by=the Quadit app",
+      "--exec",
+      "/bin/sh",
+      "-c",
+      expect.any(String),
+    ]);
+    expect(listener?.args.slice(7)).toEqual(["/bin/codex", "exec", "--skip-git-repo-check", "{quadit-item}"]);
     expect(listener?.env).toEqual({ PATH: "/bin", HOME: "/h", QUADIT_CONFIG: "/c/codex.json" });
     expect(runs.self("codex")?.answering).toBe("on");
   });
@@ -187,17 +204,31 @@ describe("SelfRuns, answering by itself", () => {
   });
 
   it("steps aside while a chat listens as the agent, never taking over, and comes back when it has stopped", async () => {
-    const { runs, started } = setUp();
+    const { runs, started, setWho } = setUp();
     await runs.sync();
-    started[0]?.say("quadit: @codex is already listening from another session (last heard 14:02)");
+    setWho({ listening: true, by: "a chat" });
+    started[0]?.say("quadit: @codex is already listening from another session (a chat, last heard 14:02 UTC)");
     started[0]?.end(1);
     await flush();
     expect(runs.self("codex")?.answering).toBe("on");
-    await vi.advanceTimersByTimeAsync(59_999);
+    // Asked each minute who listens: a chat still does.
+    await vi.advanceTimersByTimeAsync(120_000);
     expect(started).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(1);
+    setWho({ listening: false, by: "" });
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(started).toHaveLength(2);
     expect(started[1]?.args).not.toContain("take=1");
+  });
+
+  it("comes back after stepping aside when the command cannot say who listens", async () => {
+    const { runs, started, setWho } = setUp();
+    await runs.sync();
+    setWho(null);
+    started[0]?.say("quadit: @codex is already listening from another session");
+    started[0]?.end(1);
+    await flush();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(started).toHaveLength(2);
   });
 
   it("pauses a tool started more than six times in a minute, saying so, until the person resumes it", async () => {

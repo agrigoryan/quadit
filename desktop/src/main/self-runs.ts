@@ -12,11 +12,13 @@
 //   Answering: for each tool connected to the server on this computer (on
 //   by default; for another server only when the person turns it on), one
 //   listener, `quadit listen --exec`, as the tool's login, whose command
-//   runs the tool's one-prompt command for each inbox item. It is started
-//   again when it ends by itself, waiting longer each time; it steps aside,
-//   never taking over, while a chat listens as the agent, and comes back
-//   after; a run longer than ten minutes is stopped; more than six runs in a
-//   minute pauses the tool (a loop guard); Pause is remembered.
+//   runs the tool's one-prompt command for each inbox item; it says it is
+//   "the Quadit app" to whoever asks who listens. It is started again when
+//   it ends by itself, waiting longer each time; it steps aside, never
+//   taking over, while a chat listens as the agent (`quadit listening`
+//   says so), and comes back after; a run longer than ten minutes is
+//   stopped; more than six runs in a minute pauses the tool (a loop guard);
+//   Pause is remembered.
 //
 // Every program is started through child-guard.ts and stopped on Pause,
 // Disconnect and quit; what each said goes to the tool's log.
@@ -55,6 +57,12 @@ export interface SelfRunsParts {
   ): RunningChild;
   /** Whether the server says the tool's connect code was given back. */
   codeGivenBack(id: string): Promise<boolean>;
+  /**
+   * Who listens as the tool's agent now (`quadit listening`, as its login),
+   * which takes no lease: whether something does, and what (the app's own
+   * listener says BY_LABEL, a chat "a chat"); null when it cannot be said.
+   */
+  listening(tool: SelfRunTool): Promise<{ listening: boolean; by: string } | null>;
   /** Remembers whether a tool answers by itself (the ledger). */
   remember(id: string, answering: boolean): void;
   /** The folder of the runs' working folders and of the tools' logs. */
@@ -64,6 +72,9 @@ export interface SelfRunsParts {
   /** What a card shows of a tool changed. */
   changed(): void;
 }
+
+/** What the app's listeners say they are, to whoever asks who listens as the agent (a chat refused, `quadit listening`). */
+export const BY_LABEL = "the Quadit app";
 
 /** The argument the wake command puts the item's prompt in place of, in a tool's one-prompt command. */
 const ITEM = "{quadit-item}";
@@ -93,7 +104,7 @@ const FIRST_WAIT_MS = 2_000;
 const LAST_WAIT_MS = 5 * 60_000;
 /** A listener that ran this long before it ended gets its waits back from the first. */
 const STEADY_MS = 60_000;
-/** How often a listener that stepped aside for a chat looks whether the chat stopped listening. */
+/** How often a listener that stepped aside for a chat asks whether the chat stopped listening. */
 const ASIDE_WAIT_MS = 60_000;
 /** What a listener says when another session holds the agent's lease (a chat listening), or another listen this login. */
 const ASIDE = /already listening from another session|listening_elsewhere|lease_stale|another quadit listen is running/;
@@ -161,10 +172,16 @@ export class SelfRuns {
    * the line to paste.
    */
   async prove(id: string, code: string): Promise<void> {
+    if (this.quitting) return;
+    // Said at once, so its card never shows the line to paste before it shows this.
+    const held = this.heldOf(id);
+    held.proving = { state: "running" };
     this.known = await this.parts.tools();
     const tool = this.known.find((t) => t.id === id);
-    if (!tool?.oneShot || this.quitting) return;
-    const held = this.heldOf(id);
+    if (!tool?.oneShot) {
+      held.proving = null;
+      return;
+    }
     held.prover?.stop();
     if (!tool.program) {
       held.proving = { state: "failed", reason: "it was not found on this computer" };
@@ -266,7 +283,17 @@ export class SelfRuns {
   private listen(tool: SelfRunTool, quadit: string, held: Held) {
     if (!tool.program || !tool.oneShot) return;
     this.log(tool.id, "listening");
-    const args = ["listen", "--exec", "/bin/sh", "-c", WAKE_SCRIPT, "quadit-wake", tool.program, ...tool.oneShot(ITEM)];
+    const args = [
+      "listen",
+      `by=${BY_LABEL}`,
+      "--exec",
+      "/bin/sh",
+      "-c",
+      WAKE_SCRIPT,
+      "quadit-wake",
+      tool.program,
+      ...tool.oneShot(ITEM),
+    ];
     const listener = { child: undefined as unknown as RunningChild, since: Date.now(), aside: false, stopping: false };
     listener.child = this.parts.start(quadit, args, {
       cwd: this.runDir(tool.id),
@@ -311,20 +338,39 @@ export class SelfRuns {
     clearTimeout(held.runTimer);
     held.runTimer = undefined;
     if (listener.stopping || this.quitting || held.guarded) return;
-    let wait: number;
     if (listener.aside) {
       this.log(tool.id, "a chat listens as this agent: stepping aside until it stops");
-      wait = ASIDE_WAIT_MS;
-    } else {
-      if (Date.now() - listener.since >= STEADY_MS) held.waits = 0;
-      wait = Math.min(FIRST_WAIT_MS * 2 ** held.waits, LAST_WAIT_MS);
-      held.waits++;
-      this.log(tool.id, `the listener ended; starting it again in ${Math.round(wait / 1000)} s`);
+      this.stepAside(tool, held);
+      return;
     }
+    if (Date.now() - listener.since >= STEADY_MS) held.waits = 0;
+    const wait = Math.min(FIRST_WAIT_MS * 2 ** held.waits, LAST_WAIT_MS);
+    held.waits++;
+    this.log(tool.id, `the listener ended; starting it again in ${Math.round(wait / 1000)} s`);
     held.restart = setTimeout(() => {
       held.restart = undefined;
       void this.sync();
     }, wait);
+  }
+
+  /**
+   * Waits, asking each minute who listens as the agent, while something
+   * other than the app does (a chat); then starts the listener again, never
+   * taking the lease over. When the command cannot say, it starts again and
+   * steps aside anew if refused.
+   */
+  private stepAside(tool: SelfRunTool, held: Held) {
+    held.restart = setTimeout(() => {
+      void this.parts.listening(tool).then((who) => {
+        if (this.quitting || held.restart === undefined) return;
+        if (who?.listening && who.by !== BY_LABEL) {
+          this.stepAside(tool, held);
+          return;
+        }
+        held.restart = undefined;
+        void this.sync();
+      });
+    }, ASIDE_WAIT_MS);
   }
 
   private stopListener(held: Held) {
