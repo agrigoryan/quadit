@@ -158,6 +158,7 @@ The rule of the lease:
 - The agent counts as listening while the lease lives: ninety seconds past the end of the hold its holder last asked for. A holder at work renews it by asking again: a wait by waiting, `quadit listen` every minute while its command runs. A chat that handled an item for longer, with nobody else taking the lease meanwhile, still acknowledges with it, and its next wait takes it again.
 - An acknowledgment that gives a lease (`PUT /cursors/listen {"seq", "lease"}`) is refused when another session took the lease over since (`reason` `lease_stale`). One that gives none is made as before: a `quadit listen` from before the lease acknowledges so, and so does a person giving up on an item by hand.
 - Only an acknowledgment moves the cursor: a wait with nothing for the agent leaves it where it was. A cursor never moved starts at the present, so history is not replayed; before its first wait, an agent deals with what `quadit work` shows is waiting on it.
+- A tool that is killed while its `quadit wait` runs in the background can leave that wait running (Claude Code and Antigravity CLI did, in the check): the agent then shows as listening until the next item ends the wait, or its hour does. That item is not lost: it stays unread in the inbox, and whatever listens next is handed it.
 - A `quadit listen` from before the lease keeps working: its waits on the feed with `cursor=listen` take no lease, but do not count as listening.
 
 The API is `GET /listen?wait=50&lease=ID` (`take=1` to take over), answering `{lease}` or `{lease, seq, item, line}`. `for=` should be a little under the longest the tool lets one command run.
@@ -168,9 +169,9 @@ Each tool, as `scripts/agent-listen-check.sh TOOL` finds it (a throwaway server,
 
 | Tool | Connect and listen |
 | --- | --- |
-| Claude Code | verified on 2026-11-21 with 2.1.330 |
-| Codex | verified on 2026-11-21 with codex-cli 0.170.0 |
-| Antigravity CLI | verified on 2026-11-21 with 1.5.14 |
+| Claude Code | verified on 2026-11-22 with 2.1.330: connect, listen, a chat with a person, a companion |
+| Codex | verified on 2026-11-22 with codex-cli 0.170.0: connect, listen, a companion (it cannot be woken in a chat) |
+| Antigravity CLI | verified on 2026-11-22 with 1.5.14: connect, listen, a companion (the chat was not run) |
 | Gemini CLI | not verified yet |
 | Cursor | not verified yet |
 | GitHub Copilot CLI | not verified yet |
