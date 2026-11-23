@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -58,6 +60,18 @@ func TestEditedCommentIsFoundByItsNewText(t *testing.T) {
 	})
 }
 
+// person adds a person to the workspace as a member, and returns their
+// user id.
+func (w *world) person(handle string) string {
+	w.t.Helper()
+	u := core.User{ID: id.New(), Kind: core.KindPerson, Name: handle, Email: handle + "-" + id.New() + "@example.com", CreatedAt: 1, UpdatedAt: 1}
+	if err := w.st.Insert(context.Background(), u); err != nil {
+		w.t.Fatal(err)
+	}
+	w.do(w.owner.ID, "member.add", M{"user": u.ID, "handle": handle, "role": "member"})
+	return u.ID
+}
+
 // TestAReplyReachesEveryoneInTheThread: whoever wrote in a thread before is
 // told of a reply in it as a reply, not only the one who started it, on a
 // page and on a task alike. The one who asked in a reply hears the answer.
@@ -68,7 +82,7 @@ func TestAReplyReachesEveryoneInTheThread(t *testing.T) {
 		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Explosion effect"})
 		page := w.do(w.owner.ID, "doc.create", M{"title": "Art notes", "markdown": "The ring is thin.\n"}).Ref
-		asker, answerer := w.agent("asker"), w.agent("answerer")
+		asker, answerer := w.person("asker"), w.agent("answerer")
 		for _, on := range []struct {
 			name string
 			args M
@@ -283,6 +297,186 @@ func TestACommentReachesWhomTheTaskIsWith(t *testing.T) {
 				t.Fatalf("an agent's comment reached the assignee who does not follow the task: %d comment items", got)
 			}
 		})
+	})
+}
+
+// TestACommentReachesAnAgentOnlyWhenItIsForIt: a comment that mentions
+// members is for them, and reaches no other agent through the task being
+// with it or a thread it wrote in; an agent's comment reaches another agent
+// only when it mentions it or hands it the task. People hear what they
+// always heard.
+func TestACommentReachesAnAgentOnlyWhenItIsForIt(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		mia := w.person("mia")
+		coder, reviewer, helper := w.agent("coder"), w.agent("reviewer"), w.agent("helper")
+		w.do(w.owner.ID, "project.create", M{"key": "OPS", "name": "Operations"})
+		w.do(w.owner.ID, "task.create", M{"project": "OPS", "title": "Rotate keys", "assignee": "@coder"})
+		w.do(w.owner.ID, "task.update", M{"id": "OPS-1", "waiting_on": "@reviewer"})
+		w.do(w.owner.ID, "task.create", M{"project": "OPS", "title": "Renew certificates", "assignee": "@mia"})
+		page := w.do(w.owner.ID, "doc.create", M{"title": "Runbook", "markdown": "Rotate every month.\n"}).Ref
+		// told is what a comment put in a member's inbox: its type, or "" for nothing.
+		told := func(userID, comment string) string {
+			t.Helper()
+			for _, n := range w.inbox(userID) {
+				if n.EntityID == comment {
+					return n.Type
+				}
+			}
+			return ""
+		}
+
+		t.Run("a comment that mentions members is not for the agents the task is with", func(t *testing.T) {
+			cm := w.do(w.owner.ID, "comment.create", M{"task": "OPS-1", "body": "@helper can you check the old keys?"}).Ref
+			if got := told(helper, cm); got != core.NoteMentioned {
+				t.Errorf("the agent mentioned was told %q, want %q", got, core.NoteMentioned)
+			}
+			for who, id := range map[string]string{"the agent assigned": coder, "the agent the task waits on": reviewer} {
+				if got := told(id, cm); got != "" {
+					t.Errorf("%s was told (%q) of a comment that mentions only another", who, got)
+				}
+			}
+			// A person the task is with is told as before.
+			cm = w.do(w.owner.ID, "comment.create", M{"task": "OPS-2", "body": "@helper can you check the old certificates?"}).Ref
+			if got := told(mia, cm); got != core.NoteComment {
+				t.Errorf("the person assigned was told %q of a comment mentioning another, want %q", got, core.NoteComment)
+			}
+		})
+
+		t.Run("a comment that mentions nobody reaches the agents the task is with", func(t *testing.T) {
+			cm := w.do(w.owner.ID, "comment.create", M{"task": "OPS-1", "body": "The old keys expire on Friday."}).Ref
+			for who, id := range map[string]string{"the agent assigned": coder, "the agent the task waits on": reviewer} {
+				if got := told(id, cm); got != core.NoteComment {
+					t.Errorf("%s was told %q, want %q", who, got, core.NoteComment)
+				}
+			}
+		})
+
+		for _, on := range []struct {
+			name string
+			args M
+		}{
+			{"on a task", M{"task": "OPS-1"}},
+			{"on a page", M{"doc": page}},
+		} {
+			thread := func(t *testing.T) string {
+				t.Helper()
+				args := M{"body": "Is a month right?"}
+				maps.Copy(args, on.args)
+				root := w.do(w.owner.ID, "comment.create", args).Ref
+				w.do(helper, "comment.create", M{"parent": root, "body": "A month is what the policy says."})
+				w.do(mia, "comment.create", M{"parent": root, "body": "Agreed."})
+				return root
+			}
+			t.Run("a reply that mentions members is not for the agents earlier in its thread, "+on.name, func(t *testing.T) {
+				root := thread(t)
+				reply := w.do(w.owner.ID, "comment.create", M{"parent": root, "body": "@coder please write it down."}).Ref
+				if got := told(helper, reply); got != "" {
+					t.Errorf("the agent earlier in the thread was told (%q) of a reply that mentions only another", got)
+				}
+				if got := told(mia, reply); got != core.NoteReplied {
+					t.Errorf("the person earlier in the thread was told %q, want %q", got, core.NoteReplied)
+				}
+			})
+			t.Run("an agent's reply reaches no other agent through its thread, "+on.name, func(t *testing.T) {
+				root := thread(t)
+				reply := w.do(reviewer, "comment.create", M{"parent": root, "body": "The policy was changed to two months."}).Ref
+				if got := told(helper, reply); got != "" {
+					t.Errorf("the agent earlier in the thread was told (%q) of another agent's reply", got)
+				}
+				for who, id := range map[string]string{"the one who started it": w.owner.ID, "the person who replied": mia} {
+					if got := told(id, reply); got != core.NoteReplied {
+						t.Errorf("%s was told %q, want %q", who, got, core.NoteReplied)
+					}
+				}
+				// A person's reply that mentions nobody still reaches the agents of the thread.
+				reply = w.do(mia, "comment.create", M{"parent": root, "body": "Then two months it is."}).Ref
+				for who, id := range map[string]string{"the agent who replied first": helper, "the agent who replied last": reviewer} {
+					if got := told(id, reply); got != core.NoteReplied {
+						t.Errorf("%s was told %q of a person's reply, want %q", who, got, core.NoteReplied)
+					}
+				}
+			})
+		}
+
+		t.Run("an agent's comment reaches the agent it mentions or hands the task to", func(t *testing.T) {
+			cm := w.do(helper, "comment.create", M{"task": "OPS-1", "body": "@coder the keys are in the vault."}).Ref
+			if got := told(coder, cm); got != core.NoteMentioned {
+				t.Errorf("the agent mentioned was told %q, want %q", got, core.NoteMentioned)
+			}
+			cm = w.do(helper, "comment.create", M{"task": "OPS-1", "body": "Over to you.", "waiting_on": "@reviewer"}).Ref
+			if got := told(reviewer, cm); got != core.NoteComment {
+				t.Errorf("the agent handed the task was told %q, want %q", got, core.NoteComment)
+			}
+			if got := told(coder, cm); got != "" {
+				t.Errorf("the agent assigned was told (%q) of another agent's comment that is not for it", got)
+			}
+		})
+	})
+}
+
+// TestEachAgentAnswersOnlyWhatIsAskedOfIt: three agents on one task, each
+// asked in turn by name, as the owner did on a fresh install. Only the one
+// asked is woken each time, whether the questions are comments on the task
+// or replies in one thread; the agent assigned is not woken for a question
+// to another, nor one that answered before for the questions after.
+func TestEachAgentAnswersOnlyWhatIsAskedOfIt(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		agents := map[string]string{}
+		for _, handle := range []string{"claude-code", "codex", "antigravity-cli"} {
+			agents[handle] = w.agent(handle)
+		}
+		w.do(w.owner.ID, "project.create", M{"key": "GS", "name": "Getting started"})
+		for _, threaded := range []bool{false, true} {
+			name := "comments on the task"
+			if threaded {
+				name = "replies in one thread"
+			}
+			t.Run(name, func(t *testing.T) {
+				key := w.do(w.owner.ID, "task.create", M{"project": "GS", "title": "Try the agents", "assignee": "@claude-code"}).Key
+				root := w.do(w.owner.ID, "comment.create", M{"task": key, "body": "Hello, all."}).Ref
+				say := func(userID, body string) {
+					t.Helper()
+					args := M{"task": key, "body": body}
+					if threaded {
+						args = M{"parent": root, "body": body}
+					}
+					w.do(userID, "comment.create", args)
+				}
+				// woken is who of the agents got an inbox item from what happens in step.
+				woken := func(step func()) []string {
+					t.Helper()
+					before := map[string]int{}
+					for handle, id := range agents {
+						before[handle] = len(w.inbox(id))
+					}
+					step()
+					var got []string
+					for handle, id := range agents {
+						if len(w.inbox(id)) > before[handle] {
+							got = append(got, handle)
+						}
+					}
+					slices.Sort(got)
+					return got
+				}
+				for _, turn := range []struct{ asked, question string }{
+					{"codex", "@codex do you see this too ?"},
+					{"antigravity-cli", "@antigravity-cli how about you, you see this as well ?"},
+					{"claude-code", "@claude-code you see this now ?"},
+				} {
+					if got := woken(func() { say(w.owner.ID, turn.question) }); !slices.Equal(got, []string{turn.asked}) {
+						t.Errorf("%q woke %v, want only %s", turn.question, got, turn.asked)
+					}
+					if got := woken(func() { say(agents[turn.asked], "Yes, I see it.") }); len(got) > 0 {
+						t.Errorf("%s's answer woke %v, want nobody", turn.asked, got)
+					}
+				}
+			})
+		}
 	})
 }
 

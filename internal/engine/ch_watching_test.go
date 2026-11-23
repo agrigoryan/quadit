@@ -67,3 +67,59 @@ func TestAMemberWatchesOnlyWhatTheyMaySee(t *testing.T) {
 		w.do(narrow, "watch.set", M{"type": "project", "subject": "SVA"})
 	})
 }
+
+// TestAnAgentFollowsOnlyWhatItChoseTo: what a person does on a task or a
+// page (making it, being given it, being mentioned, commenting, asking or
+// answering a question) makes them follow it; the same done by or to an
+// agent does not, so it is not woken for every later comment there. An
+// agent that follows by choice hears all of it.
+func TestAnAgentFollowsOnlyWhatItChoseTo(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		mia := w.person("mia")
+		maker, coder, named, writer, asker := w.agent("maker"), w.agent("coder"), w.agent("named"), w.agent("writer"), w.agent("asker")
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		w.do(maker, "task.create", M{"project": "SVA", "title": "Boss fight", "assignee": "@coder", "description": "@named and @mia know the boss."})
+		w.do(writer, "comment.create", M{"task": "SVA-1", "body": "Looks right."})
+		w.do(w.owner.ID, "comment.create", M{"task": "SVA-1", "body": "@writer and @mia, have a look."})
+		w.do(asker, "decision.open", M{"task": "SVA-1", "question": "Which arena?", "options": []M{{"label": "Roof"}, {"label": "Dojo"}}})
+		page := w.do(writer, "doc.create", M{"title": "Boss notes"}).Ref
+		w.do(writer, "comment.create", M{"doc": page, "body": "Draft."})
+		task := w.task("SVA-1").ID
+
+		follows := func(userID, subject string) bool {
+			t.Helper()
+			n, err := w.db().Count(context.Background(), "watchers", store.Eq("subject_id", subject), store.Eq("user_id", userID))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return n > 0
+		}
+		for who, id := range map[string]string{"its maker": maker, "its assignee": coder, "one its description mentions": named,
+			"one who commented": writer, "one a comment mentions": writer, "one who asked a question": asker} {
+			if follows(id, task) {
+				t.Errorf("%s, an agent, follows the task", who)
+			}
+		}
+		if follows(writer, page) {
+			t.Error("an agent that made a page and commented on it follows the page")
+		}
+		if !follows(mia, task) {
+			t.Error("a person mentioned on the task does not follow it")
+		}
+		if !follows(w.owner.ID, task) {
+			t.Error("a person who commented on the task does not follow it")
+		}
+
+		t.Run("an agent that follows by choice hears every comment", func(t *testing.T) {
+			w.do(coder, "watch.set", M{"subject": "SVA-1"})
+			before := len(w.inbox(coder))
+			w.do(w.owner.ID, "comment.create", M{"task": "SVA-1", "body": "@mia what do you think?"})
+			w.do(writer, "comment.create", M{"task": "SVA-1", "body": "The roof, I think."})
+			if got := len(w.inbox(coder)) - before; got != 2 {
+				t.Fatalf("the agent following the task by choice got %d items for two comments, want 2", got)
+			}
+		})
+	})
+}

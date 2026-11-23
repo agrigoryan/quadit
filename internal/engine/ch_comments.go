@@ -135,7 +135,10 @@ func inThread(cm core.Comment, taskID, docID string) error {
 }
 
 // taskComment adds a comment to a task, or to a decision or an option on
-// it, tells the people it concerns and hands the task on.
+// it, tells the people it concerns and hands the task on. An agent is told
+// only of a comment for it: one that mentions it, hands it the task or is
+// on a task it follows by choice; or a person's comment that mentions
+// nobody, on a task that is with the agent or in a thread it wrote in.
 func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 	thread := cm
 	t, err := c.commentSubject(&cm, a)
@@ -168,7 +171,8 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 	if err := c.emit(event{seq: seq, typ: "comment.created", entity: "comment", entityID: cm.ID, place: inTask(t), data: data}); err != nil {
 		return err
 	}
-	if err := c.commentReaches(cm, t); err != nil {
+	mentioned, err := c.commentReaches(cm, t)
+	if err != nil {
 		return err
 	}
 	note := core.NoteComment
@@ -179,12 +183,19 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 		return err
 	}
 	// A person's comment reaches whom the task is with, whether or not they
-	// follow it: its assignee and whoever it waits on. An agent's reaches
-	// only its followers (and whom it mentions or hands the task to), so
-	// two agents on one task do not keep answering each other.
+	// follow it: its assignee and whoever it waits on, an agent among them
+	// when the comment is for it (notFor). An agent's reaches only its
+	// followers, and whom it mentions or hands the task to.
 	what := about{entity: "comment", id: cm.ID, text: cm.Body}
 	if c.actor.Kind != core.KindAgent {
 		for _, with := range []string{t.AssigneeID, t.WaitingOnID} {
+			skip, err := c.notFor(with, mentioned)
+			if err != nil {
+				return err
+			}
+			if skip {
+				continue
+			}
 			if err := c.notifyTask(with, note, t, what); err != nil {
 				return err
 			}
@@ -235,40 +246,59 @@ func (c *cx) commentSubject(cm *core.Comment, a commentCreateArgs) (core.Task, e
 	return t, nil
 }
 
-// commentReaches makes the author a follower of the task, and tells those
-// the comment mentions and the one it replies to.
-func (c *cx) commentReaches(cm core.Comment, t core.Task) error {
+// commentReaches makes the author a follower of the task (a person; see
+// watch), and those it mentions, and tells them and the ones it replies
+// to. It returns the members it mentions.
+func (c *cx) commentReaches(cm core.Comment, t core.Task) ([]core.Member, error) {
 	if err := c.watch(c.actor.UserID, "task", t.ID); err != nil {
-		return err
+		return nil, err
 	}
 	mentioned, err := c.link("comment", cm.ID, "task", t.ID, cm.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, m := range mentioned {
 		if err := c.watch(m.UserID, "task", t.ID); err != nil {
-			return err
+			return nil, err
 		}
 		if err := c.notifyTask(m.UserID, core.NoteMentioned, t, about{entity: "comment", id: cm.ID, text: cm.Body}); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	people, err := c.threadPeople(cm)
+	people, err := c.threadPeople(cm, mentioned)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, p := range people {
 		if err := c.notifyTask(p, core.NoteReplied, t, about{entity: "comment", id: cm.ID, text: cm.Body}); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return mentioned, nil
 }
 
-// threadPeople are those a reply answers: whoever wrote in its thread
-// before it, the first comment's author and each earlier reply's, once
-// each. A comment that starts a thread answers nobody.
-func (c *cx) threadPeople(cm core.Comment) ([]string, error) {
+// notFor reports whether a comment, which mentions the members given, is
+// not for a member who would be told of it only because the task is with
+// them or they wrote earlier in its thread. It is always for a person. It
+// is for an agent only when it is a person's comment that mentions nobody:
+// a comment that mentions members is for them, and an agent's comment is
+// for the agents it mentions or hands the task to, so that an agent is
+// woken only for what is asked of it, and two agents do not keep answering
+// each other.
+func (c *cx) notFor(userID string, mentioned []core.Member) (bool, error) {
+	named := slices.ContainsFunc(mentioned, func(m core.Member) bool { return m.UserID != c.actor.UserID })
+	if c.actor.Kind != core.KindAgent && !named {
+		return false, nil
+	}
+	return c.isAgent(userID)
+}
+
+// threadPeople are those a reply, which mentions the members given,
+// answers: whoever wrote in its thread before it, the first comment's
+// author and each earlier reply's, once each, an agent among them only
+// when the reply is for it (notFor). A comment that starts a thread
+// answers nobody.
+func (c *cx) threadPeople(cm core.Comment, mentioned []core.Member) ([]string, error) {
 	if cm.ParentID == "" {
 		return nil, nil
 	}
@@ -279,7 +309,14 @@ func (c *cx) threadPeople(cm core.Comment) ([]string, error) {
 	}
 	var people []string
 	for _, e := range earlier {
-		if !slices.Contains(people, e.AuthorID) {
+		if slices.Contains(people, e.AuthorID) {
+			continue
+		}
+		skip, err := c.notFor(e.AuthorID, mentioned)
+		if err != nil {
+			return nil, err
+		}
+		if !skip {
 			people = append(people, e.AuthorID)
 		}
 	}
@@ -428,7 +465,7 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 			return err
 		}
 	}
-	people, err := c.threadPeople(cm)
+	people, err := c.threadPeople(cm, mentioned)
 	if err != nil {
 		return err
 	}

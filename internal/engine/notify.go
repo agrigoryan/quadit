@@ -148,10 +148,17 @@ func (c *cx) notifyWatchers(t core.Task, typ string, what about) error {
 	return nil
 }
 
-// watch makes a member a watcher of a task, epic, project, view or doc.
+// watch makes a member a watcher of a task, epic, project, view or doc, for
+// something they did or were given there. Only a person is made one so: an
+// agent follows only what it chose to (watch.set), and hears of the rest
+// when it is for it (a mention, a hand-off, a question), so that it is not
+// woken for every later comment on a task it once touched.
 func (c *cx) watch(userID, subjectType, subjectID string) error {
 	if userID == "" {
 		return nil
+	}
+	if agent, err := c.isAgent(userID); err != nil || agent {
+		return err
 	}
 	return c.tx.Upsert(c.ctx, core.Watcher{WorkspaceID: c.ws, UserID: userID, SubjectType: subjectType, SubjectID: subjectID, CreatedAt: c.at},
 		"subject_id", "user_id")
