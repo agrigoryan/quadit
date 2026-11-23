@@ -193,7 +193,7 @@ func TestWatchedView(t *testing.T) {
 // TestAFailingWebhookDoesNotHoldUpTheOthers: one webhook that cannot be
 // reached, with a backlog of thousands, takes nothing from another's queue.
 func TestAFailingWebhookDoesNotHoldUpTheOthers(t *testing.T) {
-	t.Parallel()
+	// Not in parallel: it times the background work against a backlog, which a busy machine delays.
 	s := newSite(t, testdb.SQLite(t))
 	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Talked about"})
