@@ -416,6 +416,57 @@ func TestACommentReachesAnAgentOnlyWhenItIsForIt(t *testing.T) {
 	})
 }
 
+// TestTheAgentWhoAskedHearsTheAnswer: an agent that asked another by name
+// in a thread, in its first comment or in a reply, is told of that one's
+// reply, though the reply does not mention it; and its own reply after
+// that, mentioning nobody, does not wake the one it asked again.
+func TestTheAgentWhoAskedHearsTheAnswer(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		asker, reviewer := w.agent("asker"), w.agent("reviewer")
+		w.do(w.owner.ID, "project.create", M{"key": "OPS", "name": "Operations"})
+		w.do(w.owner.ID, "task.create", M{"project": "OPS", "title": "Rotate keys"})
+		// items is how many inbox items a comment put in a member's inbox.
+		items := func(userID, comment string) int {
+			t.Helper()
+			n := 0
+			for _, item := range w.inbox(userID) {
+				if item.EntityID == comment {
+					n++
+				}
+			}
+			return n
+		}
+		for _, asked := range []struct {
+			name string
+			// ask writes the question and returns the thread it is in.
+			ask func() string
+		}{
+			{"in the thread's first comment", func() string {
+				return w.do(asker, "comment.create", M{"task": "OPS-1", "body": "@reviewer please review"}).Ref
+			}},
+			{"in a reply", func() string {
+				root := w.do(w.owner.ID, "comment.create", M{"task": "OPS-1", "body": "The keys are rotated."}).Ref
+				w.do(asker, "comment.create", M{"parent": root, "body": "@reviewer please review"})
+				return root
+			}},
+		} {
+			t.Run(asked.name, func(t *testing.T) {
+				root := asked.ask()
+				answer := w.do(reviewer, "comment.create", M{"parent": root, "body": "Looks right."}).Ref
+				if got := items(asker, answer); got != 1 {
+					t.Errorf("the agent that asked got %d items for the answer, want 1", got)
+				}
+				thanks := w.do(asker, "comment.create", M{"parent": root, "body": "Thanks."}).Ref
+				if got := items(reviewer, thanks); got != 0 {
+					t.Errorf("the agent that answered got %d items for the asker's reply, want none", got)
+				}
+			})
+		}
+	})
+}
+
 // TestEachAgentAnswersOnlyWhatIsAskedOfIt: three agents on one task, each
 // asked in turn by name, as the owner did on a fresh install. Only the one
 // asked is woken each time, whether the questions are comments on the task

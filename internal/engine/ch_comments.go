@@ -296,8 +296,10 @@ func (c *cx) notFor(userID string, mentioned []core.Member) (bool, error) {
 // threadPeople are those a reply, which mentions the members given,
 // answers: whoever wrote in its thread before it, the first comment's
 // author and each earlier reply's, once each, an agent among them only
-// when the reply is for it (notFor). A comment that starts a thread
-// answers nobody.
+// when the reply is for it (notFor) or it asked the reply's author there
+// by mention: the one who asked hears the answer, and the answer to that
+// is the asker's alone to make. A comment that starts a thread answers
+// nobody.
 func (c *cx) threadPeople(cm core.Comment, mentioned []core.Member) ([]string, error) {
 	if cm.ParentID == "" {
 		return nil, nil
@@ -305,6 +307,14 @@ func (c *cx) threadPeople(cm core.Comment, mentioned []core.Member) ([]string, e
 	var earlier []core.Comment
 	if err := c.tx.List(c.ctx, &earlier, store.Q{Where: []store.Cond{store.Either(store.Eq("id", cm.ParentID), store.Eq("parent_id", cm.ParentID)),
 		store.Ne("id", cm.ID), store.Live}, Order: "created_seq"}); err != nil {
+		return nil, err
+	}
+	ids := make([]string, len(earlier))
+	for i, e := range earlier {
+		ids[i] = e.ID
+	}
+	var asks []core.Ref
+	if err := c.tx.List(c.ctx, &asks, store.Where(store.In("from_id", ids), store.Eq("to_id", c.actor.UserID))); err != nil {
 		return nil, err
 	}
 	var people []string
@@ -316,7 +326,8 @@ func (c *cx) threadPeople(cm core.Comment, mentioned []core.Member) ([]string, e
 		if err != nil {
 			return nil, err
 		}
-		if !skip {
+		asked := slices.ContainsFunc(asks, func(r core.Ref) bool { return r.FromID == e.ID })
+		if !skip || asked {
 			people = append(people, e.AuthorID)
 		}
 	}
