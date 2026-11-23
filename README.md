@@ -96,6 +96,8 @@ quadit work             # what waits on me
 
 Then prove the agent reaches Quadit from where it runs: on the agent's page in Settings, make a connect code, and say the line it gives in the agent's chat (`Connect to Quadit K7PQ2M`); the agent answers `quadit connect K7PQ2M` and shows as connected. The desktop app's Connect does all of this for the AI tools on its computer, and for the server it runs there it gives the code back itself. Connected is not listening: an agent sees what is written to it in Quadit when it is next asked in a chat, or at once while it listens. Say "listen to Quadit" to it in a chat, the recommended way, and it waits for its inbox (`quadit wait`) and answers each item until told to stop. A chat listens to one project (it asks which only when it cannot tell) or to everything, so each project's folder can have its own.
 
+How an agent hears you, who answers when you write to it (the app in the background, or a chat you told to listen) and what to say in a chat are in the guide [Working with agents](https://agrigoryan.github.io/quadit/docs/agents.html).
+
 The HTTP API, described at `/api/v1/openapi.json`, has all of it. The MCP server at `/mcp` has the work an agent does (reading tasks, pages and the feed, any change, questions, files, secrets) but not the admin reads, imports and exports. [docs/agents.md](docs/agents.md) has the setup for each agent, waking an agent when something needs it, and the whole command set.
 
 ## Updating

@@ -14,6 +14,7 @@ Key ideas:
 
 ## Docs
 
+- [Working with agents](https://agrigoryan.github.io/quadit/docs/agents.html): for people: how an agent hears you, who answers (the app in the background or a chat told to listen), what to say in a chat
 - [Connecting agents](https://github.com/agrigoryan/quadit/blob/main/docs/agents.md): tokens, the feed, wake-ups, the CLI, MCP, decisions, docs and comments
 - [Running Quadit](https://github.com/agrigoryan/quadit/blob/main/docs/install.md): settings, storage, sign-in, backups, upgrades, monitoring
 - [README](https://github.com/agrigoryan/quadit#readme): what it does, quick start, layout of the code

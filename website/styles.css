@@ -243,3 +243,57 @@ figcaption { margin: 18px auto 0; max-width: 46em; font-size: 0.9375rem; line-he
 .lost { min-height: 100vh; display: grid; align-items: center; text-align: center; }
 .lost h1 { font-size: clamp(2rem, 6vw, 3.5rem); }
 .lost .sub { margin-inline: auto; }
+
+/* ---------- docs: a column to read, its sections listed beside it on a wide screen */
+.doc { padding: 72px 0 120px; }
+.doc-grid { display: grid; gap: 40px; }
+@media (min-width: 1020px) { .doc-grid { grid-template-columns: 200px minmax(0, 1fr); gap: 72px; } }
+.doc-nav { display: none; font-size: 0.9375rem; }
+@media (min-width: 1020px) { .doc-nav { display: block; position: sticky; top: 96px; align-self: start; } }
+.doc-nav p { font-weight: 600; color: var(--ink); margin-bottom: 12px; }
+.doc-nav ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; border-left: 1px solid var(--line); }
+.doc-nav a { display: block; padding-left: 14px; margin-left: -1px; border-left: 1px solid transparent; color: var(--ink-3); line-height: 1.35; }
+.doc-nav a:hover { color: var(--ink); border-left-color: var(--ink-3); text-decoration: none; }
+.doc-nav .back { display: inline-block; margin-top: 28px; color: var(--ink-2); }
+.doc-body { max-width: 46rem; }
+.doc-crumb { font-size: 0.9375rem; color: var(--ink-3); margin-bottom: 18px; }
+.doc-crumb a { color: var(--ink-2); }
+.doc-body h1 { font-size: clamp(2.125rem, 4.6vw, 3.25rem); }
+.doc-body .lede { margin-top: 20px; }
+.doc-body h2 { margin-top: 76px; padding-top: 28px; border-top: 1px solid var(--line); font-size: clamp(1.5rem, 2.6vw, 1.875rem); line-height: 1.15; scroll-margin-top: 84px; }
+.doc-body h3 { margin-top: 36px; font-size: 1.125rem; }
+.doc-body p, .doc-body li { color: var(--ink-2); }
+.doc-body h2 + p, .doc-body h3 + p, .doc-body p + p, .doc-body ul + p, .doc-body ol + p, .doc-body dl + p, .doc-body .who + p { margin-top: 14px; }
+.doc-body ul, .doc-body ol { margin-top: 14px; padding-left: 1.3em; display: grid; gap: 8px; }
+.doc-body li::marker { color: var(--ink-3); }
+.doc-body strong { color: var(--ink); font-weight: 600; }
+.doc-body p code, .doc-body li code, .doc-body dd code { white-space: nowrap; }
+.doc-body li code { color: var(--ink); background: var(--raised); border: 1px solid var(--line); border-radius: 5px; padding: 0.08em 0.36em; }
+
+/* What a person types in a chat, set as the tools show a prompt: the yellow is theirs, "your move". */
+.says { margin-top: 20px; display: grid; gap: 10px; }
+.says > div { display: grid; gap: 8px 28px; padding: 18px 20px; border-radius: 12px; background: var(--sunk); box-shadow: inset 0 0 0 1px var(--line); }
+@media (min-width: 720px) { .says > div { grid-template-columns: 16.5rem minmax(0, 1fr); align-items: baseline; } }
+.says dt { font: 500 0.9375rem/1.5 var(--mono); color: var(--ink); }
+.says dt::before { content: "\276F\00a0"; color: var(--move); }
+.says dd { color: var(--ink-2); font-size: 0.9875rem; line-height: 1.55; }
+
+/* Who answers: one row for each, read across on a wide screen and down on a narrow one. */
+.who { margin-top: 22px; display: grid; gap: 10px; }
+.who > div { padding: 20px 22px; border-radius: 12px; background: linear-gradient(180deg, var(--raised), var(--surface)); box-shadow: inset 0 0 0 1px var(--line); display: grid; gap: 6px 28px; }
+@media (min-width: 720px) { .who > div { grid-template-columns: 11rem minmax(0, 1fr); } }
+.who h3 { margin: 0; font-size: 1.0625rem; }
+.who p { font-size: 0.9875rem; line-height: 1.55; }
+.who p + p { margin-top: 8px; }
+
+/* The docs' first page: its guides, one under another. */
+.doc-list { list-style: none; margin: 28px 0 0; padding: 0; display: grid; }
+.doc-body .doc-list { padding-left: 0; gap: 0; }
+.doc-list li + li { border-top: 1px solid var(--line); }
+.doc-list li:last-child { border-bottom: 1px solid var(--line); }
+.doc-list a { display: grid; gap: 4px; padding: 20px 0; color: var(--ink); }
+.doc-list a:hover { text-decoration: none; }
+.doc-list a:hover b { color: var(--blue); }
+.doc-list b { font-weight: 600; font-size: 1.125rem; }
+.doc-list span { color: var(--ink-2); font-size: 0.9875rem; }
+.doc-list small { color: var(--ink-3); font-size: 0.875rem; }
