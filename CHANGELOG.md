@@ -4,6 +4,10 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+### Changed
+
+- The folded sidebar takes the page's colour and has no line between it and the page; the colour and the line fade with the width as it folds and opens.
+
 ## [0.5.0] - 2026-11-23
 
 ### Added

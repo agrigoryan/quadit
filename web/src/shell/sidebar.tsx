@@ -169,8 +169,9 @@ export function Sidebar() {
     <>
       <aside
         className={cx(
-          "shrink-0 border-r border-line bg-sunken transition-[width] duration-150 max-md:hidden",
-          collapsed ? "w-12" : "w-58",
+          "shrink-0 border-r transition-[width,background-color,border-color] duration-150 max-md:hidden",
+          // Folded, the rail is part of the page: its colour, and no line between them.
+          collapsed ? "w-12 border-transparent bg-surface" : "w-58 border-line bg-sunken",
         )}
       >
         <SidebarBody collapsed={collapsed} />
