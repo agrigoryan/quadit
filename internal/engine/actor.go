@@ -100,3 +100,10 @@ func (c *cx) askedBy(t core.Task) (string, error) {
 	}
 	return t.AskedBy, nil
 }
+
+// isAgent reports whether a member, or one who was, is an agent.
+func (c *cx) isAgent(userID string) (bool, error) {
+	var m core.Member
+	ok, err := store.Find(c.ctx, c.tx, &m, store.Eq("user_id", userID))
+	return ok && m.Kind == core.KindAgent, err
+}

@@ -113,14 +113,6 @@ func isHandoff(ev core.Event) bool {
 	return d.Sets("assignee_id")
 }
 
-// byAgent reports whether an event was written by an agent that is still a
-// member.
-func (c *cx) byAgent(ev core.Event) (bool, error) {
-	var actor core.Member
-	ok, err := store.Find(c.ctx, c.tx, &actor, store.Eq("user_id", ev.ActorID))
-	return ok && actor.Kind == core.KindAgent, err
-}
-
 // agentChain counts the hand-offs between agents since a person last
 // assigned the task, newest first.
 func (c *cx) agentChain(evs []core.Event) (int, error) {
@@ -129,7 +121,7 @@ func (c *cx) agentChain(evs []core.Event) (int, error) {
 		if !isHandoff(ev) {
 			continue
 		}
-		agent, err := c.byAgent(ev)
+		agent, err := c.isAgent(ev.ActorID)
 		if err != nil {
 			return 0, err
 		}
@@ -207,7 +199,7 @@ func (c *cx) checkTaskHandoffs(t core.Task, evs []core.Event) error {
 		if !isHandoff(ev) {
 			continue
 		}
-		agent, err := c.byAgent(ev)
+		agent, err := c.isAgent(ev.ActorID)
 		if err != nil {
 			return err
 		}
