@@ -61,3 +61,44 @@ func TestACursorNeverMovesBackUnderConcurrentAcks(t *testing.T) {
 		}
 	})
 }
+
+// TestMyFeedIsOfMyTasks: mine=1 keeps the feed to the caller's own tasks,
+// those assigned to them, waiting on them, mentioning them or that they
+// watch, and to an agent as to a person, though an agent follows only by
+// choice.
+func TestMyFeedIsOfMyTasks(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		token := s.agentToken(t, "coder")
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		for _, task := range []M{
+			{"title": "Assigned", "assignee": "@coder"},
+			{"title": "Waiting", "waiting_on": "@coder"},
+			{"title": "Mentioning", "description": "Ask @coder."},
+			{"title": "Watched"},
+			{"title": "Someone else's"},
+		} {
+			task["project"] = "SVA"
+			s.change(t, s.owner, "", "task.create", task)
+		}
+		s.change(t, nil, token, "watch.set", M{"subject": "SVA-4"})
+		var page struct {
+			Events []struct {
+				Data struct {
+					Row struct {
+						Key string `json:"key"`
+					} `json:"row"`
+				} `json:"data"`
+			} `json:"events"`
+		}
+		s.call(t, nil, token, "GET", "/api/v1/w/-/events?after=0&mine=1&types=task.created&limit=500", nil, 200, &page)
+		var keys []string
+		for _, ev := range page.Events {
+			keys = append(keys, ev.Data.Row.Key)
+		}
+		if got := strings.Join(keys, " "); got != "SVA-1 SVA-2 SVA-3 SVA-4" {
+			t.Fatalf("the agent's own feed has the tasks %q, want SVA-1 to SVA-4", got)
+		}
+	})
+}

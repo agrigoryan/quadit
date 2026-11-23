@@ -314,6 +314,7 @@ type TaskFilter struct {
 	DueAfter      string
 	MentionsID    string // tasks that mention this member
 	WatchedBy     string
+	Involves      string // tasks this member is assigned, is waited on, is mentioned in or watches: their own
 	ActivityAfter int64  // something happened in the task after this seq
 	UpdatedAfter  int64  // the task's own fields changed after this seq
 	OpenDecision  bool   // has an open decision

@@ -127,12 +127,18 @@ func (c conn) taskWhere(filter store.TaskFilter) *clause {
 	if filter.DueAfter != "" {
 		where.add(`t.due_on >= ?`, filter.DueAfter)
 	}
-	// Mentioning a member, or watched by one.
+	// Mentioning a member, watched by one, or one's own: assigned to them,
+	// waiting on them, mentioning them or watched by them.
 	if filter.MentionsID != "" {
 		where.add(`EXISTS (SELECT 1 FROM refs r WHERE r.from_scope_id = t.id AND r.to_id = ?)`, idOrNone(filter.MentionsID))
 	}
 	if filter.WatchedBy != "" {
 		where.add(`EXISTS (SELECT 1 FROM watchers wt WHERE wt.subject_id = t.id AND wt.user_id = ?)`, idOrNone(filter.WatchedBy))
+	}
+	if filter.Involves != "" {
+		who := idOrNone(filter.Involves)
+		where.add(`(t.assignee_id = ? OR t.waiting_on_id = ? OR EXISTS (SELECT 1 FROM refs r WHERE r.from_scope_id = t.id AND r.to_id = ?) OR EXISTS (SELECT 1 FROM watchers wt WHERE wt.subject_id = t.id AND wt.user_id = ?))`,
+			who, who, who, who)
 	}
 	// Something happened in the task, or its own fields changed, after a
 	// feed position.

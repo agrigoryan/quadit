@@ -134,16 +134,19 @@ func (s *Server) handleReadFeed(x *c) error {
 	if err != nil {
 		return err
 	}
-	if truthyParam(v, "mine") {
-		query.Watching = true // tasks assigned to or mentioning the caller are watched
-	}
-	if query.Watching || len(v) > 0 && hasTaskFilter(query) {
+	mine := truthyParam(v, "mine")
+	if mine || len(v) > 0 && hasTaskFilter(query) {
 		query.Archived = true
 		tf, _, err := x.taskFilter(x.ctx(), query)
 		if err != nil {
 			return err
 		}
 		tf.Limit, tf.Sort = 0, ""
+		if mine {
+			// The caller's tasks: an agent follows only what it chose to, so
+			// following alone would leave out the tasks given to it.
+			tf.Involves = x.member.UserID
+		}
 		// The tasks are kept to the caller's projects by their own filter,
 		// and the events are those of the tasks, whatever project each
 		// was written in.
