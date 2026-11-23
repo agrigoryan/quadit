@@ -383,8 +383,7 @@ func hashOf(text string) string {
 // and an unchanged file stays unchanged. A page synced before this keeps
 // its title until its file changes.
 func TestSyncTitleFromHeading(t *testing.T) {
-	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
-	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
+	t.Parallel()
 	st := testdb.SQLite(t)
 	s := newSite(t, st)
 	r := newSyncedRepo(t, s, map[string]string{
@@ -458,8 +457,7 @@ func TestSyncTitleFromHeading(t *testing.T) {
 // with the last commit and that folder only, and still commits and proposes
 // from it. A working copy made whole before stays whole and keeps working.
 func TestSyncClonesOnlyWhatItNeeds(t *testing.T) {
-	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
-	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
+	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	r := newSyncedRepo(t, s, map[string]string{"docs/plan.md": "Plan.\n", "assets/big.bin": "pretend this is 420 MB\n", "README.md": "readme\n"})
 	r.write("assets/more.bin", "and more\n")

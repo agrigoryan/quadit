@@ -26,8 +26,7 @@ func gitIn(t *testing.T, dir string, args ...string) string {
 }
 
 func TestRepositorySync(t *testing.T) {
-	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
-	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
@@ -185,8 +184,7 @@ func (r *syncedRepo) files(branch string) string {
 // TestRepositorySyncDecides pins, from a real repository to the pages and
 // back, each case a sync decides that the other sync tests do not name.
 func TestRepositorySyncDecides(t *testing.T) {
-	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
-	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
+	t.Parallel()
 	source := func(r *syncedRepo, args M) {
 		a := M{"title": "Game docs", "repo": r.origin, "subdir": "docs"}
 		maps.Copy(a, args)
@@ -435,8 +433,7 @@ func TestRepositorySyncDecides(t *testing.T) {
 }
 
 func TestARepositorySyncFailsWhenItCannotReadWhoEditedThePages(t *testing.T) {
-	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
-	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
+	t.Parallel()
 	st := newFaultyStore(testdb.SQLite(t))
 	s := newSite(t, st)
 	r := newSyncedRepo(t, s, map[string]string{"docs/design.md": "# Design\n\nThe boss has three phases.\n"})

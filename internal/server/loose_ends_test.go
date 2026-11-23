@@ -194,8 +194,7 @@ func TestSignInGivesUpOnASilentProvider(t *testing.T) {
 // that line only, and its front matter comes back byte for byte, in each
 // of three styles.
 func TestSyncKeepsFrontMatter(t *testing.T) {
-	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
-	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
+	t.Parallel()
 	files := map[string]string{
 		"docs/plain.md":  "---\nowner: aram\nstatus:   draft\n---\n\n# Plain\n\nText.\n",
 		"docs/quoted.md": "---\ntitle: \"Boss: the return\"\nwhen: '10:30'\nnote: \"*not* emphasis\"\n---\nText.\n",

@@ -21,8 +21,7 @@ import (
 // it said before in the same sync, here that the source's folder is not in
 // the repository yet.
 func TestSyncKeepsEveryNote(t *testing.T) {
-	// Not in parallel: it runs git, and on macOS Go 1.26's race detector can crash a
-	// child process before it starts, the more often the busier the tests (go.dev/issue/79804).
+	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
 	}
