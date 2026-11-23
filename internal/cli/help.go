@@ -99,7 +99,7 @@ var helpTopics = map[string]string{
                                that many failed runs (it stays unread in quadit inbox); events=
                                reports each run as a JSON line to a file or named pipe you made.
                                Stop it with Ctrl-C, or by closing its terminal.
-                               quadit listen --exec sh -c 'codex exec "Quadit woke you for this inbox item: $QUADIT_ITEM Handle it with the quadit skill, answering where you were asked."'
+                               quadit listen --exec sh -c 'codex exec "Quadit woke you for this inbox item: $QUADIT_ITEM Handle it with the quadit skill: answer where you were asked, and write nothing when it asks nothing of you."'
   Where an agent's tool cannot hand it a background command's result (it can only wait in
   the foreground), listening from a chat keeps that chat busy; a companion keeps it free.
 `,

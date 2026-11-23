@@ -121,7 +121,7 @@ const ITEM = "{quadit-item}";
  */
 export const WAKE_SCRIPT = `p="Quadit woke you for this inbox item:
 $QUADIT_ITEM
-Handle it with the quadit skill, answering where you were asked."
+Handle it with the quadit skill: answer where you were asked, and write nothing when it asks nothing of you."
 for a do shift; if [ "$a" = "${ITEM}" ]; then set -- "$@" "$p"; else set -- "$@" "$a"; fi; done
 exec "$@"`;
 

@@ -541,7 +541,7 @@ describe.skipIf(process.platform === "win32")("the wake command", () => {
     ).toString();
     expect(out.split("\0").slice(0, -1)).toEqual([
       "a b",
-      `Quadit woke you for this inbox item:\n${item}\nHandle it with the quadit skill, answering where you were asked.`,
+      `Quadit woke you for this inbox item:\n${item}\nHandle it with the quadit skill: answer where you were asked, and write nothing when it asks nothing of you.`,
       "*",
     ]);
   });
