@@ -262,7 +262,8 @@ func TestMCPWithOAuth(t *testing.T) {
 }
 
 // feedReads is a store that, once armed, keeps the context of the first
-// read of the feed.
+// read of the feed made for a request. The server's background work reads
+// the feed too, under a context no client ends.
 type feedReads struct {
 	store.Store
 	armed atomic.Bool
@@ -274,8 +275,8 @@ func (s *feedReads) In(workspaceID string) store.DB {
 	return feedReadsDB{DB: s.Store.In(workspaceID), reads: s}
 }
 
-// read is the context of the first read since the store was armed, nil
-// before it.
+// read is the context of the first read for a request since the store was
+// armed, nil before it.
 func (s *feedReads) read() context.Context {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -288,7 +289,7 @@ type feedReadsDB struct {
 }
 
 func (d feedReadsDB) Events(ctx context.Context, f store.EventFilter) ([]core.Event, error) {
-	if d.reads.armed.Load() {
+	if d.reads.armed.Load() && ctx.Value(http.ServerContextKey) != nil {
 		d.reads.mu.Lock()
 		if d.reads.first == nil {
 			d.reads.first = ctx
