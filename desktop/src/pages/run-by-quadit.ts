@@ -18,7 +18,7 @@
 // Styled by tools.css.
 
 import { button, make } from "@/pages/dom";
-import type { PagesApi, RunEntryView, RunsView } from "@/shared/pages-api";
+import type { Owner, PagesApi, RunEntryView, RunsView } from "@/shared/pages-api";
 
 /** The app's pages API, asked only once the card is on its page. */
 const api = () => window.quaditPages as PagesApi;
@@ -29,14 +29,33 @@ export interface RunWords {
   here: string;
 }
 
-/** What the card says when Quadit runs no project for the agent yet. */
-export function offerLine({ program, here }: RunWords, agent: string): string {
-  return `Quadit can start ${program} for you when you assign ${agent} a task or comment on one, in the project’s folder on ${here}.`;
+/**
+ * What the card says when Quadit runs no project for the agent yet: whose
+ * words start it, the person here's when they answer for the agent, else
+ * that person's (`owner`), while it runs under this person's account.
+ */
+export function offerLine({ program, here }: RunWords, agent: string, owner: Owner): string {
+  return owner.me
+    ? `Quadit can start ${program} for you when you assign ${agent} a task or comment on one, in the project’s folder on ${here}.`
+    : `Quadit can start ${program} under your account when @${owner.handle} assigns ${agent} a task or writes to it on one, in the project’s folder on ${here}.`;
 }
 
 /** What running in a folder means, and whose words start a run (decision 8), said before the person starts it. */
-export function choosingNote({ program }: RunWords, agent: string, project: string | null): string {
-  return `${program} runs there with full access, as you, whenever you assign ${agent} a task in ${project ?? "the project"} or comment on one. Only your words, or those of your other agents, start it.`;
+export function choosingNote({ program, here }: RunWords, agent: string, project: string | null, owner: Owner): string {
+  const where = project ?? "the project";
+  return owner.me
+    ? `${program} runs there with full access, as you, whenever you assign ${agent} a task in ${where} or comment on one. Only your words, or those of your other agents, start it.`
+    : `${program} runs there with full access, under your account on ${here}, whenever @${owner.handle} assigns ${agent} a task in ${where} or writes to it on one. Only @${owner.handle}’s words, or those of @${owner.handle}’s other agents, start it.`;
+}
+
+/** Why Quadit offers no run of the agent: it cannot tell whose words would start one. */
+export function noOwnerLine(agent: string): string {
+  return `Quadit cannot tell who answers for ${agent}, so it does not offer to run it.`;
+}
+
+/** What the card says when the list of what Quadit runs could not be read. */
+export function unreadableLine({ here }: RunWords): string {
+  return `Quadit could not read which projects it runs on ${here}. It tries again in a moment.`;
 }
 
 /** What an entry is: the project and its folder. */
@@ -143,6 +162,10 @@ export class RunByQuadit {
   private more: HTMLParagraphElement;
   private another: HTMLButtonElement;
   private error: HTMLParagraphElement;
+  /** Who answers for the agent; null: not known, and nothing is offered. */
+  private owner: Owner | null = null;
+  /** Why nothing is offered, or nothing is shown (the list unreadable): one quiet line. */
+  private quiet: HTMLParagraphElement;
   /** The form while the person chooses; null otherwise. */
   private choosing: { form: HTMLFormElement; note: HTMLParagraphElement } | null = null;
 
@@ -166,24 +189,33 @@ export class RunByQuadit {
     );
     this.error = make("p", "", "card-error");
     this.error.setAttribute("role", "alert");
-    section.append(this.offer, this.list, this.more, this.error);
+    this.quiet = make("p", "", "run-said");
+    section.append(this.offer, this.list, this.more, this.quiet, this.error);
     this.element = section;
-    this.show(null);
+    this.show(null, null);
   }
 
-  /** Shows what Quadit runs for the tool's agent (`runs`), or nothing (null: the tool is not connected, or cannot be run). */
-  show(runs: RunsView | null) {
+  /**
+   * Shows what Quadit runs for the tool's agent (`runs`), or nothing (null:
+   * the tool is not connected, or cannot be run); `owner`, who answers for
+   * the agent (null: not known, and no run is offered).
+   */
+  show(runs: RunsView | null, owner: Owner | null) {
     this.runs = runs;
+    this.owner = owner;
     this.element.hidden = runs === null;
     if (!runs) {
       this.close();
       return;
     }
     const { entries, agent } = runs;
-    setText(this.offerText, offerLine(this.words, agent));
+    if (!owner || runs.unreadable) this.close();
+    setText(this.quiet, runs.unreadable ? unreadableLine(this.words) : owner ? "" : noOwnerLine(agent));
+    if (owner) setText(this.offerText, offerLine(this.words, agent, owner));
     this.offerButton.setAttribute("aria-label", `Run ${this.tool.name} by Quadit for a project`);
     this.another.setAttribute("aria-label", `Run ${agent} by Quadit for another project`);
-    if (this.choosing) setText(this.choosing.note, choosingNote(this.words, agent, this.chosenProject()));
+    if (this.choosing && owner)
+      setText(this.choosing.note, choosingNote(this.words, agent, this.chosenProject(), owner));
 
     // A row for each entry, kept while it is there; one gone takes its focus to the control that stays.
     const focusLost = [...this.rows.entries()].some(
@@ -226,12 +258,20 @@ export class RunByQuadit {
     if (focusLost) (entries.length > 0 ? this.another : this.offerButton).focus();
   }
 
-  /** Which of the parts show: the offer with no entry, the lines and what is under them with some, the form while choosing. */
+  /**
+   * Which of the parts show: the offer with no entry, the lines and what is
+   * under them with some, the form while choosing; with the list unreadable,
+   * only its line; with no one known to answer for the agent, the lines and
+   * why nothing is offered.
+   */
   private place() {
-    const some = (this.runs?.entries.length ?? 0) > 0;
-    this.offer.hidden = some || !!this.choosing;
+    const unread = !!this.runs?.unreadable;
+    const offered = !!this.owner && !unread;
+    const some = (this.runs?.entries.length ?? 0) > 0 && !unread;
+    this.offer.hidden = some || !!this.choosing || !offered;
     this.list.hidden = !some;
-    this.more.hidden = !some || !!this.choosing;
+    this.more.hidden = !some || !!this.choosing || !offered;
+    this.quiet.hidden = !this.quiet.textContent;
   }
 
   private newRow(entry: RunEntryView, agent: string): Row {
@@ -257,7 +297,7 @@ export class RunByQuadit {
 
   /** Asks the app for the entries now (after the person changed them). */
   private async refresh() {
-    this.show(await api().runEntries(this.tool.id));
+    this.show(await api().runEntries(this.tool.id), this.owner);
   }
 
   private async stop(entryId: string, control: HTMLButtonElement) {
@@ -278,7 +318,7 @@ export class RunByQuadit {
 
   /** Opens the form in the card: which project, which folder, and what that means. */
   private choose() {
-    if (this.choosing || !this.runs) return;
+    if (this.choosing || !this.runs || !this.owner) return;
     this.error.textContent = "";
     const { agent, entries } = this.runs;
     const id = `run-${this.tool.id}`;
@@ -330,7 +370,8 @@ export class RunByQuadit {
 
     const update = () => {
       start.disabled = !mayStart({ project: select.value, folder, busy });
-      setText(note, choosingNote(this.words, this.runs?.agent ?? agent, select.value || null));
+      if (this.owner)
+        setText(note, choosingNote(this.words, this.runs?.agent ?? agent, select.value || null, this.owner));
     };
     select.addEventListener("change", update);
     const go = async () => {

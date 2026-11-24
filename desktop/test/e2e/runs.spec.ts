@@ -26,7 +26,11 @@ test("Run by Quadit runs a connected Claude Code for a project in a folder, the 
   // quadit run refuses), and not the home folder or above it.
   const folder = testInfo.outputPath("game");
   mkdirSync(folder, { recursive: true });
-  const registry = join(computer.configDir, "runner.json");
+  // Where quadit keeps its registry: the folder of its logins, as the platform the test runs on has it.
+  const registry =
+    process.platform === "darwin"
+      ? join(computer.configDir, "runner.json")
+      : join(process.env.XDG_CONFIG_HOME || join(computer.home, ".config"), "quadit", "runner.json");
   const entries = () =>
     existsSync(registry)
       ? (

@@ -10,6 +10,10 @@ import { join } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
 
 const PAGE = `file://${join(__dirname, "../../out/pages/connect.html")}`;
+/** What the page calls this computer: it goes by the browser's platform, the one the test runs on. */
+const HERE = process.platform === "darwin" ? "this Mac" : "this computer";
+/** Who answers for the agent: the person signed in here. */
+const ME = { handle: "ann", me: true };
 
 /** What the stand-in answers; the test changes it through `window.stand`. */
 interface Stand {
@@ -20,7 +24,7 @@ interface Stand {
   /** The last line the page put on the clipboard. */
   copied?: string;
   /** What Quadit runs the tool for (RunsView); absent: Quadit cannot run it. */
-  runs?: { agent: string; entries: Record<string, unknown>[] } | null;
+  runs?: { agent: string; entries: Record<string, unknown>[]; unreadable?: true } | null;
   /** What the page asked Quadit to start and stop running. */
   started?: string[][];
   stopped?: string[];
@@ -323,14 +327,14 @@ test("a connected card offers Run by Quadit, chooses a project and a folder in t
 }) => {
   await open(page, {
     connected: true,
-    handshake: { state: "connected", listening: false },
+    handshake: { state: "connected", listening: false, owner: ME },
     runs: { agent: "@claude-code", entries: [] },
     slowMs: 0,
   });
   const card = page.getByRole("article", { name: "Claude Code" });
   await expect(
     card.getByText(
-      "Quadit can start Claude Code for you when you assign @claude-code a task or comment on one, in the project’s folder on this Mac.",
+      `Quadit can start Claude Code for you when you assign @claude-code a task or comment on one, in the project’s folder on ${HERE}.`,
     ),
   ).toBeVisible({ timeout: 10_000 });
 
@@ -415,7 +419,7 @@ test("while Quadit runs a project for the agent, the card asks no chat to listen
   // Served, though the server does not say it listens yet: no next step.
   await open(page, {
     connected: true,
-    handshake: { state: "connected", listening: false },
+    handshake: { state: "connected", listening: false, owner: ME },
     runs: { agent: "@claude-code", entries: [ready] },
     slowMs: 0,
   });
@@ -438,7 +442,8 @@ test("while Quadit runs a project for the agent, the card asks no chat to listen
   await expect(
     card.getByText("To have it listen to GS too, write “listen to Quadit for GS” in a chat in that project’s folder."),
   ).toBeVisible({ timeout: 10_000 });
-  await expect(card.getByText(/^Listening/)).toHaveCount(0);
+  // The status lines only: "Listening is not verified…" is there, hidden, on every card.
+  await expect(card.getByText(/^Listening/).filter({ visible: true })).toHaveCount(0);
   await expect(card.getByText(/while that chat is open/)).toHaveCount(0);
 
   // A chat listening to GS keeps its lines.
@@ -461,4 +466,69 @@ test("while Quadit runs a project for the agent, the card asks no chat to listen
     card.getByText(/^It answers what you assign to it or ask it in Quadit while that chat is open/),
   ).toBeVisible();
   await expect(card.getByText("Listening to Samurai vs Aliens, from Quadit's runner")).toHaveCount(0);
+
+  // A runner on another computer holds WEB, which this computer does not run: said, with that computer's name.
+  await page.evaluate(() => {
+    (window as unknown as { stand: Stand }).stand.handshake = {
+      state: "connected",
+      listening: true,
+      heard: {
+        listeners: [
+          { project: { key: "SVA", name: "Samurai vs Aliens" }, by: "Quadit's runner", runner: true },
+          { project: { key: "WEB", name: "Website" }, by: "Quadit's runner", runner: true, machine: "Bea's iMac" },
+        ],
+        pushed: false,
+        unheard: [],
+      },
+    };
+  });
+  await expect(card.getByText("Quadit runs WEB on Bea's iMac.")).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByText(/^Quadit runs SVA/)).toHaveCount(0);
+});
+
+test("a card offers no run of an agent someone else answers for without naming them, and none when it cannot tell", async ({
+  page,
+}) => {
+  await open(page, {
+    connected: true,
+    handshake: { state: "connected", listening: false, owner: { handle: "bob", me: false } },
+    runs: { agent: "@claude-code", entries: [] },
+    slowMs: 0,
+  });
+  const card = page.getByRole("article", { name: "Claude Code" });
+  await expect(
+    card.getByText(
+      `Quadit can start Claude Code under your account when @bob assigns @claude-code a task or writes to it on one, in the project’s folder on ${HERE}.`,
+    ),
+  ).toBeVisible({ timeout: 10_000 });
+  await card.getByRole("button", { name: "Run Claude Code by Quadit for a project" }).click();
+  await card.getByLabel("Which project?").selectOption("GS");
+  await expect(
+    card.getByText(
+      `Claude Code runs there with full access, under your account on ${HERE}, whenever @bob assigns @claude-code a task in GS or writes to it on one. Only @bob’s words, or those of @bob’s other agents, start it.`,
+    ),
+  ).toBeVisible();
+
+  await page.evaluate(() => {
+    (window as unknown as { stand: Stand }).stand.handshake = { state: "connected", listening: false };
+  });
+  await expect(
+    card.getByText("Quadit cannot tell who answers for @claude-code, so it does not offer to run it."),
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByRole("button", { name: "Run Claude Code by Quadit for a project" })).toBeHidden();
+  await expect(card.getByRole("button", { name: "Start running" })).toHaveCount(0);
+});
+
+test("a card says when it cannot read what Quadit runs, rather than offering to run it", async ({ page }) => {
+  await open(page, {
+    connected: true,
+    handshake: { state: "connected", listening: false, owner: ME },
+    runs: { agent: "@claude-code", entries: [], unreadable: true },
+    slowMs: 0,
+  });
+  const card = page.getByRole("article", { name: "Claude Code" });
+  await expect(
+    card.getByText(`Quadit could not read which projects it runs on ${HERE}. It tries again in a moment.`),
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByRole("button", { name: "Run Claude Code by Quadit for a project" })).toBeHidden();
 });

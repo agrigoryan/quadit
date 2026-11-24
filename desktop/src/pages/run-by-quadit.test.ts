@@ -4,14 +4,18 @@ import {
   choosingNote,
   entryLine,
   mayStart,
+  noOwnerLine,
   offerLine,
   statusLine,
+  unreadableLine,
   untilWords,
 } from "@/pages/run-by-quadit";
 import type { RunEntryView } from "@/shared/pages-api";
 
 const CLAUDE = { program: "Claude Code", here: "this Mac" };
 const CODEX = { program: "Codex", here: "this computer" };
+const ME = { handle: "ann", me: true };
+const BOB = { handle: "bob", me: false };
 
 function entry(status: RunEntryView["status"]): RunEntryView {
   return { id: "e5d2a91c", project: "SVA", folder: "~/devel/game", program: "claude", status, blocked: [] };
@@ -19,19 +23,35 @@ function entry(status: RunEntryView["status"]): RunEntryView {
 
 describe("Run by Quadit's words", () => {
   it("says what Quadit would do before it runs any project", () => {
-    expect(offerLine(CLAUDE, "@claude")).toBe(
+    expect(offerLine(CLAUDE, "@claude", ME)).toBe(
       "Quadit can start Claude Code for you when you assign @claude a task or comment on one, in the project’s folder on this Mac.",
     );
-    expect(offerLine(CODEX, "@codex")).toBe(
+    expect(offerLine(CODEX, "@codex", ME)).toBe(
       "Quadit can start Codex for you when you assign @codex a task or comment on one, in the project’s folder on this computer.",
     );
   });
 
+  it("names the person who answers for the agent when it is someone else, and its account as this person's", () => {
+    expect(offerLine(CLAUDE, "@claude", BOB)).toBe(
+      "Quadit can start Claude Code under your account when @bob assigns @claude a task or writes to it on one, in the project’s folder on this Mac.",
+    );
+    expect(choosingNote(CLAUDE, "@claude", "SVA", BOB)).toBe(
+      "Claude Code runs there with full access, under your account on this Mac, whenever @bob assigns @claude a task in SVA or writes to it on one. Only @bob’s words, or those of @bob’s other agents, start it.",
+    );
+  });
+
+  it("says why nothing is offered, or shown", () => {
+    expect(noOwnerLine("@claude")).toBe("Quadit cannot tell who answers for @claude, so it does not offer to run it.");
+    expect(unreadableLine(CODEX)).toBe(
+      "Quadit could not read which projects it runs on this computer. It tries again in a moment.",
+    );
+  });
+
   it("says, while choosing, what running there means and whose words start it", () => {
-    expect(choosingNote(CLAUDE, "@claude", "SVA")).toBe(
+    expect(choosingNote(CLAUDE, "@claude", "SVA", ME)).toBe(
       "Claude Code runs there with full access, as you, whenever you assign @claude a task in SVA or comment on one. Only your words, or those of your other agents, start it.",
     );
-    expect(choosingNote(CLAUDE, "@claude", null)).toContain("a task in the project or comment on one.");
+    expect(choosingNote(CLAUDE, "@claude", null, ME)).toContain("a task in the project or comment on one.");
   });
 
   it("lets Start running be pressed only with a project and a folder chosen, and nothing under way", () => {

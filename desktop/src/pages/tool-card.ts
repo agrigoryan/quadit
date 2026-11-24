@@ -120,6 +120,8 @@ export class ToolCard {
   private runs: RunByQuadit;
   /** The projects Quadit's runner serves for its agent now (ready, working, paused, or waiting for a chat), by key. */
   private served: string[] = [];
+  /** The projects Quadit runs its agent for on this computer, whatever each does now, by key. */
+  private local: string[] = [];
   /** Room under the card's text for what a page adds (Connect agents' More options). */
   readonly extra: HTMLDivElement;
 
@@ -203,7 +205,7 @@ export class ToolCard {
   markSetUp(setUp: boolean, handshake: Handshake | null = null) {
     this.setUp = setUp;
     this.handshake = setUp ? handshake : null;
-    if (!setUp) this.runs.show(null);
+    if (!setUp) this.runs.show(null, null);
     this.show();
     this.watch(handshake === null);
   }
@@ -263,12 +265,15 @@ export class ToolCard {
       this.actions.changed();
       return;
     }
-    this.runs.show(runs);
+    this.runs.show(runs, now.state === "connected" ? (now.owner ?? null) : null);
     const served = (runs?.entries ?? []).filter((e) => SERVED.has(e.status.state)).map((e) => e.project);
-    if (JSON.stringify([now, self, served]) === JSON.stringify([this.handshake, this.self, this.served])) return;
+    const local = runs?.unreadable ? this.local : (runs?.entries ?? []).map((e) => e.project);
+    const before = [this.handshake, this.self, this.served, this.local];
+    if (JSON.stringify([now, self, served, local]) === JSON.stringify(before)) return;
     this.handshake = now;
     this.self = self;
     this.served = served;
+    this.local = local;
     this.show();
     this.actions.changed();
   }
@@ -359,7 +364,7 @@ export class ToolCard {
       stands,
       handshake,
       stands === "waiting" ? (self?.proving ?? null) : null,
-      stands === "connected" ? this.served : null,
+      stands === "connected" ? [this.served, this.local] : null,
     ]);
     if (drawn === this.drawn) return;
     this.drawn = drawn;
@@ -383,7 +388,7 @@ export class ToolCard {
       return;
     }
     if (handshake?.state === "connected") {
-      const [lines, after] = this.listening(handshake, new Set(this.served));
+      const [lines, after] = this.listening(handshake, new Set(this.served), new Set(this.local));
       this.stand.replaceChildren(...lines);
       this.afterRuns.replaceChildren(...after);
       return;
@@ -455,11 +460,12 @@ export class ToolCard {
   private listening(
     handshake: Extract<Handshake, { state: "connected" }>,
     run: ReadonlySet<string>,
+    local: ReadonlySet<string>,
   ): [HTMLElement[], HTMLElement[]] {
     const { name, chatListens, mcpOnly } = this.tool;
     const { listening, heard } = handshake;
     if (listening === null) return [[make("p", "Cannot tell right now whether it is listening.", "listen")], []];
-    if (listening || run.size > 0) return heardLines(heard, !mcpOnly, run);
+    if (listening || run.size > 0) return heardLines(heard, !mcpOnly, run, local);
     const step = make("div", "", "next-step");
     step.setAttribute("role", "group");
     step.setAttribute("aria-label", `Next: have ${name} listen`);
@@ -505,7 +511,9 @@ export class ToolCard {
  * (`mayAdd`: not for a tool connected by MCP alone, which cannot listen).
  * A page of an older server says nothing of what listens: then only that
  * it listens. What Quadit's runner holds, and the projects `run` it serves,
- * are not said here: Run by Quadit's lines say them, and a runner is no chat;
+ * are not said here: Run by Quadit's lines say them, and a runner is no chat
+ * (one that holds a project this computer does not run, `local`, is another
+ * computer's: said as such);
  * while it serves one, how a chat adds another project goes under those
  * lines (the second list). Nothing to say: no lines.
  */
@@ -513,6 +521,7 @@ function heardLines(
   heard: Heard | undefined,
   mayAdd: boolean,
   run: ReadonlySet<string>,
+  local: ReadonlySet<string>,
 ): [HTMLElement[], HTMLElement[]] {
   const box = make("div", "", "listening");
   const on = (text: string) => {
@@ -536,6 +545,9 @@ function heardLines(
     const what = l.project ? l.project.name : own ? "everything else" : "everything";
     box.append(on(`Listening to ${what}${l.by ? `, from ${l.by}` : ""}`));
   }
+  for (const l of heard.listeners)
+    if (l.runner && l.project && !local.has(l.project.key))
+      box.append(on(`Quadit runs ${l.project.key} on ${l.machine ?? "another computer"}.`));
   if (pushed) box.append(on("A webhook pushes to it"));
   // Listening to a project the page does not show: only that it listens.
   if (!box.hasChildNodes() && !byRunner) box.append(on("Listening"));
