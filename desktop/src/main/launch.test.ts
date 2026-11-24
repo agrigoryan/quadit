@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ActivateAfterStart, coldStart, Quiet, secondStart } from "@/main/launch";
+import { ActivateAfterStart, coldStart, Quiet, secondStart, windowsToReopen } from "@/main/launch";
 
 const APP = ["/Applications/Quadit.app/Contents/MacOS/Quadit"];
 
@@ -81,5 +81,31 @@ describe("Quiet", () => {
     expect(said).toEqual([]);
     quiet.seen();
     expect(said).toEqual(["the first run"]);
+  });
+});
+
+describe("windowsToReopen", () => {
+  it("gives the servers that were open when the app last had windows", () => {
+    expect(
+      windowsToReopen([
+        { id: "a", open: true },
+        { id: "b", open: false },
+        { id: "c", open: true },
+      ]),
+    ).toEqual(["a", "c"]);
+  });
+
+  it("gives the only server when none was open: opening the app shows the workspace, not the list", () => {
+    expect(windowsToReopen([{ id: "a", open: false }])).toEqual(["a"]);
+  });
+
+  it("gives none with several servers and none open, or with no server: the list is shown", () => {
+    expect(
+      windowsToReopen([
+        { id: "a", open: false },
+        { id: "b", open: false },
+      ]),
+    ).toEqual([]);
+    expect(windowsToReopen([])).toEqual([]);
   });
 });

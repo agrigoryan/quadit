@@ -43,7 +43,7 @@ import { FirstConnect } from "@/main/first-connect";
 import { FirstRun } from "@/main/first-run";
 import { SignInFlows } from "@/main/handoff";
 import { HARNESSES } from "@/main/harnesses";
-import { ActivateAfterStart, coldStart, Quiet, secondStart } from "@/main/launch";
+import { ActivateAfterStart, coldStart, Quiet, secondStart, windowsToReopen } from "@/main/launch";
 import { LocalServer, loopbackPorts } from "@/main/local-server";
 import { appendLog } from "@/main/log-file";
 import { menuTemplate } from "@/main/menu";
@@ -473,17 +473,23 @@ function start() {
     else void offerToAdd(link.server).then((add) => add && list.invite(link.server, link.path));
   };
 
+  // The person opens the app and no window is on screen: their workspaces, as a start shows them, else the list.
+  const reopen = () => {
+    const ids = windowsToReopen(store.list());
+    if (ids.length === 0) list.show();
+    else for (const id of ids) windows.show(id);
+  };
   app.on("second-instance", (_event, argv) => {
     const asked = secondStart(argv, { windowShown: BrowserWindow.getAllWindows().some((win) => win.isVisible()) });
     if (asked.kind === "link") handleLink(asked.link);
     else if (asked.kind === "background") {
       quiet.background();
       if (list.localServer()) void local.startInBackground();
-    } else if (asked.kind === "list") list.show();
+    } else if (asked.kind === "list") reopen();
   });
   app.on("activate", () => {
     if (!activated.isThePersons()) return;
-    if (!BrowserWindow.getAllWindows().some((win) => win.isVisible())) list.show();
+    if (!BrowserWindow.getAllWindows().some((win) => win.isVisible())) reopen();
   });
   app.on("before-quit", () => {
     quitting.quitBegan();

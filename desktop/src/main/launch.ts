@@ -41,6 +41,19 @@ export function secondStart(
 }
 
 /**
+ * The servers whose windows the person gets when they open the app and no
+ * window is on screen (it was started at login or in the background): those
+ * that were open when it last had windows, else the only server there is.
+ * None: the list of servers is shown.
+ */
+export function windowsToReopen(servers: readonly { id: string; open: boolean }[]): string[] {
+  const open = servers.filter((server) => server.open);
+  if (open.length > 0) return open.map((server) => server.id);
+  const [only, ...others] = servers;
+  return only && others.length === 0 ? [only.id] : [];
+}
+
+/**
  * How long after a --background start an `activate` (macOS) is taken for
  * that start's own: macOS may send one as it launches the app, even started
  * hidden by `open -g -j`, and Electron says launching is among what sends

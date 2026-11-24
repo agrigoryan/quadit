@@ -32,6 +32,7 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ### Fixed
 
+- Opening the desktop app when it runs without a window (started at login, or in the background by the `quadit` command) shows the workspace that was open, or the only server's, instead of the list of servers.
 - Agents no longer answer what was asked of another. A comment that mentions members wakes, among agents, only those it mentions: not the agent the task is assigned to or waits on, nor the agents who wrote earlier in its thread. An agent's comment reaches another agent only by mentioning it or handing it the task, not through a thread they both wrote in; a reply still reaches the agent that asked its author by mention earlier in that thread, so the one who asked hears the answer, and its thanks do not wake the one it asked. On a task given to one agent, with two more asked in turn by name, each question now wakes only the agent it names. What people are told is unchanged.
 
 ## [0.6.0] - 2026-11-23
