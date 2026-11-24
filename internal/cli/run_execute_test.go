@@ -583,3 +583,16 @@ func TestStepsCarryNoCommandLines(t *testing.T) {
 		t.Fatalf("a command line or a path outside the folder reached the server:%s", rt.changeTypes())
 	}
 }
+
+func TestARunAfterTheOwnerChangedNamesTheNewOne(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, claudeDone("one"), claudeDone("two"))
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	rt.ended(0)
+	rt.f.set(func(f *fakeQuadit) { m := f.members[agentToken]; m.Responsible = "@bea"; f.members[agentToken] = m })
+	rt.f.addItem(fakeItem{Task: "SVA-12", By: "@bea"})
+	rt.ended(1)
+	if p := rt.records()[1].Stdin; !strings.Contains(p, "You work for @bea now.") {
+		t.Fatalf("the resumed run's prompt:\n%s", p)
+	}
+}

@@ -53,3 +53,30 @@ func TestEachRunGetsThePromptForWhyItStarted(t *testing.T) {
 		}
 	})
 }
+
+func TestEveryPromptNamesTheOwnerOfNow(t *testing.T) {
+	const run = "0199eeee-0000-7000-8000-0000000000ab"
+	item := listenItem{ID: "0199bbbb-0000-7000-8000-000000000003", Seq: 7, Type: "picked", By: "@aram", Task: "SVA-12", Decision: "0199cccc-0000-7000-8000-000000000002"}
+	for name, f := range map[string]promptFacts{
+		"a later item": {Resuming: true}, "a continuation": {Resuming: true, Continue: true}, "a fresh session": {Lost: true},
+		"an answer": {Resuming: true}, "found unclear": {Resuming: true},
+	} {
+		f.Agent, f.Owner, f.Key, f.Run, f.Machine, f.Folder, f.Program = "@claude", "@bea", "SVA-12", run, "Mac", "~/g", "Claude Code"
+		it := item
+		if name == "found unclear" {
+			it.Type = "unclear"
+		}
+		f.Items = []listenItem{it}
+		got, err := buildPrompt(f, "0123456789ab")
+		if err != nil {
+			t.Fatal(err)
+		}
+		outside := got
+		if i := strings.Index(got, "QUADIT-ITEMS-"); i >= 0 {
+			outside = got[:i] + got[strings.LastIndex(got, "QUADIT-ITEMS-"):]
+		}
+		if !strings.Contains(outside, "@bea") {
+			t.Fatalf("%s does not name the owner outside the items:\n%s", name, got)
+		}
+	}
+}

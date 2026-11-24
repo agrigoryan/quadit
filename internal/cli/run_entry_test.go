@@ -692,7 +692,9 @@ func TestAnAnswerThatDoesNotHoldTogetherIsNotActedOn(t *testing.T) {
 		rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
 		rt.f.addItem(fakeItem{Task: "OPS-12"})
 		rt.serve()
-		rt.eventually("the entry's error", func() bool { return readStatus(rt.files.status()).Entries[rt.entry.ID].Message == string(errServerWrong) })
+		rt.eventually("the entry's error", func() bool {
+			return readStatus(rt.files.status()).Entries[rt.entry.ID].Message == string(errServerWrong)
+		})
 		if len(rt.f.allRuns()) != 0 || len(rt.f.ackList()) != 0 || len(rt.records()) != 0 {
 			t.Fatal("an item of another project was acted on")
 		}
@@ -701,7 +703,9 @@ func TestAnAnswerThatDoesNotHoldTogetherIsNotActedOn(t *testing.T) {
 		rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
 		rt.f.addItem(fakeItem{Task: "SVA-12", Inner: 99999})
 		rt.serve()
-		rt.eventually("the entry's error", func() bool { return readStatus(rt.files.status()).Entries[rt.entry.ID].Message == string(errServerWrong) })
+		rt.eventually("the entry's error", func() bool {
+			return readStatus(rt.files.status()).Entries[rt.entry.ID].Message == string(errServerWrong)
+		})
 		if len(rt.f.allRuns()) != 0 || len(rt.f.ackList()) != 0 {
 			t.Fatal("an item whose seqs disagree was acted on")
 		}

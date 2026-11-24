@@ -310,7 +310,21 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 			}
 			return runEnding{state: core.AgentSessionFailed, reason: reason, resetsAt: time.UnixMilli(p.Until), line: "failed: " + pauseWords(p.Reason, e.prog.Title(), time.UnixMilli(p.Until))}
 		}
-		prompt, err := buildPrompt(promptFacts{Agent: e.me.Handle, Owner: e.me.Responsible, Key: r.key, Run: r.id, Machine: e.srv.machineNow().Name,
+		me, err := e.api.me(ctx)
+		if err != nil || me.UserID != e.reg.AgentID {
+			// Who the agent works for is read for each run: without it,
+			// nothing starts (the run waits, or the login is checked again).
+			if err == nil {
+				e.loginChanged.Store(true)
+				return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, line: "failed: the login is no longer the agent's"}
+			}
+			if end, ok := r.pauseWithin(ctx, e.srv.host.times.awayMax); !ok {
+				return end
+			}
+			attempt--
+			continue
+		}
+		prompt, err := buildPrompt(promptFacts{Agent: me.Handle, Owner: me.Responsible, Key: r.key, Run: r.id, Machine: e.srv.machineNow().Name,
 			Folder: e.label, Program: e.prog.Title(), Items: r.items, Resuming: resume != "", Continue: r.continuing && resume != "", Lost: lost}, randomHex(6))
 		if err != nil {
 			return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, ack: true, line: "failed: " + err.Error()}

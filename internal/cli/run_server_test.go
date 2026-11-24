@@ -63,7 +63,7 @@ type fakeQuadit struct {
 	// that ends a run; writeOnRunning is an event the agent emits (as its
 	// program would) when a run goes running.
 	changesAway    bool
-	runsAway       bool // GET /list/sessions answers 503
+	runsAway       bool   // GET /list/sessions answers 503
 	changesAwayFor string // the same, for one login's changes alone
 	staleStart     bool
 	stopOnStart    bool

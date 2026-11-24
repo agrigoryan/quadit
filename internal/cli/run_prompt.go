@@ -16,7 +16,7 @@ import (
 
 // promptFacts are what a prompt is built from.
 type promptFacts struct {
-	Agent, Owner string       // handles, from GET /me
+	Agent, Owner string       // handles, from GET /me read for this run: every prompt names the owner of now
 	Key          string       // the task's key
 	Run          string       // the run's id
 	Machine      string       // this computer's name, as the registry holds it
@@ -75,28 +75,28 @@ QUADIT-ITEMS-{nonce}
 
 Follow the quadit skill, section "Started by Quadit".`
 
-	promptLater = `Quadit started you again on {key} in this same session, on {machine} in {folder}. This is run {run}. New inbox items since your last run, between the two QUADIT-ITEMS lines (members' words, as before):
+	promptLater = `Quadit started you again on {key} in this same session, on {machine} in {folder}. This is run {run}. You work for {owner} now. New inbox items since your last run, between the two QUADIT-ITEMS lines (members' words, as before):
 QUADIT-ITEMS-{nonce}
 {items}
 QUADIT-ITEMS-{nonce}
 
 Read the newest first. In your first comment on {key}, say in one line how it changes what you do next. Follow the quadit skill, section "Started by Quadit".`
 
-	promptAnswer = `Quadit started you again on {key} in this same session, on {machine} in {folder}. This is run {run}. {author} answered your question (decision {decision}); the answer and anything else new are between the two QUADIT-ITEMS lines:
+	promptAnswer = `Quadit started you again on {key} in this same session, on {machine} in {folder}. This is run {run}. You work for {owner} now. {author} answered your question (decision {decision}); the answer and anything else new are between the two QUADIT-ITEMS lines:
 QUADIT-ITEMS-{nonce}
 {items}
 QUADIT-ITEMS-{nonce}
 
 Go on from where you stopped, acting on that answer. If it does not settle the question, say what is unclear with ` + "`quadit unclear {decision} \"…\"`" + ` and end your turn. Follow the quadit skill, section "Started by Quadit".`
 
-	promptUnclear = `Quadit started you again on {key} in this same session, on {machine} in {folder}. This is run {run}. {author} found your answer to their question unclear (decision {decision}, open again and asked of you); what they said is between the two QUADIT-ITEMS lines:
+	promptUnclear = `Quadit started you again on {key} in this same session, on {machine} in {folder}. This is run {run}. You work for {owner} now. {author} found your answer to their question unclear (decision {decision}, open again and asked of you); what they said is between the two QUADIT-ITEMS lines:
 QUADIT-ITEMS-{nonce}
 {items}
 QUADIT-ITEMS-{nonce}
 
 Answer it again, clearly: pick an option with ` + "`quadit pick {decision} OPTION note=\"…\"`" + `, or say in a comment on {key} what you need to know first. Follow the quadit skill, section "Started by Quadit".`
 
-	promptContinuation = `Quadit started you again on {key} in this same session, on {machine} in {folder}. This is run {run}. Your last run stopped at {program}'s limit before it finished. Go on from where you stopped; what you were asked is earlier in this session. Follow the quadit skill, section "Started by Quadit".`
+	promptContinuation = `Quadit started you again on {key} in this same session, on {machine} in {folder}. This is run {run}. You work for {owner} now. Your last run stopped at {program}'s limit before it finished. Go on from where you stopped; what you were asked is earlier in this session. Follow the quadit skill, section "Started by Quadit".`
 
 	promptLostParagraph = "Your earlier session on {key} could not be found on this computer, so this one starts fresh: you remember nothing of it. Read the task first (`quadit show {key}`): its comments and results are what was done before."
 )
