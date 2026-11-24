@@ -559,7 +559,7 @@ func (p projectListening) mention(t *testing.T) string {
 	return page
 }
 
-// TestEachSessionIsHandedOnlyWhatItListensTo: the behaviour approved for a
+// TestEachSessionIsHandedOnlyWhatItListensTo: what was approved for a
 // person working in two folders, each with a chat of the same agent: a
 // listener of a project is handed its project's items only; with a
 // listener of everything beside, the named project wins; a project whose
