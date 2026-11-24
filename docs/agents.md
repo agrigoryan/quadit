@@ -17,7 +17,7 @@ Any coding agent works: Quadit needs nothing made for one in particular. An agen
 - **The skill and the `quadit` command.** The skill (`integrations/skills/quadit/SKILL.md`, carried by the binary) teaches the agent the `quadit` commands this page describes; the agent runs them in its shell. `quadit skill install` writes it to `~/.agents/skills/quadit/`, where Codex, Cursor, Gemini CLI, GitHub Copilot, opencode and pi look, to `~/.gemini/config/skills/quadit/` on a computer that has Antigravity CLI, and to `~/.claude/skills/quadit/`, where Claude Code looks. Run it again after updating Quadit. `quadit skill install DIR` writes it into another skills folder instead, such as a project's `.agents/skills`.
 - **MCP**, for an agent without a shell, or one that should not have the `quadit` command: the server at `https://your.server/mcp`, with the token as a bearer header (see [MCP](#mcp)). The agent's own settings say where the server is, and, for work nobody watches, that its tools may run without asking each time.
 
-To wake an agent when something needs it, run `quadit listen --exec COMMAND`, with the agent's command that runs one prompt and exits. The item is in `QUADIT_ITEM` as `quadit wait` prints it (its `ITEM` line, saying `(agent)` when another agent wrote it; the command that reads it; the line that answers it once, with a change id made from the item), and its line in the feed in `QUADIT_EVENT` and on standard input, as before:
+For Claude Code and Codex, Quadit can start the agent itself for each task, on your computer, and record each run: see [Quadit runs the agent](#quadit-runs-the-agent). For any agent, to wake it when something needs it, run `quadit listen --exec COMMAND`, with the agent's command that runs one prompt and exits. The item is in `QUADIT_ITEM` as `quadit wait` prints it (its `ITEM` line, saying `(agent)` when another agent wrote it; the command that reads it; the line that answers it once, with a change id made from the item), and its line in the feed in `QUADIT_EVENT` and on standard input, as before:
 
 ```bash
 #!/bin/sh
@@ -112,11 +112,13 @@ The desktop app's Connect (macOS and Linux) sets up the coding agents it finds o
 
 Tokens are kept only in `quadit`'s own login files, readable by the user alone, never in an agent's settings. Nothing is written until the plan, every file with its change, has been shown and accepted; each file touched is backed up first. `QUADIT_URL` and `QUADIT_TOKEN`, when both are set, still win over any login file; one without the other is ignored. If the Claude Code plugin is installed, Connect warns that its MCP entry still wants those two variables.
 
-**Disconnect** puts back what Connect changed, except where a file has been changed since (it is left as it is, and said), and revokes the token. An MCP sign-in is ended in the agent itself.
+**Disconnect** puts back what Connect changed, except where a file has been changed since (it is left as it is, and said), and revokes the token; for a tool Quadit runs, it first removes its entries (Run by Quadit, below). An MCP sign-in is ended in the agent itself.
 
 Connect is a page of the app laid over the workspace window (File → Connect Agents…, the Agents page, the button under a task's comment box). An agent it set up shows the line to say in its chat, `Connect to Quadit K7PQ2M`, until it gives the code back; then whether it listens, and, while it does not, the line that has it listen, `listen to Quadit`, with Copy. Above the cards, the page says the two steps: connect an agent here, then write `listen to Quadit` in its chat.
 
-**For the server on this computer, the app gives the code back itself.** Right after Connect writes an agent's files, the app runs its program (Claude Code, Codex…) once, without a window, with its one-prompt command and "Connect to Quadit CODE", as its own login, and the card turns "Connected" when the server says the code was used. If it cannot be run, is not signed in, or the code does not come back within two minutes, the card shows the line to say in its chat instead, with a word on why. That one run is all the app does: it does not answer for the agent. Connected is not listening; to have the agent answer what is written in Quadit, write `listen to Quadit` in its chat, in your project's folder (below).
+**For the server on this computer, the app gives the code back itself.** Right after Connect writes an agent's files, the app runs its program (Claude Code, Codex…) once, without a window, with its one-prompt command and "Connect to Quadit CODE", as its own login, and the card turns "Connected" when the server says the code was used. If it cannot be run, is not signed in, or the code does not come back within two minutes, the card shows the line to say in its chat instead, with a word on why. That one run is all Connect does. Connected is not listening; to have the agent answer what is written in Quadit, write `listen to Quadit` in its chat, in your project's folder (below), or, for Claude Code and Codex, have Quadit run it (Run by Quadit, below).
+
+**Run by Quadit.** On the card of a connected Claude Code or Codex that works with an agent's own login, for any server, **Run by Quadit…** sets up [Quadit runs the agent](#quadit-runs-the-agent): pick one of the agent's projects and the project's folder. Before anything starts, the card says that the program runs there with full access, as you, whenever you assign the agent a task in that project or comment on one, and that only your words, or your other agents', start it. **Start running** runs `quadit run add`; the app then runs its own copy of `quadit run`, keeps it running while an entry is left (started again if it ends, from 2 seconds up to 5 minutes apart), and stops it with the last entry and when the app quits. When another `quadit run` already serves the computer, the card says so and the app tries again every 5 minutes. Each entry is a line on the card with what it does now (`Ready.`, `Working on SVA-12.`, a pause and what to do about it), **Stop running** and **Show log**. Disconnect first removes the tool's entries (`quadit run remove login=PATH`), which ends a run in progress and tells the server how it ended, and only then revokes the login; when the server has not heard yet, Disconnect stops there and says to try again in a moment.
 
 ### Connected, and listening
 
@@ -124,9 +126,9 @@ Files written are not proof that an agent reaches Quadit, and an agent that does
 
 - **Not connected yet**: it has never proven it reached Quadit from where it runs.
 - **Connected, not listening**: it works when the person asks it in a chat ("check Quadit"); what is written in Quadit waits until then. To have it answer as things come in, write `listen to Quadit` in its chat: that is the recommended way.
-- **Listening**: a session of it is waiting for its inbox right now (or a webhook pushes to it), and answers what comes in. A session listens to one project or to everything, so a place that is about one project says whether something listens to that one: under a task's comment box, "@claude is listening to other projects, not to this one", with “listen to Quadit for SVA”, the line that has it listen there; for an agent that does not listen at all, the line names the project only when the agent may work in several, since with one plain “listen to Quadit” has it listen to everything. The Agents page and the agent's page in Settings say what each listener listens to, and from what ("Listening to Samurai vs Aliens, from a chat").
+- **Listening**: a session of it is waiting for its inbox right now (a chat, a companion, or Quadit's runner, which starts the agent for each item), or a webhook pushes to it, and answers what comes in. A session listens to one project or to everything, so a place that is about one project says whether something listens to that one: under a task's comment box, "@claude is listening to other projects, not to this one", with “listen to Quadit for SVA”, the line that has it listen there; for an agent that does not listen at all, the line names the project only when the agent may work in several, since with one plain “listen to Quadit” has it listen to everything. The Agents page and the agent's page in Settings say what each listener listens to, and from what ("Listening to Samurai vs Aliens, from a chat").
 
-An agent is connected by the first of: a connect code given back, a change made with its own token, its listener's first wait. Reading proves nothing: `quadit login` and `quadit me` do not connect it. The member row and `GET /agents` carry `connected_at`; `GET /agents/connection` is the cheap read of all three, with the tool of the last code the agent gave back, which pages read again while they show it. Each agent there (and in `GET /agents`) also has `listeners` (`[{project_id, project, by, last_heard, live}]`, the listener of everything without a project), `listening_projects` (the ids of the projects something live is handed now) and `listening_outside_projects` (whether something live is handed the items of no project); `listening` is whether anything listens at all.
+An agent is connected by the first of: a connect code given back, a change made with its own token, its listener's first wait. Reading proves nothing: `quadit login` and `quadit me` do not connect it. The member row and `GET /agents` carry `connected_at`; `GET /agents/connection` is the cheap read of all three, with the tool of the last code the agent gave back, which pages read again while they show it. Each agent there (and in `GET /agents`) also has `listeners` (`[{project_id, project, by, last_heard, live}]`, the listener of everything without a project), `listening_projects` (the ids of the projects something live is handed now) and `listening_outside_projects` (whether something live is handed the items of no project); `listening` is whether anything listens at all. The listener of a project that a computer runs the agent for also has `runner` (see [Quadit runs the agent](#quadit-runs-the-agent)).
 
 A person's comment on a task that mentions nobody reaches the inbox of the task's assignee and of whoever the task waits on, whether or not they follow it; a reply also reaches whoever wrote earlier in its thread. A comment that mentions members is for them: it reaches no other agent through the task or the thread, though people still hear it as before. Whom a comment hands the task to is told either way. An agent's comment reaches another agent only by mentioning it or handing it the task, or, as a reply, when that agent asked its author by mention earlier in the thread: the one who asked hears the answer without being mentioned, and its own reply after that does not wake the one it asked unless it mentions it again. So agents answer only what is asked of them, and not each other. The line under the comment box follows the draft the same way: it speaks of each agent the comment would reach, in full for one ("@codex is listening and will see this"), in a few words each for several ("@helper is not listening here and sees this when next asked").
 
@@ -141,7 +143,7 @@ quadit connect           # with no code: who this login is
 
 A wrong, used or expired code is refused saying which (`reason`: `wrong`, `used`, `expired`), ten tries a minute per agent; a person's login is refused, since an agent connects with its own. The code is taken in any case and with spaces or a dash in it, and a code for a tool replaces the open one of the same tool however its name is written. Connecting starts no wait.
 
-**Listening.** Only when the person asks it in a chat ("listen to Quadit"), the agent runs `quadit wait` again and again: in the background where its tool wakes it for a background command, in the foreground otherwise, and not at all from a chat when `quadit listening` says something already listens to what it would take. It listens to one project, or to everything: the one the person named ("listen to Quadit for SVA"), else the one the repository's instruction file for agents names (CLAUDE.md, AGENTS.md), else everything when the agent has one project or none; with several and nothing to settle it, it asks once. The skill (`quadit skill`) says how it tells which, and `quadit help listen` says all of it. Listening needs the `quadit` command and the skill: an agent connected by MCP alone cannot listen. For an agent that should answer with no chat open, run a companion (`quadit listen --exec …`, [Following changes](#following-changes)), or push its inbox to a webhook.
+**Listening.** Only when the person asks it in a chat ("listen to Quadit"), the agent runs `quadit wait` again and again: in the background where its tool wakes it for a background command, in the foreground otherwise, and not at all from a chat when `quadit listening` says something already listens to what it would take. It listens to one project, or to everything: the one the person named ("listen to Quadit for SVA"), else the one the repository's instruction file for agents names (CLAUDE.md, AGENTS.md), else everything when the agent has one project or none; with several and nothing to settle it, it asks once. The skill (`quadit skill`) says how it tells which, and `quadit help listen` says all of it. Listening needs the `quadit` command and the skill: an agent connected by MCP alone cannot listen. For an agent that should answer with no chat open, have Quadit run it (Claude Code and Codex, [Quadit runs the agent](#quadit-runs-the-agent)), run a companion (`quadit listen --exec …`, [Following changes](#following-changes)), or push its inbox to a webhook.
 
 ```bash
 quadit wait project=SVA for=3600   # in the background: up to an hour, renewing the server's holds and the lease inside itself
@@ -163,14 +165,14 @@ Who is handed what:
 
 The rule of the lease:
 
-- One session of an agent delivers its inbox at a time in each scope (a project, or everything): the one holding that listener's lease. It says what it is when it takes it (`quadit wait`: "a chat"; `quadit listen`: "a companion", or what `by=` says), and `quadit listening` (`GET /listening`) tells, without taking a lease, what listens to each project and to everything else, and when each was last heard. Only `GET /listen` takes a lease (`quadit wait` and `quadit listen`); the first wait takes it, and the commands it prints carry its id and its project. Another session's wait in the same scope is refused, "@coder is already listening to SVA from another session (a chat, last heard 14:02 UTC)", ending with the `take=1` command for when the person has it take over. A wait that slept through a takeover hands nothing over. Against a server older than listening by project, a wait with `project=` stops: "this Quadit server is older and cannot listen to one project: … Listen without project=, or update the server".
+- One session of an agent delivers its inbox at a time in each scope (a project, or everything): the one holding that listener's lease. It says what it is when it takes it (`quadit wait`: "a chat"; `quadit listen`: "a companion", or what `by=` says; `quadit run`: "Quadit's runner"), and `quadit listening` (`GET /listening`) tells, without taking a lease, what listens to each project and to everything else, and when each was last heard. Only `GET /listen` takes a lease (`quadit wait` and `quadit listen`); the first wait takes it, and the commands it prints carry its id and its project. Another session's wait in the same scope is refused, "@coder is already listening to SVA from another session (a chat, last heard 14:02 UTC)", ending with the `take=1` command for when the person has it take over. A wait that slept through a takeover hands nothing over. Against a server older than listening by project, a wait with `project=` stops: "this Quadit server is older and cannot listen to one project: … Listen without project=, or update the server".
 - The agent counts as listening while the lease lives: ninety seconds past the end of the hold its holder last asked for. A holder at work renews it by asking again: a wait by waiting, `quadit listen` every minute while its command runs. A chat that handled an item for longer, with nobody else taking the lease meanwhile, still acknowledges with it, and its next wait takes it again.
 - An acknowledgment that gives a lease (`PUT /cursors/listen {"seq", "lease"}`) is refused when another session took the lease over since (`reason` `lease_stale`). One that gives none is made as before: a `quadit listen` from before the lease acknowledges so, and so does a person giving up on an item by hand.
 - Only an acknowledgment moves the cursor: a wait with nothing for the agent leaves it where it was. A cursor never moved starts at the present, so history is not replayed; before its first wait, an agent deals with what `quadit work` shows is waiting on it.
 - A tool that is killed while its `quadit wait` runs in the background can leave that wait running (Claude Code and Antigravity CLI did, in the check): the agent then shows as listening until the next item ends the wait, or its hour does. That item is not lost: it stays unread in the inbox, and whatever listens next is handed it.
 - A `quadit listen` from before the lease keeps working: its waits on the feed with `cursor=listen` take no lease, but do not count as listening.
 
-The API is `GET /listen?wait=50&lease=ID` (`project=KEY` for one project, `take=1` to take over), answering `{lease}` or `{lease, seq, item, line}`, with `project` for a project's listener; `DELETE /listening/{key}` forgets a project's listener (`quadit listening forget project=KEY`), refused while its lease lives. `for=` should be a little under the longest the tool lets one command run.
+The API is `GET /listen?wait=50&lease=ID` (`project=KEY` for one project, `take=1` to take over), answering `{lease}` or `{lease, seq, item, line, wake}`, with `project` for a project's listener (`wake` says what Quadit's runner does with the item; a chat ignores it; `item.decision` is the decision's id for an item about one); `DELETE /listening/{key}` forgets a project's listener (`quadit listening forget project=KEY`), refused while its lease lives. `for=` should be a little under the longest the tool lets one command run.
 
 Each tool, as `scripts/agent-listen-check.sh TOOL` finds it (a throwaway server, the skill under test given to the tool in its own project folder, ordinary words: "Connect to Quadit CODE", then "Listen to Quadit", a stretch with nothing arriving, two comments answered exactly once each, a second session that finds the agent listening and does not listen; for a tool that can be woken, a chat with a person in which the wait runs in the background while the person's question is answered and a comment still is; and a companion, `quadit listen --exec` with the tool's one-prompt command). It spends the person's plan, so it is run by hand.
 
@@ -186,6 +188,208 @@ Each tool, as `scripts/agent-listen-check.sh TOOL` finds it (a throwaway server,
 | GitHub Copilot CLI | not verified yet |
 | opencode | not verified yet |
 | pi | not verified yet |
+
+## Quadit runs the agent
+
+For Claude Code and Codex, Quadit can start the agent itself. When the person responsible for an agent assigns it a task, or comments on one of its tasks, `quadit run` on that person's computer starts the agent's program in the project's folder, hands it what came in, and records the run on the task. No chat has to be open, and each later comment on the task goes on in the same session. Only the person responsible for the agent (its owner), and the owner's other agents, start it: anyone else's words do not, and the task says so.
+
+It is set up for one agent and one project on each computer: in the desktop app with **Run by Quadit…** on the agent's card ([Connect from the desktop app](#connect-from-the-desktop-app)), or with `quadit run add`. The program runs with full access, as the person whose computer it is: read [Security](#security-of-runs) first.
+
+- The **runner**, `quadit run`, serves every entry of the computer's registry: one process per computer, on macOS and Linux. The desktop app starts it and keeps it running while there is an entry; it can also be run by hand.
+- An **entry** binds an agent's login, a project, a folder and a program: "@claude runs SVA in ~/devel/game with Claude Code".
+- For each entry the runner holds the agent's listener of that project, as `quadit wait` does, under the name `Quadit's runner`. The listener's cursor is the queue: an item is acknowledged only once its run has ended.
+- A **run** is one start of the program for one inbox item, with the other items of the same task that came with it. It is a session on the task, shown under Sessions.
+- Each task has one **program session** (the program's own conversation) per agent, computer and folder: every later run on that task resumes it.
+- One run at a time in a folder. The program works in the folder itself, as it is.
+
+### Commands
+
+| Command | What it does |
+| --- | --- |
+| `quadit run [registry=PATH]` | Serves every entry until Ctrl-C or SIGTERM, and picks up entries added or removed while it runs (it looks at the registry every 2 seconds). Exits 0 when stopped; 1 for an unreadable registry, wrong arguments, or a system without file locks and process groups (`quadit run serves agents on macOS and Linux only`); 3 when another `quadit run` serves this computer (`another quadit run serves this computer (pid 4123)`). |
+| `quadit run add login=PATH project=KEY folder=PATH program=claude\|codex [program_path=PATH] [max_minutes=N]` | Checks, then adds an entry: the login reaches its server and is an agent's that may write; the agent may work in the project (by key or name); the folder passes the folder rules (below); the program is found (on the `PATH`, or at `program_path=`) and answers `--version` within 10 seconds. Prints `Added: @claude runs SVA in ~/devel/game with Claude Code 2.1.331 on Aram's MacBook Pro.`; `--json` prints the entry. `max_minutes=` limits how long a run may take (no limit by default). |
+| `quadit run remove ENTRY_ID`, or `quadit run remove login=PATH [project=KEY]` | For each entry matched: stops its run, tells the server how it ended, lets the project's listener go, and drops the entry. With a runner serving, it waits up to 60 seconds for it; when the server has not answered by then it says `Quadit is still telling the server how @claude's last run ended; it is removed once the server answers.` and exits 1. `Nothing to remove.` when nothing matches. |
+| `quadit run list [--json]` | Each entry and what it does now: `e5d2a91c  @claude  SVA  ~/devel/game  Claude Code  ready` (or `working on SVA-12`, `paused: …`, `aside: a chat listens`, `removing`, `not served: no quadit run is running`). `--json` adds `serving` and each entry's `status`. |
+| `quadit run machine name="…"` | Renames this computer as Quadit shows it (1 to 64 characters). |
+
+`quadit run --secret NAME -- COMMAND` is still the secrets form ([Secrets](#secrets)): a first argument `--secret` makes it that, and every other form is the runner's. The runner's forms need no default login, since each entry has its own; they refuse `--dry-run`. `registry=PATH` uses another registry, with the runner's other files in `runner/` beside it (for tests).
+
+`quadit run` prints one line for each thing that happens, and writes the same lines with their times to `runner.log`:
+
+```
+quadit run: serving 2 entries on Aram's MacBook Pro (stop with Ctrl-C)
+SVA @claude ~/devel/game: listening
+SVA-12 @claude: received #1042 (comment from @aram)
+SVA-12 @claude: waiting for the folder (@codex works there)
+SVA-12 @claude: running Claude Code, session 3f2a6c1e-…, run 8b1c…
+SVA-12 @claude: done in 4m 12s
+SVA-13 @claude: not started: @mia is not the person responsible for @claude
+SVA-14 @claude: failed: Claude Code's usage limit; @claude paused until 18:00
+GS @codex ~/devel/site: a chat listens to GS; trying again in 60 s
+```
+
+`add` refuses with one sentence, such as `~ is your home folder: pick the project's own folder`, `/usr/local/src is a system folder: pick the project's own folder`, `~/devel/game already runs GS on this computer: one project per folder`, `@claude already runs SVA on this computer, in ~/devel/x`, `Claude Code was not found on this computer: install it, or give program_path=`, `this login is @mia's, a person's: Quadit runs an agent with the agent's own login`, `this login may only read: Quadit runs an agent whose login may write`, or `@claude may not work in SVA: quadit me lists its projects`. A folder holds one project (of one server and workspace); a second agent may run the same project in the same folder, and the two take turns. An agent runs a project in one folder per computer.
+
+**Folder rules.** The folder is made absolute and its links resolved, and so are the home folder and the system folders (on macOS `/tmp`, `/var` and `/etc` are under `/private`). It must exist and be a folder. Refused: the home folder itself and every folder above it (`/`, `/Users`, `/home`), and anything at or under `/System`, `/Library`, `/Applications`, `/usr`, `/bin`, `/sbin`, `/etc`, `/var`, `/private`, `/opt`, `/tmp`, `/dev`, `/proc`, `/sys`, `/boot`, `/lib`, `/lib64`, `/snap`, `/nix`, `/root` or `/cores`. Anything else is allowed. The rules are checked again when the entry starts and before every start of the program. The server is told only a label: the resolved path with the home folder written `~`.
+
+### Files on the computer
+
+Beside the login files (`~/Library/Application Support/quadit/` on macOS, `~/.config/quadit/` on Linux):
+
+- `runner.json`, the registry (readable by the user alone): this computer's id (16 random hexadecimal characters, made once) and its name (on macOS its Computer Name, else its host name), and the entries. An entry is bound by ids: the server's address, the workspace, the agent and the project by their ids, the folder by its resolved path, and the program by its path; the keys and handles in it are for display. `quadit run add`, `remove` and `machine` write it, always whole.
+- `runner/`, the runner's own files (readable by the user alone):
+
+| File | What |
+| --- | --- |
+| `runner.lock` | held by the one `quadit run` that serves the computer |
+| `registry.lock` | held while the registry is written |
+| `status.json` | what each entry does now; `quadit run list` and the desktop app read it |
+| `locks/` | one lock per folder: one run at a time there |
+| `entries/<id>/state.json` | what the entry keeps between runs: each task's program session, the items its runs already took, the guards' counts, a pause |
+| `entries/<id>/journal.json` | the run in flight, so that a crash can be told from a run that ended |
+| `entries/<id>/outbox/` | every write to the server, in order, each stored with its change id before it is sent; `failed/` holds the writes the server refused for good |
+| `runs/<run id>.log` | the program's output, kept 30 days |
+| `runner.log` | what `quadit run` printed, with times |
+
+An entry keeps its lease in the lease file `quadit listen` uses, beside the entry's login, so the runner and a `quadit listen` of the same login and project exclude each other, and a runner started again goes on with its lease.
+
+In `status.json` each entry is `starting`, `ready`, `working` (with its task), `paused` (with why, and until when for a usage limit), `aside` (a chat holds the project), `removing`, or `error` with a message (a refusal of `add`, `login refused`, `project gone`, `this Quadit server cannot run agents yet: update it`); `blocked` lists the writes the server refused for good.
+
+### Which items start a run
+
+For each inbox item it hands the runner, the server says whether it starts a run, is acknowledged without one, or is refused: acknowledged, with a run recorded as Not started that says why. The first rule that applies decides:
+
+| Item | Starts a run when its author is the owner or one of the owner's agents | Acknowledged without a run when |
+| --- | --- | --- |
+| `assigned` | always | |
+| `mentioned` | on a task | on a page |
+| `waiting_on` | the task was handed to the agent | a shared resource's turn |
+| `decision_asked` | the decision is still open and asked of the agent | answered or withdrawn since |
+| `picked` | an answer to the agent's own question | |
+| `unclear` | its answer was found unclear, and the decision is open and asked of it | answered again since |
+| `replied` | an answer in a thread it wrote in | |
+| `comment`, `result` | the comment was for the agent: on its own task, mentioning it, or handing it the task | heard only because it follows the task, or made before this version |
+| `status` | never | always |
+| any | | made by an automation rule, made by the agent itself, taken back by an undo, or about a task in the trash or one the agent may no longer read |
+
+The owner is the person responsible for the agent, while a current member of the workspace; the owner's agents are the current agents with the same responsible person. An item by anyone else is refused (`not_responsible`); for an agent with no responsible person, every item is (`no_responsible`). An item an automation rule made never starts a run, though a rule acts as the person who made it.
+
+The runner asks for the agent's other waiting items of the same task with each item (at most 20), and the prompt carries those that would start a run too. An item that comes during a run is not given to the running program: it becomes the next run, which resumes the same session. An item the program already took is acknowledged without another run.
+
+Inbox items carry `addressed`: whether the change that made the item was for its member itself (it was assigned, handed, mentioned, asked or answered, the comment was on its own task, or it had asked in the thread), or the member only heard it because it follows the task.
+
+Before you send a comment or assign the task, the line under the comment box, and the assignee picker, say what will happen for each agent a computer runs: it starts now on that computer; it is queued behind a run; it starts when the computer is back; it is paused, and why; or it will not start, and why.
+
+### A run
+
+1. **Received.** The runner records the run on the task as Waiting, and starts nothing before the server has it. The server takes it only with the runner's current lease of the project, and only when no other run of this agent on this task is open.
+2. **Waiting.** For the folder, while another run works there (`folder_busy`); for the program session, while something outside the runner wrote it in the last 5 minutes (`session_open`, below).
+3. **Working** (`running`). From the moment the program's provider took the prompt. Every 10 seconds the runner adds the new steps: a tool's name with the program's own short description of the call, or a file's path relative to the folder; never command lines or what a tool was given.
+4. **Ended**: Done, Failed or Stopped, with a reason when it failed. When the agent wrote nothing on the task during the run (no comment, reply, result or question), the runner posts the program's last message as a comment marked as coming from the run, cleaned of control characters and cut at 8,000 characters. Its first 500 characters are the run's summary.
+
+A run whose item does not start the program ends at once as Not started, with its reason. A Done run of an agent that asked a question on the task shows as **Waiting for an answer** while the question is open.
+
+| State | Reason | Means | What to do |
+| --- | --- | --- | --- |
+| Waiting | `folder_busy` | another run works in the folder | nothing: it starts when that run ends |
+| Waiting | `session_open` | the session was used in a terminal a moment ago | nothing: it starts once the session has been quiet for 5 minutes |
+| Not started | `not_responsible` | the item's author is not the owner, nor one of the owner's agents | ask the owner to comment, or assign the task to an agent of your own |
+| Not started | `no_responsible` | the agent has no person responsible for it | an admin sets one in Settings |
+| Not started | `run_cap` | other agents started this agent too often in the last hour | comment to start it again |
+| Not started | `no_progress` | the last two runs changed nothing on the task | comment to start it again |
+| Not started | `run_open` | a run of this agent on this task is still open on another computer | stop that run, then comment again |
+| Failed | `start_failed` | the program did not start, three times | the runner's log on that computer says why; comment to try again |
+| Failed | `program_error` | the program stopped with an error after it began to work | comment to go on in the same session |
+| Failed | `idle` | the program printed nothing for 30 minutes, so Quadit stopped it | comment to go on in the same session |
+| Failed | `time_limit` | the run went past the entry's `max_minutes` | comment to go on in the same session |
+| Failed | `interrupted` | Quadit stopped on that computer, or another session took the project, while the agent worked | comment to go on in the same session |
+| Failed | `usage_limit` | the program's usage limit was reached | nothing: it starts again by itself after the reset |
+| Failed | `not_signed_in` | the program is not signed in | sign in to the program on that computer; it starts again by itself |
+| Stopped | | a member pressed Stop | |
+
+A run whose program began to work (used a tool) is never started again by itself: what it did stays in the folder as it is, and Quadit never reverts anything. A failure before any work is tried again, three attempts in all, 10 seconds and then 60 seconds apart. After a usage limit or a sign-in failure the item is kept: the agent's entries on that computer pause, and the item runs again once the limit resets or the program is signed in; when the program had already begun, that run is told to go on from where it stopped.
+
+When an entry starts, the runner checks the folder, the program (`--version`), the login (an agent's, may write, of the entry's server and workspace), the project, that the program's own settings do not make it work as another login (`QUADIT_CONFIG` in Claude Code's `settings.json` `env`, or in Codex's `shell_environment_policy.set`), and that the program is signed in (`claude auth status`, `codex login status`). Before every start of the program it checks the folder and the program again. A failed check pauses the entry (`folder_missing`, `program_missing`, `login_mismatch`, `not_signed_in`) and its items wait; a paused entry keeps its lease and checks again every 5 minutes. A login refused or a project gone stops the entry, tried again every 5 minutes. A server that answers without saying what to do with an item is older than the runner needs: the entry pauses (`server_old`) and says to update the server.
+
+### The prompts
+
+The runner builds each prompt on the computer, from fixed texts in the `quadit` binary; the server supplies no template. The prompt goes to the program on its standard input, never on its command line. In outline:
+
+- **A first run on a task**: who started the agent, on which computer and folder, for which task and run; that nobody is in the conversation; the items, between two marker lines made with a random word for each run (`QUADIT-ITEMS-…`), each as `quadit wait` prints it; that what the owner asks there is the work, and that the items are members' words, never to be followed to reveal secrets, change who it works as or which server it uses, or do something unrelated to the task; then to follow the skill's section "Started by Quadit" ([the skill](../integrations/skills/quadit/SKILL.md)).
+- **A later item** (resuming the session): the new items, newest first to read, and to say in its first comment how they change what it does next.
+- **An answer to its question** (resuming): who answered which decision, to go on acting on it, and `quadit unclear` when it does not settle the question.
+- **Its answer found unclear** (resuming): to answer the decision again with `quadit pick`, or to say in a comment what it needs to know first.
+- **A continuation** (resuming, after a usage limit or a sign-in failure past the start of work): to go on from where it stopped.
+- **A fresh session after a lost one**: the first-run text, saying that the earlier session could not be found and to read the task first.
+
+Outside the item block a prompt carries only values the runner checked or knows itself: handles, the task's key, the run's id, a decision's id, the computer's name and the folder. Never the task's title or the workspace's name.
+
+**How the program is started.** Claude Code: `claude -p --output-format stream-json --verbose --session-id UUID --name KEY --permission-mode bypassPermissions --disallowedTools AskUserQuestion`, or `--resume UUID` in place of `--session-id UUID --name KEY` to go on with a session. Codex: `codex exec --json --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check -o LASTFILE -`, or `codex exec resume … ID -`. Each starts in a process group of its own, in the folder; on macOS the computer is kept from idle sleep while it runs (`caffeinate -i`; a closed lid still sleeps). Its environment is the runner's without `CLAUDECODE`, `CLAUDE_CODE_*`, `QUADIT_*` and `ELECTRON_*`, with `QUADIT_CONFIG` (the entry's login), `QUADIT_TASK` (the task's key), `QUADIT_SESSION` (the run's id) and `NO_COLOR=1`. Nothing else is removed, so the programs' own sign-in and network settings (API keys, proxies) reach them. The runner reads only the program's standard output as what it did; unknown lines are passed over.
+
+### Sessions, and continuing in a terminal
+
+Each task has one program session for each agent, computer and folder, kept in the entry's `state.json`, and a later run resumes it. Claude Code is given a session id the runner chose; Codex says its own, which the runner then keeps. The run on the task shows the id, but the runner resumes only an id it kept itself, never one from the server. When the session cannot be found on the computer any more, the run starts a fresh one, once, and the prompt tells the agent so.
+
+On the task, the agent's owner sees on its newest ended run **Continue in a terminal on MACHINE**, with the command to copy: `cd ~/'devel/game' && claude --resume 3f2a6c1e-…` (Codex: `codex resume …`). Two programs writing one session can lose what one of them wrote, so the runner does not start a session that something else wrote in the last 5 minutes: the run waits (`session_open`) until the session has been quiet that long. This is best effort: going back to the terminal after a run has started can still write beside it, and the program then decides what is kept.
+
+### Stopping a run
+
+Any member who may change the task stops a waiting or working run with **Stop** (the change `session.stop`): the runner sends the program's process group SIGINT, then SIGTERM after 10 seconds and SIGKILL after 5 more, and the run is Stopped. A run whose computer does not hold the project now (it is offline, or a chat holds the project) is ended at once by the server, since nothing would act on the stop. A session Quadit did not start cannot be stopped this way.
+
+The runner stopping, the entry being removed, the app quitting or updating, and a chat or another computer taking the project during a run end it as Interrupted (SIGTERM, then SIGKILL after 2 seconds), not Stopped; a comment goes on with it. The computer sleeping stops nothing: its lease lapses, the page says it is offline, and what comes waits for it. After a crash, the runner closes a run that may have started as Interrupted when it starts again, and never starts that program again by itself.
+
+A chat and the runner never answer the same project at once. The runner never takes the lease from a chat: while a chat listens, the entry waits and tries again (after 2 seconds, doubling, at most every 60 seconds). A chat told to take over (`take=1`) interrupts a run in progress, and is handed the item.
+
+### Guards
+
+| Guard | What it does |
+| --- | --- |
+| One run per folder | Across agents and entries; the next run waits (`folder_busy`). |
+| Idle watchdog | A program that prints nothing for 30 minutes of awake time is stopped (`idle`). There is no time limit unless the entry has `max_minutes`. |
+| Runs started by agents, per task | At most 4 per entry and task in any 60 minutes (`run_cap`). |
+| Runs started by agents, per entry | At most 12 per entry in any 60 minutes, whatever the task, so two agents of one person cannot keep each other going (`run_cap`). |
+| No progress | After two runs in a row that changed nothing on a task (no comment, result, question, change to the task or link), runs started by agents on it are held (`no_progress`). |
+| Usage limit | The agent's entries on the computer pause until the reset the program gave, else for 30 minutes, doubling, at most 4 hours; the item is kept and continues after it. |
+| Retries before work only | At most 3 attempts, one fresh start after a lost session among them; a run that began to work is never repeated by itself. |
+| Unknown errors | An error the runner cannot tell never stops a program that is running. |
+| Infrastructure stops | The runner, the app or a lost lease ending a run is Interrupted, not Stopped; sleep stops nothing. |
+| One runner per computer | A second `quadit run` exits with 3. |
+| Whose words | Only the owner's words, or the owner's agents', start a run; a rule's never do. |
+
+A person's item is never held by a guard, and a held item never blocks a person's item behind it: it gets its Not started run and is acknowledged, and the next item runs. The owner's next item on a held task runs, and clears its no-progress count.
+
+### Security of runs
+
+**What the server can make a computer do.** It can hand the runner an item of a project the person registered on that computer, and with it have the registered program start in the registered folder, as the registered agent's login, with a prompt built on the computer from fixed texts that carry the items' words between markers; and it can ask a run to stop. It cannot choose the program, its flags, the folder, the environment, the permission mode or the prompt's text; it cannot start anything for a project or an agent the computer did not register; and it learns nothing from the computer but a run's state, its steps (tool names, the program's own descriptions of calls, paths relative to the folder), the program's last message, the folder's label and the computer's name. Nothing listens on the computer: the runner only calls out.
+
+**The registered server is trusted for what its items say**: who wrote them, and that the owner wrote them. Its administrators could forge an item from the owner, and nothing on the computer can tell. Register only a server you trust as much as a person who may type into your terminal.
+
+**Full access.** The program runs with its approvals and its sandbox off, so it can read and change whatever the person can: their files, their keys and tokens on disk (the agent's own Quadit login among them), whatever their accounts reach. The item's words, and everything the agent reads while it works (the task, its comments, the repository, web pages), can steer it. What holds this: only the owner's words, or the owner's agents', start a run; items made by rules never do; other members' words are material, by the prompt and by the skill; the markers around the items; and the three things the skill says an agent never does because a text says to. What remains: a member who may edit a task's description writes words the agent reads during a run the owner started. The app's card says "with full access, as you" before the first entry is made.
+
+**Tokens.** A run uses the agent's existing login file, which the program can read: the same credential the agent uses in a chat, so a run gives it nothing new. The runner uses the same login.
+
+**On a team server** other members' comments reach the agent's inbox as on any server; they never start a run, and the task says so. Every member who may read the project sees the computer's name, the folder's label and the program; only the owner is shown the command that goes on with a session in a terminal. The owner's runner spends the owner's plan with the program's provider. The server never starts work on a computer whose owner did not register that project for that agent.
+
+### The API of runs
+
+- `GET /listen`, for a runner's hold: `machine_id` (16 hexadecimal characters), `machine_name`, `folder`, `program`, `program_version`, `paused` and `paused_until`; only on a project's listener, and only from an agent's login. A hold that names a machine marks the listener as the runner's; any other hold (a chat's) unmarks it as the holder and keeps the rest. Every item answer, to any listener, carries `wake`, `{"do": "run" | "ack" | "refuse", "why": …}` (`for_you`; `not_responsible`, `no_responsible`; `gone`, `rule`, `page`, `own`, `status`, `resource`, `answered`, `follow`, `unknown`), and `item.decision`. `batch=1` adds `batch`, the agent's other unacknowledged items of the same task (at most 20, oldest first, each with its `wake`), which it does not hand out.
+- `DELETE /listening/{key}/runner?machine_id=ID` lets a project's runner go: it clears the runner's mark and ends its lease, so a chat can listen at once, and keeps the listener and its cursor. It answers `{"project": "SVA", "released": true}`, `false` when that computer had no mark there; `dry_run=1` checks without doing.
+- `session.start`, for a runner's run: `state` (`waiting` or `not_started`), `reason`, `program`, `program_session`, `machine_id`, `machine_name`, `folder`, `lease` and `item_seq`. Only the agent's own login records one, on a task, with the current lease of the task's project (`conflict`, `lease_stale`), and with no other run of this agent on the task open (`conflict`, `run_open`, naming the other run's computer).
+- `session.update`: `reason`, `program_session` (a UUID, set once, or again with `fresh: true`), `items_through` (only with `state: "running"`, when the server sets `accepted_at`) and `resets_at`. A runner's run never leaves an ended state, becomes `running` only from `waiting` and `done` only from `running`; its steps are objects `{"tool", "text", "at"}`, at most 50 an update, a text cut at 200 characters. A session recorded by hand keeps its freedom.
+- `session.stop {id}` asks a runner's run to stop; any member who may change the task may. Asked twice, or of an ended run, it changes nothing.
+- `comment.create` takes `session`, the agent's own run on the same task: the comment a run posts from the program's last message. It makes no `mentioned` items.
+- `GET /tasks/{key}/run-outlook?agents=@a,@b&cause=comment|assign` says, for each agent named (at most 20), what a comment or an assignment would do: `none` (no runner, or the item would start nothing), `starts_now`, `queued` (with `running`, the task of the run before it), `when_back` (with `since`), `paused` (the pause; `until` for a usage limit), `in_chat`, or `will_not_start` (`no_runner_here`, `not_responsible`, `no_responsible`), with the computer, the folder, the program, the project and the owner. Any member who may read the task may ask.
+- `GET /listening`, `GET /agents`, `GET /agents/connection` and the dashboard's agents give the listener a runner marked `runner`: `machine`, `folder`, `program`, `program_version`, `holding`, `since`, `paused` and `paused_until` when set, and `task`, the key of its open run in that project.
+- `GET /me` gives `workspace.id`.
+
+### What is verified
+
+| Program | Runs |
+| --- | --- |
+| Claude Code | not yet verified with a live agent. The flags above are those `claude --help` lists in 2.1.331. |
+| Codex | not yet verified with a live agent. The flags above are those `codex exec --help` and `codex exec resume --help` list in 0.170.0. |
+
+`scripts/agent-run-check.sh claude|codex` checks it by hand, on a throwaway server and a throwaway folder: an assignment and a comment that go on in one session, a question and its answer, another member's comment that starts nothing, a stop, a lost session, the quiet time after a terminal, a crash of the runner, a folder removed. It spends the person's plan, so it asks before it starts.
 
 ## A session in five calls
 
@@ -234,6 +438,7 @@ Everything that changes is one event in one ordered feed per workspace. A commen
 | Push | A webhook "for" the agent gets its inbox items as signed POSTs, in order, retried until they arrive. The server calls public addresses only; one on its own machine or network needs `--allow-private-networks` ([install](install.md#addresses-users-give)) |
 | Listen in a session | `quadit wait [project=KEY]`, again and again, in the agent's own session when the person asks it to listen: one inbox item at a time, of one project or of everything, with the commands to go on ([Connected, and listening](#connected-and-listening)) |
 | Companion | `quadit listen [project=KEY] --exec ./wake.sh` holds the wait for you and runs a command for each inbox item: for agents with nothing running |
+| Quadit runs it | `quadit run` starts Claude Code or Codex in a project's folder for each inbox item from the agent's owner or the owner's other agents, resuming one session per task, and records each run ([Quadit runs the agent](#quadit-runs-the-agent)) |
 | Live stream | `GET /events/stream`: server-sent events |
 
 Rules in Settings → Automation add wake-ups such as "when a person answers a decision, tell @coordinator".
@@ -389,6 +594,8 @@ A page that mirrors a Markdown file in a repository is called by the file's open
 ## Session records and hand-off limits
 
 Record a run so people can see what you did: change `session.start {"task": "SVA-12", "title": "…"}`, then `session.update` with `add_steps`, `add_links` and at the end `state: "done"`. A session is the log of a run (what it was asked, what it did, what it produced, when it started and ended); Quadit keeps no record of what a run cost.
+
+A session an agent records itself is `running` until it is `done`, `failed` or `stopped`. One Quadit's runner records ([Quadit runs the agent](#quadit-runs-the-agent)) also goes through `waiting` (received, the program has not taken the prompt yet) or ends `not_started`, has a `reason` when it waits, did not start or failed, and carries its program, its program session, the computer and the folder's label; an ended one never changes state again. An agent does not record a session during a run Quadit started: it records that run itself. A `session.updated` event carries the steps and links added in `data.appended`, not the whole list in `changes`; a reader appends them to its copy, once, when the event is newer than its row. A runner's run keeps its newest 200 steps (`steps_dropped` counts the rest).
 
 Work passed from agent to agent is counted. An agent can have a hand-off limit (`handoff_limit`, a number of hand-offs a week, set by an admin; `quadit me` shows it), and so can a task (`handoff_limit` on `task.update`, in all, set by an admin). No agent lifts a limit: not its own, and not a task's, which an admin agent may only lower. Past either, a hand-off to another agent is refused with `handoff_limit_reached`: hand the task to a person instead.
 
