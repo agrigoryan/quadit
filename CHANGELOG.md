@@ -4,6 +4,8 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-23
+
 ### Added
 
 - Listening by project: `quadit wait project=KEY` and `quadit listen project=KEY` listen to one project, and the lines `wait` prints keep it. One session listens to each project at a time, and one to everything else; a project once listened to by itself keeps its items for its next listener instead of handing them to everything, until `quadit listening forget project=KEY` (`DELETE /listening/{key}`) gives them back. `quadit listening` says what listens to each project and what everything leaves out; against an older server, a wait with `project=` stops and says to listen without it.
@@ -14,7 +16,6 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 - Where a place is about one project, listening means listening to that project: under a task's comment box an agent that listens only to other projects says so, with “listen to Quadit for KEY”, and a not-listening agent's line names the project when the agent may work in several (with one, plain “listen to Quadit” has it listen to everything); a task's assignee and waiting-on pickers mark who listens to its project. The Agents page, an agent's page in Settings and the app's cards say what each listener listens to and from what ("Listening to Samurai vs Aliens, from a chat"), a webhook that pushes, and, in Settings, a project whose listener stopped and whose items wait.
 - A listening card in the app says how what listens stops (a chat when told, a companion with Ctrl-C) and how to add another project; the steps above the cards say the agent asks which project when it cannot tell.
-
 - The desktop app no longer starts connected agents by itself to answer what comes in: an agent answers what is written in Quadit from a chat told to listen ("listen to Quadit"). Connect still proves the connection by itself, running the agent's program once to give its connect code back for the server on this computer; the plan says so where that run has its checks off.
 - Connect agents and the first run's tools step say the two steps above the cards: connect an agent here, then write `listen to Quadit` in its chat, in your project's folder, the recommended way; without listening it sees what waits when asked in a chat ("check Quadit"). Connect agents also names the other ways: MCP (under More options), which cannot listen, a companion command, and a webhook.
 - A connected card that is not listening shows the line to write, `listen to Quadit`, with Copy, as its main step, and how its chat listens: in the background for Claude Code and Antigravity CLI, keeping the chat busy for Codex. Listening, it says what the agent answers, that one chat listens to a project (or to everything) at a time, and how to stop it. An agent connected by MCP alone says it cannot listen.
@@ -122,7 +123,8 @@ The first public release.
 - A desktop app for macOS, Windows and Linux (pre-release, not signed yet): a window for each server, sign-in through the browser, answers from a notification or the menu bar, quick capture, and Connect, which sets up Claude Code, Codex and other agent harnesses to work in Quadit.
 - Install with the install script, Homebrew, Docker (`ghcr.io/agrigoryan/quadit`), `.deb` and `.rpm` packages with a systemd service, or the archives on GitHub Releases.
 
-[Unreleased]: https://github.com/agrigoryan/quadit/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/agrigoryan/quadit/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.6.0
 [0.5.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.5.0
 [0.4.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.4.0
 [0.3.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.3.0
