@@ -225,7 +225,10 @@ function AgentsReach({
   return (
     <p className={LINE}>
       {outlooks.map((o) => (
-        <span key={o.agent}>{t(runPhrase(o), wordsOf(o, members))}</span>
+        // One line each: each names its own computer and reason, which run together badly.
+        <span key={o.agent} className="basis-full">
+          {t(runPhrase(o), wordsOf(o, members))}
+        </span>
       ))}
       {sentence("comment.reach.listeningMany", by.listening)}
       {sentence("comment.reach.notListeningMany", by.connected)}
