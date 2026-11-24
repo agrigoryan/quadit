@@ -1,5 +1,6 @@
 // What agents did on a task, shown in the task panel: their recorded
-// sessions (who, when, what they did step by step), and the
+// sessions and the runs Quadit started on a computer (who, in what state,
+// what they did step by step), and the
 // branches, commits and pull requests the work lives in, each with its state
 // and whether its checks pass.
 
@@ -19,8 +20,8 @@ import {
 } from "lucide-react";
 import { t, tMaybe } from "@/lib/i18n";
 import { useCan } from "@/data/access";
-import { useRows } from "@/data/selectors";
-import { isOpenSession, type AgentSession, type Task, type TaskLink } from "@/types/core";
+import { useOpenDecisions, useRows } from "@/data/selectors";
+import { isOpenSession, type AgentSession, type Decision, type Task, type TaskLink } from "@/types/core";
 import { BranchCommits } from "@/detail/branch-commits";
 import { linkName, useTaskLinks } from "@/detail/data";
 import { Section } from "@/detail/section";
@@ -114,15 +115,54 @@ function CodeLink({ link, readOnly }: { link: TaskLink; readOnly: boolean }) {
   );
 }
 
-function Sessions({ sessions }: { sessions: AgentSession[] }) {
+/**
+ * Each agent's newest run on the task and its newest run Quadit's runner
+ * started, by agent; `sessions` come newest first.
+ */
+function newestByAgent(sessions: AgentSession[]) {
+  const newest = new Map<string, string>();
+  const newestRun = new Map<string, string>();
+  for (const s of sessions) {
+    if (!newest.has(s.agent_id)) newest.set(s.agent_id, s.id);
+    if (s.machine_id && !newestRun.has(s.agent_id)) newestRun.set(s.agent_id, s.id);
+  }
+  return { newest, newestRun };
+}
+
+/**
+ * The task's sessions, open ones first, each newest first. A run is shown
+ * waiting for an answer (never stored: it is read from the task's questions
+ * here) when it is its agent's newest on the task, it is done, and that
+ * agent has asked a question on the task that is still open.
+ */
+function Sessions({ sessions, taskId }: { sessions: AgentSession[]; taskId: string }) {
   // The clock only has to run while a session is open.
   const ongoing = sessions.some(isOpenSession);
   const now = useNow(ongoing ? 15_000 : 600_000);
+  const open = useOpenDecisions()[taskId];
+  const { newest, newestRun } = useMemo(() => newestByAgent(sessions), [sessions]);
+  const ordered = useMemo(
+    () => [...sessions.filter(isOpenSession), ...sessions.filter((s) => !isOpenSession(s))],
+    [sessions],
+  );
+  const asked = (s: AgentSession) =>
+    newest.get(s.agent_id) === s.id && s.state === "done"
+      ? open
+          ?.filter((d) => d.created_by === s.agent_id)
+          .reduce<Decision | undefined>((last, d) => (last && last.created_at > d.created_at ? last : d), undefined)
+      : undefined;
   return (
     <Section title={t("taskwork.sessions")} meta={<span className="text-xs text-ink-3 tnum">{sessions.length}</span>}>
       <ul>
-        {sessions.map((s) => (
-          <SessionRow key={s.id} session={s} now={now} showAgent />
+        {ordered.map((s) => (
+          <SessionRow
+            key={s.id}
+            session={s}
+            now={now}
+            showAgent
+            question={asked(s)}
+            newestRun={newestRun.get(s.agent_id) === s.id}
+          />
         ))}
       </ul>
     </Section>
@@ -151,7 +191,7 @@ export function TaskWork({ task }: { task: Task }) {
           </ul>
         </Section>
       )}
-      {sessions.length > 0 && <Sessions sessions={sessions} />}
+      {sessions.length > 0 && <Sessions sessions={sessions} taskId={task.id} />}
     </>
   );
 }
