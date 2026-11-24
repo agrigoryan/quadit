@@ -26,13 +26,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  # Two jobs: published in the job that uploaded it, the site was not found
+  # by the deploy step a moment after its upload, three runs out of four.
+  build:
     # Pages is turned on once the repository is public; until then there is nothing to deploy to.
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/configure-pages@v6
@@ -49,5 +48,13 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5
