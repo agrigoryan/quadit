@@ -3,7 +3,7 @@
 // When the question is asked of the viewer, this is where the highlighter goes.
 
 import { useMemo, useRef, useState } from "react";
-import { Columns3, X } from "lucide-react";
+import { CircleSlash, Columns3, X } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { isMedia } from "@/data/files";
 import { useHotkeys } from "@/hooks/hotkeys";
@@ -11,8 +11,9 @@ import { t } from "@/lib/i18n";
 import type { Decision, DecisionOption } from "@/types/core";
 import { DecisionMentions } from "@/detail/mentions";
 import { Button, IconButton } from "@/ui/button";
+import { Input } from "@/ui/input";
 import { Markdown } from "@/ui/markdown";
-import { deleteDecision, markUnclear, pick } from "@/decisions/actions";
+import { closeDecision, deleteDecision, markUnclear, pick } from "@/decisions/actions";
 import type { CompareProps } from "@/decisions/compare-state";
 import { CompareView } from "@/decisions/compare-view";
 import { EditDecisionDialog } from "@/decisions/edit-decision-dialog";
@@ -37,6 +38,50 @@ import { NoteDialog, type NotePrompt } from "@/decisions/note-dialog";
 import { OptionCard } from "@/decisions/option-card";
 import { QuestionFiles } from "@/decisions/question-files";
 import { ThreadBody, ThreadToggle } from "@/decisions/thread";
+
+/** Opens the line that says a question is no longer needed: quiet, beside the ways to answer. */
+function CloseButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button variant="ghost" className="max-sm:h-10" onClick={onClick}>
+      <CircleSlash className="size-3.5" aria-hidden />
+      {t("decision.close")}
+    </Button>
+  );
+}
+
+/** The question is no longer needed: an optional line saying why, in place. Enter says so, Escape leaves it. */
+function CloseForm({ onClose, onCancel }: { onClose: (note: string) => void; onCancel: () => void }) {
+  const [note, setNote] = useState("");
+  return (
+    <form
+      className="mt-2 flex flex-wrap items-center gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onClose(note);
+      }}
+    >
+      <Input
+        autoFocus
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== "Escape") return;
+          e.stopPropagation();
+          onCancel();
+        }}
+        placeholder={t("decision.close.label")}
+        aria-label={t("decision.close.label")}
+        className="min-w-0 flex-1 basis-56 max-sm:h-10 max-sm:basis-full max-sm:text-base"
+      />
+      <Button type="submit" className="max-sm:h-10">
+        {t("decision.close.submit")}
+      </Button>
+      <Button variant="ghost" className="max-sm:h-10" onClick={onCancel}>
+        {t("common.cancel")}
+      </Button>
+    </form>
+  );
+}
 
 /** Splits each option's files into what can be looked at (before and after pictures joined into pairs) and everything else. */
 function splitFiles(files: OptionFiles): { media: OptionFiles; docs: OptionFiles } {
@@ -75,6 +120,9 @@ export function DecisionBlock({ decision, answerKey = false }: Props) {
   const [editing, setEditing] = useState(false);
 
   const open = decision.state === "open";
+  // A question no longer needed reads as history: what was asked and why it was closed, not its options.
+  const closed = decision.state === "not_needed";
+  const [closing, setClosing] = useState(false);
   const choice = decision.kind === "choice";
   const thread = options.find((o) => o.id === threadOf);
   const article = useRef<HTMLElement>(null);
@@ -174,7 +222,7 @@ export function DecisionBlock({ decision, answerKey = false }: Props) {
         <p className="mt-2 text-sm text-ink-2">{t("decision.askedOf", { name: askedName })}</p>
       )}
 
-      {choice && options.length > 0 && (
+      {choice && options.length > 0 && !closed && (
         <div
           className={cx(
             "mt-3 flex gap-3 max-sm:snap-x max-sm:snap-mandatory max-sm:overflow-x-auto max-sm:p-px sm:grid",
@@ -236,7 +284,8 @@ export function DecisionBlock({ decision, answerKey = false }: Props) {
               {t("decision.none")}
             </Button>
           )}
-          {allMedia.length > 0 && (
+          {viewer.canClose && !closing && <CloseButton onClick={() => setClosing(true)} />}
+          {allMedia.length > 0 && !closed && (
             <Button variant="ghost" className={cx("max-sm:h-10", !viewer.canAnswer && "-ml-2")} onClick={sideBySide}>
               <Columns3 className="size-4" aria-hidden />
               {t("decision.compare")}
@@ -248,10 +297,20 @@ export function DecisionBlock({ decision, answerKey = false }: Props) {
       ) : (
         <>
           {viewer.canAnswer && <ApprovalControls decision={decision} viewer={viewer} />}
-          <div className="mt-1.5 -ml-1.5">
+          <div className="mt-1.5 -ml-1.5 flex flex-wrap items-center gap-1">
             <ThreadToggle decision={decision} open={talk} onToggle={() => setTalk((v) => !v)} />
+            {viewer.canClose && !closing && <CloseButton onClick={() => setClosing(true)} />}
           </div>
         </>
+      )}
+      {closing && (
+        <CloseForm
+          onCancel={() => setClosing(false)}
+          onClose={(note) => {
+            closeDecision(decision, note);
+            setClosing(false);
+          }}
+        />
       )}
       {talk && (
         <ThreadBody

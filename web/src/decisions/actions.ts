@@ -3,7 +3,7 @@
 
 import type { Changes } from "@/types/changes.gen";
 import { newId } from "@/lib/ids";
-import { mutate, send } from "@/data/mutate";
+import { type ChangeSpec, mutate, send } from "@/data/mutate";
 import { after } from "@/lib/rank";
 import type { FileRole } from "@/decisions/data";
 import { getRows } from "@/data/selectors";
@@ -47,6 +47,28 @@ export function answering(decision: Decision, answer: Answer): Batch {
 export function pick(decision: Decision, answer: Answer) {
   const batch = answering(decision, answer);
   send(batch.changes, batch.show);
+}
+
+/**
+ * Says an open or sent-back question is no longer needed, with a note when
+ * one is given: it is settled without an answer, and stays in the task's
+ * history (deleting it is for a question asked by mistake). Shown at once;
+ * a refusal is shown.
+ */
+export function closeDecision(decision: Decision, note: string) {
+  const said = note.trim();
+  const args: { id: string; note?: string } = { id: decision.id };
+  if (said) args.note = said;
+  // decision.close comes with the server's commit that adds it; until types/changes.gen.ts has it, it is named here.
+  const change = { type: "decision.close", args } as unknown as ChangeSpec;
+  send(change, (tx) =>
+    tx.patch("decisions", decision.id, {
+      state: "not_needed",
+      outcome_note: said || null,
+      decided_by: meId(),
+      decided_at: Date.now(),
+    }),
+  );
 }
 
 /** The asker says the answer does not settle it: the decision opens again for whoever answered. */

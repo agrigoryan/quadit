@@ -22,7 +22,7 @@ export interface DecisionView {
   task?: string;
   kind: "choice" | "approval";
   question: string;
-  state: "open" | "picked" | "sent_back";
+  state: "open" | "picked" | "sent_back" | "not_needed";
   by: string;
   asked?: string;
   picked_label?: string;

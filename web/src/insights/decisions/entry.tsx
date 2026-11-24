@@ -4,7 +4,7 @@
 // that decision.
 
 import { memo } from "react";
-import { Check, Pin, ThumbsUp, Undo2 } from "lucide-react";
+import { Check, Minus, Pin, ThumbsUp, Undo2 } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { isMedia } from "@/data/files";
@@ -28,6 +28,7 @@ import { Ago } from "@/ui/ago";
 
 const SHOWN_OPTIONS = 4;
 
+/** Where the question stands; `mine` when it waits on me (asked of me, or sent back to me as its asker). */
 function StateBadge({ decision, mine }: { decision: Decision; mine: boolean }) {
   const approval = decision.kind === "approval";
   if (decision.state === "open") {
@@ -39,22 +40,25 @@ function StateBadge({ decision, mine }: { decision: Decision; mine: boolean }) {
   }
   if (decision.state === "picked")
     return <Badge tone="ok">{approval ? t("decision.state.approved") : t("decision.state.picked")}</Badge>;
-  return <Badge tone="danger">{approval ? t("decision.state.declined") : t("decision.state.sentBack")}</Badge>;
+  if (decision.state === "not_needed") return <Badge>{t("decision.state.notNeeded")}</Badge>;
+  return (
+    <Badge tone={mine ? "move" : "wait"}>
+      {approval ? t("decision.state.declined") : t("decision.state.sentBack")}
+    </Badge>
+  );
 }
 
-/** The mark at the start of an entry: a question still open, an answer, or one sent back. */
+/** The mark at the start of an entry: a question still open, an answer, one sent back, or one no longer needed. */
 function StateMark({ decision, mine }: { decision: Decision; mine: boolean }) {
   if (decision.state === "open") return <DecisionMark mine={mine} className="size-4" />;
-  const sentBack = decision.state === "sent_back";
+  const look = {
+    sent_back: { tone: "bg-wait-soft text-wait", icon: <Undo2 className="size-3" strokeWidth={2.5} /> },
+    not_needed: { tone: "bg-sunken text-ink-3", icon: <Minus className="size-3" strokeWidth={2.5} /> },
+    picked: { tone: "bg-ok-soft text-ok", icon: <Check className="size-3" strokeWidth={3} /> },
+  }[decision.state];
   return (
-    <span
-      aria-hidden
-      className={cx(
-        "flex size-4.5 items-center justify-center rounded-full",
-        sentBack ? "bg-danger-soft text-danger" : "bg-ok-soft text-ok",
-      )}
-    >
-      {sentBack ? <Undo2 className="size-3" strokeWidth={2.5} /> : <Check className="size-3" strokeWidth={3} />}
+    <span aria-hidden className={cx("flex size-4.5 items-center justify-center rounded-full", look.tone)}>
+      {look.icon}
     </span>
   );
 }
@@ -111,15 +115,23 @@ function Answer({ decision }: { decision: Decision }) {
     );
   }
   const option = pickedOption(decision);
+  const closed = decision.state === "not_needed";
   return (
     <div className="mt-1.5 text-sm">
-      <p className="flex flex-wrap items-baseline gap-x-2">
-        <span className="font-medium">{t(`decision.outcome.${outcomeOf(decision)}`)}</span>
-        {option && <span className="text-ink-2">{option.label}</span>}
-      </p>
+      {!closed && (
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <span className="font-medium">{t(`decision.outcome.${outcomeOf(decision)}`)}</span>
+          {option && <span className="text-ink-2">{option.label}</span>}
+        </p>
+      )}
       {decision.outcome_note && (
         <p className="mt-1 line-clamp-3 border-l-2 border-line-strong pl-2.5 whitespace-pre-line text-ink-2">
           {decision.outcome_note}
+        </p>
+      )}
+      {decision.state === "sent_back" && (
+        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-ink-2">
+          {rich(t("decision.sentBackWaits"), { name: <Who userId={decision.created_by} /> })}
         </p>
       )}
     </div>
@@ -128,7 +140,6 @@ function Answer({ decision }: { decision: Decision }) {
 
 interface Props {
   entry: Entry;
-  meId: string;
   /** Files of every option, by option id. */
   files: Dict<Attached[]>;
   /** The standing preference already made from this decision. */
@@ -138,11 +149,11 @@ interface Props {
   onMake: (entry: Entry) => void;
 }
 
-export const DecisionEntry = memo(function DecisionEntry({ entry, meId, files, preference, canMake, onMake }: Props) {
+export const DecisionEntry = memo(function DecisionEntry({ entry, files, preference, canMake, onMake }: Props) {
   const { decision, task, project } = entry;
   const link = useTaskLink(task);
   const open = decision.state === "open";
-  const mine = open && decision.asked_id === meId;
+  const mine = entry.standing === "yours";
   const options = optionsOf(decision);
   const picture = (o: DecisionOption) => files[o.id]?.find((a) => isMedia(a.file))?.file;
   const tall = options.some((o) => !!picture(o));
@@ -216,7 +227,9 @@ export const DecisionEntry = memo(function DecisionEntry({ entry, meId, files, p
           </span>
           {!open && decision.decided_by && (
             <span className="flex flex-wrap items-center gap-x-1.5">
-              {rich(t("declog.answered.line"), { name: <Who userId={decision.decided_by} capital /> })}
+              {rich(t(decision.state === "not_needed" ? "decision.closedBy" : "declog.answered.line"), {
+                name: <Who userId={decision.decided_by} capital />,
+              })}
               {decision.decided_at && (
                 <time className="text-ink-3 tnum" title={exact(decision.decided_at)}>
                   <Ago ms={decision.decided_at} />
@@ -233,8 +246,9 @@ export const DecisionEntry = memo(function DecisionEntry({ entry, meId, files, p
               {t("prefs.isStanding")}
             </span>
           ) : (
+            // Only an answer picked makes a rule: one sent back or no longer needed settled nothing to keep.
             canMake &&
-            !open && (
+            decision.state === "picked" && (
               <Button
                 variant="ghost"
                 size="sm"

@@ -61,10 +61,11 @@ export function mentionable(decisions: Decision[], tasks: Dict<Task>): Found[] {
 
 /** What was decided, in a word or two: the picked option's label, "Approved", "Declined"; nothing while it is open. */
 export function answerOf(decision: Decision): {
-  kind: "open" | "picked" | "approved" | "declined" | "sent_back";
+  kind: "open" | "picked" | "approved" | "declined" | "sent_back" | "not_needed";
   label?: string;
 } {
   if (decision.state === "open") return { kind: "open" };
+  if (decision.state === "not_needed") return { kind: "not_needed" };
   if (decision.state === "sent_back" || decision.outcome === "none") return { kind: "sent_back" };
   if (decision.outcome === "approved") return { kind: "approved" };
   if (decision.outcome === "declined") return { kind: "declined" };

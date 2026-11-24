@@ -1,5 +1,7 @@
 // The decision log: every question asked on a task, with what was shown,
-// what was picked and why, newest first; and beside it the standing
+// what was picked and why, newest first, in three groups: those waiting on
+// me (asked of me, or sent back to me), those waiting on others, and the
+// settled (answered, or no longer needed); and beside it the standing
 // preferences that answers have been turned into. All of it is read from
 // the store, so it changes as decisions are asked and answered.
 
@@ -9,7 +11,6 @@ import { useSearchParams } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
-import { useMe } from "@/data/selectors";
 import { usePageTitle } from "@/lib/ui-state";
 import { useAttachmentsBySubject } from "@/detail/data";
 import { Button } from "@/ui/button";
@@ -20,6 +21,7 @@ import {
   isFiltered,
   matches,
   noFilters,
+  STANDINGS,
   STATES,
   type StateFilter,
   useEntries,
@@ -45,7 +47,6 @@ function fromAddress(params: URLSearchParams): Filters {
 
 export function DecisionLogPage() {
   usePageTitle(t("declog.title"));
-  const me = useMe();
   const entries = useEntries();
   const prefs = usePreferences();
   const files = useAttachmentsBySubject("decision_option");
@@ -113,19 +114,36 @@ export function DecisionLogPage() {
             )
           ) : (
             <>
-              <ul>
-                {shown.map((entry) => (
-                  <DecisionEntry
-                    key={entry.decision.id}
-                    entry={entry}
-                    meId={me.user_id}
-                    files={files}
-                    preference={prefs.byDecision[entry.decision.id]}
-                    canMake={canEdit}
-                    onMake={(e) => setMaking({ entry: e })}
-                  />
-                ))}
-              </ul>
+              {/* Where each question stands for me: waiting on me, on others, or settled; each a list of its own. */}
+              {STANDINGS.map((standing) => {
+                const group = shown.filter((e) => e.standing === standing);
+                if (group.length === 0) return null;
+                return (
+                  <section key={standing} aria-labelledby={`declog-${standing}`}>
+                    <h2
+                      id={`declog-${standing}`}
+                      className="sticky top-0 z-[2] flex h-8 items-center gap-2 border-b border-line bg-sunken px-4 text-xs font-medium text-ink-2"
+                    >
+                      {t(`declog.state.${standing}`)}
+                      <span className="font-normal text-ink-3 tnum">
+                        {count(found.filter((e) => e.standing === standing).length)}
+                      </span>
+                    </h2>
+                    <ul>
+                      {group.map((entry) => (
+                        <DecisionEntry
+                          key={entry.decision.id}
+                          entry={entry}
+                          files={files}
+                          preference={prefs.byDecision[entry.decision.id]}
+                          canMake={canEdit}
+                          onMake={(e) => setMaking({ entry: e })}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
               {found.length > shown.length && (
                 <div className="flex justify-center py-3">
                   <Button onClick={() => setLimit((n) => n + PAGE)}>

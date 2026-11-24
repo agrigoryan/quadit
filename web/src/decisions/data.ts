@@ -10,14 +10,17 @@ import type { Comment, Decision, DecisionOption, FileRow, Member, SubjectType } 
 
 const byRank = (a: { rank: string }, b: { rank: string }) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : 0);
 
-/** A task's decisions: the open ones first, each group in the order asked. */
+/** Whether a question is settled: answered with a pick, or no longer needed. One sent back still waits on its asker. */
+const settled = (d: Decision) => d.state === "picked" || d.state === "not_needed";
+
+/** A task's decisions: those not settled (open, or sent back) first, each group in the order asked. */
 export function useTaskDecisions(taskId: string): Decision[] {
   const decisions = useRows("decisions");
   return useMemo(
     () =>
       decisions
         .filter((d) => d.task_id === taskId)
-        .sort((a, b) => Number(a.state !== "open") - Number(b.state !== "open") || byRank(a, b)),
+        .sort((a, b) => Number(settled(a)) - Number(settled(b)) || byRank(a, b)),
     [decisions, taskId],
   );
 }
@@ -141,6 +144,12 @@ export interface Viewer {
   canReopen: boolean;
   /** I may comment on it: the task is not in the trash and I may change it. */
   canComment: boolean;
+  /**
+   * I may say it is no longer needed: it is open or sent back, and I asked
+   * it, was asked it, answer for the agent that asked it, or run the
+   * workspace (the server's rule for decision.close).
+   */
+  canClose: boolean;
 }
 
 export function useViewer(decision: Decision): Viewer {
@@ -156,6 +165,13 @@ export function useViewer(decision: Decision): Viewer {
   const askedOther = !!decision.asked_id && decision.asked_id !== me.user_id;
   const forChange = decision.kind === "approval" && !!decision.action;
   const barred = (me.kind === "agent" || forChange) && askedOther;
+  const asker = useMember(decision.created_by);
+  const unsettled = open || decision.state === "sent_back";
+  const mayClose =
+    isAsker ||
+    decision.asked_id === me.user_id ||
+    can.administer ||
+    (asker?.kind === "agent" && asker.responsible_id === me.user_id);
   return {
     isAsker,
     mine: open && decision.asked_id === me.user_id,
@@ -164,7 +180,26 @@ export function useViewer(decision: Decision): Viewer {
     canDelete: write && open && can.editMadeBy(decision.created_by, task?.project_id),
     canReopen: write && !open && isAsker,
     canComment: write,
+    canClose: write && unsettled && mayClose,
   };
+}
+
+/** Where a question stands for a person: waiting on them, waiting on someone else, or settled. */
+export type DecisionStanding = "yours" | "others" | "settled";
+
+/**
+ * Where a question stands for `meId`. An open one waits on whom it was
+ * asked of; one sent back waits on whoever asked it (to ask again or carry
+ * on), never on the one who sent it back; one picked or no longer needed
+ * is settled.
+ */
+export function standingOf(
+  decision: Pick<Decision, "state" | "asked_id" | "created_by">,
+  meId: string,
+): DecisionStanding {
+  if (decision.state === "open") return decision.asked_id === meId ? "yours" : "others";
+  if (decision.state === "sent_back") return decision.created_by === meId ? "yours" : "others";
+  return "settled";
 }
 
 /** How someone is named in a sentence: a person by name, an agent by handle. */

@@ -246,7 +246,12 @@ export type Decision = {
   action_args?: Record<string, unknown>;
   /** When the approved change ran. */
   action_used_at?: number;
-  state: "open" | "picked" | "sent_back";
+  /**
+   * open: waits on whom it was asked of. sent_back: answered with a note
+   * and no pick: waits on whoever asked, to ask again or carry on.
+   * picked and not_needed (closed without an answer) are settled.
+   */
+  state: "open" | "picked" | "sent_back" | "not_needed";
   asked_id?: string;
   unclear_note?: string;
   recommended_option_id?: string;

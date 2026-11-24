@@ -4,7 +4,8 @@
 
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useLookupEvenIfGone, useRows } from "@/data/selectors";
+import { useLookupEvenIfGone, useMe, useRows } from "@/data/selectors";
+import { type DecisionStanding, standingOf } from "@/decisions/data";
 import type { Dict } from "@/data/store";
 import type { Decision, DecisionOption, Outcome, Project, Task } from "@/types/core";
 import type { Preference } from "@/types/plan";
@@ -15,12 +16,17 @@ export interface Entry {
   project: Project | undefined;
   /** When it was answered, or asked if it is still open: what the log is ordered by. */
   at: number;
+  /** Whether it waits on me, waits on someone else, or is settled. */
+  standing: DecisionStanding;
   /** Everything the search box looks through, lower-cased. */
   text: string;
 }
 
-export type StateFilter = "all" | "open" | "picked" | "sent_back";
-export const STATES: StateFilter[] = ["all", "open", "picked", "sent_back"];
+/** What the log shows: everything, or where questions stand for me. */
+export type StateFilter = "all" | DecisionStanding;
+export const STATES: StateFilter[] = ["all", "yours", "others", "settled"];
+/** The groups of the log, in the order shown. */
+export const STANDINGS: DecisionStanding[] = ["yours", "others", "settled"];
 
 export interface Filters {
   q: string;
@@ -35,9 +41,14 @@ export const noFilters: Filters = { q: "", state: "all", project: "", asked: "",
 
 export const isFiltered = (f: Filters) => f.q.trim() !== "" || f.state !== "all" || !!f.project || !!f.asked || !!f.by;
 
-/** Every live decision on a task not in the trash (an archived one included: the log is history), newest first. */
+/**
+ * Every live decision on a task not in the trash (an archived one included:
+ * the log is history): those waiting on me first, then those waiting on
+ * others, then the settled; newest first in each.
+ */
 export function useEntries(): Entry[] {
   const decisions = useRows("decisions");
+  const me = useMe().user_id;
   const tasks = useLookupEvenIfGone("tasks");
   // A task's project is named even when it is archived.
   const projects = useLookupEvenIfGone("projects");
@@ -61,17 +72,19 @@ export function useEntries(): Entry[] {
         task,
         project: projects[task.project_id],
         at: decision.decided_at ?? decision.created_at,
+        standing: standingOf(decision, me),
         text: words.filter(Boolean).join("\n").toLowerCase(),
       });
     }
-    return out.sort((a, b) => b.at - a.at);
-  }, [decisions, tasks, projects]);
+    const order = (e: Entry) => STANDINGS.indexOf(e.standing);
+    return out.sort((a, b) => order(a) - order(b) || b.at - a.at);
+  }, [decisions, tasks, projects, me]);
 }
 
 /** Whether an entry passes the filters; `skip` leaves one filter out (to count what it would show). */
 export function matches(entry: Entry, f: Filters, skip?: keyof Filters): boolean {
   const d = entry.decision;
-  if (skip !== "state" && f.state !== "all" && d.state !== f.state) return false;
+  if (skip !== "state" && f.state !== "all" && entry.standing !== f.state) return false;
   if (skip !== "project" && f.project && entry.task.project_id !== f.project) return false;
   if (skip !== "asked" && f.asked && d.asked_id !== f.asked) return false;
   if (skip !== "by" && f.by && d.decided_by !== f.by) return false;
@@ -88,7 +101,7 @@ export function countBy(entries: Entry[], f: Filters, field: "state" | "project"
   const out: Dict<number> = {};
   const keyOf = (e: Entry) =>
     field === "state"
-      ? e.decision.state
+      ? e.standing
       : field === "project"
         ? e.task.project_id
         : field === "asked"

@@ -170,6 +170,7 @@ export const docs = {
   "docs.decision.approved": "Approved",
   "docs.decision.declined": "Declined",
   "docs.decision.sent_back": "Sent back",
+  "docs.decision.not_needed": "No longer needed",
 
   "docs.comment.title": "Comments",
   "docs.comment.add": "Comment",

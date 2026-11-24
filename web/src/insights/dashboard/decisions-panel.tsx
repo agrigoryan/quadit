@@ -17,6 +17,7 @@ import { Ago } from "@/ui/ago";
 function answerOf(d: DecisionView): string {
   const how = d.outcome ? tMaybe(`decision.outcome.${d.outcome}`, d.outcome) : "";
   if (d.picked_label) return t("dash.decisions.picked", { label: d.picked_label, how });
+  if (d.state === "not_needed") return t("decision.state.notNeeded");
   return how || (d.state === "sent_back" ? t("decision.state.sentBack") : "");
 }
 

@@ -2,7 +2,7 @@
 // answer once there is one, and the controls of a plain approval.
 
 import { useState } from "react";
-import { Check, MoreHorizontal, Pencil, Trash2, Undo2 } from "lucide-react";
+import { Check, Minus, MoreHorizontal, Pencil, Trash2, Undo2 } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
 import { exact } from "@/lib/time";
@@ -28,7 +28,13 @@ function StateBadge({ decision, viewer }: { decision: Decision; viewer: Viewer }
   }
   if (decision.state === "picked")
     return <Badge tone="ok">{approval ? t("decision.state.approved") : t("decision.state.picked")}</Badge>;
-  return <Badge tone="danger">{approval ? t("decision.state.declined") : t("decision.state.sentBack")}</Badge>;
+  if (decision.state === "not_needed") return <Badge>{t("decision.state.notNeeded")}</Badge>;
+  // Sent back waits on whoever asked: theirs to answer for, in the highlighter.
+  return (
+    <Badge tone={viewer.isAsker ? "move" : "wait"}>
+      {approval ? t("decision.state.declined") : t("decision.state.sentBack")}
+    </Badge>
+  );
 }
 
 interface HeaderProps {
@@ -100,9 +106,10 @@ interface ResultProps {
   onUnclear: () => void;
 }
 
-/** The answer in words: the outcome, the note, who answered and when. */
+/** The answer in words: the outcome, the note, who answered and when; sent back, whom it waits on now. */
 export function DecisionResult({ decision, viewer, onUnclear }: ResultProps) {
   if (decision.state === "open") return null;
+  if (decision.state === "not_needed") return <NotNeeded decision={decision} />;
   const sentBack = decision.state === "sent_back";
   const outcome: Outcome = decision.outcome ?? (sentBack ? "none" : "as_is");
   const option = optionsOf(decision).find((o) => o.id === decision.picked_option_id);
@@ -112,7 +119,7 @@ export function DecisionResult({ decision, viewer, onUnclear }: ResultProps) {
         aria-hidden
         className={cx(
           "mt-px flex size-5 shrink-0 items-center justify-center rounded-full",
-          sentBack ? "bg-danger-soft text-danger" : "bg-ok-soft text-ok",
+          sentBack ? "bg-wait-soft text-wait" : "bg-ok-soft text-ok",
         )}
       >
         {sentBack ? <Undo2 className="size-3" strokeWidth={2.5} /> : <Check className="size-3" strokeWidth={3} />}
@@ -140,6 +147,38 @@ export function DecisionResult({ decision, viewer, onUnclear }: ResultProps) {
             </Button>
           )}
         </div>
+        {sentBack && (
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 text-sm text-ink-2">
+            {rich(t("decision.sentBackWaits"), { name: <Who userId={decision.created_by} /> })}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A question closed without an answer: who said it is no longer needed, when, and why. History, quietly. */
+function NotNeeded({ decision }: { decision: Decision }) {
+  return (
+    <div className="mt-2 flex gap-2.5">
+      <span
+        aria-hidden
+        className="mt-px flex size-5 shrink-0 items-center justify-center rounded-full bg-sunken text-ink-3"
+      >
+        <Minus className="size-3" strokeWidth={2.5} />
+      </span>
+      <div className="min-w-0 flex-1 text-xs text-ink-2">
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          {rich(t("decision.closedBy"), { name: <Who userId={decision.decided_by} capital /> })}
+          {decision.decided_at && (
+            <time className="text-ink-3" title={exact(decision.decided_at)}>
+              <Ago ms={decision.decided_at} />
+            </time>
+          )}
+        </p>
+        {decision.outcome_note && (
+          <p className="mt-1 text-sm whitespace-pre-line text-ink-2">{decision.outcome_note}</p>
+        )}
       </div>
     </div>
   );
