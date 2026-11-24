@@ -1,0 +1,6 @@
+{"fixture":"synthetic","note":"written by hand from the Agent SDK's message types: the rejected rate-limit event and the assistant error","exit":1,"stderr":"","expect":"usage_limit","resets_at":"2024-11-24T18:00:00Z"}
+{"type":"system","subtype":"init","cwd":"{folder}","session_id":"0199ffff-0000-7000-8000-00000000c1a1","tools":["Bash"]}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Looking at the code."}]},"session_id":"0199ffff-0000-7000-8000-00000000c1a1"}
+{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1732471200,"rateLimitType":"five_hour"},"session_id":"0199ffff-0000-7000-8000-00000000c1a1"}
+{"type":"assistant","error":"rate_limit","message":{"content":[{"type":"text","text":"You've hit your limit · resets 6pm"}]},"session_id":"0199ffff-0000-7000-8000-00000000c1a1"}
+{"type":"result","subtype":"success","is_error":true,"result":"You've hit your limit · resets 6pm","session_id":"0199ffff-0000-7000-8000-00000000c1a1"}

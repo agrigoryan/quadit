@@ -26,8 +26,8 @@ type command struct {
 }
 
 // commands is every command that talks to a server, in the order the help
-// gives them. (help and login are not here: they are answered before there
-// is a server to talk to.)
+// gives them. (help, login, skill and the runner's forms of run are not
+// here: they are answered before there is a default server to talk to.)
 var commands = []command{
 	// orient (cmd_read.go)
 	{names: []string{"me", "whoami"}, run: readCommand("/me")},
@@ -87,7 +87,7 @@ var commands = []command{
 	// secrets (cmd_secrets.go)
 	{names: []string{"secrets"}, run: readCommand("/secrets")},
 	{names: []string{"request"}, args: 2, noDryRun: true, usage: "request NAME URL [method=POST] [header=K:V ...] [body=TEXT|-] [approval=DECISION_ID]", run: (*runner).request},
-	{names: []string{"run"}, noDryRun: true, run: (*runner).runWithSecrets},
+	{names: []string{"run"}, noDryRun: true, run: (*runner).runWithSecrets}, // quadit run --secret …; its other forms are run.go's
 
 	// docs (cmd_docs.go)
 	{names: []string{"docs"}, run: readsWithFilters("/docs")},

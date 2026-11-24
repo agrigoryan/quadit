@@ -1,0 +1,1 @@
+{"fixture":"synthetic","note":"written by hand: a resume of a session that is not on this computer prints only to standard error","exit":1,"stderr":"No conversation found with session ID: 0199ffff-0000-7000-8000-00000000c1a1","expect":"lost_session"}

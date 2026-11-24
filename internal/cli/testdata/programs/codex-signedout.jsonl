@@ -1,0 +1,4 @@
+{"fixture":"synthetic","note":"written by hand: UNVERIFIED wording of a failed sign-in while running","exit":1,"stderr":"","expect":"not_signed_in"}
+{"type":"thread.started","thread_id":"0199ffff-0000-7000-8000-00000000c0d1"}
+{"type":"turn.started"}
+{"type":"turn.failed","error":{"message":"unexpected status 401 Unauthorized: Please log in again"}}

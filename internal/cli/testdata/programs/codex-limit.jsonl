@@ -1,0 +1,5 @@
+{"fixture":"synthetic","note":"written by hand: UNVERIFIED wording of a usage limit and its reset time","exit":1,"stderr":"","expect":"usage_limit","resets_at":"2026-11-24T15:05:00Z"}
+{"type":"thread.started","thread_id":"0199ffff-0000-7000-8000-00000000c0d1"}
+{"type":"turn.started"}
+{"type":"error","message":"You've hit your usage limit. Upgrade to Pro (https://openai.com/chatgpt/pricing) or try again at 3:05 PM."}
+{"type":"turn.failed","error":{"message":"You've hit your usage limit. Upgrade to Pro (https://openai.com/chatgpt/pricing) or try again at 3:05 PM."}}

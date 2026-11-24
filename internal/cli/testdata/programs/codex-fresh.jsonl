@@ -1,0 +1,9 @@
+{"fixture":"synthetic","note":"written by hand in the documented codex exec --json form; replaced by a sanitized recording from scripts/agent-run-check.sh","exit":0,"stderr":"","expect":"ok","final":"Added a line saying hello to README.","session":"0199ffff-0000-7000-8000-00000000c0d1","steps":["shell","edit:update README.md"]}
+{"type":"thread.started","thread_id":"0199ffff-0000-7000-8000-00000000c0d1"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"reasoning","text":"Reading the readme."}}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"bash -lc 'cat README.md'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"bash -lc 'cat README.md'","aggregated_output":"# game","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_2","type":"file_change","changes":[{"path":"{folder}/README.md","kind":"update"}],"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"Added a line saying hello to README."}}
+{"type":"turn.completed","usage":{"input_tokens":1200,"cached_input_tokens":0,"output_tokens":40}}

@@ -1,0 +1,210 @@
+//go:build unix
+
+package cli
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/agrigoryan/quadit/internal/core"
+)
+
+func TestTheRegistryRefusesAFolderOutsideTheRules(t *testing.T) {
+	dir, _ := filepath.EvalSymlinks(t.TempDir())
+	home := filepath.Join(dir, "home")
+	project := filepath.Join(home, "devel", "game")
+	if err := os.MkdirAll(project, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(project, "README")
+	_ = os.WriteFile(file, nil, 0o600)
+	_ = os.Symlink(home, filepath.Join(dir, "to-home"))
+	_ = os.Symlink("/usr/bin", filepath.Join(project, "to-usr"))
+	strict := folderRules{home: home, roots: systemRoots} // the computer's own system folders
+	lenient := folderRules{home: home, roots: testRoots()}
+	for _, c := range []struct {
+		name, path string
+		rules      folderRules
+		want       string
+	}{
+		{"a relative path", "devel/game", lenient, "folder= must be an absolute path"},
+		{"a folder that does not exist", filepath.Join(home, "nope"), lenient, "~/nope does not exist"},
+		{"a file", file, lenient, "~/devel/game/README is not a folder"},
+		{"the home folder", home, lenient, "~ is your home folder: pick the project's own folder"},
+		{"a link to the home folder", filepath.Join(dir, "to-home"), lenient, "is your home folder"},
+		{"above the home folder", dir, lenient, dir + " is above your home folder: pick the project's own folder"},
+		{"the root", "/", lenient, "/ is above your home folder"},
+		{"a system folder", "/usr/bin", strict, "/usr/bin is a system folder: pick the project's own folder"},
+		{"a link to a system folder", filepath.Join(project, "to-usr"), lenient, "~/devel/game/to-usr is a system folder"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			_, _, err := c.rules.check(c.path)
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("check(%s) = %v, want %q", c.path, err, c.want)
+			}
+		})
+	}
+	if runtime.GOOS == "darwin" {
+		t.Run("/tmp, which is under /private on macOS", func(t *testing.T) {
+			if _, _, err := (folderRules{home: home, roots: []string{"/tmp"}}).check("/tmp"); err == nil || !strings.Contains(err.Error(), "system folder") {
+				t.Fatalf("check(/tmp) = %v", err)
+			}
+		})
+	}
+	t.Run("the project's own folder, labeled with ~", func(t *testing.T) {
+		canon, label, err := lenient.check(project)
+		if err != nil || canon != project || label != "~/devel/game" {
+			t.Fatalf("check = %s %s %v", canon, label, err)
+		}
+	})
+}
+
+// add runs quadit run add in the test's world.
+func (rt *runTest) add(args ...string) (int, string) {
+	var out bytes.Buffer
+	fields := map[string][]string{}
+	for _, a := range args {
+		k, v, _ := strings.Cut(a, "=")
+		fields[k] = append(fields[k], v)
+	}
+	code := runAdd(context.Background(), rt.files, rt.host(), fields, false, &out, &out)
+	return code, strings.TrimSpace(out.String())
+}
+
+func TestTheRegistryBindsAnEntryByIDs(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	rt.writeRegistry()
+	link := filepath.Join(rt.dir, "game-link")
+	if err := os.Symlink(rt.folder, link); err != nil {
+		t.Fatal(err)
+	}
+	program := filepath.Join(rt.dir, "bin", "claude")
+	_ = os.MkdirAll(filepath.Dir(program), 0o700)
+	if err := os.Symlink(rt.entry.ProgramPath, program); err != nil {
+		t.Fatal(err)
+	}
+	code, said := rt.add("login="+rt.login, "project=sva", "folder="+link, "program=claude", "program_path="+program)
+	if code != 0 || said != "Added: @claude runs SVA in ~/devel/game with Claude Code 2.1.331 on Test Mac." {
+		t.Fatalf("add: %d %s", code, said)
+	}
+	reg, err := readRegistry(rt.files.registry)
+	if err != nil || len(reg.Entries) != 1 {
+		t.Fatalf("registry %+v %v", reg, err)
+	}
+	e := reg.Entries[0]
+	if e.Server != rt.url || e.WorkspaceID != fakeWorkspaceID || e.AgentID != fakeAgentID || e.ProjectID != fakeProjectID || e.Folder != rt.folder ||
+		e.ProgramPath != program || e.Login != rt.login || e.Mode != modeInPlace || len(e.ID) != 8 {
+		t.Fatalf("the entry is not bound by ids, the canonical folder and the program as given: %+v", e)
+	}
+	if st, _ := os.Stat(rt.files.registry); st.Mode().Perm() != 0o600 {
+		t.Fatalf("the registry's mode is %v", st.Mode())
+	}
+}
+
+func TestALoginOfAnotherWorkspaceOrReadOnlyIsAnEntryError(t *testing.T) {
+	t.Run("add refuses a read-only login and a person's", func(t *testing.T) {
+		rt := newRunTest(t, core.ProgramClaude)
+		rt.writeRegistry()
+		rt.f.set(func(f *fakeQuadit) { m := f.members[agentToken]; m.ReadOnly = true; f.members[agentToken] = m })
+		if code, said := rt.add("login="+rt.login, "project=SVA", "folder="+rt.folder, "program=claude", "program_path="+rt.entry.ProgramPath); code != 1 ||
+			said != "this login may only read: Quadit runs an agent whose login may write" {
+			t.Fatalf("add: %d %s", code, said)
+		}
+		writeJSON(t, rt.login, map[string]string{"url": rt.url, "token": "owner-token"})
+		if code, said := rt.add("login="+rt.login, "project=SVA", "folder="+rt.folder, "program=claude", "program_path="+rt.entry.ProgramPath); code != 1 ||
+			said != "this login is @aram's, a person's: Quadit runs an agent with the agent's own login" {
+			t.Fatalf("add: %d %s", code, said)
+		}
+	})
+	t.Run("an entry whose login is of another workspace is not served", func(t *testing.T) {
+		rt := newRunTest(t, core.ProgramClaude)
+		other := rt.entry
+		other.WorkspaceID = "0199aaaa-0000-7000-8000-00000000ffff"
+		rt.writeRegistry(other)
+		rt.f.addItem(fakeItem{Task: "SVA-1"})
+		rt.serve()
+		rt.eventually("the entry's error", func() bool {
+			return readStatus(rt.files.status()).Entries[other.ID].Message == string(errLoginRefused)
+		})
+		if len(rt.f.holdList()) != 0 || len(rt.records()) != 0 {
+			t.Fatal("an entry whose login is not its own held the listener or ran the program")
+		}
+	})
+}
+
+func TestTheRegistryHoldsOneProjectPerFolderAndOneEntryPerAgentAndProject(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	add := func() (int, string) {
+		return rt.add("login="+rt.login, "project=SVA", "folder="+rt.folder, "program=claude", "program_path="+rt.entry.ProgramPath)
+	}
+	if code, said := add(); code != 1 || said != "@claude already runs SVA on this computer, in ~/devel/game" {
+		t.Fatalf("a second entry of the agent and project: %d %s", code, said)
+	}
+	other := rt.entry
+	other.ID, other.ProjectID, other.Project, other.AgentID = "0000aaaa", "0199aaaa-0000-7000-8000-0000000000ab", "GS", fakeCodexID
+	rt.writeRegistry(other)
+	if code, said := add(); code != 1 || said != "~/devel/game already runs GS on this computer: one project per folder" {
+		t.Fatalf("a second project in the folder: %d %s", code, said)
+	}
+	other.ProjectID, other.Project = fakeProjectID, "SVA" // another agent on the same project and folder is allowed
+	rt.writeRegistry(other)
+	if code, said := add(); code != 0 {
+		t.Fatalf("a second agent on the project: %d %s", code, said)
+	}
+}
+
+func TestTheRegistryIsWrittenWhole(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	rt.writeRegistry()
+	stop := make(chan struct{})
+	var readers sync.WaitGroup
+	torn := make(chan string, 1)
+	readers.Go(func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			raw, err := os.ReadFile(rt.files.registry)
+			if err == nil && !json.Valid(raw) {
+				select {
+				case torn <- string(raw):
+				default:
+				}
+			}
+		}
+	})
+	var writers sync.WaitGroup
+	for i := range 20 {
+		writers.Go(func() {
+			_, err := changeRegistry(context.Background(), rt.files, func(reg *registry) error {
+				reg.Entries = append(reg.Entries, regEntry{ID: fmt.Sprintf("%08d", i)})
+				return nil
+			})
+			if err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	writers.Wait()
+	close(stop)
+	readers.Wait()
+	select {
+	case raw := <-torn:
+		t.Fatalf("a reader saw a registry half written: %q", raw)
+	default:
+	}
+	reg, err := readRegistry(rt.files.registry)
+	if err != nil || len(reg.Entries) != 20 || reg.Machine.ID != testMachine.ID {
+		t.Fatalf("after twenty writers the registry holds %d entries (%v), machine %+v", len(reg.Entries), err, reg.Machine)
+	}
+}

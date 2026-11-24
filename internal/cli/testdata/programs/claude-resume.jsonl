@@ -1,0 +1,5 @@
+{"fixture":"synthetic","note":"written by hand in the documented stream-json form","exit":0,"stderr":"","expect":"ok","final":"Added the second line.","session":"0199ffff-0000-7000-8000-00000000c1a1","steps":["Write:notes/todo.md","Refused:WebFetch"]}
+{"type":"system","subtype":"init","cwd":"{folder}","session_id":"0199ffff-0000-7000-8000-00000000c1a1","tools":["Bash"]}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_3","name":"Write","input":{"file_path":"notes/todo.md","content":"x"}}]},"session_id":"0199ffff-0000-7000-8000-00000000c1a1"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Done."}]},"session_id":"0199ffff-0000-7000-8000-00000000c1a1"}
+{"type":"result","subtype":"success","is_error":false,"result":"Added the second line.","session_id":"0199ffff-0000-7000-8000-00000000c1a1","permission_denials":[{"tool_name":"WebFetch","tool_use_id":"toolu_4","tool_input":{}}]}

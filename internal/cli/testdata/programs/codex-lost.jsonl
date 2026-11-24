@@ -1,0 +1,1 @@
+{"fixture":"synthetic","note":"written by hand: UNVERIFIED wording of a resume of a thread that is not on this computer","exit":1,"stderr":"Error: no rollout found for thread id 0199ffff-0000-7000-8000-00000000c0d1","expect":"lost_session"}

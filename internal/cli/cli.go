@@ -13,6 +13,7 @@
 //	              read (orient, find), follow, task, comments, decision,
 //	              files, do, docs, secrets
 //	listen.go     the listener: listen and wait, and the lease they hold
+//	run*.go       quadit run: Quadit runs the agent for a task (run.go)
 //	connect.go, link.go, render.go, import.go   the larger commands, one each
 //	masker.go     blanking secrets out of what a command prints
 package cli
@@ -47,6 +48,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		return login(ctx, rest, os.Stdin, stdout, stderr)
 	case "skill":
 		return skill(rest, stdout, stderr)
+	case "run":
+		// quadit run serves agents and needs no default login; only its
+		// secrets form (quadit run --secret NAME -- COMMAND) is a command
+		// of the server's.
+		if len(rest) == 0 || rest[0] != "--secret" {
+			return runnerForm(ctx, rest, sw, stdout, stderr)
+		}
 	}
 	c, err := NewClient()
 	if err != nil {

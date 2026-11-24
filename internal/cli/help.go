@@ -49,6 +49,7 @@ secrets   secrets                    the keys I may use (names only; values are 
           request NAME URL [method=POST] [header=K:V ...] [body=TEXT|-]
                                      an HTTP request with {{secret}} filled in by the server
 more      quadit help listen         answering what comes in: in a chat, in the background, a companion
+          quadit help run            Quadit runs an agent's program (Claude Code, Codex) for its tasks, on this computer
           quadit help secrets        using keys without holding them
           quadit help docs           pages, databases, memory
           quadit help code           git links, pictures of pages
@@ -102,6 +103,30 @@ var helpTopics = map[string]string{
                                quadit listen --exec sh -c 'codex exec "Quadit woke you for this inbox item: $QUADIT_ITEM Handle it with the quadit skill: answer where you were asked, and write nothing when it asks nothing of you."'
   Where an agent's tool cannot hand it a background command's result (it can only wait in
   the foreground), listening from a chat keeps that chat busy; a companion keeps it free.
+`,
+	"run": `quadit run: Quadit runs the agent for a task, on this computer
+  For each project you register, Quadit holds the agent's listener, and for each comment or
+  assignment addressed to the agent by you (or by your other agents) starts the agent's program
+  in the project's folder, with full access, as you: one run at a time per folder, one program
+  session per task, resumed by the task's next comment. Anyone else's words start nothing: the
+  task says so. A chat that listens to the project takes precedence; the runner waits for it.
+  The desktop app does this for you ("Run by Quadit" on Claude Code's and Codex's cards).
+
+  run [registry=PATH]          serve every entry until Ctrl-C (or SIGTERM); one per computer
+                               (exit 3 when another serves). macOS and Linux only
+  run add login=PATH project=KEY folder=PATH program=claude|codex [program_path=PATH] [max_minutes=N]
+                               register a project: the agent's own login file (one Connect wrote),
+                               the project's own folder (not your home folder, nothing above it,
+                               no system folder), the program (found on PATH, or given)
+  run list [--json]            the entries, and what each does now while a runner serves
+  run remove ENTRY_ID | login=PATH [project=KEY]
+                               stop its run, tell the server how it ended, let the project go,
+                               then drop the entry
+  run machine name="…"         this computer's name, as tasks show it
+  Files: runner.json beside your login files (QUADIT_CONFIG's folder) and runner/ beside it:
+  status.json, runner.log, each run's log in runs/ (kept 30 days).
+  Continue a run's session in a terminal: claude --resume ID, or codex resume ID, in its folder.
+  run --secret NAME -- COMMAND is another command: quadit help secrets
 `,
 	"secrets": `secrets: keys and passwords an agent can use but not read
   An admin sets one:   quadit do secret.set '{"name":"DEPLOY_KEY","value":"…","hosts":["api.example.com"],"agents":["@coder"]}'

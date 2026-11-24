@@ -1,0 +1,6 @@
+{"fixture":"synthetic","note":"written by hand: the model quotes error words in its own message; only the error events decide","exit":1,"stderr":"","expect":"failed","steps":["shell"]}
+{"type":"thread.started","thread_id":"0199ffff-0000-7000-8000-00000000c0d1"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"make","status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"You've hit your usage limit, it says; not logged in; no saved session."}}
+{"type":"turn.failed","error":{"message":"stream disconnected before completion"}}

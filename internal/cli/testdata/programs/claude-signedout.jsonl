@@ -1,0 +1,4 @@
+{"fixture":"synthetic","note":"written by hand: an assistant error of the authentication kind","exit":1,"stderr":"","expect":"not_signed_in"}
+{"type":"system","subtype":"init","cwd":"{folder}","session_id":"0199ffff-0000-7000-8000-00000000c1a1","tools":["Bash"]}
+{"type":"assistant","error":"authentication_failed","message":{"content":[{"type":"text","text":"Invalid API key · Please run /login"}]},"session_id":"0199ffff-0000-7000-8000-00000000c1a1"}
+{"type":"result","subtype":"success","is_error":true,"result":"Invalid API key · Please run /login","session_id":"0199ffff-0000-7000-8000-00000000c1a1"}

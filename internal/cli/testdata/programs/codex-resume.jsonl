@@ -1,0 +1,7 @@
+{"fixture":"synthetic","note":"written by hand in the documented codex exec --json form","exit":0,"stderr":"","expect":"ok","final":"Added the second line.","session":"0199ffff-0000-7000-8000-00000000c0d1","steps":["docs.search","web search"]}
+{"type":"thread.started","thread_id":"0199ffff-0000-7000-8000-00000000c0d1"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_4","type":"mcp_tool_call","server":"docs","tool":"search","status":"in_progress"}}
+{"type":"item.started","item":{"id":"item_5","type":"web_search","query":"x"}}
+{"type":"item.completed","item":{"id":"item_6","type":"agent_message","text":"Added the second line."}}
+{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":2}}
