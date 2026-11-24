@@ -23,7 +23,12 @@ vi.mock("@/data/sync", () => ({
 }));
 
 // What the agents are doing is read from the server; here, nothing yet.
-vi.mock("@/data/listening", () => ({ useAgentStates: () => ({ data: undefined, error: "" }) }));
+vi.mock("@/data/listening", async (original) => ({
+  ...(await original<typeof import("@/data/listening")>()),
+  useAgentStates: () => ({ data: undefined, error: "" }),
+}));
+// The app's answer about its agents is asked of the app through a query of its own: none here.
+vi.mock("@/ui/desktop-agents", () => ({ useLocalAgents: () => null }));
 
 const { useSystemNotices } = await import("@/shell/system-notices");
 const { useDesktopSummary } = await import("@/shell/desktop-summary");

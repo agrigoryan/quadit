@@ -168,6 +168,7 @@ export const common = {
   "desktop.noProject": "There is no such project in this workspace.",
   "desktop.taskNeedsProject": "A task needs a project.",
   "desktop.unknown": "This window does not know that button. Reload it, then try again.",
+  "desktop.mayNotStop": "You may not stop this run: it is on a task you may not change.",
 
   "conn.down": "Reconnecting…",
   "conn.downHint": "Live updates are paused. What you see may be out of date until the connection is back.",

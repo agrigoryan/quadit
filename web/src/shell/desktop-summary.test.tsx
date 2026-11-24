@@ -8,7 +8,7 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentState } from "@/types/dashboard";
 import { clearStore, loadBootstrap, mergeRows, patchRow } from "@/data/store";
-import type { Member, User, Workspace } from "@/types/core";
+import type { AgentSession, Member, Task, User, Workspace } from "@/types/core";
 import type { QuaditDesktop } from "@/types/desktop";
 
 // As GET /agents gives them: the handle with its "@".
@@ -40,7 +40,16 @@ const agentStates: Record<string, AgentState> = {
     waiting_on_it: 0,
   },
 };
-vi.mock("@/data/listening", () => ({ useAgentStates: () => ({ data: agentStates, error: "" }) }));
+vi.mock("@/data/listening", async (original) => ({
+  ...(await original<typeof import("@/data/listening")>()),
+  useAgentStates: () => ({ data: agentStates, error: "" }),
+}));
+// What the app on this computer runs: Claude for SVA.
+vi.mock("@/ui/desktop-agents", () => ({
+  useLocalAgents: () => ({
+    a1: { agent: "a1", program: "claude", programName: "Claude Code", computer: "Mac", canRun: true, runs: ["p1"] },
+  }),
+}));
 
 const { useDesktopSummary, useSummary } = await import("@/shell/desktop-summary");
 
@@ -130,6 +139,8 @@ describe("the summary", () => {
         detail: "SVA-5 tuning",
         path: "/acme/task/SVA-5",
         usable: true,
+        line: { text: "Listening to everything, from a chat", tone: "ok" },
+        reach: "heard",
       },
       {
         id: "a2",
@@ -139,6 +150,8 @@ describe("the summary", () => {
         detail: "Nothing assigned",
         path: "/acme/agents",
         usable: false,
+        line: { text: "Not connected", tone: "quiet" },
+        reach: "not_connected",
       },
     ]);
     expect(result.current?.me).toEqual({ name: "Ann", canCreateAgents: false });
@@ -164,6 +177,139 @@ describe("the summary", () => {
       ["claude-code", true],
       ["codex", false],
     ]);
+  });
+
+  it("lists the tasks that wait on me with who waits, each said once: a task with a question of mine is said by it", () => {
+    load("member");
+    act(() => {
+      mergeRows("tasks", [
+        {
+          id: "t2",
+          key: "SVA-53",
+          title: "Check the new level graphics",
+          project_id: "p1",
+          waiting_on_id: "u1",
+          assignee_id: "a2",
+        },
+        { id: "t3", key: "SVA-54", title: "Nobody's", project_id: "p1", waiting_on_id: "u1" },
+        { id: "t4", key: "SVA-55", title: "Waits on Bea", project_id: "p1", waiting_on_id: "u2" },
+      ] as Task[]);
+      patchRow("tasks", "t1", { waiting_on_id: "u1" });
+    });
+    const { result } = renderHook(() => useSummary());
+    expect(result.current?.tasks?.items.map(({ key, who }) => [key, who]).sort()).toEqual([
+      ["SVA-53", "@codex"],
+      ["SVA-54", ""],
+    ]);
+    expect(result.current?.tasks?.more).toBe(0);
+  });
+
+  it("lists my agents' runs that failed or did not start in the last day, each the newest on its task, with its own line", () => {
+    load("member");
+    const now = Date.now();
+    const run = (id: string, extra: Partial<AgentSession>): AgentSession => ({
+      id,
+      agent_id: "a1",
+      task_id: "t1",
+      state: "done",
+      started_at: now - 60_000,
+      updated_seq: 1,
+      machine_id: "m1",
+      program: "codex",
+      ...extra,
+    });
+    act(() =>
+      mergeRows("sessions", [
+        run("r1", { state: "not_started", reason: "not_signed_in", machine_name: "Mac", started_at: now - 30_000 }),
+        run("r0", { state: "failed", reason: "program_error", started_at: now - 90_000 }),
+        // Another's agent, a day old, and one Quadit did not start: none of them.
+        run("r2", { agent_id: "a2", state: "failed", reason: "program_error" }),
+        run("r3", { task_id: "t9", state: "failed", started_at: now - 2 * 24 * 3_600_000 }),
+        run("r4", { agent_id: "a1", task_id: "t5", state: "failed", machine_id: undefined }),
+      ]),
+    );
+    const { result } = renderHook(() => useSummary());
+    expect(result.current?.runs).toEqual({
+      items: [
+        {
+          key: "SVA-5",
+          title: "Jump feels floaty",
+          line: "Failed: Codex is not signed in on Mac. Sign in to Codex there, and it starts again by itself.",
+          path: "/acme/task/SVA-5",
+        },
+      ],
+      more: 0,
+    });
+  });
+
+  it("lists the runs open now, with Stop where I may change the task, and says a runner's line as the card does", () => {
+    load("member");
+    const now = Date.now();
+    act(() =>
+      mergeRows("sessions", [
+        {
+          id: "r9",
+          agent_id: "a1",
+          task_id: "t1",
+          state: "running",
+          started_at: now - 180_000,
+          updated_seq: 1,
+          machine_id: "m1",
+        },
+      ] as AgentSession[]),
+    );
+    const { result } = renderHook(() => useSummary());
+    expect(result.current?.working).toEqual({
+      items: [
+        {
+          agent: "@claude",
+          key: "SVA-5",
+          title: "Jump feels floaty",
+          state: "Working",
+          since: now - 180_000,
+          path: "/acme/task/SVA-5",
+          stop: { label: "Stop", request: "stop:r9" },
+        },
+      ],
+      more: 0,
+    });
+    // Asked to stop already: no Stop.
+    act(() => patchRow("sessions", "r9", { stop_requested_at: now }));
+    expect(result.current?.working?.items[0]).not.toHaveProperty("stop");
+  });
+
+  it("says a project Quadit runs on this computer as the card says it, and one it runs elsewhere", () => {
+    load("member");
+    const runner = {
+      machine: "Mac",
+      folder: "~/devel/game",
+      program: "claude",
+      program_version: "2",
+      holding: true,
+      since: "",
+    };
+    const [claude, codex] = [agentStates.a1, agentStates.a2];
+    if (!claude || !codex) throw new Error("the fixture has both agents");
+    agentStates.a1 = {
+      ...claude,
+      listeners: [{ project_id: "p1", project: "SVA", live: true, by: "Quadit's runner", runner }],
+    };
+    agentStates.a2 = {
+      ...codex,
+      connected_at: "2026-11-24 14:02",
+      listening: true,
+      listeners: [{ project_id: "p2", project: "OPS", live: true, runner: { ...runner, machine: "Bea's iMac" } }],
+    };
+    try {
+      const { result } = renderHook(() => useSummary());
+      expect(result.current?.agents.map((a) => a.line)).toEqual([
+        { text: "Runs SVA in ~/devel/game. Ready.", tone: "ok" },
+        { text: "Quadit runs OPS on Bea's iMac.", tone: "ok" },
+      ]);
+    } finally {
+      agentStates.a1 = claude;
+      agentStates.a2 = codex;
+    }
   });
 
   it("offers only the projects I may make a task in", () => {

@@ -30,7 +30,7 @@ export interface DesktopNotification {
 export interface DesktopSummary {
   workspace: { id: string; slug: string; name: string };
   me: { name: string; canCreateAgents: boolean };
-  /** Decisions waiting on me, newest first, at most 20, each with at most 6 actions. */
+  /** Decisions waiting on me, newest first, at most 10 (20 from an older page), each with at most 6 actions. */
   waiting: { title: string; detail: string; path: string; actions: DesktopAction[] }[];
   /** Agents in the workspace, at most 50; `usable`: I may let a client work as it (I answer for it, or I am an admin). */
   agents: {
@@ -41,9 +41,43 @@ export interface DesktopSummary {
     detail: string;
     path: string;
     usable: boolean;
+    /** The first line of its card on the Agents page, coloured as there; absent from an older page. */
+    line?: { text: string; tone: "ok" | "work" | "wait" | "quiet" };
+    /** How far it is heard: not connected, connected and nothing hears it, or heard; absent from an older page. */
+    reach?: "not_connected" | "not_listening" | "heard";
   }[];
   /** Projects I may create tasks in, at most 200, for quick capture. */
   projects: { key: string; name: string }[];
+  /** How many more decisions wait on me than `waiting` holds (it holds at most 10). */
+  waitingMore?: number;
+  /** Tasks that wait on me (no question of theirs is in `waiting`): the task, and the handle of its assignee, who waits ("" for none). */
+  tasks?: SummaryList<{ key: string; title: string; who: string; path: string }>;
+  /**
+   * Runs of agents I answer for that failed or did not start, which nothing
+   * newer on their task replaced, in the last day: the task, and the run's
+   * own reason line ("Not started: … ").
+   */
+  runs?: SummaryList<{ key: string; title: string; line: string; path: string }>;
+  /**
+   * Runs open now: waiting, working, or done and waiting for an answer; the
+   * agent's handle, the task, the state's word, when it started (ms), and
+   * Stop where I may stop it.
+   */
+  working?: SummaryList<{
+    agent: string;
+    key: string;
+    title: string;
+    state: string;
+    since: number;
+    path: string;
+    stop?: DesktopAction;
+  }>;
+}
+
+/** At most 10 of something, newest or most pressing first, and how many more there are. */
+export interface SummaryList<T> {
+  items: T[];
+  more: number;
 }
 
 /** Something the person asked for in the app, which the page carries out through its own write paths. */

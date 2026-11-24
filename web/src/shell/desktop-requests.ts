@@ -5,7 +5,7 @@
 // the answer.
 
 import { useEffect } from "react";
-import { mayBeGivenWork } from "@/data/access";
+import { can, mayBeGivenWork } from "@/data/access";
 import { api, errorMessage, workspacePath } from "@/data/api";
 import { mutate } from "@/data/mutate";
 import { getProjectByKey, getRow, getRows } from "@/data/selectors";
@@ -24,7 +24,7 @@ import { isNotFound } from "@/data/query";
 import { makeConnectCode, readConnectCode } from "@/settings/agents/data";
 import type { Changes } from "@/types/changes.gen";
 import type { AgentConnection } from "@/types/dashboard";
-import type { Decision, DecisionOption, Member, Notification } from "@/types/core";
+import { type Decision, type DecisionOption, isOpenSession, type Member, type Notification } from "@/types/core";
 import type { DesktopAction, DesktopNotification, DesktopOutcome, DesktopRequest } from "@/types/desktop";
 
 // The buttons the page hands the app, and the reply box; act() reads their requests back.
@@ -236,6 +236,15 @@ async function act(request: string, text: string | undefined): Promise<DesktopOu
     if (!decision) return refused(t("desktop.gone"));
     const batch = answering(decision, { option });
     await mutate(batch.changes, batch.show, { quiet: true });
+    return { ok: true };
+  }
+  if (verb === "stop") {
+    // Asked of the run as the task page's Stop asks it, by whoever may change its task.
+    const session = getRow("sessions", id);
+    const task = session?.task_id ? getRow("tasks", session.task_id) : undefined;
+    if (!session?.machine_id || !isOpenSession(session) || !task) return refused(t("desktop.gone"));
+    if (!can(getState().me).editTask(task)) return refused(t("desktop.mayNotStop"));
+    await mutate({ type: "session.stop", args: { id } }, undefined, { quiet: true });
     return { ok: true };
   }
   const item = getRow("notifications", id);

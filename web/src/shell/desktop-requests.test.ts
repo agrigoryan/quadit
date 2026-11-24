@@ -6,10 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, ApiError } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
 import { queryClient } from "@/data/query";
-import { clearStore, getState, loadBootstrap, patchRow } from "@/data/store";
+import { clearStore, getState, loadBootstrap, mergeRows, patchRow } from "@/data/store";
 import { clearUndo } from "@/data/undo";
 import { answer } from "@/shell/desktop-requests";
-import type { Member, User, Workspace } from "@/types/core";
+import type { AgentSession, Member, User, Workspace } from "@/types/core";
 
 type Sent = { type: string; args: Record<string, unknown> };
 let changes: Sent[] = [];
@@ -101,6 +101,18 @@ describe("a button pressed in the app", () => {
     expect(await answer({ kind: "action", request: "read:n1" })).toEqual({ ok: true });
     expect(sent()).toEqual([{ type: "notification.read", args: { ids: ["n1"] } }]);
     expect(getState().collections.notifications.n1?.read_at).toBeTruthy();
+  });
+
+  it("asks a run Quadit's runner holds open to stop, as the task page's Stop does, and nothing else", async () => {
+    mergeRows("sessions", [
+      { id: "r1", agent_id: "a1", task_id: "t1", state: "running", started_at: 1, updated_seq: 1, machine_id: "m1" },
+      { id: "r2", agent_id: "a1", task_id: "t1", state: "done", started_at: 1, updated_seq: 1, machine_id: "m1" },
+      { id: "r3", agent_id: "a1", task_id: "t1", state: "running", started_at: 1, updated_seq: 1 },
+    ] as AgentSession[]);
+    expect(await answer({ kind: "action", request: "stop:r1" })).toEqual({ ok: true });
+    for (const id of ["r2", "r3", "gone"])
+      expect(await answer({ kind: "action", request: `stop:${id}` })).toMatchObject({ ok: false });
+    expect(sent()).toEqual([{ type: "session.stop", args: { id: "r1" } }]);
   });
 
   it("is refused for what is not here, and for an empty reply", async () => {
