@@ -909,3 +909,53 @@ func TestWhatListensToEachProjectIsTold(t *testing.T) {
 		}
 	})
 }
+
+// TestAnAgentListensToAProjectWithTheCommand: quadit wait project=KEY
+// against a real server listens to that project, and the lines it prints
+// to go on keep to it, as run; quadit listening says what listens to each
+// project; quadit listening forget project=KEY is refused while the
+// project's session lives, and checks without forgetting in a dry run.
+func TestAnAgentListensToAProjectWithTheCommand(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv).
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newProjectListening(t, st)
+		run := func(args ...string) string {
+			t.Helper()
+			out, code := p.quadit(t, p.coder, args...)
+			if code != 0 {
+				t.Fatalf("quadit %s said (%d):\n%s", strings.Join(args, " "), code, out)
+			}
+			return out
+		}
+		out := run("wait", "project=sva", "for=1")
+		next := regexp.MustCompile(`(?m)^quadit wait project=SVA for=1 lease=[A-Z0-9]{8}`).FindString(out)
+		if !strings.HasPrefix(out, "IDLE\n") || next == "" {
+			t.Fatalf("the first quadit wait project=sva said:\n%s", out)
+		}
+		p.give(t, "ART")
+		key := p.give(t, "SVA")
+		out = run(strings.Fields(next)[1:]...)
+		lines := strings.Split(strings.TrimSpace(out), "\n")
+		if len(lines) != 5 || !strings.Contains(lines[0], " assigned "+key+" ") || !strings.HasPrefix(lines[4], next+"   # then go on listening") {
+			t.Fatalf("the next wait said:\n%s", out)
+		}
+		ack, _, _ := strings.Cut(lines[3], "   #")
+		run(strings.Fields(ack)[1:]...)
+
+		if out := run("listening"); out != "SVA: a chat listens (last heard "+regexp.MustCompile(`\d{4}-\d\d-\d\d \d\d:\d\d`).FindString(out)+" UTC).\n"+
+			"Everything else: nothing listens now, and those items wait in the inbox; it leaves out SVA, which has a listener of its own.\n" {
+			t.Fatalf("quadit listening said:\n%s", out)
+		}
+		if out, code := p.quadit(t, p.coder, "listening", "forget", "project=SVA"); code == 0 || !strings.Contains(out, "already listening to SVA from another session") {
+			t.Fatalf("forgetting SVA while it listens said (%d):\n%s", code, out)
+		}
+		lease := regexp.MustCompile(`lease=([A-Z0-9]{8})`).FindStringSubmatch(next)[1]
+		runOut(t, st, lease)
+		if out := run("--dry-run", "listening", "forget", "project=SVA"); !strings.HasPrefix(out, "would be accepted: Forgot the listener of SVA") || p.listenersOf(t) != 1 {
+			t.Fatalf("a dry forget said:\n%s", out)
+		}
+		if out := run("listening", "forget", "project=SVA"); !strings.HasPrefix(out, "Forgot the listener of SVA") || p.listenersOf(t) != 0 {
+			t.Fatalf("forget said:\n%s", out)
+		}
+	})
+}

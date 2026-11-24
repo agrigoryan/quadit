@@ -1,6 +1,7 @@
 // The file beside the login file where `quadit listen` keeps its lease's
-// id, one for each login (server and token), held locked for as long as the
-// listen runs, so one login has one companion.
+// id, one for each login (server and token) and scope (a project, or
+// everything), held locked for as long as the listen runs, so one login has
+// one companion in each scope.
 
 package cli
 
@@ -15,19 +16,25 @@ import (
 	"strings"
 )
 
-// errAnotherListen refuses a second `quadit listen` on a login whose lease
-// file another one holds.
-var errAnotherListen = errors.New("another quadit listen is running with this login")
+// errAnotherListen refuses a second `quadit listen` on a login and scope
+// whose lease file another one holds.
+var errAnotherListen = errors.New("another quadit listen is running with this login, for the same project or for everything")
 
 // leaseFile is the lease file of a login, open and locked.
 type leaseFile struct{ f *os.File }
 
 // openLeaseFile opens and locks the lease file of the login c signs in
-// with, or refuses when another listen holds it. Its name is a hash of the
-// server and the token, so logins given in QUADIT_URL and QUADIT_TOKEN have
-// one each too.
-func openLeaseFile(c *Client) (*leaseFile, error) {
-	sum := sha256.Sum256([]byte(c.URL + "\n" + c.Token))
+// with, listening to project (as project= gave it; "" for everything), or
+// refuses when another listen holds it. Its name is a hash of the server,
+// the token and the project, so logins given in QUADIT_URL and
+// QUADIT_TOKEN have one each too; everything's is the one a listen from
+// before projects kept.
+func openLeaseFile(c *Client, project string) (*leaseFile, error) {
+	login := c.URL + "\n" + c.Token
+	if project != "" {
+		login += "\n" + project
+	}
+	sum := sha256.Sum256([]byte(login))
 	f, err := os.OpenFile(filepath.Join(filepath.Dir(configPath()), "listen-"+hex.EncodeToString(sum[:6])+".lease"), os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("the listener's lease file: %w", err)

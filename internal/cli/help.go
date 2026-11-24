@@ -17,12 +17,14 @@ find      tasks [filter=value ...]   assignee=me status=todo label=art open=1 q=
           search TEXT | decisions [state=open] | inbox [all=1]
 follow    events [after=SEQ] [wait=50] [cursor=NAME] [mine=1] [others=1] [task=KEY]
           ack SEQ [NAME] [lease=ID]  mark the feed handled up to SEQ (the cursor listen takes its lease)
-          wait [for=SECONDS] [lease=ID] [take=1]
+          wait [project=KEY] [for=SECONDS] [lease=ID] [take=1]
                                      wait for the next inbox item (50 seconds unless for= says, up to
-                                     3600: an hour, for a wait in the background);
-                                     prints ITEM or IDLE and the exact commands to go on. One session
-                                     at a time listens; take=1 takes over, only when the person says so
-          listening                  whether something already listens as you, and what
+                                     3600: an hour, for a wait in the background), of one project
+                                     or of everything; prints ITEM or IDLE and the exact commands to
+                                     go on. One session at a time listens to each; take=1 takes over,
+                                     only when the person says so
+          listening [forget project=KEY]
+                                     what already listens as you, to which project, and what
           listen --exec CMD          run CMD for each inbox item, again until it succeeds (quadit help listen)
 act       new PROJECT TITLE [field=value ...]      description=- reads it from stdin
           update KEY field=value ... status=done assignee=@ann priority=high add_labels=a,b
@@ -66,27 +68,32 @@ Codex, Cursor, Gemini CLI, Antigravity CLI, Copilot, opencode and pi look; quadi
 // helpTopics are the texts of "quadit help TOPIC".
 var helpTopics = map[string]string{
 	"listen": `listening: answering what comes in to you in Quadit
-  One session at a time listens as you: it holds your lease, which lives ninety seconds past
-  the wait it last asked for. Another session is refused, and told what holds the lease.
+  A session listens to one project (project=KEY: the work of the folder it sits in) or to
+  everything. One session at a time listens to each, holding its lease, which lives ninety
+  seconds past the wait it last asked for. Another session is refused, and told what holds it.
+  A project's items go to its own listener; everything gets the rest. A project once listened
+  to by itself stays its own: when its session stops, its items wait for its next one.
 
-  listening                    whether something already listens as you, and what, without
-                               taking the lease
+  listening                    what already listens as you, to which project, and what, without
+                               taking a lease
                                quadit listening  ->  Something already listens as you: a companion (last heard 2026-11-21 14:05 UTC).
-  wait [for=SECONDS] [lease=ID] [take=1]
+  listening forget project=KEY hand a project's items to whatever listens to everything again,
+                               once nothing listens to it
+  wait [project=KEY] [for=SECONDS] [lease=ID] [take=1]
                                wait for the next inbox item (50 seconds unless for= says, up to
                                3600), then print ITEM or IDLE and the exact commands to go on:
                                read it, answer it once, acknowledge it, wait again. Run them as
-                               printed: they carry your lease. take=1 takes the lease from another
-                               session, only when the person says so.
+                               printed: they carry your lease and your project. take=1 takes the
+                               lease from another session, only when the person says so.
                                quadit wait for=3600  ->  in the background, where your tool hands
                                a background command's result back to you by itself
-  ack SEQ listen lease=ID      mark an item handled
-  listen [take=1] [by=WORDS] [limit=SECONDS] [tries=N] [events=PATH] --exec COMMAND [ARG ...]
+  ack SEQ listen lease=ID      mark an item handled (the lease says whose)
+  listen [project=KEY] [take=1] [by=WORDS] [limit=SECONDS] [tries=N] [events=PATH] --exec COMMAND [ARG ...]
                                a companion, outside any chat: runs COMMAND for each inbox item,
                                the item's line in the feed in QUADIT_EVENT and on stdin, and what
                                wait prints for it (ITEM line, how to read it, the line that answers
-                               it once) in QUADIT_ITEM, until it exits 0. One per
-                               login. It says it is "a companion" to whoever asks, or what by= says.
+                               it once) in QUADIT_ITEM, until it exits 0. One per login and
+                               project. It says it is "a companion" to whoever asks, or what by= says.
                                limit= kills a run that takes longer; tries= gives an item up after
                                that many failed runs (it stays unread in quadit inbox); events=
                                reports each run as a JSON line to a file or named pipe you made.

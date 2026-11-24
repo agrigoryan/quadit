@@ -1,7 +1,8 @@
 // The listener's commands: listen, the companion that runs a command for
 // each inbox item, and wait, which an agent in a chat runs to be handed the
-// next one. Both read through GET /listen, which lets one session at a time
-// hold the agent's listener lease, and move the cursor only by
+// next one. Both listen to one project (project=KEY) or to everything, and
+// read through GET /listen, which lets one session at a time hold the lease
+// of the agent's listener of that scope, and move its cursor only by
 // acknowledging an item with it.
 
 package cli
@@ -39,14 +40,16 @@ import (
 // listen prints beside a failure moves the cursor past an item that should
 // not be tried again.
 //
-// It holds the agent's listener lease, and stops when another session
-// holds it or takes it over, or when the server refuses it (a person's
-// login, a token revoked); take=1 takes the lease over. It says
-// what it is to whoever asks what listens ("a companion", or what by=
-// says: the desktop app says "the Quadit app"). The lease's id is kept
-// beside the login file, so a companion stopped or restarted goes on with
-// the lease it held. With events=PATH it reports each run, an item given
-// up, and being refused, for whatever started it (listen_runs.go).
+// It holds the lease of the agent's listener of everything, or of one
+// project with project=KEY, and stops when another session holds it or
+// takes it over, or when the server refuses it (a person's login, a token
+// revoked, a server too old to listen by project); take=1 takes the lease
+// over. It says what it is to whoever asks what listens ("a companion", or
+// what by= says: the desktop app says "the Quadit app"). The lease's id is
+// kept beside the login file, one for each scope, so a companion stopped or
+// restarted goes on with the lease it held. With events=PATH it reports
+// each run, an item given up, and being refused, for whatever started it
+// (listen_runs.go).
 func (r *runner) listen(in input) error {
 	return r.listenWith(listenArgs(in.rest), leaseRenewal)
 }
@@ -60,7 +63,7 @@ const leaseRenewal = time.Minute
 // every renewEvery while a command runs.
 func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error {
 	if len(opts.command) == 0 {
-		return errors.New("usage: quadit listen [take=1] [by=WORDS] [limit=SECONDS] [tries=N] [events=PATH] --exec COMMAND [ARG ...]")
+		return errors.New("usage: quadit listen [project=KEY] [take=1] [by=WORDS] [limit=SECONDS] [tries=N] [events=PATH] --exec COMMAND [ARG ...]")
 	}
 	if opts.bad != "" {
 		return errors.New(opts.bad)
@@ -81,7 +84,7 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 		maxItemPause = 5 * time.Minute  // an item's command keeps failing
 	)
 	readPause, itemPause := firstPause, firstPause
-	kept, err := openLeaseFile(r.c)
+	kept, err := openLeaseFile(r.c, opts.project)
 	if err != nil {
 		return err
 	}
@@ -89,8 +92,9 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 	lease := kept.kept()
 	var failedSeq int64 // the item whose runs failed, failed times in a row
 	failed := 0
+	scoped := false // the server said it listens to the project asked for
 	for {
-		page, err := r.nextItem(r.ctx, listenAsk{lease: lease, take: take, by: opts.by}, waitHold)
+		page, err := r.nextItem(r.ctx, listenAsk{project: opts.project, lease: lease, take: take, by: opts.by}, firstHold(opts.project, scoped))
 		if err != nil {
 			if r.ctx.Err() != nil {
 				return r.ctx.Err()
@@ -109,6 +113,10 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 		if !leaseForm.MatchString(page.Lease) {
 			return errStrangeLease
 		}
+		if _, err := page.scope(opts.project); err != nil {
+			return err
+		}
+		scoped = true
 		if page.Lease != lease {
 			kept.keep(page.Lease)
 		}
@@ -129,7 +137,7 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 					return
 				case <-ticker.C:
 					// A short hold with the lease renews it; what it answers (the same item, not acknowledged yet) is not wanted.
-					_, _ = r.nextItem(ctx, listenAsk{lease: lease, by: opts.by}, time.Second) // a renewal that fails leaves the lease to its ninety seconds
+					_, _ = r.nextItem(ctx, listenAsk{project: opts.project, lease: lease, by: opts.by}, time.Second) // a renewal that fails leaves the lease to its ninety seconds
 				}
 			}
 		}
@@ -184,10 +192,11 @@ func pause(ctx context.Context, d time.Duration) error {
 }
 
 // listenOptions are what listen was given: the command after --exec, the
-// secrets it gets, whether to take the lease over (take=1), and what it
-// says it is (by=).
+// secrets it gets, the project it listens to (project=; none: everything),
+// whether to take the lease over (take=1), and what it says it is (by=).
 type listenOptions struct {
 	command, secrets []string
+	project          string
 	take             bool
 	by               string
 	limit            time.Duration // the longest one run may take; 0: no limit
@@ -211,6 +220,11 @@ func listenArgs(args []string) listenOptions {
 			i = len(args)
 		case strings.HasPrefix(args[i], "by="):
 			opts.by = strings.TrimPrefix(args[i], "by=")
+		case strings.HasPrefix(args[i], "project="):
+			var err error
+			if opts.project, err = projectArg(strings.TrimPrefix(args[i], "project=")); err != nil {
+				opts.bad = err.Error()
+			}
 		case strings.HasPrefix(args[i], "limit="):
 			n, ok := wholeIn(strings.TrimPrefix(args[i], "limit="), 1, 86400)
 			if !ok {
@@ -231,7 +245,8 @@ func listenArgs(args []string) listenOptions {
 }
 
 // giveUp is the command that moves the cursor past an item that should not
-// be tried again, with the listener's lease.
+// be tried again, with the listener's lease: the lease says which
+// listener's cursor it is.
 func giveUp(seq int64, lease string) string {
 	return fmt.Sprintf("quadit ack %d listen lease=%s", seq, lease)
 }
@@ -269,13 +284,57 @@ const (
 	holdSlack = 10 * time.Second
 )
 
-// listened is one answer of GET /listen: the lease, and the item with its
-// feed position and its line in the feed, when one came.
+// listened is one answer of GET /listen: the lease, the key of the project
+// it listens to (none: everything), and the item with its feed position
+// and its line in the feed, when one came.
 type listened struct {
-	Lease string      `json:"lease"`
-	Seq   int64       `json:"seq"`
-	Item  *listenItem `json:"item"`
-	Line  string      `json:"line"`
+	Lease   string      `json:"lease"`
+	Project string      `json:"project"`
+	Seq     int64       `json:"seq"`
+	Item    *listenItem `json:"item"`
+	Line    string      `json:"line"`
+}
+
+// errOlderServer stops a listener asked for one project by a server that
+// does not say it listens to one: a server from before listening by
+// project ignores project= and hands over every item.
+var errOlderServer = errors.New("this Quadit server is older and cannot listen to one project: it would hand this session every item, of every project. Listen without project=, or update the server")
+
+// scope is the key of the project the answer says it listens to, checked
+// against what was asked: a project, or none (project is ""). A server that
+// does not say, when a project was asked, is too old to listen by project.
+func (page listened) scope(project string) (string, error) {
+	switch {
+	case project == "":
+		return "", nil
+	case page.Project == "":
+		return "", errOlderServer
+	case !keyForm.MatchString(page.Project):
+		return "", fmt.Errorf("the server sent a project key quadit does not recognize (%q), so nothing is printed to run", page.Project)
+	}
+	return page.Project, nil
+}
+
+// firstHold is how long to ask the server to hold a wait: a second until
+// it has said it listens to the project asked for, so that a server too
+// old to listen by project is found out at once, and waitHold after.
+func firstHold(project string, scoped bool) time.Duration {
+	if project != "" && !scoped {
+		return time.Second
+	}
+	return waitHold
+}
+
+// projectArg checks a project= given: a project's key (in any case) or
+// id, the forms the server takes; it goes into the commands printed.
+func projectArg(v string) (string, error) {
+	if up := strings.ToUpper(v); keyForm.MatchString(up) {
+		return up, nil
+	}
+	if pageForm.MatchString(v) {
+		return v, nil
+	}
+	return "", errors.New("project= is a project's key (SVA) or id: quadit me lists yours")
 }
 
 // errStrangeLease refuses to use a lease id the server sent that is not of
@@ -296,13 +355,15 @@ type listenItem struct {
 	Thread  string `json:"thread"`
 }
 
-// listenAsk is one ask for the next item: with which lease (or none),
-// whether to take it from another session, and what the asker says it is
-// ("a chat", "a companion").
+// listenAsk is one ask for the next item: of the listener of which
+// project (none: everything), with which lease (or none), whether to take
+// it from another session, and what the asker says it is ("a chat", "a
+// companion").
 type listenAsk struct {
-	lease string
-	take  bool
-	by    string
+	project string
+	lease   string
+	take    bool
+	by      string
 }
 
 // nextItem asks for the next item, holding the lease (or taking one, from
@@ -315,6 +376,9 @@ func (r *runner) nextItem(ctx context.Context, ask listenAsk, hold time.Duration
 	}
 	if ask.take {
 		q.Set("take", "1")
+	}
+	if ask.project != "" {
+		q.Set("project", ask.project)
 	}
 	ctx, cancel := context.WithTimeout(ctx, hold+holdSlack)
 	defer cancel()
@@ -329,61 +393,72 @@ func (r *runner) nextItem(ctx context.Context, ask listenAsk, hold time.Duration
 // wait blocks until the caller's next inbox item, for= seconds at most (50
 // when not given, up to maxWait), and prints one record for an agent to act
 // on: the item and the exact commands to read it, acknowledge it and go on,
-// or IDLE and the command to go on. The first wait takes the listener's
-// lease, and the commands it prints carry it; take=1 takes it from another
-// session. A long wait is many holds of the server's, each renewing the
-// lease, so an agent that waits in the background for an hour costs
-// nothing while nothing comes.
+// or IDLE and the command to go on. It listens to everything, or to one
+// project with project=KEY. The first wait takes the lease of the
+// listener of that scope, and the commands it prints carry it, and the
+// project; take=1 takes it from another session. A long wait is many holds
+// of the server's, each renewing the lease, so an agent that waits in the
+// background for an hour costs nothing while nothing comes.
 func (r *runner) wait(in input) error {
-	total := waitHold
-	goOn := "quadit wait"
+	ask := listenAsk{lease: firstValue(in.f["lease"]), by: "a chat"}
+	ask.take = slices.Contains([]string{"1", "true", "yes"}, strings.ToLower(firstValue(in.f["take"])))
+	if v := firstValue(in.f["project"]); v != "" {
+		var err error
+		if ask.project, err = projectArg(v); err != nil {
+			return err
+		}
+	}
+	total, forArg := waitHold, ""
 	if v := in.f["for"]; len(v) > 0 {
 		// The range is checked on the number, before it is made a duration that could overflow.
 		n, err := strconv.Atoi(v[0])
 		if err != nil || n < 1 || n > int(maxWait/time.Second) {
 			return fmt.Errorf("for= is a number of seconds, from 1 to %d", int(maxWait/time.Second))
 		}
-		total = time.Duration(n) * time.Second
-		goOn += " for=" + strconv.Itoa(n)
+		total, forArg = time.Duration(n)*time.Second, " for="+strconv.Itoa(n)
 	}
-	take := slices.Contains([]string{"1", "true", "yes"}, strings.ToLower(firstValue(in.f["take"])))
-	return r.waitFor(waitSpan{total: total, hold: waitHold}, firstValue(in.f["lease"]), take, goOn)
+	return r.waitFor(waitSpan{total: total, hold: waitHold}, ask, forArg)
 }
 
 // waitSpan is how long a wait blocks in all, and the most the server is
 // asked to hold one request of it.
 type waitSpan struct{ total, hold time.Duration }
 
-// waitFor is wait, once its arguments are read: it holds lease (or takes
-// one, from another session with take) for span, and prints the record;
-// goOn is the command that waits again, without its lease.
+// waitFor is wait, once its arguments are read: it asks as ask says for
+// span, and prints the record; forArg is the for= that the command that
+// waits again carries (" for=N"), or "".
 //
 // What it prints is run by an agent as written, so nothing the server sent
-// goes into it unless it has the form quadit gives it: a lease id, a task
-// key, a page id, a handle. The item's words are shown in quotes, without
-// what could end them or start a line.
-func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) error {
+// goes into it unless it has the form quadit gives it: a lease id, a
+// project or task key, a page id, a handle. The item's words are shown in
+// quotes, without what could end them or start a line.
+func (r *runner) waitFor(span waitSpan, ask listenAsk, forArg string) error {
 	deadline := time.Now().Add(span.total)
+	scoped := false
 	for {
-		page, err := r.nextItem(r.ctx, listenAsk{lease: lease, take: take, by: "a chat"}, min(span.hold, time.Until(deadline)))
+		page, err := r.nextItem(r.ctx, ask, min(span.hold, firstHold(ask.project, scoped), time.Until(deadline)))
 		if err != nil {
 			var ae *APIError
 			if errors.As(err, &ae) && ae.Reason == "listening_elsewhere" {
-				return fmt.Errorf("%w\n  only when the person says this session should listen instead: quadit wait take=1", err)
+				return fmt.Errorf("%w\n  only when the person says this session should listen instead: %s", err, waitCommand(ask.project, " take=1"))
 			}
 			return err
 		}
 		if !leaseForm.MatchString(page.Lease) {
 			return errStrangeLease
 		}
-		lease, take = page.Lease, false
-		next := fmt.Sprintf("%s lease=%s", goOn, lease)
+		project, err := page.scope(ask.project)
+		if err != nil {
+			return err
+		}
+		scoped, ask.lease, ask.take = true, page.Lease, false
+		next := fmt.Sprintf("%s lease=%s", waitCommand(project, forArg), ask.lease)
 		if item := page.Item; item != nil {
 			if _, err := item.reading(); err != nil {
 				return err
 			}
 			fmt.Fprintln(r.out, item.record())
-			fmt.Fprintf(r.out, "quadit ack %d listen lease=%s   # once it is handled\n", item.Seq, lease)
+			fmt.Fprintf(r.out, "quadit ack %d listen lease=%s   # once it is handled\n", item.Seq, ask.lease)
 			fmt.Fprintf(r.out, "%s   # then go on listening\n", next)
 			return nil
 		}
@@ -395,11 +470,21 @@ func (r *runner) waitFor(span waitSpan, lease string, take bool, goOn string) er
 	}
 }
 
+// waitCommand is the command that waits again: of the project of key
+// project (none: everything), with rest after it (" for=N", " take=1").
+func waitCommand(project, rest string) string {
+	if project == "" {
+		return "quadit wait" + rest
+	}
+	return "quadit wait project=" + project + rest
+}
+
 // The forms of what the server sends that wait puts into a command or the
 // item's line: a lease id (the server's alphabet without look-alikes), a
-// task key, a page id, a handle, a kind of item.
+// project's key, a task key, a page id, a handle, a kind of item.
 var (
 	leaseForm  = regexp.MustCompile(`^[A-HJKMNP-Z2-9]{8}$`)
+	keyForm    = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,9}$`)
 	timeForm   = regexp.MustCompile(`^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$`)
 	taskForm   = regexp.MustCompile(`^[A-Z][A-Z0-9]{1,9}-[0-9]{1,9}$`)
 	pageForm   = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
@@ -508,11 +593,18 @@ func (item listenItem) reading() (string, error) {
 	return "quadit inbox", nil
 }
 
-// listening says whether something listens as this login's member, what
-// it said it is and when it was last heard, without taking the lease: so
-// an agent in a chat can tell the person that a companion or the app
-// already answers for it.
-func (r *runner) listening(input) error {
+// listening says what listens as this login's member, what each listener
+// said it is and when it was last heard, without taking a lease: so an
+// agent in a chat can tell the person that a companion or the app already
+// answers for it, and which projects listen by themselves. `listening
+// forget project=KEY` forgets that project's listener instead.
+func (r *runner) listening(in input) error {
+	if len(in.pos) > 0 {
+		if in.pos[0] != "forget" {
+			return errors.New("usage: quadit listening [forget project=KEY]")
+		}
+		return r.forgetListener(firstValue(in.f["project"]))
+	}
 	raw, err := r.c.JSON(r.ctx, "/listening", url.Values{})
 	if err != nil {
 		return err
@@ -525,30 +617,106 @@ func (r *runner) listening(input) error {
 	if err := json.Unmarshal(raw, &who); err != nil {
 		return err
 	}
-	fmt.Fprint(r.out, who.sentence())
+	fmt.Fprint(r.out, who.lines())
 	return nil
 }
 
-// listener is what GET /listening answers.
+// listener is what GET /listening answers: the listener of everything's
+// lease, and every listener (none from a server from before projects).
 type listener struct {
 	Listening bool
 	By        string
 	LastHeard string `json:"last_heard"`
+	Listeners []listenerShown
 }
 
-// sentence says it, in the command's own words: what the holder said it
-// is, and when it was last heard, only in the forms a label and a time
-// have.
-func (who listener) sentence() string {
-	if !who.Listening {
-		return "Nothing listens as you.\n"
+// listenerShown is one listener as GET /listening tells it: its project's
+// key (none: everything), what holds it, when it was last heard, and
+// whether its lease lives.
+type listenerShown struct {
+	Project   string
+	By        string
+	LastHeard string `json:"last_heard"`
+	Live      bool
+}
+
+// lines say it, in the command's own words: with no project listening by
+// itself, one sentence on everything, as before projects; else a line for
+// each project and one for everything else, which leaves those projects
+// out. What the server sent is printed only in the forms a key, a label
+// and a time have.
+func (who listener) lines() string {
+	var out strings.Builder
+	var own []string
+	for _, l := range who.Listeners {
+		if l.Project == "" || !keyForm.MatchString(l.Project) {
+			continue
+		}
+		own = append(own, l.Project)
+		if l.Live {
+			fmt.Fprintf(&out, "%s: %s listens%s.\n", l.Project, label(l.By), heard(l.LastHeard))
+		} else {
+			fmt.Fprintf(&out, "%s: nothing listens now; its items wait for the next %s (or, to hand them to everything instead: quadit listening forget project=%s).\n",
+				l.Project, waitCommand(l.Project, ""), l.Project)
+		}
 	}
-	by := "another session"
-	if core.ListenerLabel.MatchString(who.By) {
-		by = who.By
+	if len(own) == 0 {
+		if !who.Listening {
+			return "Nothing listens as you.\n"
+		}
+		return fmt.Sprintf("Something already listens as you: %s%s.\n", label(who.By), heard(who.LastHeard))
 	}
-	if !timeForm.MatchString(who.LastHeard) {
-		return fmt.Sprintf("Something already listens as you: %s.\n", by)
+	if who.Listening {
+		fmt.Fprintf(&out, "Everything else: %s listens%s;", label(who.By), heard(who.LastHeard))
+	} else {
+		out.WriteString("Everything else: nothing listens now, and those items wait in the inbox;")
 	}
-	return fmt.Sprintf("Something already listens as you: %s (last heard %s UTC).\n", by, who.LastHeard)
+	which := "which have listeners of their own"
+	if len(own) == 1 {
+		which = "which has a listener of its own"
+	}
+	fmt.Fprintf(&out, " it leaves out %s, %s.\n", strings.Join(own, ", "), which)
+	return out.String()
+}
+
+// label is what a listener said it is, when it has the form of a label.
+func label(by string) string {
+	if core.ListenerLabel.MatchString(by) {
+		return by
+	}
+	return "another session"
+}
+
+// heard says when a listener was last heard, when the time has its form.
+func heard(at string) string {
+	if !timeForm.MatchString(at) {
+		return ""
+	}
+	return " (last heard " + at + " UTC)"
+}
+
+// forgetListener forgets the listener of a project, so that its items go
+// to the listener of everything again.
+func (r *runner) forgetListener(project string) error {
+	project, err := projectArg(project)
+	if err != nil {
+		return err
+	}
+	raw, err := r.send("DELETE", "/listening/"+url.PathEscape(project), nil, nil, "")
+	if err != nil {
+		return err
+	}
+	var done struct{ Forgotten bool }
+	if err := json.Unmarshal(raw, &done); err != nil {
+		return err
+	}
+	if r.dry {
+		fmt.Fprint(r.out, "would be accepted: ")
+	}
+	if !done.Forgotten {
+		fmt.Fprintf(r.out, "%s has no listener of its own: its items go to whatever listens to everything.\n", project)
+		return nil
+	}
+	fmt.Fprintf(r.out, "Forgot the listener of %s: its items go to whatever listens to everything again.\n", project)
+	return nil
 }

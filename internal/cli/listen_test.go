@@ -193,11 +193,14 @@ func TestListenStopsWhenAnotherSessionListens(t *testing.T) {
 
 // listenServer answers GET /listen as the API does: it holds a request for
 // its wait= seconds unless an item is there, answers the lease (testLease
-// unless told another), and keeps what each request asked.
+// unless told another) and, unless it is older than listening by project,
+// the project asked for, in upper case; and it keeps what each request
+// asked.
 type listenServer struct {
 	mu    sync.Mutex
 	item  string // the item's JSON, or "" for none
 	lease string
+	older bool // from before listening by project: project= is not answered
 	asked []url.Values
 }
 
@@ -218,7 +221,11 @@ func (s *listenServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	raw, _ := json.Marshal(lease)
-	_, _ = io.WriteString(w, `{"lease":`+string(raw)+`,"seq":40,"item":`+item+`}`)
+	project, _ := json.Marshal(strings.ToUpper(q.Get("project")))
+	if s.older {
+		project = []byte(`""`)
+	}
+	_, _ = io.WriteString(w, `{"lease":`+string(raw)+`,"project":`+string(project)+`,"seq":40,"item":`+item+`}`)
 }
 
 func TestWaitPrintsOneRecordToActOn(t *testing.T) {
@@ -247,7 +254,7 @@ quadit wait for=30 lease=KQ7MX4PA   # then go on listening
 		out := &bytes.Buffer{}
 		r := &runner{ctx: context.Background(), c: testClient(t, srv), out: out}
 		started := time.Now()
-		if err := r.waitFor(waitSpan{total: 3 * time.Second, hold: time.Second}, "", true, "quadit wait for=3"); err != nil {
+		if err := r.waitFor(waitSpan{total: 3 * time.Second, hold: time.Second}, listenAsk{take: true, by: "a chat"}, " for=3"); err != nil {
 			t.Fatal(err)
 		}
 		if took := time.Since(started); took < 3*time.Second || took > 5*time.Second {
@@ -340,7 +347,7 @@ func TestAWaitGivesUpOnAServerThatDoesNotAnswer(t *testing.T) {
 	srv := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { <-stalled })
 	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: &bytes.Buffer{}}
 	started := time.Now()
-	err := r.waitFor(waitSpan{total: time.Second, hold: time.Second}, "", false, "quadit wait")
+	err := r.waitFor(waitSpan{total: time.Second, hold: time.Second}, listenAsk{by: "a chat"}, "")
 	if took := time.Since(started); err == nil || took > time.Second+holdSlack+5*time.Second {
 		t.Fatalf("a wait of a second on a server that never answers ended after %s with %v", took, err)
 	}
@@ -364,15 +371,16 @@ func TestConnectSendsTheCodeAsTheServerKeepsIt(t *testing.T) {
 	}
 }
 
-// TestOneListenPerLogin: a second `quadit listen` on the login of one that
-// runs is refused before it asks anything, so two companions never run
-// their command for the same item.
+// TestOneListenPerLogin: a second `quadit listen` on the login and the
+// scope of one that runs is refused before it asks anything, so two
+// companions never run their command for the same item; one for a project
+// beside one for everything is not.
 func TestOneListenPerLogin(t *testing.T) {
 	t.Setenv("QUADIT_CONFIG", filepath.Join(t.TempDir(), "codex.json"))
 	asked := false
 	srv := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { asked = true })
 	c := testClient(t, srv)
-	first, err := openLeaseFile(c)
+	first, err := openLeaseFile(c, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -385,11 +393,19 @@ func TestOneListenPerLogin(t *testing.T) {
 	// Another agent's login beside it, given by QUADIT_URL and QUADIT_TOKEN, has a lease file of its own.
 	other := *c
 	other.Token = "another agent's token"
-	second, err := openLeaseFile(&other)
+	second, err := openLeaseFile(&other, "")
 	if err != nil {
 		t.Fatalf("a second agent's listen is refused: %v", err)
 	}
 	second.close()
+	project, err := openLeaseFile(c, "SVA")
+	if err != nil {
+		t.Fatalf("a listen of a project beside one of everything is refused: %v", err)
+	}
+	defer project.close()
+	if _, err := openLeaseFile(c, "SVA"); !errors.Is(err, errAnotherListen) {
+		t.Fatalf("a second listen of the same project ended with %v", err)
+	}
 }
 
 // TestListenKeepsNoLeaseItDoesNotRecognize: a lease id the server sends
@@ -477,7 +493,7 @@ func TestALongWaitRenewsItsHoldsAndTakesWhatComesLate(t *testing.T) {
 	srv := &lateServer{arrives: time.Now().Add(2500 * time.Millisecond)}
 	out := &bytes.Buffer{}
 	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: out}
-	if err := r.waitFor(waitSpan{total: time.Hour, hold: time.Second}, "", false, "quadit wait for=3600"); err != nil {
+	if err := r.waitFor(waitSpan{total: time.Hour, hold: time.Second}, listenAsk{by: "a chat"}, " for=3600"); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(out.String(), "ITEM #7 comment SVA-1 from @ann: ") || !strings.Contains(out.String(), "quadit wait for=3600 lease="+testLease) {
@@ -629,5 +645,147 @@ func TestForIsCheckedBeforeItBecomesADuration(t *testing.T) {
 		if err := r.wait(input{f: map[string][]string{"for": {given}}}); err == nil || !strings.Contains(err.Error(), "from 1 to 3600") {
 			t.Fatalf("for=%s was taken: %v", given, err)
 		}
+	}
+}
+
+// TestWaitForAProjectKeepsToItInWhatItPrints: wait project=KEY asks for
+// that project's listener, and every line it prints to go on carries the
+// project, as the server named it, so a chat that runs them as printed
+// stays on its project; refused, it names the way to take that project
+// over.
+func TestWaitForAProjectKeepsToItInWhatItPrints(t *testing.T) {
+	t.Run("an item", func(t *testing.T) {
+		srv := &listenServer{item: `{"seq":42,"type":"assigned","by":"@ann","task":"SVA-12","title":"SVA-12 Login"}`}
+		out := &bytes.Buffer{}
+		r := &runner{ctx: context.Background(), c: testClient(t, srv), out: out}
+		if err := r.wait(input{f: map[string][]string{"for": {"30"}, "project": {"sva"}}}); err != nil {
+			t.Fatal(err)
+		}
+		want := `ITEM #42 assigned SVA-12 from @ann: "SVA-12 Login"
+quadit show SVA-12   # read it
+quadit ack 42 listen lease=KQ7MX4PA   # once it is handled
+quadit wait project=SVA for=30 lease=KQ7MX4PA   # then go on listening
+`
+		if out.String() != want {
+			t.Fatalf("wait printed:\n%s\nwant:\n%s", out, want)
+		}
+		if q := srv.asked[0]; q.Get("project") != "SVA" || q.Get("wait") != "1" {
+			t.Fatalf("the first ask was %v, want project=SVA held a second", q)
+		}
+	})
+
+	t.Run("nothing", func(t *testing.T) {
+		srv := &listenServer{}
+		out := &bytes.Buffer{}
+		r := &runner{ctx: context.Background(), c: testClient(t, srv), out: out}
+		if err := r.waitFor(waitSpan{total: 2 * time.Second, hold: time.Second}, listenAsk{project: "SVA", by: "a chat"}, ""); err != nil {
+			t.Fatal(err)
+		}
+		if want := "IDLE\nquadit wait project=SVA lease=" + testLease + "   # go on listening\n"; out.String() != want {
+			t.Fatalf("wait printed:\n%s\nwant:\n%s", out, want)
+		}
+		for _, q := range srv.asked {
+			if q.Get("project") != "SVA" {
+				t.Fatalf("a hold asked %v, without the project", q)
+			}
+		}
+	})
+
+	t.Run("refused", func(t *testing.T) {
+		r := &runner{ctx: context.Background(), c: testClient(t, http.HandlerFunc(refusingListener)), out: &bytes.Buffer{}}
+		err := r.wait(input{f: map[string][]string{"project": {"sva"}}})
+		if err == nil || !strings.Contains(err.Error(), "quadit wait project=SVA take=1") {
+			t.Fatalf("wait refused ended with %v", err)
+		}
+	})
+
+	t.Run("a project not of a key's or an id's form", func(t *testing.T) {
+		srv := &listenServer{}
+		r := &runner{ctx: context.Background(), c: testClient(t, srv), out: &bytes.Buffer{}}
+		if err := r.wait(input{f: map[string][]string{"project": {"SVA; rm -rf ~"}}}); err == nil || !strings.Contains(err.Error(), "project= is a project's key") || len(srv.asked) != 0 {
+			t.Fatalf("wait with a strange project ended with %v, having asked %v", err, srv.asked)
+		}
+	})
+}
+
+// TestAServerTooOldToListenByProjectIsFoundOutAtOnce: a server from before
+// listening by project ignores project= and would hand over every item; a
+// wait or a listen asked for a project stops at its first answer, a hold
+// of a second, saying so, and prints nothing to run.
+func TestAServerTooOldToListenByProjectIsFoundOutAtOnce(t *testing.T) {
+	t.Setenv("QUADIT_CONFIG", filepath.Join(t.TempDir(), "codex.json"))
+	srv := &listenServer{older: true, item: `{"seq":42,"type":"assigned","by":"@ann","task":"GS-3"}`}
+	out := &bytes.Buffer{}
+	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: out}
+	if err := r.wait(input{f: map[string][]string{"project": {"SVA"}}}); !errors.Is(err, errOlderServer) || out.Len() != 0 {
+		t.Fatalf("wait printed %q and ended with %v", out, err)
+	}
+	if err := r.listen(input{rest: []string{"project=SVA", "--exec", "true"}}); !errors.Is(err, errOlderServer) {
+		t.Fatalf("listen ended with %v", err)
+	}
+	if len(srv.asked) != 2 || srv.asked[0].Get("wait") != "1" || srv.asked[1].Get("wait") != "1" {
+		t.Fatalf("they asked %v, want one hold of a second each", srv.asked)
+	}
+	if !strings.Contains(errOlderServer.Error(), "older and cannot listen to one project") {
+		t.Fatalf("the message is %q", errOlderServer)
+	}
+	// Without project=, an older server is as good as ever.
+	if err := r.wait(input{}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestListeningSaysWhatListensToEachProject: with projects that listen by
+// themselves, quadit listening says, a line each, what listens to each and
+// to everything else, which leaves them out; a project whose session
+// stopped waits for its next one, and the line says how to hand its items
+// to everything instead.
+func TestListeningSaysWhatListensToEachProject(t *testing.T) {
+	answer := `{"listening":true,"by":"a companion","last_heard":"2026-11-23 14:05","listeners":[` +
+		`{"by":"a companion","last_heard":"2026-11-23 14:05","live":true},` +
+		`{"project_id":"0192f4a2-0000-7000-8000-000000000001","project":"ART","by":"a chat","last_heard":"2026-11-22 09:00","live":false},` +
+		`{"project_id":"0192f4a2-0000-7000-8000-000000000002","project":"SVA","by":"a chat","last_heard":"2026-11-23 14:04","live":true},` +
+		`{"project_id":"0192f4a2-0000-7000-8000-000000000003","project":"x; rm","by":"a chat","live":true}]}`
+	want := `ART: nothing listens now; its items wait for the next quadit wait project=ART (or, to hand them to everything instead: quadit listening forget project=ART).
+SVA: a chat listens (last heard 2026-11-23 14:04 UTC).
+Everything else: a companion listens (last heard 2026-11-23 14:05 UTC); it leaves out ART, SVA, which have listeners of their own.
+`
+	srv := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, answer)
+	})
+	out := &bytes.Buffer{}
+	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: out}
+	if err := r.listening(input{}); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != want {
+		t.Fatalf("listening printed:\n%s\nwant:\n%s", out, want)
+	}
+}
+
+// TestListeningForgetsAProjectsListener: quadit listening forget
+// project=KEY asks the server to forget that project's listener, and says
+// what became of its items.
+func TestListeningForgetsAProjectsListener(t *testing.T) {
+	var asked []string
+	srv := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.Method+" "+r.URL.Path+"?"+r.URL.RawQuery)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"project":"SVA","forgotten":`+strconv.FormatBool(len(asked) == 1)+`}`)
+	})
+	out := &bytes.Buffer{}
+	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: out}
+	for range 2 {
+		if err := r.listening(input{pos: []string{"forget"}, f: map[string][]string{"project": {"sva"}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := "Forgot the listener of SVA: its items go to whatever listens to everything again.\nSVA has no listener of its own: its items go to whatever listens to everything.\n"
+	if out.String() != want || len(asked) != 2 || !strings.HasPrefix(asked[0], "DELETE ") || !strings.Contains(asked[0], "/listening/SVA?") {
+		t.Fatalf("forget asked %v and printed:\n%s", asked, out)
+	}
+	if err := r.listening(input{pos: []string{"forget"}}); err == nil || !strings.Contains(err.Error(), "project= is a project's key") {
+		t.Fatalf("forget with no project ended with %v", err)
 	}
 }
