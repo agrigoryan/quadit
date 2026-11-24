@@ -106,6 +106,8 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
         },
         toolSelf: async () => (state.connected ? (state.self ?? { proving: null }) : null),
         runEntries: async () => state.runs ?? null,
+        // Nothing waits on the agent: Start running is let go once this is answered.
+        runWaiting: async () => null,
         agentProjects: async () => ({
           ok: true,
           projects: [
