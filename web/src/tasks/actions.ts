@@ -164,6 +164,32 @@ export function setWaitingOn(tasks: Task[], userId: string | null, note?: string
   );
 }
 
+/**
+ * Stops a task waiting, as it was when it was read: sent with its position
+ * then (base_seq), so a wait set since, for someone else, is not cleared by
+ * a click made before it was seen (offline, say). Refused for that, nothing
+ * is said: the task shows as it is. Undone like any change of the wait.
+ */
+export function stopWaiting(task: Task) {
+  const u = there(
+    task,
+    { waiting_on: null, waiting_on_note: "" },
+    { waiting_on_id: null, waiting_outside: null, waiting_on_note: null },
+  );
+  sendUndoable(
+    t("undo.change", { what: t("undo.what.waitingOn"), of: task.key }),
+    {
+      changes: [{ type: "task.update", args: { id: task.id, base_seq: task.updated_seq, ...u.args } }],
+      show: (tx) => tx.patch("tasks", task.id, u.local),
+      quiet: true,
+    },
+    {
+      changes: [{ type: "task.update", args: { id: task.id, ...u.back } }],
+      show: (tx) => tx.patch("tasks", task.id, u.before),
+    },
+  );
+}
+
 /** The task waits on an outside event; the note says which. */
 export function setWaitingOutside(tasks: Task[], note: string) {
   updateAll(

@@ -17,15 +17,19 @@ import { isOpenCategory } from "@/types/core";
 import { editDraft } from "@/detail/comment-actions";
 import { startComment } from "@/detail/comment-box";
 import { nameOf } from "@/detail/data";
-import { setStatus, setWaitingOn } from "@/tasks/actions";
+import { setStatus, stopWaiting } from "@/tasks/actions";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 
-/** Who set the task to wait on `userId`, from its history: the actor of the newest change that did. */
-export function handedBy(events: FeedEvent[], userId: string): string | undefined {
+/**
+ * Who handed the task on as it waits now, from its history: the actor of
+ * the newest change of its wait or of the wait's note. A second hand-off to
+ * the same person changes only the note, and it is that hand-off's.
+ */
+export function handedBy(events: FeedEvent[]): string | undefined {
   for (let i = events.length - 1; i >= 0; i--) {
-    const ev = events[i];
-    if (ev?.data?.changes?.waiting_on_id?.to === userId) return ev.actor_id;
+    const changes = events[i]?.data?.changes;
+    if (changes?.waiting_on_id || changes?.waiting_on_note) return events[i]?.actor_id;
   }
   return undefined;
 }
@@ -34,18 +38,20 @@ export function handedBy(events: FeedEvent[], userId: string): string | undefine
 export function HandBack({ task }: { task: Task }) {
   const me = useMe();
   const can = useCan();
-  const asked = useOpenDecisions()[task.id]?.some((d) => d.asked_id === me.user_id) ?? false;
+  const open = useOpenDecisions()[task.id] ?? [];
+  const asked = open.some((d) => d.asked_id === me.user_id);
   const events = useTaskEvents(task.id);
-  const hander = useMember(useMemo(() => handedBy(events, me.user_id), [events, me.user_id]));
+  const hander = useMember(useMemo(() => handedBy(events), [events]));
   const statuses = useStatuses(task.project_id);
   const done = statuses.find((st) => st.category === "done");
   // Set when Looks good was pressed here: the offer to mark it done takes the block's place until the person moves on.
   const [found, setFound] = useState(false);
 
   if (!can.editTask(task)) return null;
-  const open = isOpenCategory(statuses.find((st) => st.id === task.status_id)?.category);
   if (found) {
-    if (!open || !done) return null;
+    // Gone as soon as marking it done would be wrong: it is closed, waits on someone again, or has a question open.
+    const closed = !isOpenCategory(statuses.find((st) => st.id === task.status_id)?.category);
+    if (closed || !done || task.waiting_on_id || task.waiting_outside || open.length > 0) return null;
     return (
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-ink-2">
         <span className="flex items-center gap-1.5">
@@ -86,7 +92,7 @@ export function HandBack({ task }: { task: Task }) {
           variant="move"
           className="max-sm:h-10"
           onClick={() => {
-            setWaitingOn([task], null);
+            stopWaiting(task);
             setFound(true);
           }}
         >
@@ -102,7 +108,7 @@ export function HandBack({ task }: { task: Task }) {
         >
           {t("handBack.reply")}
         </Button>
-        <Button variant="ghost" className="max-sm:h-10" onClick={() => setWaitingOn([task], null)}>
+        <Button variant="ghost" className="max-sm:h-10" onClick={() => stopWaiting(task)}>
           {t("handBack.notMe")}
         </Button>
       </div>

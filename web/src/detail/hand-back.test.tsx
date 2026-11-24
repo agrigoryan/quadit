@@ -5,13 +5,15 @@
 // the hand-back to whoever handed it in my comment box; Not waiting on me
 // only stops the wait.
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "@/data/api";
+import { api, ApiError } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
 import { queryClient } from "@/data/query";
-import { clearStore, getState, loadBootstrap } from "@/data/store";
+import { clearStore, getState, loadBootstrap, mergeRows, patchRow } from "@/data/store";
+import { useToasts } from "@/lib/toast";
+import { useRow } from "@/data/selectors";
 import { taskKeys } from "@/data/task-detail";
 import { EMPTY_DRAFT, useDrafts } from "@/detail/comment-actions";
 import { HandBack, handedBy } from "@/detail/hand-back";
@@ -34,6 +36,7 @@ const task = (over: Partial<Task> = {}): Task =>
     status_id: "s1",
     waiting_on_id: "u1",
     waiting_on_note: "review the result",
+    updated_seq: 4,
     ...over,
   }) as Task;
 
@@ -72,10 +75,16 @@ function show(shown: Task, more: { me?: Member; decisions?: Decision[] } = {}) {
   queryClient.setQueryData(taskKeys.detail("acme", "t1"), { events: [handOff] });
   render(
     <MemoryRouter>
-      <HandBack task={getState().collections.tasks.t1 as Task} />
+      <Live />
     </MemoryRouter>,
     { wrapper: WithQuery },
   );
+}
+
+/** The block over the task as the store has it now, as the task's page gives it. */
+function Live() {
+  const live = useRow("tasks", "t1");
+  return live ? <HandBack task={live} /> : null;
 }
 
 const block = () => screen.queryByRole("region", { name: "Waiting on you" });
@@ -129,7 +138,9 @@ describe("the hand-back block", () => {
     show(task());
     fireEvent.click(screen.getByRole("button", { name: "Looks good" }));
     await waitFor(() =>
-      expect(sent).toEqual([{ type: "task.update", args: { id: "t1", waiting_on: null, waiting_on_note: "" } }]),
+      expect(sent).toEqual([
+        { type: "task.update", args: { id: "t1", base_seq: 4, waiting_on: null, waiting_on_note: "" } },
+      ]),
     );
     expect(block()).toBeNull();
     expect(screen.getByText("It no longer waits on you.")).toBeTruthy();
@@ -156,16 +167,61 @@ describe("the hand-back block", () => {
     show(task());
     fireEvent.click(screen.getByRole("button", { name: "Not waiting on me" }));
     await waitFor(() =>
-      expect(sent).toEqual([{ type: "task.update", args: { id: "t1", waiting_on: null, waiting_on_note: "" } }]),
+      expect(sent).toEqual([
+        { type: "task.update", args: { id: "t1", base_seq: 4, waiting_on: null, waiting_on_note: "" } },
+      ]),
     );
     expect(screen.queryByText("It no longer waits on you.")).toBeNull();
+  });
+
+  it("says nothing when the task changed meanwhile and the server refuses: the task shows as it is", async () => {
+    vi.mocked(api.post).mockRejectedValue(new ApiError(409, { code: "conflict", message: "the task changed since" }));
+    show(task());
+    fireEvent.click(screen.getByRole("button", { name: "Not waiting on me" }));
+    await waitFor(() => expect(getState().collections.tasks.t1?.waiting_on_id).toBe("u1"));
+    expect(useToasts.getState().items).toEqual([]);
+  });
+
+  it("takes the offer to mark it done away as soon as the task waits again or a question is open on it", async () => {
+    show(task());
+    fireEvent.click(screen.getByRole("button", { name: "Looks good" }));
+    expect(await screen.findByRole("button", { name: "Mark SVA-53 done" })).toBeTruthy();
+    act(() => patchRow("tasks", "t1", { waiting_on_id: "a1" }));
+    expect(screen.queryByRole("button", { name: "Mark SVA-53 done" })).toBeNull();
+
+    show(task());
+    fireEvent.click(screen.getByRole("button", { name: "Looks good" }));
+    expect(await screen.findByRole("button", { name: "Mark SVA-53 done" })).toBeTruthy();
+    act(() =>
+      mergeRows("decisions", [
+        {
+          id: "d9",
+          task_id: "t1",
+          kind: "choice",
+          question: "Q",
+          state: "open",
+          created_by: "a1",
+          rank: "a",
+        } as Decision,
+      ]),
+    );
+    expect(screen.queryByRole("button", { name: "Mark SVA-53 done" })).toBeNull();
   });
 });
 
 describe("handedBy", () => {
-  it("names who last set the task to wait on someone", () => {
+  it("names who last set the wait or its note: a second hand-off to the same person changes only the note", () => {
     const again = { ...handOff, seq: 9, actor_id: "u5" };
-    expect(handedBy([handOff, again], "u1")).toBe("u5");
-    expect(handedBy([handOff], "u9")).toBeUndefined();
+    expect(handedBy([handOff, again])).toBe("u5");
+    const noteOnly = {
+      ...handOff,
+      seq: 11,
+      actor_id: "a2",
+      data: { changes: { waiting_on_note: { from: "review the result", to: "check the second phase" } } },
+    };
+    expect(handedBy([handOff, noteOnly])).toBe("a2");
+    const other = { ...handOff, seq: 12, actor_id: "u7", data: { changes: { title: { from: "a", to: "b" } } } };
+    expect(handedBy([handOff, other])).toBe("a1");
+    expect(handedBy([])).toBeUndefined();
   });
 });

@@ -38,6 +38,8 @@ const SAME_STEP_MS = 10_000;
 export interface Batch {
   changes: ChangeSpec[];
   show?: (tx: Tx) => void;
+  /** A refusal of it is not said: what it showed goes back to what the server has, and that is all. */
+  quiet?: boolean;
 }
 
 /** Something done that can be taken back. */
@@ -137,6 +139,7 @@ export function sendUndoable(name: string, forward: Batch, back: Batch, about?: 
     return mutate(
       forward.changes.map((change, i) => ({ ...change, id: sentAs[i] })),
       forward.show,
+      { quiet: forward.quiet },
     );
   };
   // Each change on the way back takes back the one in its place; where the way back is longer, the rest take back the last.
