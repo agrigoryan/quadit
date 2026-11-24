@@ -725,16 +725,18 @@ func (e *liveEntry) handle(ctx context.Context, ans held) error {
 		}
 		return nil
 	}
-	switch ans.Wake.Do {
-	case wakeAck:
+	task := e.state.task(head.Task)
+	continuing := task.Continue != nil && task.Continue.Seq == head.Seq
+	switch {
+	// The head this entry kept to go on with still waits on it, whatever
+	// the server counts as from before.
+	case ans.Wake.Do == wakeAck && (!continuing || ans.Wake.Why != whyBefore):
 		e.acknowledge(ctx, head, itemRunID(head.ID))
 		return nil
-	case wakeRefuse:
+	case ans.Wake.Do == wakeRefuse:
 		e.notStarted(ctx, head, ans.Wake.Why)
 		return nil
 	}
-	task := e.state.task(head.Task)
-	continuing := task.Continue != nil && task.Continue.Seq == head.Seq
 	covered, err := e.covered(ctx, head, task)
 	switch {
 	case err != nil:

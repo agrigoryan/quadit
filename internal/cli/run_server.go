@@ -86,6 +86,10 @@ const (
 	wakeRefuse = "refuse"
 )
 
+// whyBefore is why an item from before the runner began is acknowledged:
+// it no longer waits on the agent.
+const whyBefore = "before"
+
 // understood reports whether the runner can act on w: a do it knows. Why
 // an item is acknowledged does not matter (any why, known or not, is a
 // plain acknowledgment); a refusal's why goes on the row, so it must have
@@ -148,6 +152,29 @@ func (api entryAPI) me(ctx context.Context) (whoAmI, error) {
 		return me, err
 	}
 	return me, json.Unmarshal(raw, &me)
+}
+
+// waitingAnswer is what GET /listening/{key}/waiting answers: the tasks a
+// runner set up now would start, the first five named.
+type waitingAnswer struct {
+	Agent   string `json:"agent"`
+	Project string `json:"project"`
+	Runs    int    `json:"runs"`
+	Tasks   []struct {
+		Key   string `json:"key"`
+		Title string `json:"title"`
+	} `json:"tasks"`
+}
+
+// waiting is what a runner set up now for the project would start, and
+// the answer as the server wrote it.
+func (api entryAPI) waiting(ctx context.Context, project string) (waitingAnswer, []byte, error) {
+	var answer waitingAnswer
+	raw, err := api.client().JSON(ctx, "/listening/"+url.PathEscape(project)+"/waiting", nil)
+	if err != nil {
+		return answer, nil, err
+	}
+	return answer, raw, json.Unmarshal(raw, &answer)
 }
 
 // projectRow is a project as GET /list/projects gives it.

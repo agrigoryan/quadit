@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -774,5 +775,35 @@ func TestARunSaysWhatStartedItAsAPersonWould(t *testing.T) {
 	}
 	if got, want := runInstructions(more[2:]), `@aram-grigoryan assigned SVA-53.`; got != want {
 		t.Errorf("%q, want %q", got, want)
+	}
+}
+
+// usageLimited is a Claude Code that takes the prompt, works, and stops at
+// its usage limit, which resets in an hour.
+func usageLimited() []fakeagent.Step {
+	resets := time.Now().Add(time.Hour).Truncate(time.Second)
+	return []fakeagent.Step{claudeInit(), claudeSays("Working."),
+		{Out: fmt.Sprintf(`{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":%d}}`, resets.Unix())}, exit(1)}
+}
+
+// TestAKeptHeadGoesOnThoughTheServerSaysItIsFromBefore: the head an entry
+// keeps after a usage limit, which a server counts as taken by the run
+// (ack before), is continued, not acknowledged.
+func TestAKeptHeadGoesOnThoughTheServerSaysItIsFromBefore(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, usageLimited(), claudeDone("done"))
+	head := rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	if row := rt.ended(0); row["reason"] != core.RunUsageLimit {
+		t.Fatalf("the first run ended %v", row)
+	}
+	rt.eventually("paused", func() bool { return readStatus(rt.files.status()).Entries[rt.entry.ID].Pause == core.PauseUsageLimit })
+	rt.f.set(func(f *fakeQuadit) { f.items[0].Do, f.items[0].Why = wakeAck, whyBefore })
+	rt.clock.jump(61 * time.Minute)
+	if row := rt.ended(1); row["state"] != core.AgentSessionDone {
+		t.Fatalf("the continuation ended %v", row)
+	}
+	rt.acked(head)
+	if p := rt.records()[1].Stdin; !strings.Contains(p, "Your last run stopped at Claude Code's limit before it finished") {
+		t.Fatalf("the second run is not the continuation:\n%s", p)
 	}
 }

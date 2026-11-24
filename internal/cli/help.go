@@ -119,6 +119,9 @@ var helpTopics = map[string]string{
                                the project's own folder (not your home folder, nothing above it,
                                no system folder), the program (found on PATH, or given)
   run list [--json]            the entries, and what each does now while a runner serves
+  run waiting login=PATH project=KEY [--json]
+                               what a runner set up now would start at once: the tasks whose
+                               items from before still wait on the agent there (five named)
   run remove ENTRY_ID | login=PATH [project=KEY]
                                stop its run, tell the server how it ended, let the project go,
                                then drop the entry

@@ -102,12 +102,14 @@ func runnerFormOn(ctx context.Context, host runHost, args []string, sw switches,
 		return runList(files, host, sw.json, stdout, stderr)
 	case "machine":
 		return runMachine(ctx, files, fields, stdout, stderr)
+	case "waiting":
+		return runWaiting(ctx, fields, sw.json, stdout, stderr)
 	}
 	return exitFailed // formArgs refused every other form
 }
 
 // runUsage is what quadit run says to an argument it does not take.
-const runUsage = "usage: quadit run [registry=PATH] | run add … | run remove … | run list | run machine name=… | run --secret NAME -- COMMAND (quadit help run)"
+const runUsage = "usage: quadit run [registry=PATH] | run add … | run remove … | run list | run waiting … | run machine name=… | run --secret NAME -- COMMAND (quadit help run)"
 
 // runForms are the fields each form of quadit run takes (registry= is
 // every form's), and how many arguments besides its name.
@@ -120,6 +122,7 @@ var runForms = map[string]struct {
 	"remove":  {[]string{"login", "project"}, 1},
 	"list":    {nil, 0},
 	"machine": {[]string{"name"}, 0},
+	"waiting": {[]string{"login", "project"}, 0},
 }
 
 // formArgs refuses, before anything is touched, a form of quadit run that
@@ -824,5 +827,47 @@ func runMachine(ctx context.Context, files runFiles, fields map[string][]string,
 		return exitFailed
 	}
 	fmt.Fprintf(stdout, "This computer is now %q.\n", name)
+	return exitOK
+}
+
+// runWaiting says what a runner set up now for the agent of the login
+// file and the project would start at once: the tasks with items that
+// wait on the agent there, the first five named. It asks the server and
+// changes nothing.
+func runWaiting(ctx context.Context, fields map[string][]string, asJSON bool, stdout, stderr io.Writer) int {
+	login, project := firstValue(fields["login"]), firstValue(fields["project"])
+	if login == "" || project == "" {
+		fmt.Fprintln(stderr, "usage: quadit run waiting login=PATH project=KEY [--json]")
+		return exitFailed
+	}
+	c, err := loginClient(login)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return exitFailed
+	}
+	answer, raw, err := entryAPI{c: c}.waiting(ctx, project)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return exitFailed
+	}
+	if asJSON {
+		fmt.Fprintln(stdout, strings.TrimSpace(string(raw)))
+		return exitOK
+	}
+	switch answer.Runs {
+	case 0:
+		fmt.Fprintf(stdout, "Nothing waits on %s in %s: Quadit starts it with what comes next.\n", answer.Agent, answer.Project)
+		return exitOK
+	case 1:
+		fmt.Fprintf(stdout, "1 run starts when Quadit runs %s in %s:\n", answer.Agent, answer.Project)
+	default:
+		fmt.Fprintf(stdout, "%d runs start when Quadit runs %s in %s:\n", answer.Runs, answer.Agent, answer.Project)
+	}
+	for _, t := range answer.Tasks {
+		fmt.Fprintf(stdout, "  %s  %s\n", t.Key, t.Title)
+	}
+	if more := answer.Runs - len(answer.Tasks); more > 0 {
+		fmt.Fprintf(stdout, "  and %d more\n", more)
+	}
 	return exitOK
 }

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -253,6 +254,95 @@ func TestQuaditRunsTheAgentForATaskOnARealServer(t *testing.T) {
 		time.Sleep(300 * time.Millisecond)
 		if n := len(rt.records()); n != 4 || len(q.runs(owner, "RC-1")) != 5 {
 			t.Fatalf("after the restart: %d starts, runs %v", n, q.runs(owner, "RC-1"))
+		}
+	})
+}
+
+// TestATaskAssignedBeforeTheRunnerGoesOnAfterAUsageLimit: on a real
+// server, a task assigned before the runner starts; its run takes the
+// prompt and stops at Claude Code's usage limit; when the limit resets
+// the run goes on with the same item, in the same session.
+func TestATaskAssignedBeforeTheRunnerGoesOnAfterAUsageLimit(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		q := startRealQuadit(t, st)
+		owner := q.token(q.owner, "me")
+		q.change(owner, "project.create", map[string]any{"key": "RC", "name": "Run check"})
+		q.change(owner, "agent.create", map[string]any{"name": "claude", "handle": "claude"})
+		agent := q.token(q.owner, "@claude")
+		rt := newRunTest(t, core.ProgramClaude, usageLimited(), claudeDone("Added the line."))
+		writeJSON(t, rt.login, map[string]string{"url": q.url, "token": agent})
+		rt.times.renew, rt.times.steps, rt.poll = 500*time.Millisecond, 200*time.Millisecond, 150*time.Millisecond
+		rt.writeRegistry()
+		if code, said := rt.add("login="+rt.login, "project=RC", "folder="+rt.folder, "program=claude", "program_path="+rt.entry.ProgramPath); code != 0 {
+			t.Fatalf("quadit run add on the real server: %s", said)
+		}
+		q.change(owner, "task.create", map[string]any{"project": "RC", "title": "Add a line", "assignee": "@claude"})
+		rt.serve()
+		state := func(n int) string {
+			runs := q.runs(owner, "RC-1")
+			if n >= len(runs) {
+				return ""
+			}
+			return fmt.Sprint(runs[n]["reason"], " ", runs[n]["state"])
+		}
+		rt.eventually("the first run at its limit", func() bool { return state(0) == core.RunUsageLimit+" "+core.AgentSessionFailed })
+		rt.eventually("paused", func() bool {
+			for _, entry := range readStatus(rt.files.status()).Entries {
+				if entry.Pause == core.PauseUsageLimit {
+					return true
+				}
+			}
+			return false
+		})
+		rt.clock.jump(61 * time.Minute)
+		rt.eventually("the run that goes on done", func() bool { return state(1) == "<nil> "+core.AgentSessionDone })
+		if p := rt.records()[1].Stdin; !strings.Contains(p, "Your last run stopped at Claude Code's limit before it finished") || !slices.Contains(rt.records()[1].Argv, "--resume") {
+			t.Fatalf("the second run is not the first going on: argv %q\n%s", rt.records()[1].Argv, p)
+		}
+	})
+}
+
+// TestRunWaitingSaysWhatARunnerWouldStart: quadit run waiting, with an
+// agent's login file, says what a runner set up now for a project would
+// start at once, as the server answers it, and changes nothing.
+func TestRunWaitingSaysWhatARunnerWouldStart(t *testing.T) {
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		q := startRealQuadit(t, st)
+		owner := q.token(q.owner, "me")
+		q.change(owner, "project.create", map[string]any{"key": "RC", "name": "Run check"})
+		q.change(owner, "agent.create", map[string]any{"name": "claude", "handle": "claude"})
+		login := t.TempDir() + "/claude.json"
+		writeJSON(t, login, map[string]string{"url": q.url, "token": q.token(q.owner, "@claude")})
+		say := func(asJSON bool, args ...string) (int, string) {
+			var out bytes.Buffer
+			fields := map[string][]string{}
+			for _, a := range args {
+				k, v, _ := strings.Cut(a, "=")
+				fields[k] = append(fields[k], v)
+			}
+			code := runWaiting(context.Background(), fields, asJSON, &out, &out)
+			return code, out.String()
+		}
+		if code, said := say(false, "login="+login, "project=RC"); code != 0 || said != "Nothing waits on @claude in RC: Quadit starts it with what comes next.\n" {
+			t.Fatalf("with nothing waiting: %d %q", code, said)
+		}
+		for i := range 7 {
+			q.change(owner, "task.create", map[string]any{"project": "RC", "title": fmt.Sprint("Line ", i), "assignee": "@claude"})
+		}
+		want := "7 runs start when Quadit runs @claude in RC:\n  RC-1  Line 0\n  RC-2  Line 1\n  RC-3  Line 2\n  RC-4  Line 3\n  RC-5  Line 4\n  and 2 more\n"
+		if code, said := say(false, "login="+login, "project=RC"); code != 0 || said != want {
+			t.Fatalf("with seven waiting: %d\n%s", code, said)
+		}
+		code, said := say(true, "login="+login, "project=rc")
+		wantJSON := `{"agent":"@claude","project":"RC","runs":7,"tasks":[{"key":"RC-1","title":"Line 0"},{"key":"RC-2","title":"Line 1"},{"key":"RC-3","title":"Line 2"},{"key":"RC-4","title":"Line 3"},{"key":"RC-5","title":"Line 4"}]}` + "\n"
+		if code != 0 || said != wantJSON {
+			t.Fatalf("--json: %d %s", code, said)
+		}
+		if code, said := say(false, "login="+login); code != exitFailed || !strings.Contains(said, "usage: quadit run waiting login=PATH project=KEY") {
+			t.Fatalf("without a project: %d %q", code, said)
+		}
+		if code, said := say(false, "login="+login, "project=NOPE"); code != exitFailed || !strings.Contains(said, "NOPE") {
+			t.Fatalf("an unknown project: %d %q", code, said)
 		}
 	})
 }
