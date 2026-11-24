@@ -56,8 +56,21 @@ describe("shellFolder", () => {
     expect(shellFolder("~/-rf")).toBe("~/'-rf'");
   });
 
-  it("quotes ~ followed by a name, which the shell would read as another person's home", () => {
-    expect(shellFolder("~root/x")).toBe("'~root/x'");
+  it("refuses ~ followed by a name, another person's home, which quoted would be a folder under the current one", () => {
+    expect(shellFolder("~root/x")).toBeNull();
+    expect(shellFolder("~root")).toBeNull();
+  });
+
+  it("refuses a backslash, which some shells read even inside single quotes", () => {
+    expect(shellFolder("~/game\\n")).toBeNull();
+    expect(shellFolder("/a\\b")).toBeNull();
+  });
+
+  it("refuses a very long label with a trailing slash at once", () => {
+    const started = performance.now();
+    expect(shellFolder(`/${"a".repeat(100_000)}/`)).toBeNull();
+    expect(shellFolder(`~/${"a/".repeat(50_000)}`)).toBeNull();
+    expect(performance.now() - started).toBeLessThan(500);
   });
 
   it("refuses a label with a control character, an empty part, or not starting at ~ or /", () => {
@@ -70,6 +83,8 @@ describe("shellFolder", () => {
       "/a\tb",
       "/a\u0000b",
       "/a\u001bb",
+      "/a\u007fb",
+      "/a\u0085b",
       "~//game",
       "/a//b",
       "~/game/",

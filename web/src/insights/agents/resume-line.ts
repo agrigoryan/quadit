@@ -10,9 +10,19 @@ import type { AgentSession } from "@/types/core";
 /** A canonical UUID: lower-case hex, 8-4-4-4-12. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** A folder label: from ~ or /, components of no slash and no control character, none empty. */
-// oxlint-disable-next-line no-control-regex -- control characters are what the form refuses
-const FOLDER = /^(~|\/)(\/?[^/\x00-\x1f]+)*$/;
+/** A character a label may not hold: a backslash (some shells read it even inside single quotes) or a control character. */
+const UNSAFE = /[\\\p{Cc}]/u;
+
+/**
+ * Whether a folder label has the strict form: `/`, `~`, or non-empty
+ * components under `/` or `~/`, none holding a backslash or a control
+ * character. Checked part by part, in time linear in its length.
+ */
+function strictFolder(label: string): boolean {
+  if (label === "/" || label === "~") return true;
+  const under = label.startsWith("~/") ? label.slice(2) : label.startsWith("/") ? label.slice(1) : null;
+  return under !== null && !UNSAFE.test(under) && under.split("/").every((part) => part !== "");
+}
 
 /** How each program resumes a session, given its id. */
 const resume = new Map<string, (id: string) => string>([
@@ -29,7 +39,7 @@ const quoted = (text: string) => `'${text.replaceAll("'", `'\\''`)}'`;
  * single-quoted word. Null when the label is not of the strict form.
  */
 export function shellFolder(label: string): string | null {
-  if (!FOLDER.test(label)) return null;
+  if (!strictFolder(label)) return null;
   if (label === "~") return "~";
   if (label.startsWith("~/")) return `~/${quoted(label.slice(2))}`;
   return quoted(label);
