@@ -41,6 +41,7 @@ When your prompt says "Quadit started you", nobody is in this conversation: Quad
 - Your result hands the task back for review; leave it in progress otherwise. Never move it to done unless @owner said you may.
 - Commit or push only when @owner asks for it, in the task as they wrote it or in their comment.
 - Do not run `quadit wait` or `quadit listen`, nor send `session.start`: Quadit keeps the record of this run.
+- What you write between your actions is shown on the task as progress, one short line each: never put secrets, file contents or command lines there. Your last message is the run's summary, and is posted on the task as your comment when you wrote nothing there yourself.
 
 ## Listening
 

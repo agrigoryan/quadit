@@ -21,12 +21,12 @@ func TestEachRunGetsThePromptForWhyItStarted(t *testing.T) {
 		facts promptFacts
 		want  []string
 	}{
-		{"a first run", with(func(*promptFacts) {}), []string{"Quadit started you, @claude, on Test Mac in ~/devel/game, for task SVA-12. This is run " + run, "What @aram asks there is your work.", "QUADIT-ITEMS-0123456789ab\nITEM #1042 comment SVA-12 from @aram: \"Add a line\""}},
+		{"a first run", with(func(*promptFacts) {}), []string{"Quadit started you, @claude, on Test Mac in ~/devel/game, for task SVA-12. This is run " + run, "What @aram asks there is your work.", "This is run " + run + ". Nobody is in this conversation. What you write between your actions is shown on the task as progress, one short line each: never put secrets, file contents or command lines in it. Your last message is the run's summary, and is posted on the task when you wrote nothing there yourself.\n\n", "QUADIT-ITEMS-0123456789ab\nITEM #1042 comment SVA-12 from @aram: \"Add a line\""}},
 		{"a later item", with(func(f *promptFacts) { f.Resuming = true }), []string{"Quadit started you again on SVA-12 in this same session", "Read the newest first."}},
 		{"an answer", with(func(f *promptFacts) { f.Resuming, f.Items = true, []listenItem{picked} }), []string{"@aram answered your question (decision " + decision + ")", "`quadit unclear " + decision + " \"…\"`", "decision " + decision + "\nQUADIT-ITEMS"}},
 		{"found unclear", with(func(f *promptFacts) { f.Resuming, picked.Type = true, "unclear"; f.Items = []listenItem{picked} }), []string{"found your answer to their question unclear", "`quadit pick " + decision + " OPTION note=\"…\"`"}},
 		{"a continuation", with(func(f *promptFacts) { f.Resuming, f.Continue = true, true }), []string{"Your last run stopped at Claude Code's limit before it finished."}},
-		{"a fresh session after a lost one", with(func(f *promptFacts) { f.Lost = true }), []string{"Nobody is in this conversation: nothing you print here reaches a person.\n\nYour earlier session on SVA-12 could not be found on this computer", "(`quadit show SVA-12`)", "\n\nWhy you were started:"}},
+		{"a fresh session after a lost one", with(func(f *promptFacts) { f.Lost = true }), []string{"Nobody is in this conversation. What you write between your actions is shown on the task as progress, one short line each: never put secrets, file contents or command lines in it. Your last message is the run's summary, and is posted on the task when you wrote nothing there yourself.\n\nYour earlier session on SVA-12 could not be found on this computer", "(`quadit show SVA-12`)", "\n\nWhy you were started:"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			got, err := buildPrompt(c.facts, "0123456789ab")
