@@ -2,10 +2,14 @@ package engine_test
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -234,6 +238,117 @@ func TestASentBackQuestionIsSettledWhenItsAskerMovesOn(t *testing.T) {
 		q.do(q.artist, "comment.create", M{"task": key, "kind": "result", "body": "Done another way."})
 		if got := q.decision(d); got.State != core.StateNotNeeded {
 			t.Fatalf("a result left it %+v", got)
+		}
+	})
+}
+
+// TestAResultGoesToWhoAnsweredNotToWhoClosed: a result hands the task to
+// the member who last answered a question on it (picked, or sent back),
+// not to one who only closed a question.
+func TestAResultGoesToWhoAnsweredNotToWhoClosed(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		q := newQuestions(t, st)
+		key := q.newTask("Boss")
+		answered := q.ask(q.artist, key, "@aram")
+		q.do(q.owner.ID, "decision.pick", M{"id": answered, "option": 1})
+		closed := q.ask(q.artist, key, "@bea")
+		q.do(q.bea, "decision.close", M{"id": closed})
+		q.do(q.artist, "comment.create", M{"task": key, "kind": "result", "body": "Done."})
+		if got := q.world.task(key); got.WaitingOnID != q.owner.ID {
+			t.Fatalf("the result handed the task to %q, want the owner, who answered", got.WaitingOnID)
+		}
+	})
+}
+
+// TestClosingIsRefusedWithoutAccessBeforeAnythingIsSaid: a caller whose
+// access leaves out the task's project is refused, whatever state the
+// question is in, before learning anything of it.
+func TestClosingIsRefusedWithoutAccessBeforeAnythingIsSaid(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		q := newQuestions(t, st)
+		ops := q.do(q.owner.ID, "project.create", M{"key": "OPS", "name": "Operations"}).Ref
+		key := q.newTask("Boss")
+		closed := q.ask(q.artist, key, "@aram")
+		q.do(q.owner.ID, "decision.close", M{"id": closed})
+		answered := q.ask(q.artist, key, "@aram")
+		q.do(q.owner.ID, "decision.pick", M{"id": answered, "option": 1})
+		for _, d := range []string{closed, answered} {
+			raw, _ := json.Marshal(M{"id": d})
+			_, err := q.e.Apply(context.Background(), q.ws.ID, engine.Actor{UserID: q.owner.ID, Projects: []string{ops}}, engine.Change{ID: id.New(), Type: "decision.close", Args: raw})
+			var e *engine.Error
+			if !errors.As(err, &e) || e.Code != engine.CodeForbidden || strings.Contains(e.Message, key) {
+				t.Fatalf("closing %s without access to its project: %v", d, err)
+			}
+		}
+	})
+}
+
+// TestClosingAQuestionClearsOnlyTheWaitItSet: closing a question takes away
+// the wait its own last write set (on the one asked, or on the asker after
+// an answer sent back), and no other.
+func TestClosingAQuestionClearsOnlyTheWaitItSet(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		q := newQuestions(t, st)
+		t.Run("the wait for its answer goes", func(t *testing.T) {
+			key := q.newTask("Boss")
+			d := q.ask(q.artist, key, "@aram")
+			q.do(q.owner.ID, "decision.close", M{"id": d})
+			if got := q.world.task(key); got.WaitingOnID != "" {
+				t.Fatalf("the task still waits on %q", got.WaitingOnID)
+			}
+		})
+		t.Run("the wait on the asker after a send-back goes", func(t *testing.T) {
+			key := q.newTask("Arena")
+			d := q.ask(q.artist, key, "@aram")
+			q.do(q.owner.ID, "decision.pick", M{"id": d, "outcome": "none", "note": "let us talk"})
+			if got := q.world.task(key); got.WaitingOnID != q.artist {
+				t.Fatalf("after the send-back the task waits on %q", got.WaitingOnID)
+			}
+			q.do(q.owner.ID, "decision.close", M{"id": d})
+			if got := q.world.task(key); got.WaitingOnID != "" {
+				t.Fatalf("the task still waits on %q", got.WaitingOnID)
+			}
+		})
+		t.Run("a wait another write set stays", func(t *testing.T) {
+			key := q.newTask("Sky")
+			d := q.ask(q.artist, key, "@aram")
+			q.do(q.artist, "comment.create", M{"task": key, "body": "Have a look.", "waiting_on": "@aram"})
+			q.do(q.owner.ID, "decision.close", M{"id": d})
+			if got := q.world.task(key); got.WaitingOnID != q.owner.ID {
+				t.Fatalf("closing the question took away the hand-off: the task waits on %q", got.WaitingOnID)
+			}
+		})
+	})
+}
+
+// TestATaskClosingEmitsItsQuestionsWhole: the questions a task's closing
+// settles come in its events with their options, as an answer's do.
+func TestATaskClosingEmitsItsQuestionsWhole(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		q := newQuestions(t, st)
+		key := q.newTask("Boss")
+		q.ask(q.artist, key, "@aram")
+		res := q.do(q.owner.ID, "task.update", M{"id": key, "status": "Done"})
+		seen := 0
+		for _, ev := range res.Events {
+			if ev.Type != "decision.closed" {
+				continue
+			}
+			seen++
+			var data struct{ Row core.Decision }
+			if err := json.Unmarshal(ev.Data, &data); err != nil {
+				t.Fatal(err)
+			}
+			if len(data.Row.Options) != 2 {
+				t.Fatalf("the settled question came as %+v", data.Row)
+			}
+		}
+		if seen != 1 {
+			t.Fatalf("%d decision.closed events", seen)
 		}
 	})
 }

@@ -393,15 +393,7 @@ func decisionPick(c *cx, a decisionPickArgs) error {
 	if err := c.watch(c.actor.UserID, "task", t.ID); err != nil {
 		return err
 	}
-	text := outcome
-	for _, o := range d.Options {
-		if o.ID == optionID {
-			text = o.Label
-		}
-	}
-	if a.Note != "" {
-		text += ": " + a.Note
-	}
+	text := answerText(d)
 	// The answer is in, so the next move is the asker's.
 	if err := c.notifyTask(d.CreatedBy, core.NotePicked, t, about{entity: "decision", id: d.ID, text: text}); err != nil {
 		return err
@@ -417,6 +409,37 @@ func decisionPick(c *cx, a decisionPickArgs) error {
 		return err
 	}
 	return c.setWaitingOn(t, d.CreatedBy, "answered: "+snippet(text, 80))
+}
+
+// answerText is a question's answer in words: the option picked, or the
+// outcome, and the note.
+func answerText(d core.Decision) string {
+	text := d.Outcome
+	for _, o := range d.Options {
+		if o.ID == d.PickedOptionID {
+			text = o.Label
+		}
+	}
+	if d.OutcomeNote != "" {
+		text += ": " + d.OutcomeNote
+	}
+	return text
+}
+
+// waitSetBy is the wait the last write of question d left on its task, as
+// that write set it: on the one asked while it is open (asked, or found
+// unclear), on the asker once an answer sent it back. A wait that is not
+// that one, whom and note alike, another write set.
+func waitSetBy(d core.Decision) (userID, note string) {
+	switch {
+	case d.State == core.StateOpen && d.UnclearNote != "":
+		return d.AskedID, "unclear: " + snippet(d.UnclearNote, 80)
+	case d.State == core.StateOpen:
+		return d.AskedID, "answer: " + snippet(d.Question, 80)
+	case d.State == core.StateSentBack:
+		return d.CreatedBy, "answered: " + snippet(answerText(d), 80)
+	}
+	return "", ""
 }
 
 // mayAnswer says whether the actor may answer a decision.
@@ -602,6 +625,10 @@ func decisionClose(c *cx, a decisionCloseArgs) error {
 	if err != nil {
 		return err
 	}
+	// Who may not write in the task's project learns nothing of the question.
+	if err := c.mayWriteIn(t.ProjectID); err != nil {
+		return err
+	}
 	if err := c.mayClose(d); err != nil {
 		return err
 	}
@@ -612,7 +639,7 @@ func decisionClose(c *cx, a decisionCloseArgs) error {
 	case core.StatePicked:
 		return conflictErr("this decision was already answered; it stays as it was")
 	}
-	wasOpen := d.State == core.StateOpen
+	waitedOn, waitNote := waitSetBy(d)
 	if err := c.closeQuestion(&d, t, strings.TrimSpace(a.Note)); err != nil {
 		return err
 	}
@@ -632,14 +659,9 @@ func decisionClose(c *cx, a decisionCloseArgs) error {
 	if err := c.readWrittenOn(t.ID, before); err != nil {
 		return err
 	}
-	// A task that waited on the one asked for this question alone waits on
-	// nobody now.
-	if !wasOpen || d.AskedID == "" || t.WaitingOnID != d.AskedID {
+	// The wait this question set goes with it; any other stays.
+	if waitedOn == "" || t.WaitingOnID != waitedOn || t.WaitingOnNote != waitNote {
 		return nil
-	}
-	if n, err := c.tx.Count(c.ctx, "decisions", store.Eq("task_id", t.ID), store.Eq("state", core.StateOpen), store.Live,
-		store.Eq("asked_id", d.AskedID)); err != nil || n > 0 {
-		return err
 	}
 	return c.setWaitingOn(t, "", "")
 }
@@ -698,6 +720,10 @@ func (c *cx) settleQuestions(t core.Task, states []string, askedBy string) error
 	}
 	ref, key := c.ref, c.key
 	for i := range hanging {
+		// Its event carries it whole, as an answer's does.
+		if err := c.loadOptions(&hanging[i]); err != nil {
+			return err
+		}
 		if err := c.closeQuestion(&hanging[i], t, ""); err != nil {
 			return err
 		}

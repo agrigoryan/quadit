@@ -406,7 +406,10 @@ func (c *cx) handOn(cm core.Comment, t core.Task, a commentCreateArgs, note stri
 		}
 	case cm.Kind == core.CommentResult:
 		var ds []core.Decision
-		if err := c.tx.List(c.ctx, &ds, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.NotNull("decided_by"), store.Live},
+		// The last who answered a question here (picked, or sent back): not
+		// one who closed one as no longer needed.
+		if err := c.tx.List(c.ctx, &ds, store.Q{Where: []store.Cond{store.Eq("task_id", t.ID), store.In("state", []string{core.StatePicked, core.StateSentBack}),
+			store.NotNull("decided_by"), store.Live},
 			Order: "-updated_seq", Limit: 1}); err != nil {
 			return err
 		}
