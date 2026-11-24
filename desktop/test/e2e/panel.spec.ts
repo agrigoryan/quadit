@@ -64,11 +64,12 @@ test("the panel lists a decision waiting on the person and answers it", async ({
 });
 
 test("a server whose window shows no workspace is listed with a way to open it", async ({ desktop, run }) => {
-  await desktop.addServer(run.server);
+  await desktop.addServer(run.server, "Work");
   await desktop.hide(run.server);
   await desktop.chooseMenuItem("panel");
   const panel = await desktop.appPage("panel.html");
-  await expect(panel.getByRole("button", { name: /^Open / })).toBeVisible();
+  // The server's own Open, by its name: the panel also ends with Open Quadit.
+  await expect(panel.getByRole("button", { name: "Open Work" })).toBeVisible();
 });
 
 test("the panel says first what waits on the person: a task that waits on them, with who waits", async ({
