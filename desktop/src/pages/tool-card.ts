@@ -94,6 +94,8 @@ export class ToolCard {
   private self: SelfRun | null = null;
   /** What the card's buttons and its standing lines were last drawn from: they are drawn anew only when it changes. */
   private drawn = "";
+  /** Where it stood when the buttons beside its name were last drawn. */
+  private actFor = "";
   private addsCommand: boolean;
   private asking = false;
   private timer: ReturnType<typeof setInterval> | undefined;
@@ -326,24 +328,28 @@ export class ToolCard {
     const drawn = JSON.stringify([stands, handshake, shown]);
     if (drawn === this.drawn) return;
     this.drawn = drawn;
-    if (stands === "found") {
-      this.connectButton.textContent = "Connect";
-      this.connectButton.setAttribute("aria-label", `Connect ${tool.name}`);
-      this.act.replaceChildren(this.connectButton);
-      this.stand.replaceChildren();
-      return;
-    }
-    const label = stands === "waiting" ? "Undo" : "Disconnect";
-    const back = button(label, () => void this.takeBack(back), "undo", `${label} ${tool.name}`);
-    if (handshake?.state === "connected") {
+    // The buttons beside its name follow where it stands only: what listens changing leaves focus on Disconnect.
+    if (stands !== this.actFor) {
+      this.actFor = stands;
+      const label = stands === "waiting" ? "Undo" : "Disconnect";
+      const back = button(label, () => void this.takeBack(back), "undo", `${label} ${tool.name}`);
       const badge = make("span", "", "connected");
       badge.setAttribute("role", "status");
       badge.append(lineIcon(["M20 6 9 17l-5-5"]), document.createTextNode("Connected"));
-      this.act.replaceChildren(badge, back);
+      if (stands === "found") {
+        this.connectButton.textContent = "Connect";
+        this.connectButton.setAttribute("aria-label", `Connect ${tool.name}`);
+        this.act.replaceChildren(this.connectButton);
+      } else this.act.replaceChildren(...(stands === "connected" ? [badge, back] : [back]));
+    }
+    if (stands === "found") {
+      this.stand.replaceChildren();
+      return;
+    }
+    if (handshake?.state === "connected") {
       this.stand.replaceChildren(this.listening(handshake), ...this.answering());
       return;
     }
-    this.act.replaceChildren(back);
     if (handshake?.state === "unknown")
       this.stand.replaceChildren(
         make("p", `Set up on ${HERE}. Whether it reached Quadit is not known here.`, "set-up-line"),

@@ -227,7 +227,11 @@ test("a connected card that is not listening makes the line to write its main st
   ).toBeVisible();
   await expect(step).toHaveCount(0);
 
-  // A project from a chat and everything else from a companion: a line each, and how a companion stops.
+  // A project from a chat and everything else from a companion: a line each, and how a companion stops. Focus on
+  // Disconnect stays there: what listens changing leaves the buttons beside the name alone.
+  const disconnect = card.getByRole("button", { name: "Disconnect Claude Code" });
+  await disconnect.focus();
+  await disconnect.evaluate((el) => el.setAttribute("data-test-mark", "disconnect"));
   await page.evaluate(() => {
     (window as unknown as { stand: Stand }).stand.handshake = {
       state: "connected",
@@ -244,6 +248,7 @@ test("a connected card that is not listening makes the line to write its main st
   await expect(
     card.getByText("A companion runs in a terminal, and stops with Ctrl-C or when that terminal closes."),
   ).toBeVisible();
+  expect(await page.evaluate(() => document.activeElement?.getAttribute("data-test-mark"))).toBe("disconnect");
   await expect(card.getByText(/^To have it listen to/)).toHaveCount(0);
 
   // A companion of everything while GS keeps its items for its own listener, stopped: everything else, not everything.
