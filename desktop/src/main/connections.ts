@@ -78,6 +78,7 @@ import type {
   Handshake,
   PlanView,
   Refused,
+  RunProgram,
   Unrevoked,
 } from "@/shared/pages-api";
 
@@ -102,6 +103,12 @@ export interface ConnectionsParts {
   connected(harnessId: string, code: string | null): void;
   /** A tool was disconnected: what the app ran for it stops. */
   disconnected(harnessId: string): void;
+  /**
+   * Stops Quadit running the agent of the login file `login` for any
+   * project on this computer (`quadit run remove`, agent-runs-contract.md
+   * §8.2): its run ends and the server is told, while the login still works.
+   */
+  removeRuns(login: string): Promise<{ ok: true } | Refused>;
   /** Asks the page that speaks for a workspace (Requests.toWorkspace). */
   ask(serverId: string, workspaceId: string, request: DesktopRequest): Promise<DesktopOutcome>;
 }
@@ -793,6 +800,21 @@ export class Connections {
     });
   }
 
+  /**
+   * The agent Quadit can run a connected Claude Code or Codex as, for a
+   * project of this computer (agent-runs-contract.md §8.2): the tool's own
+   * login file, which is an agent's, and that agent's handle; null for any
+   * other tool, one connected without the quadit command, or one without a
+   * login of its own.
+   */
+  runAs(harnessId: string): { login: string; agent: string; program: RunProgram } | null {
+    const connection = this.ledger().harnesses[harnessId];
+    const harness = HARNESSES.find((h) => h.id === harnessId);
+    if (!connection?.token || !harness?.env || !connection.methods.includes("cli")) return null;
+    if (harness.id !== "claude" && harness.id !== "codex") return null;
+    return { login: connection.token.config, agent: `@${connection.agent.handle}`, program: harness.id };
+  }
+
   /** The connect codes still open, of the tools waiting to be proven connected. */
   waitingCodes(): { id: string; code: string }[] {
     return Object.entries(this.ledger().harnesses).flatMap(([id, c]) =>
@@ -899,6 +921,15 @@ export class Connections {
           error: `${changed.path} changed since you reviewed the plan: review it again.`,
           stale: true,
         };
+      // Quadit stops running the agent before its login is revoked, so that how its last run ended reaches the server
+      // (agent-runs-contract.md §8.2). Not done yet: nothing else is, and the same plan may be carried out again.
+      if (plan.revoke && !(await this.parts.removeRuns(plan.revoke.config)).ok) {
+        this.plans.set(plan.id, plan);
+        return {
+          ok: false,
+          error: `Quadit is still telling the server how @${plan.agent}'s last run ended. Disconnect again in a moment.`,
+        };
+      }
       backUp(plan.edits, plan.backupDir);
       writeEdits(plan.edits);
       const ledger = this.ledger();

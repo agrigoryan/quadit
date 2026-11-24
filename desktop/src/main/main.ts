@@ -239,6 +239,7 @@ function start() {
     // A code to give back, else a look at the tools.
     connected: (id, code) => void (code ? selfRuns.prove(id, code) : selfRuns.sync()),
     disconnected: (id) => selfRuns.disconnected(id),
+    removeRuns: (login) => runner.remove({ login }),
   });
   // What the app runs by itself for the tools connected (desktop contract §11, third amendment): each tool's program
   // on the login shell's PATH, else its desktop app's copy, run once to give its connect code back. Looked at again at

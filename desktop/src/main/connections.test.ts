@@ -76,6 +76,7 @@ function setUp({
   tokensWait = Promise.resolve(),
   revokeRefused = "",
   ownServer = false,
+  runs = { refused: false, removed: [] as string[] },
 }: {
   quaditOnPath?: boolean;
   bundled?: boolean;
@@ -93,6 +94,8 @@ function setUp({
   revokeRefused?: string;
   /** Whether the server "s1" is the one the app runs on this computer. */
   ownServer?: boolean;
+  /** What quadit run remove does: the logins it was asked to stop running, and whether it refuses. */
+  runs?: { refused: boolean; removed: string[] };
 } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
   const home = join(root, "home");
@@ -163,6 +166,10 @@ function setUp({
     server: (id) => (id === "s1" ? { name: "Work", origin: ORIGIN } : undefined),
     connected: (id, code) => void told.push(`connected ${id} ${code ?? "-"}`),
     disconnected: (id) => void told.push(`disconnected ${id}`),
+    removeRuns: async (login) => {
+      runs.removed.push(login);
+      return runs.refused ? { ok: false, error: "Quadit is still telling the server…" } : { ok: true };
+    },
     appFor: (id) => (ownServer && id === "s1" ? "/Applications/Quadit.app/Contents/MacOS/Quadit" : null),
     ask: async (_server, _workspace, request) => {
       asked.push(request);
@@ -912,6 +919,66 @@ posixOnly("what the app runs by itself for a connected tool (desktop contract §
       { id: "claude", code: "ABCDE2" },
       { id: "pi", code: "ABCDE3" },
     ]);
+  });
+});
+
+posixOnly("Quadit running a connected tool's agent (agent-runs-contract.md §8.2)", () => {
+  it("runs Claude Code and Codex as their own agent's login, and no other tool", async () => {
+    const { connections, connect, choice, configDir } = setUp();
+    await connect(choice("claude"));
+    await connect(choice("codex"));
+    await connect(choice("pi"));
+    expect(connections.runAs("claude")).toEqual({
+      login: join(configDir, "claude.json"),
+      agent: "@coder",
+      program: "claude",
+    });
+    expect(connections.runAs("codex")).toMatchObject({ login: join(configDir, "codex.json"), program: "codex" });
+    expect(connections.runAs("pi")).toBeNull();
+    expect(connections.runAs("gemini")).toBeNull();
+  });
+
+  it("runs none connected by MCP alone: it has no login of its own", async () => {
+    const { connections, connect, choice } = setUp();
+    await connect(choice("claude", { methods: ["mcp"] }));
+    expect(connections.runAs("claude")).toBeNull();
+  });
+
+  it("stops Quadit running the agent before Disconnect revokes its login, and goes no further when that is not done", async () => {
+    const runs = { refused: true, removed: [] as string[] };
+    const { connections, connect, choice, configDir, asked, json, home } = setUp({ runs });
+    mkdirSync(join(home, ".claude"));
+    writeFileSync(join(home, ".claude", "settings.json"), "{}");
+    await connect(choice("claude"));
+    const planned = connections.planDisconnect("claude");
+    if (!planned.ok) throw new Error(planned.error);
+    const login = join(configDir, "claude.json");
+    expect(await connections.applyDisconnect(planned.plan.id)).toEqual({
+      ok: false,
+      error: "Quadit is still telling the server how @coder's last run ended. Disconnect again in a moment.",
+    });
+    expect(runs.removed).toEqual([login]);
+    // Nothing taken back, nothing revoked: still connected, as it was.
+    expect(existsSync(login)).toBe(true);
+    expect(json(".claude/settings.json")).toMatchObject({ env: { QUADIT_CONFIG: login } });
+    expect(asked.some((request) => request.kind === "revoke-token")).toBe(false);
+    expect(connections.runAs("claude")).not.toBeNull();
+
+    // Pressed again once Quadit is done: the same plan carries it out.
+    runs.refused = false;
+    expect(await connections.applyDisconnect(planned.plan.id)).toMatchObject({ ok: true });
+    expect(runs.removed).toEqual([login, login]);
+    expect(asked.at(-1)).toEqual({ kind: "revoke-token", token: "t1" });
+    expect(existsSync(login)).toBe(false);
+  });
+
+  it("asks nothing of quadit run for a tool whose login stays (shared with another tool)", async () => {
+    const runs = { refused: true, removed: [] as string[] };
+    const { connect, disconnect, choice } = setUp({ runs });
+    await connect(choice("pi"));
+    await connect(choice("copilot"));
+    await disconnect("pi");
+    expect(runs.removed).toEqual([]);
   });
 });
 
