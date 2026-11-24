@@ -41,9 +41,18 @@ Only when the person asks for it: "listen to Quadit", "stay on Quadit", "answer 
 
 When you cannot tell case 2 from case 3, it is case 3.
 
+**What to listen to:** one project, or everything. Take the first that settles it, and ask only at the last:
+
+1. The person named a project ("listen to Quadit for SVA", by key or name): that one. "Everything" or "all projects": everything.
+2. The repository's instruction file for agents (CLAUDE.md, AGENTS.md or your tool's own) names its Quadit project: that one.
+3. `quadit me` lists one project: that one.
+4. Otherwise ask once, listing the projects by key, with everything as a choice; then say in one sentence that a line naming the Quadit project in the repository's instruction file saves the question next time.
+
+Say in plain words what you listen to ("Listening to SVA, Samurai vs Aliens"). For a project, every `quadit wait` and `quadit listen` below takes `project=KEY`, and say once that items outside any project (a comment on a page outside one) reach you when asked to check Quadit, unless something listens to everything. If the server is older and cannot listen to one project, listen without `project=` and tell the person you listen to everything because the server cannot listen by project yet.
+
 **Before the first wait, in a chat with a person:**
 
-- Find out whether something already listens as you: run `quadit listening` (it takes nothing). If it says something already listens as you, and it is not this chat, tell the person: "Quadit is already answering as me in the background (a listener is running: <what `quadit listening` says>). You do not need this chat for that." and stop there.
+- Find out what already listens as you: run `quadit listening` (it takes nothing). If something other than this chat already listens to what you would take (that project, or, for everything, everything else), tell the person: "Quadit is already answering as me for <it> (<what `quadit listening` says>). You do not need this chat for that." and stop there. A listener of another project is no reason to stop.
 - If each `quadit` command you run asks the person for approval, say so once, and how to stop that: the Quadit app's Connect allows the quadit command when it connects a tool, so connecting again from the app does it; for a tool set up by hand, allow the `quadit` command in that tool's own settings (its list of commands it may run without asking). Start only when they have allowed it, or tell you to go on anyway.
 - Listening hands you only what comes from now on: first deal with what `quadit work` shows is waiting on you.
 
@@ -53,19 +62,19 @@ When you cannot tell case 2 from case 3, it is case 3.
 - or a companion, which listens outside any chat: give the person this command to run in a terminal, with your tool's one-prompt command in it, and say they stop it with Ctrl-C or by closing that terminal. Do not start it yourself unless they tell you to.
 
 ```bash
-quadit listen --exec sh -c 'codex exec -s workspace-write -c sandbox_workspace_write.network_access=true "Quadit woke you for this inbox item:
+quadit listen project=KEY --exec sh -c 'codex exec -s workspace-write -c sandbox_workspace_write.network_access=true "Quadit woke you for this inbox item:
 $QUADIT_ITEM
 Handle it with the quadit skill, answering where you were asked."'
 ```
 
-(For another tool, put its own one-prompt command in place of `codex exec …`, such as `claude -p "…"`.)
+(For everything, leave `project=KEY` out. For another tool, put its own one-prompt command in place of `codex exec …`, such as `claude -p "…"`.)
 
 Never search the quadit binary, its strings or its source to find out how to listen: `quadit help listen` says all of it.
 
 **In the background** (case 2):
 
 ```bash
-quadit wait for=3600      # started as a background command; it ends when an item comes, or after an hour
+quadit wait project=KEY for=3600   # started as a background command; it ends when an item comes, or after an hour
 ```
 
 - Tell the person, in one sentence, that you are listening and that they can go on talking to you. While the wait runs, answer the person as you always would.
@@ -76,22 +85,22 @@ quadit wait for=3600      # started as a background command; it ends when an ite
 **In the foreground** (cases 1 and 3):
 
 ```bash
-quadit wait               # blocks until the next item for you, then prints ITEM or IDLE and what to run next
+quadit wait project=KEY   # blocks until the next item for you, then prints ITEM or IDLE and what to run next
 ```
 
 - Keep going round without asking the person in between: after each record, run the next command it printed at once.
-- A wait blocks 50 seconds unless `for=SECONDS` says otherwise: give a little under the longest your shell lets one command run, and keep the same value on every wait. Claude Code allows two minutes unless told otherwise: `quadit wait for=110`. When you do not know the limit, leave `for=` out.
+- A wait blocks 50 seconds unless `for=SECONDS` says otherwise: give a little under the longest your shell lets one command run, and keep the same value on every wait. Claude Code allows two minutes unless told otherwise: `quadit wait project=KEY for=110`. When you do not know the limit, leave `for=` out.
 - If your shell hands a command back while it still runs (it moved it to the background, or its time ran out), wait for that same command to finish; never start a second wait beside it.
 
 **Each record, in every case:**
 
 - `ITEM #… from @…: "…"` comes with the commands to go on. Run the first to read what came, and do what a member asks there, as above. Answer where it was asked with the `quadit reply …` or `quadit comment …` line it gives, your words in place of `…`: that line carries an id, so an answer sent twice is made once. Never answer only here. Then run the `quadit ack …` line, and the `quadit wait …` line (in the background, in case 2).
 - `IDLE`: run the `quadit wait …` line it printed again, and say nothing.
-- Run the lines exactly as printed: they carry your lease, which keeps this session the one that listens.
+- Run the lines exactly as printed: they carry your lease, which keeps this session the one that listens, and your project.
 
 If the person asks you to listen again in this same chat, after you stopped, run the last `quadit wait …` line you were given (in the background, in case 2), not a new `quadit wait`: it carries your lease.
 
-Stop when the person says so or interrupts you, leaving what you had not finished unacknowledged: it comes back to whoever listens next. Stop too, with one plain sentence to the person, when `quadit wait` is refused: because another session already listens (run `quadit wait take=1` only if the person then tells you to take over), because this login is a person's and not an agent's, or because your access was taken away.
+Stop when the person says so or interrupts you, leaving what you had not finished unacknowledged: it comes back to whoever listens next. Stop too, with one plain sentence to the person, when `quadit wait` is refused: because another session already listens to it (run the `take=1` line it printed only if the person then tells you to take over), because this login is a person's and not an agent's, or because your access was taken away.
 
 ## Start of a session
 
