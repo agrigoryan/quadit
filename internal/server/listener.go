@@ -237,7 +237,8 @@ func (s *Server) handleNextInboxItem(x *c) error {
 
 // listenStart is where a listener reads on from, its cursor: one never
 // moved is set, once, to the present, so the agent's history is not
-// replayed.
+// replayed. A project's first listener has its cursor already
+// (startProjectListener).
 func (s *Server) listenStart(x *c, cursorName string) (int64, error) {
 	ctx := x.ctx()
 	var cursor core.Cursor
@@ -250,6 +251,42 @@ func (s *Server) listenStart(x *c, cursorName string) (int64, error) {
 		return 0, err
 	}
 	return ws.Seq, x.db.Advance(ctx, core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: cursorName, Seq: ws.Seq, UpdatedAt: time.Now().UnixMilli()},
+		"seq", "workspace_id", "user_id", "name")
+}
+
+// startProjectListener sets the cursor of the agent's first listener of a
+// project, in the write that makes it, from listeners as they were before
+// it. While the listener of everything's lease lives, what lies between
+// its cursor and the present is its queue, not history: the project's
+// listener takes over the queue's items of its project, after the item the
+// listener of everything may hold in hand, delivered and not acknowledged.
+// That is the first item after its cursor it covers, since it is handed
+// that one until it acknowledges it; it is taken to be in hand even when it
+// may not have been handed yet, because an item missed stays in the inbox,
+// and one handed to two sessions is done twice. With no live listener of
+// everything, the project's listener starts at the present, so history is
+// never replayed.
+func (who *viewer) startProjectListener(ctx context.Context, tx store.Tx, listeners agentListeners, projectID string, now time.Time) error {
+	start := tx.Seq()
+	var queue core.Cursor
+	everything, _ := listeners.of("")
+	there, err := store.Find(ctx, tx, &queue, store.Eq("user_id", who.member.UserID), store.Eq("name", core.ListenCursor))
+	if err != nil {
+		return err
+	}
+	if there && leaseLives(everything, now) {
+		f := listenFilter(who.feed(), "", listeners.own())
+		f.After, f.OnlyAudience, f.Types, f.Limit = queue.Seq, who.member.UserID, []string{"notification.created"}, 1
+		inHand, err := tx.Events(ctx, f)
+		if err != nil {
+			return err
+		}
+		start = queue.Seq
+		if len(inHand) > 0 {
+			start = inHand[0].Seq
+		}
+	}
+	return tx.Advance(ctx, core.Cursor{WorkspaceID: who.ws.ID, UserID: who.member.UserID, Name: core.ListenCursorOf(projectID), Seq: start, UpdatedAt: now.UnixMilli()},
 		"seq", "workspace_id", "user_id", "name")
 }
 
@@ -297,6 +334,9 @@ func (s *Server) holdLease(x *c, project core.Project, ask leaseAsk, wait time.D
 				listenerOf(agentID, project.ID)...)
 		} else {
 			err = tx.Insert(ctx, row)
+			if err == nil && project.ID != "" {
+				err = x.startProjectListener(ctx, tx, listeners, project.ID, now)
+			}
 			listeners = append(listeners, row)
 		}
 		if err != nil {

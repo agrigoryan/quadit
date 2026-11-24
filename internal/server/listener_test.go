@@ -716,23 +716,71 @@ func TestAnAcknowledgmentMovesTheCursorOfTheListenerOfItsLease(t *testing.T) {
 	})
 }
 
-// TestAProjectsFirstWaitStartsAtThePresent: a project first listened to
-// does not have its history replayed, even when the agent had a cursor for
-// everything.
-func TestAProjectsFirstWaitStartsAtThePresent(t *testing.T) {
+// TestWhereAProjectsFirstListenerStarts: a project first listened to
+// beside a live listener of everything takes over that one's queue of its
+// project's items, but never the item it holds in hand; with no live
+// listener of everything, it starts at the present, and history is not
+// replayed.
+func TestWhereAProjectsFirstListenerStarts(t *testing.T) {
 	t.Parallel()
-	testdb.Each(t, func(t *testing.T, st store.Store) {
-		p := newProjectListening(t, st)
-		p.listen(t, "wait=0")
-		p.give(t, "SVA")
-		first := p.listen(t, "wait=0&project=SVA")
-		if first.Item != nil {
-			t.Fatalf("SVA's first wait handed over %+v from before it", first.Item)
-		}
-		key := p.give(t, "SVA")
-		if next := p.listen(t, "wait=0&project=SVA&lease="+first.Lease); next.Item == nil || next.Item.Task != key {
-			t.Fatalf("SVA's next wait answered %+v, want %s", next.Item, key)
-		}
+	each := func(t *testing.T, test func(t *testing.T, p projectListening)) {
+		t.Helper()
+		testdb.Each(t, func(t *testing.T, st store.Store) { test(t, newProjectListening(t, st)) })
+	}
+	t.Run("beside a live listener of everything, it takes over the queued items of its project", func(t *testing.T) {
+		each(t, func(t *testing.T, p projectListening) {
+			everything := p.listen(t, "wait=0")
+			art := p.give(t, "ART")
+			inHand := p.listen(t, "wait=0&lease="+everything.Lease)
+			if inHand.Item == nil || inHand.Item.Task != art {
+				t.Fatalf("the listener of everything got %+v, want %s", inHand.Item, art)
+			}
+			queued := p.give(t, "SVA")
+			sva := p.listen(t, "wait=0&project=SVA")
+			if sva.Item == nil || sva.Item.Task != queued {
+				t.Fatalf("SVA's first wait got %+v, want %s, queued behind the item in hand", sva.Item, queued)
+			}
+			p.call(t, nil, p.coder, "PUT", w+"/cursors/listen", M{"seq": inHand.Seq, "lease": everything.Lease}, 200, nil)
+			if got := p.listen(t, "wait=0&lease="+everything.Lease); got.Item != nil {
+				t.Fatalf("after its acknowledgment the listener of everything got %+v, SVA's", got.Item)
+			}
+		})
+	})
+
+	t.Run("the item the listener of everything holds in hand is not handed to the project's listener as well", func(t *testing.T) {
+		each(t, func(t *testing.T, p projectListening) {
+			everything := p.listen(t, "wait=0")
+			key := p.give(t, "SVA")
+			inHand := p.listen(t, "wait=0&lease="+everything.Lease)
+			if inHand.Item == nil || inHand.Item.Task != key {
+				t.Fatalf("the listener of everything got %+v, want %s", inHand.Item, key)
+			}
+			sva := p.listen(t, "wait=0&project=SVA")
+			if sva.Item != nil {
+				t.Fatalf("SVA's first wait was handed %+v, which the listener of everything holds", sva.Item)
+			}
+			p.call(t, nil, p.coder, "PUT", w+"/cursors/listen", M{"seq": inHand.Seq, "lease": everything.Lease}, 200, nil)
+			next := p.give(t, "SVA")
+			if got := p.listen(t, "wait=0&project=SVA&lease="+sva.Lease); got.Item == nil || got.Item.Task != next {
+				t.Fatalf("SVA's next wait got %+v, want %s", got.Item, next)
+			}
+		})
+	})
+
+	t.Run("with no live listener of everything, it starts at the present", func(t *testing.T) {
+		each(t, func(t *testing.T, p projectListening) {
+			everything := p.listen(t, "wait=0")
+			p.give(t, "SVA")
+			runOut(t, p.st, everything.Lease)
+			first := p.listen(t, "wait=0&project=SVA")
+			if first.Item != nil {
+				t.Fatalf("SVA's first wait handed over %+v from before it", first.Item)
+			}
+			key := p.give(t, "SVA")
+			if next := p.listen(t, "wait=0&project=SVA&lease="+first.Lease); next.Item == nil || next.Item.Task != key {
+				t.Fatalf("SVA's next wait answered %+v, want %s", next.Item, key)
+			}
+		})
 	})
 }
 
