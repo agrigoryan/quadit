@@ -236,7 +236,7 @@ function start() {
     ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
     // A code to give back first (one program at a time: the listener, when the app answers, follows it), else a sync.
     connected: (id, code) => void (code ? selfRuns.prove(id, code) : selfRuns.sync()),
-    disconnected: () => void selfRuns.sync(),
+    disconnected: (id) => selfRuns.disconnected(id),
   });
   // What the app runs by itself for the tools connected (desktop contract §11, third amendment): each tool's program
   // on the login shell's PATH, else its desktop app's copy; the listeners' quadit the one on the PATH, else the app's.

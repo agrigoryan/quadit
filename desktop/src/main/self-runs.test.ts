@@ -199,6 +199,27 @@ describe("SelfRuns, giving the code back", () => {
     expect(runs.self("codex")).toEqual({ proving: null, answering: "none" });
   });
 
+  it("stops the run giving the code back when the tool is taken back (Undo), and starts none from a look begun before", async () => {
+    const running = setUp([tool({ ran: false })], { answers: false });
+    void running.runs.prove("codex", "ABC234");
+    await flush();
+    expect(running.started).toHaveLength(1);
+    running.list.splice(0, 1);
+    running.runs.disconnected("codex");
+    expect(running.started[0]?.stopped).toBe(true);
+    await flush();
+    expect(running.runs.self("codex")).toBeNull();
+
+    const looking = setUp([tool({ ran: false })], { answers: false });
+    const release = looking.holdLookups();
+    const proving = looking.runs.prove("codex", "ABC234");
+    looking.runs.disconnected("codex");
+    release();
+    await proving;
+    await flush();
+    expect(looking.started).toHaveLength(0);
+  });
+
   it("runs one program at a time for a tool: the listener waits while the code is given back, and comes after", async () => {
     const { runs, started, setBack } = setUp();
     await runs.sync();

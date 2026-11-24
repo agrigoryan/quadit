@@ -232,6 +232,8 @@ export class SelfRuns {
     held.tried = true;
     this.parts.changed();
     const { tools, path } = await this.parts.look();
+    // Taken back meanwhile (disconnected): nothing starts for it.
+    if (this.held.get(id) !== held) return;
     this.known = tools;
     let tool = this.known.find((t) => t.id === id);
     if (!tool || !this.mayRun(tool)) {
@@ -248,6 +250,7 @@ export class SelfRuns {
     held.prover?.stop();
     await this.stopListener(held);
     await held.ending;
+    if (this.held.get(id) !== held) return;
     tool = this.known.find((t) => t.id === id);
     if (!tool?.program || !tool.oneShot || !this.mayRun(tool)) {
       held.proving = null;
@@ -343,6 +346,15 @@ export class SelfRuns {
     await held.ending;
     await this.sync();
     this.parts.changed();
+  }
+
+  /** A tool taken back (Undo, Disconnect): what runs for it stops now, and nothing starts for it from a look begun before. */
+  disconnected(id: string) {
+    const held = this.held.get(id);
+    if (held) this.stopAll(held);
+    this.held.delete(id);
+    this.parts.changed();
+    void this.sync();
   }
 
   /**
