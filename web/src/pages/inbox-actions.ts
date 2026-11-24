@@ -96,8 +96,26 @@ export function archiveRead(shown: Notification[]) {
   if (ids.length > 0) archive(ids);
 }
 
-/** Marks everything shown as read, in one step to undo; items that arrive meanwhile stay unread. */
-export function markAllRead(shown: Notification[]) {
+/**
+ * Marks a tab of the inbox read, in one step to undo: on the server every
+ * unread item of the tab (`addressed`: Needs you, else Updates) up to the
+ * newest one shown, those older than the rows held here among them; items
+ * that arrive meanwhile stay unread. Undone, the items shown that it marked
+ * are unread again.
+ */
+export function markAllRead(shown: Notification[], addressed: boolean) {
   const ids = shown.filter((n) => !n.read_at).map((n) => n.id);
-  if (ids.length > 0) setRead(ids, true);
+  if (ids.length === 0) return;
+  const now = Date.now();
+  const args = { all: true, addressed, up_to: Math.max(...shown.map((n) => n.seq)) };
+  sendUndoable(
+    t("undo.read", { n: ids.length }),
+    {
+      changes: [{ type: "notification.read", args }],
+      show: (tx) => {
+        for (const id of ids) tx.patch("notifications", id, { read_at: now });
+      },
+    },
+    reading(ids, false),
+  );
 }

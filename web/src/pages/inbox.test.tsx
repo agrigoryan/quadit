@@ -108,7 +108,9 @@ describe("the inbox's two tabs", () => {
   it("marks read only what the tab shows", async () => {
     show(mixed);
     fireEvent.click(screen.getByRole("button", { name: "Mark all read" }));
-    await waitFor(() => expect(sent).toEqual([{ type: "notification.read", args: { ids: ["n1"] } }]));
+    await waitFor(() =>
+      expect(sent).toEqual([{ type: "notification.read", args: { all: true, addressed: true, up_to: 2 } }]),
+    );
     expect(tab(/^Updates/).textContent).toBe("Updates2");
   });
 

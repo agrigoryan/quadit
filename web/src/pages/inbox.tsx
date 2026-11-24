@@ -111,7 +111,7 @@ export function InboxPage() {
       },
       "alt+u": (e) => {
         e.preventDefault();
-        markAllRead(items);
+        markAllRead(items, tab === "needs");
       },
     },
     { enabled: write },
@@ -165,7 +165,7 @@ export function InboxPage() {
           <Button
             variant="ghost"
             disabled={!write || unread === 0}
-            onClick={() => markAllRead(items)}
+            onClick={() => markAllRead(items, tab === "needs")}
             className="max-sm:ml-auto max-sm:h-9"
           >
             <CheckCheck className="size-4" aria-hidden />

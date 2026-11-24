@@ -7,7 +7,7 @@ import { clearStore, getState, loadBootstrap } from "@/data/store";
 import { clearUndo, nextUndo, undo } from "@/data/undo";
 import { useToasts } from "@/lib/toast";
 import type { Member, User, Workspace } from "@/types/core";
-import { archive, archiveRead, markOpened, markRead } from "@/pages/inbox-actions";
+import { archive, archiveRead, markAllRead, markOpened, markRead } from "@/pages/inbox-actions";
 
 type Sent = { type: string; args: Record<string, unknown> };
 let requests: Sent[][] = [];
@@ -84,6 +84,22 @@ describe("undoing what was done in the inbox", () => {
     expect(last()).toEqual([{ type: "notification.read", args: { ids: ["n2"], unarchive: true } }]);
     expect(item("n2")?.archived_at ?? null).toBeNull();
     expect(item("n2")?.read_at).toBeTruthy();
+  });
+
+  it("marks a tab read on the server whole, past the rows held here, up to the newest shown; undone, those shown are unread again", async () => {
+    markAllRead(Object.values(getState().collections.notifications), true);
+    expect(item("n1")?.read_at).toBeTruthy();
+    await settle();
+    expect(last()).toEqual([{ type: "notification.read", args: { all: true, addressed: true, up_to: 6 } }]);
+    expect(nextUndo()?.name).toBe("mark 1 notification read");
+    undo();
+    await settle();
+    expect(last()).toEqual([{ type: "notification.read", args: { ids: ["n1"], unread: true } }]);
+    expect(item("n1")?.read_at ?? null).toBeNull();
+
+    markAllRead(Object.values(getState().collections.notifications), false);
+    await settle();
+    expect(last()).toEqual([{ type: "notification.read", args: { all: true, addressed: false, up_to: 6 } }]);
   });
 
   it("sends nothing when no item is read", async () => {
