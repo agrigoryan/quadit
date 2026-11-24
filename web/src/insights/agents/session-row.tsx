@@ -1,10 +1,12 @@
 // One recorded agent run as a line that opens in place: its state first,
-// what it was asked, what it did step by step, what it produced, and when
-// it started and ended. A run Quadit's runner started on a computer also
-// names the computer, says why it waits, did not start or failed and what
-// to do about it, can be stopped by whoever may change its task, and, once
-// it ended, gives the agent's responsible person the line that continues
-// its session in a terminal. Used on the agents page and in the task panel.
+// what it was asked or what started it, what it did (the agent's own words
+// on the way and its tools, a run of tool steps that say nothing folded
+// into one line), what it produced, and when it started and ended. A run
+// Quadit's runner started on a computer also names the computer, says why
+// it waits, did not start or failed and what to do about it, can be
+// stopped by whoever may change its task, and, once it ended, gives the
+// agent's responsible person the line that continues its session in a
+// terminal. Used on the agents page and in the task panel.
 
 import { useState } from "react";
 import { Check, ChevronRight, CircleHelp, Clock, Loader, type LucideIcon, Minus, Square, X } from "lucide-react";
@@ -18,7 +20,7 @@ import { ago, exact, lengthOfHours } from "@/lib/time";
 import { type AgentSession, type Decision, isOpenSession, type Member, type SessionState } from "@/types/core";
 import { revealDecision } from "@/insights/decisions/reveal";
 import { resumeLine } from "@/insights/agents/resume-line";
-import { sessionLink, stepText } from "@/insights/agents/session-data";
+import { sessionLink, type StepLine, stepLines, toolKind } from "@/insights/agents/session-data";
 import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
@@ -157,16 +159,63 @@ export function StopRun({ session }: { session: AgentSession }) {
   );
 }
 
+/** A tool as a person reads it: its plain name when it has one ("Command" for shell and Bash), else as the program names it. */
+function toolName(tool: string): string {
+  const kind = toolKind(tool);
+  return kind ? t(`agents.step.tool.${kind}`) : tool;
+}
+
+/** Words with their `code` spans set as code, the way both programs mark a file or a command's name. */
+function Words({ text }: { text: string }) {
+  return text.split(/`([^`]+)`/).map((part, i) =>
+    i % 2 ? (
+      <code key={i} className="rounded-xs bg-sunken px-0.5 text-[0.92em]">
+        {part}
+      </code>
+    ) : (
+      part
+    ),
+  );
+}
+
+/** One line of what a run did. */
+function Step({ line }: { line: StepLine }) {
+  switch (line.kind) {
+    case "words":
+      return <Words text={line.text} />;
+    case "tool":
+      return (
+        <span className="text-ink-2">
+          <Words text={line.text} />
+          <span className="ml-1.5 rounded-xs bg-sunken px-1 py-px text-xs">{toolName(line.tool)}</span>
+        </span>
+      );
+    case "fold": {
+      const kind = toolKind(line.tool);
+      return (
+        <span className="text-ink-2">
+          {kind === "command" || kind === "webSearch"
+            ? t(`agents.step.fold.${kind}`, { n: line.n })
+            : t("agents.step.fold.other", { tool: toolName(line.tool), n: line.n })}
+        </span>
+      );
+    }
+  }
+}
+
 function SessionBody({ session, resume }: { session: AgentSession; resume: string | null }) {
-  const steps = session.steps ?? [];
-  const links = session.links ?? [];
+  const steps = stepLines(session.steps ?? []);
+  const links = (session.links ?? []).map(sessionLink).filter((link) => link !== null);
   const dropped = session.steps_dropped ?? 0;
   const heading = "mb-0.5 text-xs font-medium text-ink-2";
   return (
     <div className="flex flex-col gap-2.5 pt-1 pr-2 pb-3 pl-7 text-sm">
       {session.instructions && (
         <div>
-          <h4 className={heading}>{t("agents.session.instructions")}</h4>
+          {/* A runner says who started the run and how; a session an agent recorded says what it was asked. */}
+          <h4 className={heading}>
+            {t(session.machine_id ? "agents.session.startedBy" : "agents.session.instructions")}
+          </h4>
           <p className="whitespace-pre-wrap text-ink">{session.instructions}</p>
         </div>
       )}
@@ -177,24 +226,18 @@ function SessionBody({ session, resume }: { session: AgentSession; resume: strin
         </div>
       )}
       <div>
-        <h4 className={heading}>{t("agents.session.steps", { n: dropped + steps.length })}</h4>
+        <h4 className={heading}>{t("agents.session.steps")}</h4>
         {dropped > 0 && <p className="text-xs text-ink-3">{t("agents.session.stepsDropped", { n: dropped })}</p>}
         {steps.length === 0 ? (
           <p className="text-ink-3">{t("agents.session.noSteps")}</p>
         ) : (
           <ol className="flex flex-col gap-1">
-            {steps.map((step, i) => {
-              const { text, tool } = stepText(step);
-              return (
-                <li key={dropped + i} className="flex gap-2">
-                  <span className="w-6 shrink-0 text-right text-xs leading-5 text-ink-3 tnum">{dropped + i + 1}</span>
-                  <span className="min-w-0 break-words">
-                    {text}
-                    {tool && <span className="ml-1.5 rounded-xs bg-sunken px-1 py-px text-xs text-ink-2">{tool}</span>}
-                  </span>
-                </li>
-              );
-            })}
+            {steps.map((line, i) => (
+              // Plain lines with no state of their own: their place is key enough.
+              <li key={i} className="min-w-0 break-words">
+                <Step line={line} />
+              </li>
+            ))}
           </ol>
         )}
       </div>
@@ -202,25 +245,22 @@ function SessionBody({ session, resume }: { session: AgentSession; resume: strin
         <div>
           <h4 className={heading}>{t("agents.session.links")}</h4>
           <ul className="flex flex-col gap-0.5">
-            {links.map((raw, i) => {
-              const link = sessionLink(raw);
-              return (
-                <li key={i} className="min-w-0 truncate">
-                  {link.url ? (
-                    <a
-                      href={link.url}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="text-accent-text underline-offset-2 hover:underline"
-                    >
-                      {link.name}
-                    </a>
-                  ) : (
-                    link.name
-                  )}
-                </li>
-              );
-            })}
+            {links.map((link, i) => (
+              <li key={i} className="min-w-0 truncate">
+                {link.url ? (
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-accent-text underline-offset-2 hover:underline"
+                  >
+                    {link.name}
+                  </a>
+                ) : (
+                  link.name
+                )}
+              </li>
+            ))}
           </ul>
         </div>
       )}
@@ -245,6 +285,7 @@ function timing(session: AgentSession, now: number): string {
     return t("agents.session.received", { time: ago(session.started_at, now) });
   if (runner && session.state === "running") {
     const since = session.accepted_at ?? session.started_at;
+    if (now - since < 60_000) return t("agents.session.workingJustNow");
     return t("agents.session.working", { duration: lengthOfHours((now - since) / 3_600_000) });
   }
   if (isOpenSession(session)) return t("agents.session.startedAgo", { time: ago(session.started_at, now) });

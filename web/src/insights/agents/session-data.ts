@@ -47,25 +47,72 @@ export function useSessions(
   return { sessions, loading: query !== null && fetched.isPending, error: readError(fetched.error) };
 }
 
-/** What one recorded step says: its text, and the tool it used when it names one. */
-export function stepText(step: unknown): { text: string; tool?: string } {
-  if (typeof step === "string") return { text: step };
-  if (step && typeof step === "object") {
-    const s = step as Record<string, unknown>;
-    const text = [s.text, s.title, s.summary, s.action, s.name].find((v) => typeof v === "string" && v) as
-      string | undefined;
-    const tool = typeof s.tool === "string" ? s.tool : undefined;
-    return { text: text ?? JSON.stringify(step), tool };
+/**
+ * One line of what a run did: the agent's own words on the way; a tool's
+ * step with what it says (a description, a path); or tool steps in a row
+ * that say nothing, of one kind, folded into one with their count.
+ */
+export type StepLine =
+  | { kind: "words"; text: string }
+  | { kind: "tool"; tool: string; text: string }
+  | { kind: "fold"; tool: string; n: number };
+
+export type ToolKind = "command" | "edit" | "webSearch";
+
+/**
+ * The tools a person knows by another word, by the names the programs give
+ * them: Codex's and Claude Code's. A fold counts steps of one kind
+ * together, so a shell step and a Bash step are both commands.
+ */
+const toolKinds: Record<string, ToolKind | undefined> = {
+  shell: "command",
+  Bash: "command",
+  edit: "edit",
+  Edit: "edit",
+  MultiEdit: "edit",
+  "web search": "webSearch",
+  WebSearch: "webSearch",
+};
+
+/** The kind of a tool a step names, when a person knows it by another word. */
+export const toolKind = (tool: string): ToolKind | undefined => toolKinds[tool];
+
+/**
+ * What a run's recorded steps say, line by line. A step is an object
+ * {tool, text} as a runner records it, a plain string, or any JSON a
+ * session recorded by hand gave; a shape with neither a tool nor a string
+ * to show is left out.
+ */
+export function stepLines(steps: readonly unknown[]): StepLine[] {
+  const lines: StepLine[] = [];
+  for (const step of steps) {
+    const { text, tool } = readStep(step);
+    const last = lines.at(-1);
+    if (text) lines.push(tool ? { kind: "tool", tool, text } : { kind: "words", text });
+    else if (!tool) continue;
+    else if (last?.kind === "fold" && (toolKind(last.tool) ?? last.tool) === (toolKind(tool) ?? tool))
+      lines[lines.length - 1] = { ...last, n: last.n + 1 };
+    else lines.push({ kind: "fold", tool, n: 1 });
   }
-  return { text: String(step) };
+  return lines;
 }
 
-/** A link a run produced: an address with a name, a commit, a file. */
-export function sessionLink(link: unknown): { name: string; url?: string } {
+/** What one recorded step says: its text, and the tool it used when it names one; empty when it says neither. */
+function readStep(step: unknown): { text: string; tool: string } {
+  if (typeof step === "string") return { text: step, tool: "" };
+  if (!step || typeof step !== "object") return { text: "", tool: "" };
+  const s = step as Record<string, unknown>;
+  return { text: firstString(s.text, s.title, s.summary, s.action, s.name), tool: firstString(s.tool) };
+}
+
+const firstString = (...values: unknown[]) => values.find((v): v is string => typeof v === "string" && v !== "") ?? "";
+
+/** A link a run produced: an address with a name, a commit, a file. Nothing for a link that has no string to show. */
+export function sessionLink(link: unknown): { name: string; url?: string } | null {
   if (typeof link === "string")
     return { name: link.replace(/^https?:\/\//, ""), url: /^https?:\/\//i.test(link) ? link : undefined };
   const l = (link && typeof link === "object" ? link : {}) as Record<string, unknown>;
   const url = typeof l.url === "string" && /^https?:\/\//i.test(l.url) ? l.url : undefined;
-  const name = [l.title, l.name, l.ref, l.url].find((v) => typeof v === "string" && v) as string | undefined;
-  return { name: name ?? JSON.stringify(link), url };
+  const name = firstString(l.title, l.name, l.ref, l.url);
+  return name ? { name, url } : null;
 }

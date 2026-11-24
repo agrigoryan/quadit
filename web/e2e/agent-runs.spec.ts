@@ -2,7 +2,8 @@
 // plays Quadit's runner by holding the agent's listener of a project with
 // GET /listen and machine_id=, and records runs with session.start and
 // session.update as the agent. The comment box then says what a comment
-// will do, and the task's Sessions show the run as it goes, with Stop.
+// will do, and the task's Sessions show the run as it goes, in words, with
+// Stop.
 
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
@@ -127,7 +128,15 @@ test("a run's line shows its state and computer, its steps as they come, and Sto
     JSON.stringify({ id, add_steps: [{ tool: "Edit", text: "Raise its health" }] }),
   );
   await expect(run.getByText("Raise its health")).toBeVisible();
-  await expect(run.getByRole("heading", { name: "2 steps" })).toBeVisible();
+  // The agent's own words on the way, and commands that say nothing folded into one line.
+  await agent.as(
+    "do",
+    "session.update",
+    JSON.stringify({ id, add_steps: [{ text: "I'll run the tests." }, { tool: "shell" }, { tool: "shell" }] }),
+  );
+  await expect(run.getByText("I'll run the tests.")).toBeVisible();
+  await expect(run.getByText("Ran 2 commands")).toBeVisible();
+  await expect(run.getByRole("heading", { name: "What it did" })).toBeVisible();
 
   await run.getByRole("button", { name: `Stop @${agent.handle}'s run on ${key}` }).click();
   await expect(run.getByRole("button", { name: "Stopping…" })).toBeDisabled();

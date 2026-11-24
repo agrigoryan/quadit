@@ -4,8 +4,9 @@
 // Quadit's runner started, its computer, why it waits, did not start or
 // failed and what to do; Stop for whoever may change the task while the run
 // is open; the line that continues its session, only for the agent's
-// responsible person on its newest ended run; and a run done that waits for
-// the answer to the question its agent asked since.
+// responsible person on its newest ended run; a run done that waits for
+// the answer to the question its agent asked since; and, opened, who
+// started it and what it did, in words, never as JSON.
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -119,7 +120,101 @@ describe("a session's state", () => {
 
   it("counts how long a run has worked from when the program took the prompt", () => {
     show(run("running", { accepted_at: now - 3 * 60_000 }));
-    expect(screen.getByText("working 3m")).toBeInTheDocument();
+    expect(screen.getByText("for 3m")).toBeInTheDocument();
+    show(run("running", { accepted_at: now - 20_000 }));
+    expect(screen.getByText("for under a minute")).toBeInTheDocument();
+  });
+});
+
+describe("what a run did", () => {
+  const lines = () =>
+    within(screen.getByRole("heading", { name: "What it did" }).parentElement as HTMLElement)
+      .getAllByRole("listitem")
+      .map((li) => li.textContent);
+
+  it("shows the agent's words, and folds the commands between them into one line each", () => {
+    const words = (text: string) => ({ text, at: 1 });
+    const shell = { tool: "shell", at: 1 };
+    show(
+      run("done", {
+        program: "codex",
+        steps: [words("I'll list the files under `src`."), shell, shell, words("I'll write `summary.txt`."), shell],
+      }),
+    );
+    expand();
+    expect(lines()).toEqual([
+      "I'll list the files under src.",
+      "Ran 2 commands",
+      "I'll write summary.txt.",
+      "Ran a command",
+    ]);
+    expect(screen.getByText("summary.txt").tagName).toBe("CODE");
+  });
+
+  it("gives a tool its plain name beside what the program said it does", () => {
+    show(
+      run("done", {
+        steps: [
+          { text: "Listing files under src.", at: 1 },
+          { tool: "Bash", text: "Count lines in every file under src", at: 1 },
+          { tool: "Write", text: "summary.txt", at: 1 },
+          { tool: "edit", text: "update README.md", at: 1 },
+        ],
+      }),
+    );
+    expand();
+    expect(lines()).toEqual([
+      "Listing files under src.",
+      "Count lines in every file under srcCommand",
+      "summary.txtWrite",
+      "update README.mdEdit",
+    ]);
+  });
+
+  it("folds tool steps that say nothing by their kind, and says how many times", () => {
+    const step = (tool: string) => ({ tool, at: 1 });
+    show(
+      run("done", {
+        steps: [
+          step("shell"),
+          step("Bash"),
+          step("web search"),
+          step("web search"),
+          step("Read"),
+          step("quadit.task_get"),
+        ],
+      }),
+    );
+    expand();
+    expect(lines()).toEqual(["Ran 2 commands", "Searched the web 2 times", "Used Read", "Used quadit.task_get"]);
+  });
+
+  it("never shows a step as JSON: a string of it, or nothing; old steps of plain strings read as they are", () => {
+    show(
+      run("done", {
+        steps: ["drew a line", { anything: [1, 2] }, 7, { name: "Looked around" }, { tool: "Read", text: "" }],
+      }),
+    );
+    expand();
+    expect(lines()).toEqual(["drew a line", "Looked around", "Used Read"]);
+    expect(document.body.textContent).not.toContain("{");
+  });
+
+  it("says who started a run Quadit's runner started, and what an agent's own session was asked", () => {
+    show(run("done", { instructions: '@ann commented: "check this out"' }));
+    expand();
+    expect(screen.getByRole("heading", { name: "Started by" })).toBeInTheDocument();
+    expect(screen.getByText('@ann commented: "check this out"')).toBeInTheDocument();
+    show(run("done", { machine_id: undefined, machine_name: undefined, instructions: "Fix the login bug" }));
+    expand();
+    expect(screen.getByRole("heading", { name: "Asked to" })).toBeInTheDocument();
+  });
+
+  it("shows a link by a string of it, and leaves out one with none", () => {
+    show(run("done", { links: ["https://example.com/pr/1", { ref: "abc123" }, { size: 3 }] }));
+    expand();
+    const produced = within(screen.getByRole("heading", { name: "Produced" }).parentElement as HTMLElement);
+    expect(produced.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["example.com/pr/1", "abc123"]);
   });
 });
 
