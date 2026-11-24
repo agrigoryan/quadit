@@ -13,6 +13,7 @@ describe("sheetOf", () => {
   it("holds the card of the tool that works as the agent, for each intent", () => {
     for (const intent of ["run", "disconnect", "connect"] as const)
       expect(sheetOf({ id: 1, intent, tool: "claude" }, tools, "this Mac")).toEqual({
+        title: null,
         tools: ["claude"],
         line: null,
         intent,
@@ -23,6 +24,7 @@ describe("sheetOf", () => {
 
   it("with none, to connect, says the agent and holds only the cards that could work as it", () => {
     expect(sheetOf({ id: 1, intent: "connect", agent: HELPER }, tools, "this Mac")).toEqual({
+      title: { name: "@helper", handle: null },
       tools: ["codex"],
       line: "Choose what should work as @helper on this Mac.",
       intent: "connect",
@@ -33,6 +35,16 @@ describe("sheetOf", () => {
       tools: [],
       line: "No AI tool found on this computer is free to work as @helper.",
     });
+  });
+
+  it("is titled with the agent's name and its handle, else its handle, else the page's own title", () => {
+    const agents = [{ id: "u9", name: "Helper Bot", handle: "helper" }];
+    const titled = (focus: Parameters<typeof sheetOf>[0], list = agents) =>
+      sheetOf(focus, tools, "this Mac", list)?.title;
+    expect(titled({ id: 1, tool: "claude", agent: HELPER })).toEqual({ name: "Helper Bot", handle: "@helper" });
+    expect(titled({ id: 1, intent: "connect", agent: HELPER })).toEqual({ name: "Helper Bot", handle: "@helper" });
+    expect(titled({ id: 1, tool: "claude", agent: HELPER }, [])).toEqual({ name: "@helper", handle: null });
+    expect(titled({ id: 1, tool: "claude" })).toBeNull();
   });
 
   it("is none, and the whole page shows, without a focus, or with nothing to show for it", () => {

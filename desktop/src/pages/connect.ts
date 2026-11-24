@@ -525,6 +525,7 @@ async function showTarget() {
         .filter((h) => h.installed || h.connected)
         .map((h) => ({ id: h.id, found: h.installed, setUp: !!h.connected, defaultLogin: workingAs(h) !== null })),
       HERE,
+      target?.summary?.agents ?? [],
     );
     connectAs = sheet?.connectAs ?? null;
     const line = element("focus-line");
@@ -543,6 +544,11 @@ async function showTarget() {
  */
 function arrange() {
   document.body.classList.toggle("sheet-mode", sheet !== null);
+  // The title, and so the page's name: the agent's in its sheet, else the page's own.
+  const title = element("connect-title");
+  const said = sheet?.title;
+  if (!said) title.replaceChildren("Connect agents");
+  else title.replaceChildren(said.name, ...(said.handle ? [" ", make("span", said.handle, "title-handle")] : []));
   for (const [id, shown] of shownCards) {
     shown.card.element.hidden = (sheet !== null && !sheet.tools.includes(id)) || disconnecting === id;
     shown.card.setConnectAs(connectAs?.handle ?? null);

@@ -492,6 +492,12 @@ body.sheet-mode .connect-head h1 {
   font-size: 18px;
 }
 
+/* The agent's handle beside its name in the sheet's title, quieter. */
+.title-handle {
+  font-weight: 450;
+  color: var(--muted);
+}
+
 body.sheet-mode .full-only,
 body:not(.sheet-mode) .sheet-only {
   display: none !important;

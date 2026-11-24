@@ -612,6 +612,9 @@ test("opened to connect an agent no tool works as here, it says which, and a car
     slowMs: 0,
   });
   await expect(page.getByText(`Choose what should work as @helper on ${HERE}.`)).toBeVisible({ timeout: 10_000 });
+  // Titled with the agent, and named so.
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("@helper");
+  await expect(page.getByRole("main", { name: "@helper" })).toBeVisible();
   const card = page.getByRole("article", { name: "Claude Code" });
   await expect(
     card.getByText(
@@ -637,9 +640,12 @@ test("opened at an agent, it is a sheet of that agent alone over the page: the w
   const steps = page.getByRole("region", { name: "To have an agent answer you in Quadit" });
   await expect(steps).toBeHidden();
   await expect(page.getByText(/^Connect an agent here, then tell it to listen/)).toBeHidden();
+  // No name of the agent is known here (the summary lists none): the page's own title.
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Connect agents");
 
   await page.getByRole("button", { name: "All agents on this computer" }).click();
   await expect(steps).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Connect agents");
   await expect(page.getByRole("button", { name: "All agents on this computer" })).toBeHidden();
 });
 
@@ -662,4 +668,37 @@ test("opened without an agent, it is the whole page as before", async ({ page })
     timeout: 10_000,
   });
   await expect(page.getByRole("button", { name: "All agents on this computer" })).toBeHidden();
+});
+
+test("the sheet of one agent is titled with its name, its handle beside it, when the workspace's summary gives them", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    // The summary the page's stand-in gives lists the agent.
+    const agents = [
+      { id: "u2", handle: "claude-code", name: "Claude", state: "idle", detail: "", path: "/e2e", usable: true },
+    ];
+    const set = () => {
+      const pages = (
+        window as unknown as { quaditPages?: { connectTarget: () => Promise<{ summary: { agents: unknown[] } }> } }
+      ).quaditPages;
+      if (!pages) return void setTimeout(set, 0);
+      const target = pages.connectTarget;
+      pages.connectTarget = async () => {
+        const answer = await target();
+        return { ...answer, summary: { ...answer.summary, agents } };
+      };
+    };
+    set();
+  });
+  await open(page, {
+    connected: true,
+    handshake: { state: "connected", listening: false, owner: ME },
+    focus: { id: 1, intent: "connect", tool: "claude", agent: { id: "u2", handle: "claude-code" } },
+    slowMs: 0,
+  });
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Claude @claude-code", { timeout: 10_000 });
+  await expect(page.getByRole("main", { name: "Claude @claude-code" })).toBeVisible();
+  await page.getByRole("button", { name: "All agents on this computer" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Connect agents");
 });
