@@ -2,8 +2,10 @@
 // items, which decides whose words start the agent's program on a person's
 // computer. It is said here once, for an item handed out (GET /listen) and
 // for one about to be written (the outlook, run_outlook.go). Only the
-// words of the agent's responsible person, or of an agent of theirs, start
-// a run; a rule's never do (it acts as its creator, whoever set it off).
+// words of the agent's responsible person, or of an agent of theirs that
+// they control, start a run, and only in a change applied in person: what
+// the server writes in someone's name (a rule, a sync, a view's news) never
+// does.
 // Any read the rule needs that fails is returned, never decided: the hold
 // that asked hands nothing out.
 
@@ -14,6 +16,7 @@ import (
 	"slices"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -44,6 +47,11 @@ type wakeItem struct {
 	entityType string
 	entityID   string
 	taskID     string
+	// projectID is the project the item was made in: its task's then.
+	projectID string
+	// event is the item's notification.created event; nil for an item not
+	// written yet, which the caller is about to write themselves.
+	event *core.Event
 }
 
 // wakeOf decides it for an item handed out: ev is its notification.created
@@ -66,13 +74,14 @@ func (who *viewer) wakeOf(ctx context.Context, agent core.Member, ev core.Event)
 		return wake{wakeAck, "rule"}, nil
 	}
 	return who.wakeRule(ctx, agent, wakeItem{typ: note.Type, authorID: note.ActorID, addressed: note.Addressed, entityType: note.EntityType,
-		entityID: note.EntityID, taskID: note.TaskID})
+		entityID: note.EntityID, taskID: note.TaskID, projectID: ev.ProjectID, event: &ev})
 }
 
 // wakeFor is the same rule for an item not written yet, of type typ by
 // author on task t, addressed to the agent: what the outlook asks.
 func (who *viewer) wakeFor(ctx context.Context, agent, author core.Member, typ string, t core.Task) (wake, error) {
-	return who.wakeRule(ctx, agent, wakeItem{typ: typ, authorID: author.UserID, addressed: true, entityType: "task", entityID: t.ID, taskID: t.ID})
+	return who.wakeRule(ctx, agent, wakeItem{typ: typ, authorID: author.UserID, addressed: true, entityType: "task", entityID: t.ID, taskID: t.ID,
+		projectID: t.ProjectID})
 }
 
 // wakeRule is the rule from its third row on, the first that matches
@@ -87,7 +96,9 @@ func (who *viewer) wakeRule(ctx context.Context, agent core.Member, item wakeIte
 	switch {
 	case err != nil:
 		return wake{}, err
-	case !there || t.DeletedAt != 0 || !agent.Scope.MayRead(t.ProjectID):
+	// A task that moved to another project since is no longer the item's
+	// listener's to start work on, nor one the viewer's credential may reach.
+	case !there || t.DeletedAt != 0 || !agent.Scope.MayRead(t.ProjectID) || t.ProjectID != item.projectID || !who.canProject(t.ProjectID):
 		return wake{wakeAck, "gone"}, nil
 	case item.authorID == agent.UserID:
 		return wake{wakeAck, "own"}, nil
@@ -110,28 +121,76 @@ func (who *viewer) wakeRule(ctx context.Context, agent core.Member, item wakeIte
 		return wake{wakeAck, "unknown"}, nil
 	}
 
-	owner, err := who.ownerOf(ctx, agent.UserID)
+	// Whose words they are. The responsible persons of the agent, of the
+	// author and of the author's maker are read in one go, so they are of
+	// one moment.
+	author, authorCurrent, err := who.currentMember(ctx, item.authorID)
 	if err != nil {
 		return wake{}, err
+	}
+	ids := []string{agent.UserID, item.authorID}
+	if author.DelegatedBy != "" {
+		ids = append(ids, author.DelegatedBy)
+	}
+	var users []core.User
+	if err := who.st.List(ctx, &users, store.Where(store.In("id", ids))); err != nil {
+		return wake{}, err
+	}
+	ownerOf := map[string]string{}
+	for _, u := range users {
+		ownerOf[u.ID] = u.ResponsibleID
+	}
+	owner := ownerOf[agent.UserID]
+	if owner != "" {
+		_, current, err := who.currentMember(ctx, owner)
+		if err != nil {
+			return wake{}, err
+		}
+		if !current {
+			owner = ""
+		}
 	}
 	if owner == "" {
 		return wake{wakeRefuse, core.RunNoResponsible}, nil
 	}
-	if item.authorID == owner {
-		return wake{wakeRun, "for_you"}, nil
+	if item.authorID != owner {
+		// An agent of the owner's: answering to the owner, and not a helper
+		// another member made and holds a token of, whoever it names.
+		if !authorCurrent || author.Kind != core.KindAgent || ownerOf[author.UserID] != owner {
+			return wake{wakeRefuse, core.RunNotResponsible}, nil
+		}
+		if maker := author.DelegatedBy; maker != "" && maker != owner {
+			m, current, err := who.currentMember(ctx, maker)
+			if err != nil {
+				return wake{}, err
+			}
+			if !current || m.Kind != core.KindAgent || ownerOf[maker] != owner {
+				return wake{wakeRefuse, core.RunNotResponsible}, nil
+			}
+		}
 	}
-	author, current, err := who.currentMember(ctx, item.authorID)
-	if err != nil || !current || author.Kind != core.KindAgent {
-		return wake{wakeRefuse, core.RunNotResponsible}, err
+	if item.event != nil {
+		inPerson, err := who.appliedInPerson(ctx, *item.event)
+		if err != nil {
+			return wake{}, err
+		}
+		if !inPerson {
+			return wake{wakeAck, "background"}, nil
+		}
 	}
-	authorOwner, err := who.ownerOf(ctx, author.UserID)
-	if err != nil {
-		return wake{}, err
+	return wake{wakeRun, "for_you"}, nil
+}
+
+// appliedInPerson reports whether an event came from a change its actor
+// applied themselves, which the engine records as applied by them, and not
+// from a write the server made in their name: a rule, a sync with GitHub or
+// a repository, a saved view's news, a job. Only those it never records.
+func (who *viewer) appliedInPerson(ctx context.Context, ev core.Event) (bool, error) {
+	if !id.Valid(ev.ChangeID) {
+		return false, nil
 	}
-	if authorOwner == owner {
-		return wake{wakeRun, "for_you"}, nil
-	}
-	return wake{wakeRefuse, core.RunNotResponsible}, nil
+	var applied core.AppliedChange
+	return store.Find(ctx, who.db, &applied, store.Eq("id", ev.ChangeID), store.Eq("actor_id", ev.ActorID))
 }
 
 // ownerOf is the person responsible for an agent, as its account says
