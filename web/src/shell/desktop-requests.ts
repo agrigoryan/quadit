@@ -7,7 +7,7 @@
 import { useEffect } from "react";
 import { api, errorMessage, workspacePath } from "@/data/api";
 import { mutate } from "@/data/mutate";
-import { getProjectByKey, getRow } from "@/data/selectors";
+import { getProjectByKey, getRow, getRows } from "@/data/selectors";
 import { getState } from "@/data/store";
 import { answering } from "@/decisions/actions";
 import { docPath } from "@/docs/area";
@@ -22,6 +22,7 @@ import { readConnection } from "@/data/listening";
 import { isNotFound } from "@/data/query";
 import { makeConnectCode, readConnectCode } from "@/settings/agents/data";
 import type { Changes } from "@/types/changes.gen";
+import type { AgentConnection } from "@/types/dashboard";
 import type { Decision, DecisionOption, Notification } from "@/types/core";
 import type { DesktopAction, DesktopNotification, DesktopOutcome, DesktopRequest } from "@/types/desktop";
 
@@ -129,10 +130,38 @@ async function agentState(agent: string, code: string | undefined): Promise<Desk
   if (!connection) return refused(t("desktop.gone"));
   return {
     ok: true,
-    connected: connection !== "not_connected",
-    listening: connection === "listening",
+    connected: connection.connection !== "not_connected",
+    listening: connection.connection === "listening",
     codeUsed: codeState.used,
     codeGone: codeState.gone,
+    ...heard(connection.reading),
+  };
+}
+
+/**
+ * What listens as an agent, for its card in the app: each live listener, by
+ * its project's key and name (none: everything else) and what holds it;
+ * whether a webhook pushes to it; and the projects nothing hears now.
+ */
+function heard(
+  agent: AgentConnection | undefined,
+): Pick<DesktopOutcome & { ok: true }, "listeners" | "pushed" | "unheard"> {
+  if (!agent) return {};
+  const live = agent.listeners.filter((l) => l.live);
+  const listeners = live.flatMap((l) => {
+    const project = l.project_id ? getRow("projects", l.project_id) : undefined;
+    // A project this page does not hold is not said as everything else.
+    if (l.project_id && !project) return [];
+    return [
+      { ...(project ? { project: { key: project.key, name: project.name } } : {}), ...(l.by ? { by: l.by } : {}) },
+    ];
+  });
+  return {
+    listeners,
+    pushed: agent.listening_outside_projects && !live.some((l) => !l.project_id),
+    unheard: getRows("projects")
+      .filter((p) => !agent.listening_projects.includes(p.id))
+      .map((p) => p.key),
   };
 }
 

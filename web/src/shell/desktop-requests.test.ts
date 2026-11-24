@@ -204,12 +204,23 @@ describe("the end of the app's first run", () => {
   });
 });
 
+/** An agent's reading as GET /agents/connection gives it: listening to nothing unless `more` says. */
+const reading = (more: Record<string, unknown>) => ({
+  listeners: [],
+  listening_projects: [],
+  listening_outside_projects: false,
+  ...more,
+});
+
+/** What the card is told of listeners when nothing listens: none, and every project unheard. */
+const NOTHING_HEARD = { listeners: [], pushed: false, unheard: ["SVA", "GS"] };
+
 describe("a tool's card in the app's Connect", () => {
   let reads: string[] = [];
-  const serve = (agents: unknown[], used: boolean) =>
+  const serve = (agents: Record<string, unknown>[], used: boolean) =>
     vi.spyOn(api, "get").mockImplementation((path: string) => {
       reads.push(path);
-      if (path.endsWith("/agents/connection")) return Promise.resolve({ agents });
+      if (path.endsWith("/agents/connection")) return Promise.resolve({ agents: agents.map(reading) });
       return Promise.resolve({ id: "cc1", used, expired: false });
     });
   beforeEach(() => {
@@ -235,6 +246,7 @@ describe("a tool's card in the app's Connect", () => {
       listening: false,
       codeUsed: false,
       codeGone: false,
+      ...NOTHING_HEARD,
     });
     serve([{ user_id: "a1", listening: false }], true);
     patchRow("members", "a1", { connected_at: 1700000000000 });
@@ -244,11 +256,23 @@ describe("a tool's card in the app's Connect", () => {
       listening: false,
       codeUsed: true,
       codeGone: false,
+      ...NOTHING_HEARD,
     });
   });
 
   it("says it is listening, from a reading of the agents shared for a few seconds, and asks about no code unless given one", async () => {
-    serve([{ user_id: "a1", listening: true, connected_at: "2026-11-21 14:02" }], false);
+    serve(
+      [
+        {
+          user_id: "a1",
+          listening: true,
+          connected_at: "2026-11-21 14:02",
+          listeners: [{ project_id: "p1", project: "SVA", by: "a chat", live: true }],
+          listening_projects: ["p1"],
+        },
+      ],
+      false,
+    );
     for (let i = 0; i < 3; i++) {
       expect(await answer({ kind: "agent-state", agent: "a1" })).toEqual({
         ok: true,
@@ -256,6 +280,10 @@ describe("a tool's card in the app's Connect", () => {
         listening: true,
         codeUsed: false,
         codeGone: false,
+        // What listens, by project name, for the card; and what nothing hears, for "listen to another".
+        listeners: [{ project: { key: "SVA", name: "Samurai" }, by: "a chat" }],
+        pushed: false,
+        unheard: ["GS"],
       });
     }
     expect(reads).toEqual(["/api/v1/w/acme/agents/connection"]);
@@ -264,7 +292,7 @@ describe("a tool's card in the app's Connect", () => {
   it("says a code replaced or cleared away since is gone, unused", async () => {
     vi.spyOn(api, "get").mockImplementation((path: string) =>
       path.endsWith("/agents/connection")
-        ? Promise.resolve({ agents: [{ user_id: "a1", listening: false }] })
+        ? Promise.resolve({ agents: [reading({ user_id: "a1", listening: false })] })
         : Promise.reject(new ApiError(404, { code: "not_found", message: "connect code not found" })),
     );
     expect(await answer({ kind: "agent-state", agent: "a1", code: "gone" })).toEqual({
@@ -273,6 +301,7 @@ describe("a tool's card in the app's Connect", () => {
       listening: false,
       codeUsed: false,
       codeGone: true,
+      ...NOTHING_HEARD,
     });
   });
 

@@ -86,6 +86,13 @@ export type DesktopOutcome =
       listening?: boolean;
       codeUsed?: boolean;
       codeGone?: boolean;
+      /**
+       * What listens as the agent now (agent-state): each live listener, of a project or, without one, of everything
+       * else, and what holds it ("a chat"); whether a webhook pushes to it; the projects (keys) nothing hears.
+       */
+      listeners?: { project?: { key: string; name: string }; by?: string }[];
+      pushed?: boolean;
+      unheard?: string[];
     }
   | { ok: false; message: string; path?: string };
 

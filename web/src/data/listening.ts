@@ -144,7 +144,9 @@ export function useListening(where?: Where): (member: Member | undefined) => boo
  * that asks often (the desktop app while a card waits): the cheap reading
  * is shared with every page and asked again at most every few seconds.
  */
-export async function readConnection(agentId: string): Promise<Connection | undefined> {
+export async function readConnection(
+  agentId: string,
+): Promise<{ connection: Connection; reading: AgentConnection | undefined } | undefined> {
   const member = getRow("members", agentId);
   if (!member || member.kind !== "agent") return undefined;
   const { slug } = getState();
@@ -153,10 +155,8 @@ export async function readConnection(agentId: string): Promise<Connection | unde
     queryFn: ({ signal }) => api.get<{ agents: AgentConnection[] }>(workspacePath(slug, CONNECTION), signal),
     staleTime: FRESH_ENOUGH_MS,
   });
-  return connectionOf(
-    member,
-    answer.agents.find((a) => a.user_id === agentId),
-  );
+  const reading = answer.agents.find((a) => a.user_id === agentId);
+  return { connection: connectionOf(member, reading), reading };
 }
 
 /** How old a reading readConnection hands out may be. */
