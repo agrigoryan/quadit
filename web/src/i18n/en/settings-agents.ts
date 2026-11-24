@@ -21,6 +21,23 @@ export const agentStrings = {
   "agents.listener.webhook": "A webhook pushes to it",
   "agents.listener.idle":
     "{project}: nothing listens now; its items wait. Say “listen to Quadit for {project}” to it in a chat.",
+  // A listener Quadit's runner holds on a computer, and its state.
+  "agents.runner.line": "{runs}. {status}",
+  "agents.runner.runs": "Runs {project} on {machine}, in {folder}, with {program}",
+  "agents.runner.ready": "Ready",
+  "agents.runner.working": "Working on {task}",
+  "agents.runner.paused.usage_limit": "Paused until {time}: {program}'s usage limit",
+  "agents.runner.paused.usage_limitUnknown": "Paused: {program}'s usage limit",
+  "agents.runner.paused.not_signed_in": "Paused: {program} is not signed in",
+  "agents.runner.paused.program_missing": "Paused: {program} is not found",
+  "agents.runner.paused.folder_missing": "Paused: the folder is gone",
+  "agents.runner.paused.login_mismatch": "Paused: {program} works as another agent",
+  "agents.runner.paused.server_old": "Paused: this server needs an update",
+  "agents.runner.paused.other": "Paused",
+  "agents.runner.away": "Runs {project} on {machine}: offline since {time}. Its requests wait for it.",
+  "agents.runner.chat": "Listening to {project}, from a chat; Quadit runs it on {machine} again when that chat stops.",
+  "agents.runner.setUp":
+    "Quadit can start {agent} on a computer for each task: set it up in the Quadit app, on {agent}'s card, or with quadit run add on that computer.",
   "agents.connection.connected": "Connected, not listening",
   "agents.connection.not_connected": "Not connected yet",
   "agents.connection.listeningHint":

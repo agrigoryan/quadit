@@ -8,7 +8,7 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, User, Workspace } from "@/types/core";
-import type { ListenerShown } from "@/types/dashboard";
+import type { ListenerShown, RunnerShown } from "@/types/dashboard";
 import { ListenerLines } from "@/ui/listener-lines";
 
 beforeEach(() => {
@@ -78,5 +78,67 @@ describe("what an agent listens to", () => {
     expect(
       lines([stopped], { idle: true, listening_outside_projects: true, listening_projects: ["p1", "p2"] }),
     ).toEqual(["A webhook pushes to it"]);
+  });
+});
+
+describe("a listener Quadit's runner marked", () => {
+  const runner = (over: Partial<RunnerShown> = {}, live = true): ListenerShown => ({
+    project_id: "p1",
+    project: "SVA",
+    by: "Quadit's runner",
+    live,
+    runner: {
+      machine: "Aram's MacBook Pro",
+      folder: "~/devel/game",
+      program: "claude",
+      program_version: "2.1.331",
+      holding: live,
+      since: "2026-11-24 14:02",
+      ...over,
+    },
+  });
+  const runs = "Runs Samurai vs Aliens on Aram's MacBook Pro, in ~/devel/game, with Claude Code";
+
+  it("says what runs the agent, where, and that it is ready or what it works on", () => {
+    expect(lines([runner()])).toEqual([`${runs}. Ready`]);
+    expect(lines([runner({ task: "SVA-12" })])).toEqual([`${runs}. Working on SVA-12`]);
+    expect(lines([runner({ program: "codex" })])).toEqual([
+      "Runs Samurai vs Aliens on Aram's MacBook Pro, in ~/devel/game, with Codex. Ready",
+    ]);
+  });
+
+  it.each([
+    ["not_signed_in", "Paused: Claude Code is not signed in"],
+    ["program_missing", "Paused: Claude Code is not found"],
+    ["folder_missing", "Paused: the folder is gone"],
+    ["login_mismatch", "Paused: Claude Code works as another agent"],
+    ["server_old", "Paused: this server needs an update"],
+    ["usage_limit", "Paused: Claude Code's usage limit"],
+    ["something_new", "Paused"],
+  ])("says it is paused: %s", (paused, status) => {
+    expect(lines([runner({ paused, task: "SVA-12" })])).toEqual([`${runs}. ${status}`]);
+  });
+
+  it("says until when it is paused for a usage limit", () => {
+    expect(lines([runner({ paused: "usage_limit", paused_until: "2026-11-24 18:00" })])[0]).toMatch(
+      new RegExp(`^${runs}\\. Paused until .+: Claude Code's usage limit$`),
+    );
+  });
+
+  it("says a chat holds it for now, and Quadit runs it again after", () => {
+    const chat = runner({ holding: false });
+    expect(lines([chat])).toEqual([
+      "Listening to Samurai vs Aliens, from a chat; Quadit runs it on Aram's MacBook Pro again when that chat stops.",
+    ]);
+  });
+
+  it("says, when asked, that the computer is offline and its requests wait, in place of the line for a stopped listener", () => {
+    const away = runner({}, false);
+    expect(lines([away])).toEqual([]);
+    expect(lines([away], { idle: true })).toEqual([
+      expect.stringMatching(
+        /^Runs Samurai vs Aliens on Aram's MacBook Pro: offline since .+\. Its requests wait for it\.$/,
+      ),
+    ]);
   });
 });

@@ -138,6 +138,9 @@ function AgentBody({ agent }: { agent: AgentMember }) {
               <ListenerLines reading={fresh(state)} idle />
             </span>
           )}
+          {state && !agent.delegated_by && !fresh(state).listeners.some((l) => l.runner) && (
+            <p className="basis-full text-ink-3">{t("agents.runner.setUp", { agent: `@${agent.handle}` })}</p>
+          )}
         </Card>
       </Section>
 
