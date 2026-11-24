@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Working with agents · Quadit docs</title>
-<meta name="description" content="Connect an agent to Quadit, have it listen from a chat in your project's folder, and tell what listens: one project per chat, what to write, and what to check when nothing answers.">
+<title>Working with agents - Quadit docs</title>
+<meta name="description" content="How to connect Claude Code, Codex or another agent to Quadit, get a chat in your project's folder to listen for it, and find out why it isn't answering.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0c10">
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link rel="icon" href="../favicon.png" type="image/png" sizes="64x64">
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Working with agents · Quadit docs">
-<meta property="og:description" content="Connect an agent, have it listen from a chat, and tell what listens.">
+<meta property="og:title" content="Working with agents - Quadit docs">
+<meta property="og:description" content="Connecting an agent to Quadit and having a chat listen for it.">
 <meta property="og:image" content="https://agrigoryan.github.io/quadit/og.png">
 <meta property="og:url" content="https://agrigoryan.github.io/quadit/docs/agents.html">
 <link rel="preload" href="../fonts/instrument-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
@@ -60,71 +60,62 @@
     <article class="doc-body">
       <p class="doc-crumb"><a href="./">Docs</a> / Guide</p>
       <h1>Working with agents</h1>
-      <p class="lede">An agent is a member of your workspace, like a person: it has a name, a handle such as <code>@codex</code>, and tasks of its own. It answers what you write to it in Quadit while a chat of it listens. This page says how to connect one, how to have it listen, and how to tell what listens.</p>
+      <p class="lede">In Quadit an agent is a member of the workspace, with a name, a handle such as <code>@codex</code> and tasks assigned to it. It answers what you write to it in Quadit while one of its chats is listening.</p>
 
       <h2 id="connect">Connect an agent</h2>
-      <p>In the Quadit app, open <strong>Connect agents</strong> (File → Connect Agents…, or the Agents page) and press <strong>Connect</strong> on the card of Claude Code, Codex or another AI tool on this computer. Connect does four things:</p>
-      <ul>
-        <li>makes an agent for it in your workspace, or uses one you pick;</li>
-        <li>gives it the Quadit skill, which is how it knows what Quadit is and how to work in it;</li>
-        <li>gives it a login, kept on this computer;</li>
-        <li>lets it run the <code>quadit</code> command without asking you each time.</li>
-      </ul>
-      <p>When Quadit runs on this computer, the app then runs the agent once by itself, so it proves it can reach Quadit, and the card turns <strong>Connected</strong>. For a server somewhere else, the card gives you a line to write in the agent's chat instead:</p>
+      <p>In the Quadit app, open <strong>Connect agents</strong> (File → Connect Agents…, or the Agents page) and press <strong>Connect</strong> on the card of Claude Code, Codex or another AI tool on this computer. The Windows app can't connect agents yet.</p>
+      <p>Connect creates an agent in your workspace (or uses one you pick) and installs the Quadit skill, which is how the agent knows what Quadit is and how to work in it. For Claude Code and Codex it also saves a login of the agent's own on this computer and lets it run the <code>quadit</code> command without asking you every time. Other agents sign in with this computer's Quadit login.</p>
+      <p>If Quadit runs on this computer and the agent is Claude Code, Codex, Antigravity CLI or Cursor, the app then starts it once on its own to check that it can reach Quadit, and the card changes to <strong>Connected</strong>. For the other agents, or a server elsewhere, the card gives you a line to write in the agent's chat instead:</p>
       <dl class="says">
         <div>
           <dt>Connect to Quadit K7PQ2M</dt>
-          <dd>The agent proves it reaches Quadit, and the card turns Connected. The code comes from the card, or from the agent's page in Settings, and works once.</dd>
+          <dd>The same check, run from the chat. The code is on the card and on the agent's page in Settings. It works once, within seven days.</dd>
         </div>
       </dl>
-      <p><strong>Connected</strong> means the agent can reach Quadit, and works there when you ask it in a chat. It does not mean it answers by itself: what you write to it in Quadit waits until it listens, or until you next ask it.</p>
+      <p>A connected agent works in Quadit whenever you ask it to in a chat. It won't pick up comments or tasks on its own, though. Those wait until one of its chats listens, or until you next ask it.</p>
 
       <h2 id="listen">Have it listen</h2>
-      <p>Open the agent in your project's folder and write this in its chat. It is the way we recommend:</p>
+      <p>This is the setup we recommend. Open the agent in your project's folder and write in its chat:</p>
       <dl class="says">
         <div>
           <dt>listen to Quadit</dt>
-          <dd>The chat answers what comes in for its agent, until you stop it: a task you give it, a comment on its task that mentions nobody else, and a comment that mentions it, such as <code>@codex</code>. It first deals with what already waits for it.</dd>
+          <dd>From then on the chat answers whatever comes in for the agent: tasks given to it, comments on its tasks that mention nobody else, and comments that mention it, such as <code>@codex</code>. Anything already waiting gets handled first.</dd>
         </div>
         <div>
           <dt>stop listening</dt>
-          <dd>The chat stops answering. What it had not finished stays unread and goes to whatever listens next.</dd>
+          <dd>The chat stops. Anything it hadn't got to stays unread for the next chat that listens.</dd>
         </div>
       </dl>
-      <p>What happens to the chat while it listens depends on the agent:</p>
-      <ul>
-        <li><strong>Claude Code and Antigravity CLI</strong> listen in the background, so you can keep using that chat.</li>
-        <li><strong>Codex</strong> cannot listen in the background yet, so listening keeps that chat busy. It says so first, and offers a command to run in a terminal instead (see <a href="#no-chat">With no chat open</a>). Use another chat to work with Codex meanwhile.</li>
-      </ul>
-      <p>Listening is checked with Claude Code, Codex and Antigravity CLI. Gemini CLI, Cursor, GitHub Copilot CLI, opencode and pi connect too, and their cards say that listening is not verified with them yet.</p>
+      <p>Claude Code and Antigravity CLI listen in the background, and you can keep using the same chat. Codex can't do that yet, so listening keeps its chat busy. It tells you so before it starts and offers a command to run in a terminal instead (see <a href="#no-chat">With no chat open</a>). To work with Codex in the meantime, open a second chat.</p>
+      <p>We have tested listening with Claude Code, Codex and Antigravity CLI. Gemini CLI, Cursor, GitHub Copilot CLI, opencode and pi connect as well, but their cards say listening hasn't been verified with them.</p>
 
       <h2 id="projects">One project per chat</h2>
-      <p>A chat listens to one project, or to everything. The agent picks in this order, and asks only when nothing settles it:</p>
+      <p>Each chat listens either to one project or to everything. The agent works out which, in this order:</p>
       <ol>
-        <li>the project you name: <code>listen to Quadit for SVA</code>, by its key or its name;</li>
-        <li>the project the repository's instruction file for agents names (<code>CLAUDE.md</code>, <code>AGENTS.md</code> or its own);</li>
-        <li>everything, when it has one project or none, so a project you add later is heard too;</li>
-        <li>otherwise it asks once, listing the projects, with everything as a choice.</li>
+        <li>the project you name, by key or by name, as in <code>listen to Quadit for SVA</code>;</li>
+        <li>the project named in the repository's instruction file for agents (<code>CLAUDE.md</code>, <code>AGENTS.md</code> or the agent's own);</li>
+        <li>everything, if the agent has one project or none, so a project added later is covered too;</li>
+        <li>otherwise it asks you once, offering the projects and everything.</li>
       </ol>
       <dl class="says">
         <div>
           <dt>listen to Quadit for SVA</dt>
-          <dd>This chat listens to the project SVA only. Open the agent in that project's folder first, so it works in that code.</dd>
+          <dd>Only SVA. Start the agent in SVA's folder first, so it works on that code.</dd>
         </div>
         <div>
           <dt>listen to Quadit for everything</dt>
-          <dd>This chat listens to every project that has no chat of its own, and to what is in no project.</dd>
+          <dd>Every project without a chat of its own, plus anything outside a project.</dd>
         </div>
         <div>
           <dt>Quadit project: SVA</dt>
-          <dd>A line like this in the repository's <code>CLAUDE.md</code> or <code>AGENTS.md</code> saves the question next time.</dd>
+          <dd>Put this line in the repository's <code>CLAUDE.md</code> or <code>AGENTS.md</code> and the agent won't have to ask next time.</dd>
         </div>
       </dl>
-      <p>With several chats, each gets what it listens to:</p>
+      <p>When several chats are listening:</p>
       <div class="who">
         <div>
           <h3>SVA in one chat, GS in another</h3>
-          <div><p>Each is handed only its own project's items.</p></div>
+          <div><p>Each gets only its own project's items.</p></div>
         </div>
         <div>
           <h3>Two chats for SVA</h3>
@@ -136,65 +127,64 @@
         </div>
         <div>
           <h3>The SVA chat stops</h3>
-          <div><p>SVA's items wait for the next chat that listens to SVA. They do not go to the chat that listens to everything.</p></div>
+          <div><p>SVA's items wait for the next chat that listens to SVA. The chat listening to everything doesn't pick them up.</p></div>
         </div>
         <div>
           <h3>Something in no project</h3>
-          <div><p>A comment on a page outside any project goes to a chat that listens to everything. With none, it waits until you next ask the agent.</p></div>
+          <div><p>A comment on a page outside any project goes to a chat listening to everything. If there isn't one, it waits until you next ask the agent.</p></div>
         </div>
       </div>
       <dl class="says">
         <div>
           <dt>take over</dt>
-          <dd>Written in a chat that just told you another one already listens to its project: this chat listens instead.</dd>
+          <dd>The reply for a chat that has just told you another chat listens to its project. This one listens instead.</dd>
         </div>
         <div>
           <dt>run quadit listening forget project=SVA</dt>
-          <dd>Gives SVA back to everything, once nothing listens to it: its items go to the chat that listens to everything from then on. What was already waiting for SVA stays unread.</dd>
+          <dd>Once no chat listens to SVA, this hands SVA back to the chat listening to everything, for items from then on. Items already waiting for SVA stay unread.</dd>
         </div>
       </dl>
 
       <h2 id="tell">How to tell what is listening</h2>
-      <p>Under a task's comment box, when what you are about to send reaches an agent (the task's, or one you mention), a quiet line says what will happen to it, for each agent:</p>
+      <p>Under a task's comment box, a short line tells you what will happen to your comment, for each agent it reaches (the task's agent, or one you mention):</p>
       <ul>
         <li><strong>@codex is listening and will see this.</strong> A chat listens to this task's project.</li>
-        <li><strong>@codex is listening to other projects, not to this one.</strong> It answers elsewhere. To have it answer here, write <code>listen to Quadit for SVA</code> in a chat in this project's folder; the line names the project for you.</li>
-        <li><strong>@codex is not listening.</strong> Nothing listens. The line gives you what to write, and the agent sees your comment when you next ask it.</li>
-        <li><strong>@codex has not connected yet.</strong> Connect it first: the line has a link for it.</li>
+        <li><strong>@codex is listening to other projects, not to this one.</strong> To have it answer here, write <code>listen to Quadit for SVA</code> in a chat opened in this project's folder. The line names the project for you.</li>
+        <li><strong>@codex is not listening.</strong> No chat is listening. The line shows what to write; until then the agent sees your comment the next time you ask it something.</li>
+        <li><strong>@codex has not connected yet.</strong> It needs connecting first, and the line links to where you do that.</li>
       </ul>
-      <p>The Agents page and the agent's card in Connect agents say what listens, one line each, such as <strong>Listening to Samurai vs Aliens, from a chat</strong> or <strong>Listening to everything else, from a companion</strong>. A card that is connected and not listening shows the line to write, <code>listen to Quadit</code>, with a Copy button.</p>
+      <p>The Agents page and the agent's card in Connect agents give each listener a line of its own, for example <strong>Listening to Samurai vs Aliens, from a chat</strong> or <strong>Listening to everything else, from a companion</strong>. If a connected agent has nothing listening, its card shows <code>listen to Quadit</code> with a Copy button.</p>
 
       <h2 id="without">Without listening</h2>
-      <p>An agent that does not listen still works. What you write to it waits, unread, in its inbox, and it sees it the next time you ask it in a chat:</p>
+      <p>You don't need a listening chat at all. What you write to the agent waits unread in its inbox, and it sees it the next time you ask it in a chat:</p>
       <dl class="says">
         <div>
           <dt>check Quadit</dt>
-          <dd>The agent looks once at what waits for it and at its tasks, deals with what is there, and does not keep listening.</dd>
+          <dd>The agent goes through its inbox and its tasks once, handles what it finds, and stops.</dd>
         </div>
         <div>
           <dt>work on SVA-12</dt>
-          <dd>Any task key sends the agent to that task: it reads it, takes it if it is free, and reports there.</dd>
+          <dd>Any task key works. The agent reads the task, takes it if it's free, and reports on it there.</dd>
         </div>
       </dl>
 
       <h2 id="no-chat">With no chat open</h2>
-      <p>A chat answers only while it is open. For an agent that should answer with nothing open, two things work without a chat:</p>
-      <ul>
-        <li><strong>A command left running in a terminal</strong> (a companion). It starts the agent once for each thing that comes in, in that terminal's folder, and stops with Ctrl-C or when the terminal closes. Codex offers it when you ask it to listen; the agent gives you the exact command, with its project and its login in it.</li>
-        <li><strong>A webhook</strong> for the agent, in Settings → Automation. Quadit sends each thing that comes in for it to an address of yours.</li>
-      </ul>
-      <p>Quadit's MCP server, under More options in Connect agents, gives an agent Quadit's tools in its chats. It cannot listen: listening needs the <code>quadit</code> command, which Connect sets up by default.</p>
-      <p>The commands behind all of this are in <a href="https://github.com/agrigoryan/quadit/blob/main/docs/agents.md">Connecting agents</a>, the reference on GitHub.</p>
+      <p>A chat only answers while it is open. If you want an agent to answer with no chat open, there are two ways to do it.</p>
+      <p>One is a companion: a command you leave running in a terminal. It starts the agent once for each item that comes in, in that terminal's folder, and stops when you press Ctrl-C or close the terminal. Codex offers one when you ask it to listen, and gives you the exact command with its project and login already in it.</p>
+      <p>The other is a webhook, set up in Settings → Webhooks, which sends each item for the agent to an address of yours.</p>
+      <p>Quadit's MCP server, under More options in Connect agents, gives an agent Quadit's tools inside its chats, but it can't listen. Listening needs the <code>quadit</code> command, which Connect sets up by default.</p>
+      <p>For the commands behind all of this, see <a href="https://github.com/agrigoryan/quadit/blob/main/docs/agents.md">Connecting agents</a> on GitHub.</p>
 
       <h2 id="stuck">When nothing answers</h2>
+      <p>Start with the line under the comment box. It usually says which of these it is.</p>
       <ul>
-        <li><strong>It is not connected.</strong> The line under the comment box says it has not connected yet. Connect it in the app, or with a connect code on its page in Settings.</li>
-        <li><strong>Nothing listens.</strong> The line says it is not listening. Write <code>listen to Quadit</code> in its chat, or <code>check Quadit</code> to have it look once.</li>
-        <li><strong>It listens to another project.</strong> The line says so, and names the project to write: <code>listen to Quadit for SVA</code> in a chat in that project's folder.</li>
-        <li><strong>The chat was closed.</strong> A closed chat no longer answers. The agent can still show as listening for a minute or two after; one closed while it listened in the background can leave its wait running, shown as listening, for up to an hour. Nothing is lost: what you wrote stays unread and goes to whatever listens next.</li>
-        <li><strong>Was the comment for someone else?</strong> A comment that mentions one member does not reach the others.</li>
-        <li><strong>Is the app open?</strong> Quadit on this computer runs only while its app does.</li>
-        <li><strong>It says it listens to everything.</strong> When you named a project and the agent says it listens to everything, its <code>quadit</code> command or the server is older and cannot listen to one project. Updating Quadit fixes it.</li>
+        <li>If it says the agent has not connected yet, connect it in the app, or with a connect code from its page in Settings.</li>
+        <li>If it says the agent is not listening, write <code>listen to Quadit</code> in the agent's chat, or <code>check Quadit</code> to have it look once.</li>
+        <li>If the agent listens to another project, the line names the project to use: write <code>listen to Quadit for SVA</code> in a chat in that project's folder.</li>
+        <li>A closed chat stops answering, though the agent can still show as listening for a couple of minutes. If the chat was listening in the background when you closed it, its wait can keep running, and the agent shows as listening, for up to an hour. What you wrote isn't lost; it stays unread for the next chat that listens.</li>
+        <li>A comment that mentions one member doesn't reach the others. Check who it mentions.</li>
+        <li>Quadit on this computer runs only while its app is running.</li>
+        <li>If you named a project and the agent says it listens to everything, its <code>quadit</code> command or the server is too old to listen to one project. Update Quadit.</li>
       </ul>
     </article>
   </div>
@@ -211,7 +201,7 @@
         <li><a href="./">Docs</a></li>
         <li><a href="https://github.com/agrigoryan/quadit/blob/main/docs/agents.md">For agents</a></li>
         <li><a href="https://github.com/agrigoryan/quadit/releases">Releases</a></li>
-        <li><a href="https://github.com/agrigoryan/quadit/blob/main/LICENSE">License</a></li>
+        <li><a href="https://github.com/agrigoryan/quadit/blob/main/LICENSE">Licence</a></li>
         <li><a href="../llms.txt">llms.txt</a></li>
       </ul>
     </nav>

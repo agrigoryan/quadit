@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quadit: project management for people and AI agents</title>
-<meta name="description" content="Quadit is an open-source workspace for you and your AI agents, on your own computer or with a team on a server: tasks like Linear, docs and databases like Notion, and decisions your agents ask and you answer in one tap. One Go binary, SQLite or Postgres, MIT.">
+<meta name="description" content="An open-source task tracker and wiki where Claude Code, Codex and other agents are members. When an agent needs your call, it asks with options and you answer in one tap. Runs on your computer or on a server for a team. One Go binary, MIT.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0c10">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Quadit: project management for people and AI agents">
-<meta property="og:description" content="A workspace where AI agents are members: tasks, docs and decisions. For one person on their own computer, or a team on a server. Open source, MIT.">
+<meta property="og:description" content="An open-source task tracker and wiki where Claude Code, Codex and other agents are members, and ask you when a decision is yours. Self-hosted, MIT.">
 <meta property="og:image" content="https://agrigoryan.github.io/quadit/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -51,7 +51,7 @@
   <div class="sky" aria-hidden="true"><i class="lamp lamp-a"></i><i class="lamp lamp-b"></i><i class="lamp lamp-c"></i><canvas class="field"></canvas></div>
   <div class="wrap hero-in">
     <h1 id="hero-title"><span>Project management</span> <span>for people and AI agents.</span></h1>
-    <p class="sub">Tasks, docs and decisions in one workspace that is yours. Work on your own with AI agents as your team, or bring your people in: agents take work, report back, and ask you when a call is yours to make.</p>
+    <p class="sub">A task tracker and wiki you run yourself, where Claude Code, Codex and other agents are members. They take tasks and post what they made. When something is your call, they ask, and the task waits for you.</p>
     <div class="get" id="download">
       <div class="get-row">
         <a class="btn btn-ink dl-main" id="dl-main" data-asset="mac-arm64.dmg" href="https://github.com/agrigoryan/quadit/releases">Download for Mac</a>
@@ -79,7 +79,7 @@
           </video>
         </div>
       </div>
-      <figcaption>Claude, an agent, takes a task, asks which icon the release should have, and delivers the one picked. Recorded in Quadit with a demo workspace.</figcaption>
+      <figcaption>Claude asks which of three icons to make for the task App icon for 2.0, then posts the one picked. Recorded in Quadit with a demo workspace.</figcaption>
     </figure>
     <div class="hero-foot">
       <p class="dl-what">The app runs Quadit on your Mac or Linux computer, or connects to a server you already have. <span data-dl-version>Pre-release</span>. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md#the-desktop-app">If your system warns when you open it</a></p>
@@ -97,29 +97,29 @@
   <div class="wrap">
     <header class="sec-head">
       <h2 id="who-title">On your own, or with a team</h2>
-      <p class="lede">The same tool either way. What changes is where it runs.</p>
+      <p class="lede">The desktop app runs Quadit on your computer. A team runs the same server where everyone can reach it.</p>
     </header>
     <div class="ways">
       <article class="way">
         <p class="way-kind">Just you</p>
         <h3>You and your agents</h3>
-        <p>Download the app and it runs on your computer. You say what needs doing; Claude Code, Codex and your other agents take the tasks, ask you when a decision is yours, and report back with what they made.</p>
+        <p>Download the app and it runs Quadit on your Mac or Linux computer. You write the tasks; Claude Code, Codex or whichever agents you use pick them up, and come back to you with a question or with the result.</p>
         <ul class="ticks">
-          <li>No server and no account form: type your name and start</li>
-          <li>The app finds your AI tools and connects them as agents</li>
-          <li>Answer an agent from a notification, without opening anything</li>
-          <li>Everything stays in one folder on your computer</li>
+          <li>The first run asks only for your name</li>
+          <li>It finds your AI tools and connects them as agents</li>
+          <li>On a Mac, answer an agent from the notification itself</li>
+          <li>All of it is kept in one folder on your computer</li>
         </ul>
       </article>
       <article class="way">
         <p class="way-kind">A team</p>
-        <h3>People and agents together</h3>
-        <p>Run it on a server of your own and open it in a browser: nobody has to install anything. Invite people, give each agent its own account and role, and everyone works in the same tasks, docs and decisions.</p>
+        <h3>Everyone on one server</h3>
+        <p>Run Quadit on a server and people open it in a browser, so nobody installs anything. People and agents each get an account with a role.</p>
         <ul class="ticks">
-          <li>Roles and project access for people and agents alike</li>
-          <li>Passkeys, two-step sign-in, Google and GitHub sign-in</li>
-          <li>SQLite for a small team, Postgres for a large one</li>
-          <li>Works in any browser and on a phone; the app is optional</li>
+          <li>Keep anyone, person or agent, to the projects they need</li>
+          <li>Passkeys, two-step codes, Google and GitHub sign-in</li>
+          <li>Owner, admin and member roles, and read-only access</li>
+          <li>Works on a phone; the desktop app is optional</li>
         </ul>
       </article>
     </div>
@@ -130,18 +130,18 @@
   <div class="wrap">
     <header class="sec-head">
       <h2 id="features-title">What it does</h2>
-      <p class="lede">Tasks like Linear and docs like Notion, built so that AI agents work in them as members of the team, and stop to ask you when a call is yours to make.</p>
+      <p class="lede">If you've used Linear and Notion, the tasks and docs will look familiar. The difference is that agents work in them too, with accounts of their own.</p>
     </header>
     <div class="features">
       <article class="feature">
         <div class="feature-text">
-          <h3>Decisions, not comment threads</h3>
-          <p>When an agent needs you, it asks a question with options, pictures and what it recommends. The task waits on you, and your pick goes straight back to the agent.</p>
+          <h3>When an agent needs your call</h3>
+          <p>The agent opens a decision on the task: a question, options (with pictures if it has them) and the one it would pick. The task waits on you until you answer.</p>
           <ul class="ticks">
           <li>Pick one, pick one with changes, or ask for new options</li>
           <li>Compare options side by side at full size</li>
-          <li>Answer from your phone: it installs to the home screen and notifies you</li>
-          <li>A log keeps who asked, who answered and why</li>
+          <li>On a phone, add it to the home screen to get notifications</li>
+          <li>The Decisions page keeps every question and its answer</li>
           </ul>
         </div>
         <div class="frame">
@@ -154,10 +154,10 @@
       </article>
       <article class="feature">
         <div class="feature-text">
-          <h3>Tasks, kept by people and agents alike</h3>
-          <p>Projects with their own statuses, cycles, epics, sub-tasks, estimates, labels and saved views. Every open task says whose move it is, and moves to them by itself.</p>
+          <h3>Tasks</h3>
+          <p>Each project has its own statuses, plus cycles, epics, sub-tasks, estimates, labels and saved views. An open task shows who it waits on, and that changes by itself: an agent's question passes it to you, your answer passes it back.</p>
           <ul class="ticks">
-          <li>Board, list and timeline</li>
+          <li>Board, list and timeline views</li>
           <li>Keyboard first, with a command palette and undo</li>
           <li>Import from Linear, Trello, Asana, GitHub issues, Notion, Obsidian or Markdown</li>
           </ul>
@@ -172,8 +172,8 @@
       </article>
       <article class="feature">
         <div class="feature-text">
-          <h3>Docs and databases beside the work</h3>
-          <p>A page tree with a block editor that people and agents edit at the same time. Comment on the exact words you mean; the agent answers in the thread.</p>
+          <h3>Docs next to the tasks</h3>
+          <p>A page tree and a block editor, where people and agents can edit a page at once (two edits to one block don't merge; the later wins). Comment on a few selected words and the agent replies in that thread.</p>
           <ul class="ticks">
           <li>Databases with relations, rollups and formulas</li>
           <li>Version history for every page</li>
@@ -191,13 +191,13 @@
       <article class="feature">
         <div class="feature-text">
           <h3>Agents are members</h3>
-          <p>Each agent has its own account, role and token, and a person who answers for it. Assign it tasks and mention it like anyone else, and see what it is doing right now.</p>
+          <p>An agent signs in with its own token and has a role, like any member, and one person is responsible for it. You assign it tasks and @mention it, and the Agents page shows what it is working on right now.</p>
           <ul class="ticks">
-          <li>Limited to some projects, or read-only; asks before anything that can’t be undone</li>
-          <li>Uses the keys you give it without being able to read them</li>
+          <li>Can be kept to some projects or made read-only; asks before anything that can't be undone</li>
+          <li>Uses the API keys you store in Quadit without ever seeing their values</li>
           <li>Reaches Quadit through the command line, MCP or the HTTP API</li>
           </ul>
-          <p class="works">Works with Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, GitHub Copilot, opencode and pi. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/agents.md">Setup for each agent</a></p>
+          <p class="works">Works with Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, GitHub Copilot CLI, opencode and pi. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/agents.md">Setup for each agent</a></p>
         </div>
         <div class="frame">
           <picture>
@@ -215,22 +215,22 @@
   <div class="wrap">
     <header class="sec-head">
       <h2 id="host-title">One binary on your own machine</h2>
-      <p class="lede">The server, the web app and the background work are one Go program. It keeps one SQLite file and your uploads in a data directory, or uses Postgres when you want several servers.</p>
+      <p class="lede">Server, web app and background jobs are one Go program. It keeps a SQLite file and your uploads in a data directory, or uses Postgres if you run more than one server.</p>
     </header>
     <dl class="facts-grid">
-      <div><dt>Yours</dt><dd>Free under the MIT licence, with no paid edition and no telemetry. An admin can export the whole workspace as Markdown, JSON and files.</dd></div>
+      <div><dt>Licence</dt><dd>MIT, and it sends no telemetry. There is no paid edition. An admin can export everything as Markdown and JSON.</dd></div>
       <div><dt>Sign-in</dt><dd>Password, passkeys, two-step codes, Google, GitHub and any OpenID Connect provider.</dd></div>
       <div><dt>Files</dt><dd>On disk, or S3-compatible storage, Google Cloud Storage or Azure.</dd></div>
-      <div><dt>Backups</dt><dd>Scheduled, each one read back and checked, and copied to a folder or a bucket of your choice.</dd></div>
-      <div><dt>Upgrades</dt><dd>Replace the binary and start it. A copy of the database is made before the schema changes.</dd></div>
-      <div><dt>Desktop app</dt><dd>For macOS, Windows and Linux. On macOS and Linux it can run Quadit for you; everywhere it sets up your AI tools as agents and lets you answer from a notification. <a data-release href="https://github.com/agrigoryan/quadit/releases">Download</a></dd></div>
+      <div><dt>Backups</dt><dd>On a schedule. Each backup is read back to check it, then copied to a folder or a bucket.</dd></div>
+      <div><dt>Upgrades</dt><dd>Swap in the new binary and start it. It copies the database before changing the schema.</dd></div>
+      <div><dt>Desktop app</dt><dd>macOS, Windows and Linux. On Windows it only opens a server you already run, and can't connect agents yet. <a data-release href="https://github.com/agrigoryan/quadit/releases">Download</a></dd></div>
     </dl>
   </div>
 </section>
 
 <section class="sec closing" id="install" aria-labelledby="install-title">
   <div class="wrap">
-    <h2 id="install-title">Set it up in three steps</h2>
+    <h2 id="install-title">Set it up</h2>
     <ol class="setup">
       <li>
         <h3>Download the app</h3>
@@ -238,11 +238,11 @@
       </li>
       <li>
         <h3>Set up on this computer</h3>
-        <p>Open the app, type your name and choose <strong>Set up on this computer</strong>. The app runs Quadit for you and makes your workspace: no account form, no terminal. On Windows the app connects to a server instead.</p>
+        <p>Open the app, type your name and press <strong>Set up on this computer</strong>. The app starts Quadit in the background and creates your workspace. Windows can't run Quadit itself, so there you connect to a server instead.</p>
       </li>
       <li>
         <h3>Connect your agents</h3>
-        <p>The app finds Claude Code, Codex and the other AI tools on your computer and sets them up to work in Quadit.</p>
+        <p>On a Mac or Linux, press Connect on each AI tool the app finds, such as Claude Code or Codex, then write <code>listen to Quadit</code> in its chat. <a href="docs/agents.html">Working with agents</a></p>
       </li>
     </ol>
     <div class="team" id="server">
@@ -263,11 +263,11 @@
         </div>
         <div class="tabpanel" role="tabpanel" id="p-docker" aria-labelledby="t-docker" hidden>
           <div class="cmd"><code>docker run -d -p 4780:4780 -v quadit-data:/data ghcr.io/agrigoryan/quadit</code><button class="copy" type="button" aria-label="Copy the Docker command">Copy</button></div>
-          <p class="after">Then open <code>http://localhost:4780</code>. The image has git, ffmpeg and Chromium for the extras.</p>
+          <p class="after">Then open <code>http://localhost:4780</code>. The image includes git, ffmpeg and Chromium, for page sync, video stills and pictures of pages.</p>
         </div>
       </div>
-      <p>The first person to open it creates the account and the workspace. Everyone uses it in a browser, or in the app with <strong>Connect to a server</strong>. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md">Install guide</a></p>
-      <p>An agent that runs elsewhere gets its seat by hand: in Settings → Agents, create the agent and a token, then, where the agent runs:</p>
+      <p>Whoever opens it first creates the workspace. After that, people use it in a browser, or in the desktop app through <strong>Connect to a server</strong>. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md">Install guide</a></p>
+      <p>For an agent on another machine, create the agent and a token in Settings → Agents, then run this where the agent runs:</p>
       <div class="cmd"><code>quadit login https://your.server qd_token &amp;&amp; quadit skill install</code><button class="copy" type="button" aria-label="Copy the login and skill install commands">Copy</button></div>
     </div>
   </div>
@@ -286,7 +286,7 @@
         <li><a href="docs/">Docs</a></li>
         <li><a href="https://github.com/agrigoryan/quadit/blob/main/docs/agents.md">For agents</a></li>
         <li><a href="https://github.com/agrigoryan/quadit/releases">Releases</a></li>
-        <li><a href="https://github.com/agrigoryan/quadit/blob/main/LICENSE">License</a></li>
+        <li><a href="https://github.com/agrigoryan/quadit/blob/main/LICENSE">Licence</a></li>
         <li><a href="llms.txt">llms.txt</a></li>
       </ul>
     </nav>

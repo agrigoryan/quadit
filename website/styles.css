@@ -223,6 +223,7 @@ figcaption { margin: 18px auto 0; max-width: 46em; font-size: 0.9375rem; line-he
 .setup li::before { content: counter(step); position: absolute; left: 24px; top: 24px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 9px; font: 600 0.875rem var(--sans); color: var(--move-ink); background: var(--move); }
 .setup h3 { font-size: 1.125rem; margin-bottom: 12px; }
 .setup p { color: var(--ink-2); }
+.setup p code { white-space: nowrap; }
 .setup .cmd + .cmd { margin-top: 8px; }
 .setup p + .cmd { margin-top: 12px; }
 .team { max-width: 820px; margin: 44px auto 0; padding-top: 32px; border-top: 1px solid var(--line); text-align: left; }
