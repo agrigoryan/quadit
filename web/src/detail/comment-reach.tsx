@@ -7,16 +7,22 @@
 // is listening to the task's project will see it; one that listens only to
 // other projects, or not at all, sees it when it is next asked, and is told
 // the line that has it listen to this one; one that has never connected is
-// offered the way to connect. For several it says each one's state in a
-// few words.
+// offered the way to connect. An agent that a computer runs for the
+// project is spoken of as the server foresees it instead (the run outlook):
+// it starts now there, waits its turn, waits for the computer, is paused or
+// will not start, and why. For several it says each one's state in a few
+// words.
 
 import { Link } from "react-router";
-import { joinPhrases, t, type Key } from "@/lib/i18n";
+import { isKey, joinPhrases, t, tMaybe, type Key } from "@/lib/i18n";
+import { exact, parseWhen } from "@/lib/time";
 import { useConnection, type Connection } from "@/data/listening";
 import { mayBeGivenWork } from "@/data/access";
+import { useRunOutlook } from "@/data/run-outlook";
 import { useMe, useMembers, useProjects, useRowEvenIfGone } from "@/data/selectors";
 import { EMPTY_DRAFT, useDrafts, type Draft } from "@/detail/comment-actions";
 import type { Member, Task } from "@/types/core";
+import type { RunOutlook } from "@/types/dashboard";
 import { useSettingsBase } from "@/settings/base";
 import { canConnectTools, ConnectToolsButton } from "@/ui/connect-tools";
 
@@ -47,11 +53,109 @@ function agentsReached(task: Task, draft: Draft, members: Member[], me: Member):
 
 export function CommentReach({ task }: { task: Task }) {
   const draft = useDrafts((s) => s.drafts[task.id]) ?? EMPTY_DRAFT;
-  const agents = agentsReached(task, draft, useMembers(), useMe());
+  const members = useMembers();
+  const agents = agentsReached(task, draft, members, useMe());
   // Only a draft that reaches an agent asks the server how far it is connected.
+  return agents.length > 0 ? <Reach agents={agents} members={members} task={task} /> : null;
+}
+
+/** The line for the agents a draft reaches: one in full, several in a few words each. */
+function Reach({ agents, members, task }: { agents: Member[]; members: Member[]; task: Task }) {
+  const connection = useConnection();
+  // Only agents a computer runs are asked about: for the others the server would say none.
+  const run = agents.filter((agent) => connection(agent, task.project_id)?.runner);
+  const outlook = useRunOutlook(
+    task.key,
+    run.map((agent) => agent.handle),
+    "comment",
+  );
+  // Until the server says what will happen, an agent a computer runs is not spoken of at all, rather than as listening.
+  if (run.length > 0 && !outlook.outlooks && !outlook.error) return null;
+  const runs = (agent: Member) => {
+    const o = outlook.outlooks?.[`@${agent.handle}`];
+    return o && o.outcome !== "none" && o.outcome !== "in_chat" ? o : undefined;
+  };
   const [only, ...more] = agents;
-  if (!only) return null;
-  return more.length === 0 ? <AgentReach agent={only} task={task} /> : <AgentsReach agents={agents} task={task} />;
+  if (only && more.length === 0) {
+    const o = runs(only);
+    return o ? <RunReach outlook={o} members={members} task={task} /> : <AgentReach agent={only} task={task} />;
+  }
+  return (
+    <AgentsReach
+      agents={agents.filter((agent) => !runs(agent))}
+      outlooks={agents.flatMap((agent) => runs(agent) ?? [])}
+      members={members}
+      task={task}
+    />
+  );
+}
+
+/** What an outlook's words name: the agent, its computer, program and folder, its owner by name, the project, a time. */
+function wordsOf(o: RunOutlook, members: Member[]) {
+  const owner = members.find((m) => `@${m.handle}` === o.owner);
+  const when = parseWhen(o.outcome === "when_back" ? o.since : o.until);
+  return {
+    agent: o.agent,
+    machine: o.machine,
+    folder: o.folder,
+    program: tMaybe(`run.program.${o.program}`, o.program),
+    owner: owner?.name ?? o.owner,
+    project: o.project,
+    time: when ? exact(when) : "",
+  };
+}
+
+/** The full line for one agent a computer runs, for a comment on the task `taskKey`. */
+function runLine(o: RunOutlook, taskKey: string): Key {
+  switch (o.outcome) {
+    case "starts_now":
+      return "comment.run.starts_now";
+    case "queued":
+      return o.running === taskKey ? "comment.run.queuedHere" : "comment.run.queued";
+    case "when_back":
+      return "comment.run.when_back";
+    case "paused": {
+      if (o.reason === "usage_limit" && !o.until) return "comment.run.paused.usage_limitUnknown";
+      const key = `comment.run.paused.${o.reason}`;
+      return isKey(key) ? key : "comment.run.paused.other";
+    }
+    default: {
+      const key = `comment.run.will_not_start.${o.reason}`;
+      return isKey(key) ? key : "comment.run.will_not_start.other";
+    }
+  }
+}
+
+/** The few words for one agent a computer runs, among several. */
+function runPhrase(o: RunOutlook): Key {
+  switch (o.outcome) {
+    case "starts_now":
+    case "queued":
+    case "when_back":
+    case "paused":
+      return `comment.run.many.${o.outcome}`;
+    default: {
+      const key = `comment.run.many.${o.reason}`;
+      return isKey(key) ? key : "comment.run.many.will_not_start";
+    }
+  }
+}
+
+/** For one agent a computer runs: what will happen to the comment, and, when nothing runs it here, the way to set it up. */
+function RunReach({ outlook, members, task }: { outlook: RunOutlook; members: Member[]; task: Task }) {
+  const words = wordsOf(outlook, members);
+  const unset = outlook.outcome === "will_not_start" && outlook.reason === "no_runner_here";
+  return (
+    <p className={LINE}>
+      <span>{t(runLine(outlook, task.key), words)}</span>
+      {unset &&
+        (canConnectTools() ? (
+          <ConnectToolsButton size="sm">{t("comment.run.setUp")}</ConnectToolsButton>
+        ) : (
+          <span>{t("comment.run.setUpInApp", words)}</span>
+        ))}
+    </p>
+  );
 }
 
 function AgentReach({ agent, task }: { agent: Member; task: Task }) {
@@ -91,8 +195,22 @@ function AgentReach({ agent, task }: { agent: Member; task: Task }) {
   );
 }
 
-/** The line for several agents: who will see it now, who when next asked, who has not connected. */
-function AgentsReach({ agents, task }: { agents: Member[]; task: Task }) {
+/**
+ * The line for several agents: who will see it now, who when next asked,
+ * who has not connected, and for each agent a computer runs, what will
+ * happen there.
+ */
+function AgentsReach({
+  agents,
+  outlooks,
+  members,
+  task,
+}: {
+  agents: Member[];
+  outlooks: RunOutlook[];
+  members: Member[];
+  task: Task;
+}) {
   const connection = useConnection();
   const by: Record<Connection, Member[]> = { listening: [], connected: [], not_connected: [] };
   for (const agent of agents) {
@@ -103,9 +221,12 @@ function AgentsReach({ agents, task }: { agents: Member[]; task: Task }) {
     group.length > 0 && (
       <span>{t(key, { n: group.length, handles: joinPhrases(group.map((m) => `@${m.handle}`)) })}</span>
     );
-  if (agents.every((agent) => !connection(agent, task.project_id))) return null;
+  if (outlooks.length === 0 && agents.every((agent) => !connection(agent, task.project_id))) return null;
   return (
     <p className={LINE}>
+      {outlooks.map((o) => (
+        <span key={o.agent}>{t(runPhrase(o), wordsOf(o, members))}</span>
+      ))}
       {sentence("comment.reach.listeningMany", by.listening)}
       {sentence("comment.reach.notListeningMany", by.connected)}
       {sentence("comment.reach.notConnectedMany", by.not_connected)}

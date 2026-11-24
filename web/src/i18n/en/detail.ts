@@ -201,6 +201,45 @@ export const detail = {
   "comment.reach.notConnectedMany": "{handles} has not connected yet. | {handles} have not connected yet.",
   "comment.reach.connect": "Connect it | Connect them",
   "comment.reach.connectInSettings": "Connect it in Settings | Connect them in Settings",
+  // What happens to the comment for an agent a computer runs (the run outlook).
+  "comment.run.starts_now": "Starts {agent} now on {machine}.",
+  "comment.run.queuedHere": "{agent} is working on this task on {machine}. This comes next, in the same session.",
+  "comment.run.queued": "{agent} is busy on {machine}. This is queued and starts when it is free.",
+  "comment.run.when_back": "Starts {agent} when {machine} is back. It has been offline since {time}.",
+  "comment.run.paused.usage_limit": "Starts {agent} at {time}, when {program}'s usage limit resets on {machine}.",
+  "comment.run.paused.usage_limitUnknown": "Starts {agent} when {program}'s usage limit resets on {machine}.",
+  "comment.run.paused.not_signed_in":
+    "Will not start yet: {program} is not signed in on {machine}. Sign in there, and it starts.",
+  "comment.run.paused.program_missing":
+    "Will not start yet: {program} is not found on {machine}. Install it there, and it starts.",
+  "comment.run.paused.folder_missing":
+    "Will not start yet: the folder {folder} is gone on {machine}. Pick the folder again in the Quadit app.",
+  "comment.run.paused.login_mismatch":
+    "Will not start yet: {program} on {machine} is set to work as another agent. Connect {agent} again in the Quadit app.",
+  "comment.run.paused.server_old": "Will not start yet: Quadit on {machine} needs this server updated.",
+  "comment.run.paused.other": "Will not start yet: Quadit holds {agent} back on {machine}.",
+  "comment.run.will_not_start.not_responsible":
+    "Will not start: only {owner}'s words, or their agents', start {agent}. Ask {owner}, or assign the task to an agent of your own.",
+  "comment.run.will_not_start.no_responsible":
+    "Will not start: {agent} has no person responsible for it. An admin can set one in Settings.",
+  "comment.run.will_not_start.no_runner_here": "Will not start: no computer runs {agent} for {project}.",
+  "comment.run.will_not_start.other": "Will not start: Quadit will not start {agent} for this.",
+  "comment.run.setUp": "Set it up",
+  "comment.run.setUpInApp": "Set it up in the Quadit app, on {agent}'s card.",
+  // The same, a few words each, when the comment reaches several agents.
+  "comment.run.many.starts_now": "{agent} starts now on {machine}.",
+  "comment.run.many.queued": "{agent} is busy on {machine}: queued.",
+  "comment.run.many.when_back": "{agent} starts when {machine} is back.",
+  "comment.run.many.paused": "{agent} is paused on {machine}.",
+  "comment.run.many.not_responsible": "{agent} will not start: only {owner}'s words start it.",
+  "comment.run.many.no_responsible": "{agent} will not start: no person is responsible for it.",
+  "comment.run.many.no_runner_here": "{agent} will not start: no computer runs it for {project}.",
+  "comment.run.many.will_not_start": "{agent} will not start.",
+  "comment.fromRun": "From the run's last message",
+  "comment.fromRunHint":
+    "{agent} wrote nothing on the task during this run, so Quadit posted what {program} said last.",
+  "comment.fromRunHintNoProgram":
+    "{agent} wrote nothing on the task during this run, so Quadit posted what its program said last.",
   "comment.label": "New comment",
   "comment.send": "Send",
   "comment.attach": "Attach files",

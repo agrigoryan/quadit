@@ -107,21 +107,28 @@ export function connectionOf(member: Member, reading: Reading | undefined, where
 
 /**
  * How far each agent is connected as `where` goes (see Where), the tool it
- * was last connected from, and, when it is not listening there, whether it
- * listens elsewhere: for what shows it (a task's assignee, the comment box,
+ * was last connected from, when it is not listening there whether it
+ * listens elsewhere, and whether a computer runs it (Quadit's runner marked
+ * one of its listeners of a project this viewer may read, whether or not
+ * it holds it now): for what shows it (a task's assignee, the comment box,
  * a picker). Undefined for a person, and for an agent until the server has
  * answered.
  */
 export function useConnection(): (
   member: Member | undefined,
   where?: Where,
-) => { connection: Connection; tool?: string; elsewhere: boolean } | undefined {
+) => { connection: Connection; tool?: string; elsewhere: boolean; runner: boolean } | undefined {
   const connections = useAgentConnections();
   return (member, where) => {
     if (!member || member.kind !== "agent" || !connections) return undefined;
     const reading = connections[member.user_id];
     const connection = connectionOf(member, reading, where);
-    return { connection, tool: reading?.tool, elsewhere: connection !== "listening" && hears(reading) };
+    return {
+      connection,
+      tool: reading?.tool,
+      elsewhere: connection !== "listening" && hears(reading),
+      runner: !!reading?.listeners.some((l) => l.runner),
+    };
   };
 }
 

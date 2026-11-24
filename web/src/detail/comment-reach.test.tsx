@@ -267,3 +267,172 @@ describe("the line under the comment box, as the draft goes", () => {
     expect(screen.queryByText(/codex/)).toBeNull();
   });
 });
+
+describe("the line under the comment box, for an agent a computer runs", () => {
+  /** A runner listener of SVA on Aram's MacBook Pro. */
+  const runner = {
+    project_id: "p1",
+    project: "SVA",
+    by: "Quadit's runner",
+    live: true,
+    runner: {
+      machine: "Aram's MacBook Pro",
+      folder: "~/devel/game",
+      program: "claude",
+      program_version: "2",
+      holding: true,
+      since: "2026-11-24 14:02",
+    },
+  };
+
+  /**
+   * GET /agents/connection says Quadit runs @codex (and, with `helperToo`,
+   * @helper); the run outlook answers `outlooks`, each with the fields it
+   * leaves out empty, as the server sends them all. Gives the paths asked.
+   */
+  function serve(outlooks: Record<string, string>[], helperToo = false) {
+    const asked: string[] = [];
+    vi.spyOn(api, "get").mockImplementation((path: string) => {
+      asked.push(path);
+      if (path.includes("/run-outlook"))
+        return Promise.resolve({
+          outlooks: outlooks.map((o) => ({
+            agent: "@codex",
+            machine: "Aram's MacBook Pro",
+            folder: "~/devel/game",
+            program: "claude",
+            project: "SVA",
+            owner: "@ann",
+            since: "",
+            until: "",
+            running: "",
+            reason: "",
+            ...o,
+          })),
+        });
+      return Promise.resolve({
+        agents: [
+          { user_id: "a1", handle: "@codex", listening: true, listening_projects: ["p1"], listeners: [runner] },
+          {
+            user_id: "a2",
+            handle: "@helper",
+            listening: helperToo,
+            listening_projects: helperToo ? ["p1"] : [],
+            listeners: helperToo ? [runner] : [],
+          },
+        ],
+      });
+    });
+    return asked;
+  }
+
+  it.each([
+    [{ outcome: "starts_now" }, "Starts @codex now on Aram's MacBook Pro."],
+    [
+      { outcome: "queued", running: "SVA-1" },
+      "@codex is working on this task on Aram's MacBook Pro. This comes next, in the same session.",
+    ],
+    [
+      { outcome: "queued", running: "SVA-9" },
+      "@codex is busy on Aram's MacBook Pro. This is queued and starts when it is free.",
+    ],
+    [{ outcome: "queued" }, "@codex is busy on Aram's MacBook Pro. This is queued and starts when it is free."],
+    [
+      { outcome: "paused", reason: "usage_limit" },
+      "Starts @codex when Claude Code's usage limit resets on Aram's MacBook Pro.",
+    ],
+    [
+      { outcome: "paused", reason: "not_signed_in" },
+      "Will not start yet: Claude Code is not signed in on Aram's MacBook Pro. Sign in there, and it starts.",
+    ],
+    [
+      { outcome: "paused", reason: "program_missing", program: "codex" },
+      "Will not start yet: Codex is not found on Aram's MacBook Pro. Install it there, and it starts.",
+    ],
+    [
+      { outcome: "paused", reason: "folder_missing" },
+      "Will not start yet: the folder ~/devel/game is gone on Aram's MacBook Pro. Pick the folder again in the Quadit app.",
+    ],
+    [
+      { outcome: "paused", reason: "login_mismatch" },
+      "Will not start yet: Claude Code on Aram's MacBook Pro is set to work as another agent. Connect @codex again in the Quadit app.",
+    ],
+    [
+      { outcome: "paused", reason: "server_old" },
+      "Will not start yet: Quadit on Aram's MacBook Pro needs this server updated.",
+    ],
+    [
+      { outcome: "will_not_start", reason: "not_responsible" },
+      "Will not start: only Ann's words, or their agents', start @codex. Ask Ann, or assign the task to an agent of your own.",
+    ],
+    [
+      { outcome: "will_not_start", reason: "no_responsible", owner: "" },
+      "Will not start: @codex has no person responsible for it. An admin can set one in Settings.",
+    ],
+  ])("%o: says what will happen", async (outlook, line) => {
+    serve([outlook]);
+    show({ ...base, assignee_id: "a1" });
+    expect(await screen.findByText(line)).toBeTruthy();
+    expect(screen.queryByText(/is listening/)).toBeNull();
+  });
+
+  it("names the time a usage limit resets, and since when a computer is offline", async () => {
+    serve([{ outcome: "paused", reason: "usage_limit", until: "2026-11-24 18:00" }]);
+    show({ ...base, assignee_id: "a1" });
+    expect(
+      await screen.findByText(/^Starts @codex at .+, when Claude Code's usage limit resets on Aram's MacBook Pro\.$/),
+    ).toBeTruthy();
+    cleanup();
+    vi.restoreAllMocks();
+    serve([{ outcome: "when_back", since: "2026-11-24 14:02" }]);
+    show({ ...base, assignee_id: "a1" });
+    expect(
+      await screen.findByText(/^Starts @codex when Aram's MacBook Pro is back\. It has been offline since .+\.$/),
+    ).toBeTruthy();
+  });
+
+  it("asks about the agents the draft reaches, for a comment on this task", async () => {
+    const asked = serve([{ outcome: "starts_now" }]);
+    show({ ...base, assignee_id: "a1" });
+    await screen.findByText("Starts @codex now on Aram's MacBook Pro.");
+    expect(asked).toContain(
+      `/api/v1/w/acme/tasks/SVA-1/run-outlook?agents=${encodeURIComponent("@codex")}&cause=comment`,
+    );
+  });
+
+  it("keeps today's line when Quadit would not start it for this, or a chat holds it", async () => {
+    serve([{ outcome: "none" }]);
+    show({ ...base, assignee_id: "a1" });
+    expect(await screen.findByText("@codex is listening and will see this.")).toBeTruthy();
+    cleanup();
+    vi.restoreAllMocks();
+    serve([{ outcome: "in_chat" }]);
+    show({ ...base, assignee_id: "a1" });
+    expect(await screen.findByText("@codex is listening and will see this.")).toBeTruthy();
+  });
+
+  it("says no computer runs it for the project, with the way to set it up: the app's Connect, else words", async () => {
+    serve([{ outcome: "will_not_start", reason: "no_runner_here" }]);
+    show({ ...base, assignee_id: "a1" });
+    expect(await screen.findByText("Will not start: no computer runs @codex for SVA.")).toBeTruthy();
+    expect(screen.getByText("Set it up in the Quadit app, on @codex's card.")).toBeTruthy();
+    cleanup();
+    const openConnect = vi.fn();
+    window.quaditDesktop = { version: "0.1.0", notify: () => {}, setBadge: () => {}, openConnect };
+    show({ ...base, assignee_id: "a1" });
+    fireEvent.click(await screen.findByRole("button", { name: "Set it up" }));
+    expect(openConnect).toHaveBeenCalledOnce();
+  });
+
+  it("says it in a few words for each of several agents, beside today's words for the others", async () => {
+    serve(
+      [{ outcome: "starts_now" }, { agent: "@helper", outcome: "will_not_start", reason: "not_responsible" }],
+      true,
+    );
+    editDraft("t1", () => ({ ...EMPTY_DRAFT, body: "@codex, @helper and @gemini: who has the boss?" }));
+    show({ ...base, assignee_id: "u1" });
+    expect(await screen.findByText("@codex starts now on Aram's MacBook Pro.")).toBeTruthy();
+    expect(screen.getByText("@helper will not start: only Ann's words start it.")).toBeTruthy();
+    expect(screen.getByText("@gemini has not connected yet.")).toBeTruthy();
+  });
+});

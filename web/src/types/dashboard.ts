@@ -96,7 +96,61 @@ export interface ListenerShown {
   by?: string;
   last_heard?: string;
   live: boolean;
+  /** Set when Quadit's runner on a computer marked it as its own. */
+  runner?: RunnerShown;
 }
+
+/**
+ * What Quadit's runner said of itself on a listener it marked (Go's
+ * runnerShown). Times are "2026-11-24 14:02", UTC.
+ */
+export interface RunnerShown {
+  /** The computer's name, as the runner said it. */
+  machine: string;
+  /** The folder's label ("~/devel/game"): the path stays on the computer. */
+  folder: string;
+  /** core.Programs: "claude", "codex". */
+  program: string;
+  program_version: string;
+  /** The runner holds the lease now; false while a chat holds it, or the runner is away. */
+  holding: boolean;
+  /** When the runner last held it. */
+  since: string;
+  /** Why it holds every item back (core.Pause*). */
+  paused?: string;
+  /** With paused "usage_limit": when it tries again. */
+  paused_until?: string;
+  /** The key of the task its open run is on, in this listener's project. */
+  task?: string;
+}
+
+/** What will happen to a comment or an assignment for one agent (Go's runOutlook): GET /tasks/{ref}/run-outlook. */
+export interface RunOutlook {
+  /** "@claude". */
+  agent: string;
+  outcome: RunOutcome;
+  machine: string;
+  folder: string;
+  program: string;
+  /** The task's project's key. */
+  project: string;
+  /** The handle of the person responsible for the agent, "" without one. */
+  owner: string;
+  /** when_back: when its runner was last heard. */
+  since: string;
+  /** paused for a usage limit: when the runner tries again. */
+  until: string;
+  /** queued: the key of the task of the run open there, "" when items wait. */
+  running: string;
+  /** will_not_start: no_runner_here, not_responsible, no_responsible; paused: the pause (core.Pause*). */
+  reason: string;
+}
+
+/**
+ * none: Quadit does not run the agent here, or would not start it for this
+ * (what the page said before); in_chat: a chat holds its listener.
+ */
+export type RunOutcome = "none" | "will_not_start" | "in_chat" | "when_back" | "paused" | "queued" | "starts_now";
 
 /** How far an agent is connected: GET /agents/connection, the cheap part of GET /agents. */
 export type AgentConnection = Pick<
