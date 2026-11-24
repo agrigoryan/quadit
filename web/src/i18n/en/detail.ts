@@ -204,7 +204,7 @@ export const detail = {
   // What happens to the comment for an agent a computer runs (the run outlook).
   "comment.run.starts_now": "Starts {agent} now on {machine}.",
   "comment.run.queuedHere": "{agent} is working on this task on {machine}. This comes next, in the same session.",
-  "comment.run.queued": "{agent} is busy on {machine}. This is queued and starts when it is free.",
+  "comment.run.queued": "Queued for {agent} on {machine}.",
   "comment.run.when_back": "Starts {agent} when {machine} is back. It has been offline since {time}.",
   "comment.run.paused.usage_limit": "Starts {agent} at {time}, when {program}'s usage limit resets on {machine}.",
   "comment.run.paused.usage_limitUnknown": "Starts {agent} when {program}'s usage limit resets on {machine}.",
@@ -228,7 +228,6 @@ export const detail = {
   "comment.run.setUpInApp": "Set it up in the Quadit app, on {agent}'s card.",
   // The same, a few words each, when the comment reaches several agents.
   "comment.run.many.starts_now": "{agent} starts now on {machine}.",
-  "comment.run.many.queued": "{agent} is busy on {machine}: queued.",
   "comment.run.many.when_back": "{agent} starts when {machine} is back.",
   "comment.run.many.paused": "{agent} is paused on {machine}.",
   "comment.run.many.not_responsible": "{agent} will not start: only {owner}'s words start it.",

@@ -14,7 +14,7 @@ import { clearStore, loadBootstrap } from "@/data/store";
 import { EMPTY_DRAFT, editDraft, useDrafts } from "@/detail/comment-actions";
 import { CommentReach } from "@/detail/comment-reach";
 import { WithQuery } from "@/test/query";
-import type { Member, Task, User, Workspace } from "@/types/core";
+import type { AgentSession, Member, Task, User, Workspace } from "@/types/core";
 import { TooltipProvider } from "@/ui/tooltip";
 
 const ann = { user_id: "u1", handle: "ann", name: "Ann", kind: "person", role: "owner" } as Member;
@@ -35,7 +35,7 @@ const base = { id: "t1", key: "SVA-1", project_id: "p1", status_id: "s1", title:
  * The store with `agent` (and @helper, @gemini and @bea), the project SVA
  * (with `project`'s fields) and, with `others`, a second project, GS.
  */
-function load(agent: Member, project: Record<string, unknown> = {}, others = false) {
+function load(agent: Member, project: Record<string, unknown> = {}, others = false, sessions: AgentSession[] = []) {
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
@@ -47,6 +47,7 @@ function load(agent: Member, project: Record<string, unknown> = {}, others = fal
       ...(others ? [{ id: "p2", key: "GS", name: "Getting started", rank: "b" }] : []),
     ],
     members: [ann, agent, helper, gemini, bea],
+    sessions,
   });
 }
 
@@ -328,15 +329,10 @@ describe("the line under the comment box, for an agent a computer runs", () => {
 
   it.each([
     [{ outcome: "starts_now" }, "Starts @codex now on Aram's MacBook Pro."],
-    [
-      { outcome: "queued", running: "SVA-1" },
-      "@codex is working on this task on Aram's MacBook Pro. This comes next, in the same session.",
-    ],
-    [
-      { outcome: "queued", running: "SVA-9" },
-      "@codex is busy on Aram's MacBook Pro. This is queued and starts when it is free.",
-    ],
-    [{ outcome: "queued" }, "@codex is busy on Aram's MacBook Pro. This is queued and starts when it is free."],
+    // The run the computer works on may be another agent's, even on this task: only a run of its own is promised.
+    [{ outcome: "queued", running: "SVA-1" }, "Queued for @codex on Aram's MacBook Pro."],
+    [{ outcome: "queued", running: "SVA-9" }, "Queued for @codex on Aram's MacBook Pro."],
+    [{ outcome: "queued" }, "Queued for @codex on Aram's MacBook Pro."],
     [
       { outcome: "paused", reason: "usage_limit" },
       "Starts @codex when Claude Code's usage limit resets on Aram's MacBook Pro.",
@@ -422,6 +418,41 @@ describe("the line under the comment box, for an agent a computer runs", () => {
     show({ ...base, assignee_id: "a1" });
     fireEvent.click(await screen.findByRole("button", { name: "Set it up" }));
     expect(openConnect).toHaveBeenCalledOnce();
+  });
+
+  it("says a comment comes next in the same session only when the page holds an open run of this agent on this task", async () => {
+    const run = (over: Partial<AgentSession>): AgentSession => ({
+      id: "s1",
+      agent_id: "a1",
+      task_id: "t1",
+      state: "running",
+      machine_id: "0123456789abcdef",
+      started_at: 1,
+      updated_seq: 1,
+      ...over,
+    });
+    load({ ...codex, connected_at: 1 }, {}, false, [run({})]);
+    serve([{ outcome: "queued", running: "SVA-1" }]);
+    show({ ...base, assignee_id: "a1" });
+    expect(
+      await screen.findByText(
+        "@codex is working on this task on Aram's MacBook Pro. This comes next, in the same session.",
+      ),
+    ).toBeTruthy();
+    cleanup();
+    for (const other of [run({ agent_id: "a2" }), run({ task_id: "t9" }), run({ state: "done" })]) {
+      load({ ...codex, connected_at: 1 }, {}, false, [other]);
+      show({ ...base, assignee_id: "a1" });
+      expect(await screen.findByText("Queued for @codex on Aram's MacBook Pro.")).toBeTruthy();
+      cleanup();
+    }
+  });
+
+  it("says a comment is queued in a few words among several agents", async () => {
+    serve([{ outcome: "queued", running: "SVA-1" }]);
+    editDraft("t1", () => ({ ...EMPTY_DRAFT, body: "@codex and @gemini: who has the boss?" }));
+    show({ ...base, assignee_id: "u1" });
+    expect(await screen.findByText("Queued for @codex on Aram's MacBook Pro.")).toBeTruthy();
   });
 
   it("says it in a few words for each of several agents, beside today's words for the others", async () => {

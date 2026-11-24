@@ -19,9 +19,9 @@ import { exact, parseWhen } from "@/lib/time";
 import { useConnection, type Connection } from "@/data/listening";
 import { mayBeGivenWork } from "@/data/access";
 import { useRunOutlook } from "@/data/run-outlook";
-import { useMe, useMembers, useProjects, useRowEvenIfGone } from "@/data/selectors";
+import { useMe, useMembers, useProjects, useRowEvenIfGone, useRows } from "@/data/selectors";
 import { EMPTY_DRAFT, useDrafts, type Draft } from "@/detail/comment-actions";
-import type { Member, Task } from "@/types/core";
+import { isOpenSession, type Member, type Task } from "@/types/core";
 import type { RunOutlook } from "@/types/dashboard";
 import { useSettingsBase } from "@/settings/base";
 import { canConnectTools, ConnectToolsButton } from "@/ui/connect-tools";
@@ -62,6 +62,7 @@ export function CommentReach({ task }: { task: Task }) {
 /** The line for the agents a draft reaches: one in full, several in a few words each. */
 function Reach({ agents, members, task }: { agents: Member[]; members: Member[]; task: Task }) {
   const connection = useConnection();
+  const sessions = useRows("sessions");
   // Only agents a computer runs are asked about: for the others the server would say none.
   const run = agents.filter((agent) => connection(agent, task.project_id)?.runner);
   const outlook = useRunOutlook(
@@ -75,10 +76,17 @@ function Reach({ agents, members, task }: { agents: Member[]; members: Member[];
     const o = outlook.outlooks?.[`@${agent.handle}`];
     return o && o.outcome !== "none" && o.outcome !== "in_chat" ? o : undefined;
   };
+  // The run the computer works on may be another agent's: only a run of this agent's own on this task takes the comment next.
+  const ownRunHere = (agent: Member) =>
+    sessions.some((s) => s.agent_id === agent.user_id && s.task_id === task.id && !!s.machine_id && isOpenSession(s));
   const [only, ...more] = agents;
   if (only && more.length === 0) {
     const o = runs(only);
-    return o ? <RunReach outlook={o} members={members} task={task} /> : <AgentReach agent={only} task={task} />;
+    return o ? (
+      <RunReach outlook={o} members={members} here={ownRunHere(only)} />
+    ) : (
+      <AgentReach agent={only} task={task} />
+    );
   }
   return (
     <AgentsReach
@@ -105,13 +113,13 @@ function wordsOf(o: RunOutlook, members: Member[]) {
   };
 }
 
-/** The full line for one agent a computer runs, for a comment on the task `taskKey`. */
-function runLine(o: RunOutlook, taskKey: string): Key {
+/** The full line for one agent a computer runs; `here`: it has a run of its own open on the task. */
+function runLine(o: RunOutlook, here: boolean): Key {
   switch (o.outcome) {
     case "starts_now":
       return "comment.run.starts_now";
     case "queued":
-      return o.running === taskKey ? "comment.run.queuedHere" : "comment.run.queued";
+      return here ? "comment.run.queuedHere" : "comment.run.queued";
     case "when_back":
       return "comment.run.when_back";
     case "paused": {
@@ -129,8 +137,9 @@ function runLine(o: RunOutlook, taskKey: string): Key {
 /** The few words for one agent a computer runs, among several. */
 function runPhrase(o: RunOutlook): Key {
   switch (o.outcome) {
-    case "starts_now":
     case "queued":
+      return "comment.run.queued";
+    case "starts_now":
     case "when_back":
     case "paused":
       return `comment.run.many.${o.outcome}`;
@@ -142,12 +151,12 @@ function runPhrase(o: RunOutlook): Key {
 }
 
 /** For one agent a computer runs: what will happen to the comment, and, when nothing runs it here, the way to set it up. */
-function RunReach({ outlook, members, task }: { outlook: RunOutlook; members: Member[]; task: Task }) {
+function RunReach({ outlook, members, here }: { outlook: RunOutlook; members: Member[]; here: boolean }) {
   const words = wordsOf(outlook, members);
   const unset = outlook.outcome === "will_not_start" && outlook.reason === "no_runner_here";
   return (
     <p className={LINE}>
-      <span>{t(runLine(outlook, task.key), words)}</span>
+      <span>{t(runLine(outlook, here), words)}</span>
       {unset &&
         (canConnectTools() ? (
           <ConnectToolsButton size="sm">{t("comment.run.setUp")}</ConnectToolsButton>
