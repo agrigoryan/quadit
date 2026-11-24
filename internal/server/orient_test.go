@@ -109,3 +109,30 @@ func TestAnInboxItemOfAProjectAMemberWasKeptOutOfIsNotShown(t *testing.T) {
 		}
 	})
 }
+
+// TestWhoAmINamesEachProjectAfterItsKey: /me names each project the caller
+// may read after its key, so an agent can match a name a person says to the
+// key commands take. In the text, a name's parentheses, commas and line
+// breaks are written so that each entry stays "KEY (name)" and the entries
+// stay apart; the JSON keeps the keys as they were and gives each name as
+// it is.
+func TestWhoAmINamesEachProjectAfterItsKey(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Aliens"})
+		s.change(t, s.owner, "", "project.create", M{"key": "ART", "name": "Art, (old)\npipeline"})
+		text := s.call(t, s.owner, "", "GET", w+"/me?format=text", nil, 200, nil)
+		if want := "projects: ART (Art; [old] pipeline), SVA (Samurai vs Aliens)\n"; !strings.Contains(text, want) {
+			t.Fatalf("/me as text says:\n%s\nwant the line %q", text, want)
+		}
+		var me struct {
+			Projects     []string
+			ProjectNames map[string]string `json:"project_names"`
+		}
+		s.call(t, s.owner, "", "GET", w+"/me", nil, 200, &me)
+		if strings.Join(me.Projects, ",") != "ART,SVA" || me.ProjectNames["ART"] != "Art, (old)\npipeline" || me.ProjectNames["SVA"] != "Samurai vs Aliens" || len(me.ProjectNames) != 2 {
+			t.Fatalf("/me says projects %v, names %v", me.Projects, me.ProjectNames)
+		}
+	})
+}

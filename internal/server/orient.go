@@ -5,6 +5,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -30,8 +31,12 @@ func (s *Server) handleShowWhoAmI(x *c) error {
 		"workspace": map[string]any{"slug": ws.Slug, "name": ws.Name}, "seq": ws.Seq, "server_time": time.Now().UTC().Format(time.RFC3339),
 		"version": s.cfg.Version,
 	}
-	keys := x.projectKeys(names)
-	out["projects"] = keys
+	projects := x.readableProjects(names)
+	keys, projectNames := make([]string, len(projects)), map[string]string{}
+	for i, project := range projects {
+		keys[i], projectNames[project.Key] = project.Key, project.Name
+	}
+	out["projects"], out["project_names"] = keys, projectNames
 	if x.actor.ReadOnly || (x.member.Scope != nil && x.member.Scope.ReadOnly) {
 		out["read_only"] = true
 	}
@@ -62,22 +67,29 @@ func (s *Server) handleShowWhoAmI(x *c) error {
 		out["standing_preferences"] = rules
 	}
 	if x.wantText() {
-		return x.text(whoAmIText(out, ws, keys, cursors, rules))
+		return x.text(whoAmIText(out, ws, projects, cursors, rules))
 	}
 	return x.ok(out)
 }
 
-// projectKeys lists, in order, the keys of the projects the caller may read.
-func (who *viewer) projectKeys(names *nameLookup) []string {
-	var keys []string
+// readableProjects lists, by key, the projects the caller may read that
+// are neither archived nor in the trash.
+func (who *viewer) readableProjects(names *nameLookup) []core.Project {
+	var projects []core.Project
 	for _, project := range names.projects {
 		if project.DeletedAt == 0 && project.ArchivedAt == 0 && who.canProject(project.ID) {
-			keys = append(keys, project.Key)
+			projects = append(projects, project)
 		}
 	}
-	sort.Strings(keys)
-	return keys
+	slices.SortFunc(projects, func(a, b core.Project) int { return strings.Compare(a.Key, b.Key) })
+	return projects
 }
+
+// entryName is a project's name as an entry of a list on one line ("SVA
+// (Samurai vs Aliens), …") gives it: on one line, its parentheses made
+// brackets and its commas semicolons, so that a reader who wants the keys
+// can split the line at ", " and take each entry's first word.
+var entryName = strings.NewReplacer("(", "[", ")", "]", ",", ";")
 
 // cursorSeqs is where each of the caller's cursors stands, by name, of
 // those the viewer may see (mayCursor).
@@ -109,12 +121,16 @@ func (who *viewer) workspaceRules(ctx context.Context) ([]string, error) {
 }
 
 // whoAmIText is handleShowWhoAmI's answer as lines of text: who, where,
-// what may be done, the hand-off limit, what is unread, the cursors and the
-// rules.
-func whoAmIText(out map[string]any, ws core.Workspace, keys []string, cursors map[string]int64, rules []string) string {
+// the projects by key and name, what may be done, the hand-off limit, what
+// is unread, the cursors and the rules.
+func whoAmIText(out map[string]any, ws core.Workspace, projects []core.Project, cursors map[string]int64, rules []string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "you are %s (%s, %s) in %s\n", out["handle"], out["kind"], out["role"], ws.Slug)
-	fmt.Fprintf(&b, "projects: %s\n", strings.Join(keys, ", "))
+	entries := make([]string, len(projects))
+	for i, project := range projects {
+		entries[i] = project.Key + " (" + strings.Join(strings.Fields(entryName.Replace(project.Name)), " ") + ")"
+	}
+	fmt.Fprintf(&b, "projects: %s\n", strings.Join(entries, ", "))
 	if v, ok := out["responsible"]; ok {
 		fmt.Fprintf(&b, "responsible: %s\n", v)
 	}

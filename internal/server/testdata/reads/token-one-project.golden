@@ -445,6 +445,9 @@ surface: 2.0 (within 2.x nothing is removed or renamed)
  "handle": "@aram",
  "kind": "person",
  "name": "Aram",
+ "project_names": {
+  "SVA": "Samurai vs Alien"
+ },
  "projects": [
   "SVA"
  ],
@@ -466,7 +469,7 @@ surface: 2.0 (within 2.x nothing is removed or renamed)
 === GET /api/v1/w/games/me?format=text
 200
 you are @aram (person, owner) in games
-projects: SVA
+projects: SVA (Samurai vs Alien)
 unread: 5   seq: 280
 rule: Write short.
 

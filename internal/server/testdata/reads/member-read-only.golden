@@ -444,6 +444,10 @@ surface: 2.0 (within 2.x nothing is removed or renamed)
  "handle": "@cy",
  "kind": "person",
  "name": "Cy",
+ "project_names": {
+  "OPS": "Operations",
+  "SVA": "Samurai vs Alien"
+ },
  "projects": [
   "OPS",
   "SVA"
@@ -467,7 +471,7 @@ surface: 2.0 (within 2.x nothing is removed or renamed)
 === GET /api/v1/w/games/me?format=text
 200
 you are @cy (person, member) in games
-projects: OPS, SVA
+projects: OPS (Operations), SVA (Samurai vs Alien)
 read-only
 unread: 6   seq: 280
 rule: Write short.
