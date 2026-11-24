@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -24,13 +25,12 @@ func TestNotifyMarksAnItemAddressedUnlessItIsHeardAsAFollower(t *testing.T) {
 		// when there is none.
 		item := func(t *testing.T, what string) core.Notification {
 			t.Helper()
-			ns := w.inbox(coder)
-			for i := len(ns) - 1; i >= 0; i-- {
-				if ns[i].EntityID == what {
-					return ns[i]
+			for _, n := range slices.Backward(w.inbox(coder)) {
+				if n.EntityID == what {
+					return n
 				}
 			}
-			t.Fatalf("no item about %s in %+v", what, ns)
+			t.Fatalf("no item about %s", what)
 			return core.Notification{}
 		}
 		addressed := func(t *testing.T, what, typ string, want bool) {

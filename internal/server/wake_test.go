@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"testing"
 	"time"
@@ -111,9 +112,7 @@ func (r *aRunner) drain(t *testing.T) {
 func (r *aRunner) task(t *testing.T, fields M) string {
 	t.Helper()
 	args := M{"project": "SVA", "title": "Boss fight"}
-	for k, v := range fields {
-		args[k] = v
-	}
+	maps.Copy(args, fields)
 	return r.change(t, r.owner, "", "task.create", args)["key"].(string)
 }
 

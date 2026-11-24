@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -50,9 +51,7 @@ func newRuns(t *testing.T, st store.Store) runs {
 func start(task string, more M) M {
 	args := M{"id": id.New(), "task": task, "state": "waiting", "program": "claude", "machine_id": runnerMachine, "machine_name": "Aram's MacBook Pro",
 		"folder": "~/devel/game", "lease": runnerLease, "item_seq": 1}
-	for k, v := range more {
-		args[k] = v
-	}
+	maps.Copy(args, more)
 	return args
 }
 
@@ -592,9 +591,7 @@ func TestACommentFromARunIsMarkedOnlyByTheAgentOfThatSession(t *testing.T) {
 		} {
 			t.Run(refused.name, func(t *testing.T) {
 				args := M{"body": "Done.", "session": run}
-				for k, v := range refused.args {
-					args[k] = v
-				}
+				maps.Copy(args, refused.args)
 				if e := r.refused(engine.CodeInvalid, refused.actor, "comment.create", args); e.Field != "session" {
 					t.Fatalf("refused with %v", e)
 				}
