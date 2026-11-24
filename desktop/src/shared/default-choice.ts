@@ -8,14 +8,19 @@
 import type { DesktopSummary } from "@/shared/bridge";
 import type { ConnectChoice } from "@/shared/pages-api";
 
-/** The default choice for connecting `tool` to the workspace `summary` describes, on the server `serverId`. */
+/**
+ * The default choice for connecting `tool` to the workspace `summary`
+ * describes, on the server `serverId`; working as the agent `as` when a page
+ * chose one (Connect agents opened at one of its agents).
+ */
 export function defaultChoice(
   tool: { id: string; name: string },
   serverId: string,
   summary: Pick<DesktopSummary, "workspace" | "agents">,
+  as?: string,
 ): ConnectChoice {
   const handle = handleOf(tool.name);
-  const agent = summary.agents.find((a) => a.handle === handle && a.usable);
+  const agent = as ? { id: as } : summary.agents.find((a) => a.handle === handle && a.usable);
   return {
     harness: tool.id,
     serverId,

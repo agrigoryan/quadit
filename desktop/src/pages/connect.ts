@@ -167,25 +167,19 @@ function reviewDisconnect(h: HarnessView, within?: HTMLElement): Promise<Disconn
   });
 }
 
-/** The plan of a Connect of `h` with its defaults, but working as the agent `agent` where a choice of agent holds. */
-function planAs(h: HarnessView, agent: string): Promise<Planned> {
+/** The plan of a card's Connect of `h`, and of its "See the files": its defaults, as the agent the page chose if any. */
+function cardPlan(h: HarnessView): Promise<Planned> {
   const at = chosen();
   if (!at) return Promise.resolve(NO_WORKSPACE);
-  const choice = defaultChoice(h, at.serverId, at.summary);
-  return api.planConnect(choice.agent ? { ...choice, agent: { id: agent } } : choice);
+  return api.planConnect(defaultChoice(h, at.serverId, at.summary, connectAs?.id));
 }
 
 /** A new card for `h`, set up or not as `h` says, with where it stands when known (`handshake`). */
 function newCard(h: HarnessView, made: string, addsCommand: boolean, handshake: Handshake | null): Shown {
-  const plainPlan = (): Promise<Planned> => {
-    const at = chosen();
-    if (!at) return Promise.resolve(NO_WORKSPACE);
-    return api.planConnect(defaultChoice(h, at.serverId, at.summary));
-  };
   const tool = { ...h, ownLogin: h.cliIdentity === "own", worksAs: workingAs(h), mcpOnly: mcpOnly(h) };
   const card: ToolCard = new ToolCard(tool, addsCommand, {
     connect: async () => {
-      const planned = await (connectAs ? planAs(h, connectAs.id) : plainPlan());
+      const planned = await cardPlan(h);
       if (!planned.ok) return planned;
       const done = await api.applyConnect(planned.plan.id);
       if (!done.ok) return done;
@@ -196,7 +190,7 @@ function newCard(h: HarnessView, made: string, addsCommand: boolean, handshake: 
     back: () => reviewDisconnect(h),
     seeFiles: () => {
       if (card.isSetUp) void reviewDisconnect(h);
-      else reviewConnect(h, plainPlan);
+      else reviewConnect(h, () => cardPlan(h));
     },
     changed: () => {},
   });

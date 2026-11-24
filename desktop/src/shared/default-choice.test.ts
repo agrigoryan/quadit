@@ -25,6 +25,14 @@ describe("defaultChoice", () => {
       create: { name: "Claude Code", handle: "claude-code" },
     });
   });
+
+  it("works as the agent a page chose when there is one, whatever the workspace's agent named after the tool", () => {
+    const usable = { ...agent, id: "u7", usable: true };
+    for (const agents of [[], [usable]])
+      expect(defaultChoice({ id: "claude", name: "Claude Code" }, "s1", { workspace, agents }, "u9").agent).toEqual({
+        id: "u9",
+      });
+  });
 });
 
 describe("handleOf", () => {
