@@ -4,7 +4,16 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+### Added
+
+- Listening by project: `quadit wait project=KEY` and `quadit listen project=KEY` listen to one project, and the lines `wait` prints keep it. One session listens to each project at a time, and one to everything else; a project once listened to by itself keeps its items for its next listener instead of handing them to everything, until `quadit listening forget project=KEY` (`DELETE /listening/{key}`) gives them back. `quadit listening` says what listens to each project and what everything leaves out; against an older server, a wait with `project=` stops and says to listen without it.
+- `GET /agents/connection`, `GET /agents` and the dashboard's agents carry `listeners` (`[{project_id, project, by, last_heard, live}]`), `listening_projects` and `listening_outside_projects`.
+- The skill picks what a chat listens to: the project the person named, else the one the repository's instruction file for agents names, else the agent's only project, else it asks once, with everything as a choice.
+
 ### Changed
+
+- Where a place is about one project, listening means listening to that project: under a task's comment box an agent that listens only to other projects says so, with “listen to Quadit for KEY”, and a not-listening agent's line names the project; a task's assignee and waiting-on pickers mark who listens to its project. The Agents page, an agent's page in Settings and the app's cards say what each listener listens to and from what ("Listening to Samurai vs Aliens, from a chat"), a webhook that pushes, and, in Settings, a project whose listener stopped and whose items wait.
+- A listening card in the app says how what listens stops (a chat when told, a companion with Ctrl-C) and how to add another project; the steps above the cards say the agent asks which project when there are several.
 
 - The desktop app no longer starts connected agents by itself to answer what comes in: an agent answers what is written in Quadit from a chat told to listen ("listen to Quadit"). Connect still proves the connection by itself, running the agent's program once to give its connect code back for the server on this computer; the plan says so where that run has its checks off.
 - Connect agents and the first run's tools step say the two steps above the cards: connect an agent here, then write `listen to Quadit` in its chat, in your project's folder, the recommended way; without listening it sees what waits when asked in a chat ("check Quadit"). Connect agents also names the other ways: MCP (under More options), which cannot listen, a companion command, and a webhook.
