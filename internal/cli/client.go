@@ -98,6 +98,11 @@ func loginClient(path string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("the login file: %w", err)
 	}
+	return loginClientOf(raw, path)
+}
+
+// loginClientOf is loginClient of a login file's bytes, read from path.
+func loginClientOf(raw []byte, path string) (*Client, error) {
 	var sc savedConfig
 	if err := json.Unmarshal(raw, &sc); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)

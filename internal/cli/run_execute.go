@@ -297,6 +297,12 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 			e.pauseEntry(pause)
 			return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, line: "failed: " + pauseWords(pause, e.prog.Title(), time.Time{})}
 		}
+		if !e.loginUnchanged() {
+			// The program would work as whatever login is at the path now:
+			// it starts only with the login verified.
+			e.loginChanged.Store(true)
+			return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, line: "failed: the login file changed since it was verified"}
+		}
 		if p := e.state.pause(); p != nil {
 			reason := core.RunStartFailed
 			if p.Reason == core.PauseUsageLimit {

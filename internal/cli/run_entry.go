@@ -8,6 +8,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -43,6 +45,13 @@ type liveEntry struct {
 	// lease is the listener's lease, kept by the entry's goroutine.
 	lease     string
 	leaseFile *leaseFile
+
+	// loginRaw is the login file as it was verified (verifyLogin); verified
+	// says it was, and nothing is sent for the entry before. loginChanged
+	// is set by a run that found the file changed since.
+	loginRaw     []byte
+	verified     bool
+	loginChanged atomic.Bool
 
 	// unkept is a run's terminal record that could not be stored, and what
 	// follows its storing; the entry does nothing else until it is stored.
@@ -127,9 +136,6 @@ func newEntry(srv *serving, reg regEntry) (*liveEntry, error) {
 	out.quiet = func(task, run string, quiet bool) {
 		_ = state.countQuiet(task, run, quiet) // a count not kept holds nothing back but G4 for this run
 	}
-	if c, err := loginClient(reg.Login); err == nil {
-		e.api = entryAPI{c: c}
-	}
 	return e, nil
 }
 
@@ -151,9 +157,7 @@ func (e *liveEntry) serve(runner context.Context) {
 		}
 	}()
 	e.setStatus(entryStatus{State: statusStarting})
-	if e.api.c != nil {
-		e.recover(runner)
-	}
+	e.recover(runner) // on this computer alone: nothing is sent before the login is verified
 	if e.reg.Removing {
 		cancel(errRemoving)
 	}
@@ -169,6 +173,9 @@ func (e *liveEntry) serve(runner context.Context) {
 			break
 		}
 		pause, err := e.check(ctx)
+		if e.verified && !e.out.empty() {
+			_ = e.flush(ctx) // what is not sent now is sent with the next round
+		}
 		current := e.state.pause()
 		switch {
 		case ctx.Err() != nil:
@@ -210,36 +217,21 @@ func (e *liveEntry) stop(cause error) {
 	}
 }
 
-// check makes the checks of an entry's start, in order: the folder, the
-// program, the login, the project, the program's own settings, its
-// sign-in. It gives the pause the first that fails sets, or the error it
-// says; neither when all pass.
+// check makes the checks of an entry's start, in order: the login and the
+// project (verifyLogin), the lease file, the folder, the program, the
+// program's own settings, its sign-in. It gives the pause the first that
+// fails sets, or the error it says; neither when all pass. A paused entry
+// has its login, project and lease file all the same: its holds need them.
 func (e *liveEntry) check(ctx context.Context) (pause string, err error) {
+	if err := e.verifyLogin(ctx); err != nil {
+		return "", err
+	}
+	if err := e.openLease(); err != nil {
+		return "", err
+	}
 	if pause := e.checkFolderAndProgram(ctx); pause != "" {
 		return pause, nil
 	}
-	if e.api.c == nil {
-		return "", errLoginRefused
-	}
-	me, err := e.api.me(ctx)
-	if err != nil {
-		if temporary(err) {
-			return "", err
-		}
-		return "", errLoginRefused
-	}
-	if me.Kind != "agent" || me.ReadOnly || me.UserID != e.reg.AgentID || me.Workspace.ID != e.reg.WorkspaceID || e.api.c.URL != e.reg.Server {
-		return "", errLoginRefused
-	}
-	projects, err := e.api.projects(ctx)
-	if err != nil {
-		return "", err
-	}
-	i := slices.IndexFunc(projects, func(p projectRow) bool { return p.ID == e.reg.ProjectID })
-	if i < 0 || !keyForm.MatchString(projects[i].Key) {
-		return "", errProjectGone
-	}
-	e.me, e.projectKey = me, projects[i].Key
 	if setting, ok := e.prog.LoginSetting(e.srv.host.home); ok && resolved(expandHome(setting, e.srv.host.home)) != resolved(e.reg.Login) {
 		return core.PauseLoginMismatch, nil
 	}
@@ -251,6 +243,78 @@ func (e *liveEntry) check(ctx context.Context) (pause string, err error) {
 		return core.PauseNotSignedIn, nil
 	}
 	return "", nil
+}
+
+// verifyLogin reads the entry's login file and makes sure it is the
+// entry's: of its server, and, as GET /me says, of its workspace and its
+// agent, an agent's login that may write; and that the project is still
+// the agent's. Until it has, nothing is sent for the entry; a program is
+// started with the login as it was verified (loginUnchanged).
+func (e *liveEntry) verifyLogin(ctx context.Context) error {
+	e.verified = false
+	raw, err := os.ReadFile(e.reg.Login)
+	if err != nil {
+		return errLoginRefused
+	}
+	c, err := loginClientOf(raw, e.reg.Login)
+	if err != nil || c.URL != e.reg.Server {
+		return errLoginRefused
+	}
+	api := entryAPI{c: c}
+	me, err := api.me(ctx)
+	if err != nil {
+		if temporary(err) {
+			return err
+		}
+		return errLoginRefused
+	}
+	if me.Kind != "agent" || me.ReadOnly || me.UserID != e.reg.AgentID || me.Workspace.ID != e.reg.WorkspaceID {
+		return errLoginRefused
+	}
+	projects, err := api.projects(ctx)
+	if err != nil {
+		return err
+	}
+	i := slices.IndexFunc(projects, func(p projectRow) bool { return p.ID == e.reg.ProjectID })
+	if i < 0 || !keyForm.MatchString(projects[i].Key) {
+		return errProjectGone
+	}
+	if e.leaseFile != nil && (e.api.c == nil || e.api.c.Token != c.Token || e.projectKey != projects[i].Key) {
+		e.leaseFile.close() // the lease file is the login's and the project's: another's is opened
+		e.leaseFile, e.lease = nil, ""
+	}
+	e.api, e.me, e.projectKey, e.loginRaw, e.verified = api, me, projects[i].Key, raw, true
+	e.loginChanged.Store(false)
+	return nil
+}
+
+// loginUnchanged reports whether the login file still holds what was
+// verified.
+func (e *liveEntry) loginUnchanged() bool {
+	raw, err := os.ReadFile(e.reg.Login)
+	return err == nil && bytes.Equal(raw, e.loginRaw)
+}
+
+// openLease opens the lease file of the verified login and project, once.
+func (e *liveEntry) openLease() error {
+	if e.leaseFile != nil {
+		return nil
+	}
+	lf, err := openLeaseFile(filepath.Dir(e.reg.Login), e.api.c, e.projectKey)
+	if err != nil {
+		return err
+	}
+	e.leaseFile, e.lease = lf, lf.kept()
+	return nil
+}
+
+// dropLease forgets a lease the server says ended: the next hold asks
+// for one again (never taking it from another session).
+func (e *liveEntry) dropLease() {
+	e.lease = ""
+	if e.leaseFile != nil {
+		e.leaseFile.keep("")
+	}
 }
 
 // checkFolderAndProgram checks again what is checked before every start
@@ -363,6 +427,9 @@ func (e *liveEntry) whilePaused(ctx context.Context) {
 			until = time.UnixMilli(p.Until)
 		}
 		e.setStatus(entryStatus{State: statusPaused, Pause: p.Reason, Until: until})
+		if !e.out.empty() {
+			_ = e.flush(ctx) // a pause holds back runs, not what waits to be sent
+		}
 		e.keepLease(ctx, p.Reason, p.Until)
 		now := e.srv.host.clock.Now()
 		switch {
@@ -402,8 +469,12 @@ func (e *liveEntry) keepLease(ctx context.Context, paused string, until int64) {
 	if paused == core.PauseUsageLimit {
 		ask.pausedUntil = until
 	}
-	if ans, err := e.api.hold(ctx, ask); err == nil && leaseForm.MatchString(ans.Lease) {
+	ans, err := e.api.hold(ctx, ask)
+	switch {
+	case err == nil && leaseForm.MatchString(ans.Lease):
 		e.keepLeaseID(ans.Lease)
+	case leaseLost(err) && refusalReason(err) == "lease_stale":
+		e.dropLease()
 	}
 }
 
@@ -433,24 +504,14 @@ func (e *liveEntry) keepLeaseID(lease string) {
 // pauses, with an error the entry waits out, or when ctx ends.
 func (e *liveEntry) listen(ctx context.Context) error {
 	t := e.srv.host.times
-	if e.leaseFile == nil {
-		lf, err := openLeaseFile(filepath.Dir(e.reg.Login), e.api.c, e.projectKey)
-		if err != nil {
-			if errors.Is(err, errAnotherListen) {
-				e.setStatus(entryStatus{State: statusAside})
-				e.sayEntry("a quadit listen of this login listens to %s; trying again in %s", e.projectKey, seconds(t.asideMax))
-				e.srv.wait(ctx, t.asideMax)
-				return nil
-			}
-			return err
-		}
-		e.leaseFile, e.lease = lf, lf.kept()
-	}
 	aside, away := t.asideFirst, t.awayFirst
 	ready := false
 	for ctx.Err() == nil {
 		if e.state.pause() != nil {
 			return nil
+		}
+		if e.loginChanged.Load() {
+			return errLoginRefused // verified again before anything more is sent
 		}
 		if !e.out.empty() {
 			_ = e.flush(ctx) // what is not sent now is sent before the next run, which waits for it
@@ -466,6 +527,9 @@ func (e *liveEntry) listen(ctx context.Context) error {
 			return ctx.Err() // the entry ends: whoever ended it does not wait on this
 		}
 		switch {
+		case leaseLost(err) && refusalReason(err) == "lease_stale":
+			e.dropLease() // that lease ended: ask for one again at once
+			continue
 		case leaseLost(err):
 			if e.shownState() != statusAside {
 				e.sayEntry("a chat listens to %s; trying again in %s", e.projectKey, seconds(aside))
@@ -657,7 +721,6 @@ func (e *liveEntry) recover(ctx context.Context) {
 	if err == nil && j != nil {
 		e.recoverRun(ctx, *j)
 	}
-	_ = e.flush(ctx) // what is not sent now is sent with the next hold
 }
 
 // recoverRun ends the run a journal holds. A terminal record in the outbox
@@ -695,8 +758,14 @@ func (e *liveEntry) recoverRun(ctx context.Context, j journal) {
 // (runner, a context that ends only then).
 func (e *liveEntry) letGo(runner context.Context) {
 	e.setStatus(entryStatus{State: statusRemoving})
-	if e.api.c == nil {
-		e.srv.drop(runner, e.reg.ID)
+	for !e.verified {
+		// Nothing is sent, the release neither, with a login not verified.
+		if err := e.verifyLogin(runner); err == nil || runner.Err() != nil {
+			break
+		}
+		e.srv.wait(runner, e.srv.host.times.recheck)
+	}
+	if !e.verified {
 		return
 	}
 	project := e.projectKey

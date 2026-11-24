@@ -659,14 +659,16 @@ func runRemove(ctx context.Context, files runFiles, host runHost, pos []string, 
 		srv := newServing(files, host, reg.Machine, io.Discard, "")
 		for _, r := range matched {
 			e, err := newEntry(srv, r)
-			if err == nil && e.api.c != nil {
-				e.recover(ctx)
-				_, _ = e.out.add(outboxWrite{Write: writeRelease, Release: &pendingRelease{Project: r.Project, MachineID: reg.Machine.ID}}) // not stored: the entry stays, removing
-				if e.flush(ctx) == nil && e.out.empty() {
-					srv.drop(ctx, r.ID)
-				}
-			} else if err == nil {
-				srv.drop(ctx, r.ID) // a login that cannot be read lets nothing go: the server ends its lease by itself
+			if err != nil {
+				continue
+			}
+			e.recover(ctx)
+			if e.verifyLogin(ctx) != nil {
+				continue // nothing is sent with a login not verified: the entry stays, removing
+			}
+			_, _ = e.out.add(outboxWrite{Write: writeRelease, Release: &pendingRelease{Project: e.projectKey, MachineID: reg.Machine.ID}}) // not stored: the entry stays, removing
+			if e.flush(ctx) == nil && e.out.empty() {
+				srv.drop(ctx, r.ID)
 			}
 		}
 	} else {

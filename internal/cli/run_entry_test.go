@@ -510,3 +510,117 @@ func TestAnAcknowledgmentOfAnyWhyIsPlain(t *testing.T) {
 		t.Fatal("an acknowledgment started something or paused the entry")
 	}
 }
+
+func TestNothingIsSentBeforeTheLoginIsVerified(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	other := rt.entry
+	other.WorkspaceID = "0199aaaa-0000-7000-8000-00000000ffff" // the login at the path is of another workspace now
+	rt.writeRegistry(other)
+	out, _ := openOutbox(filepath.Join(rt.files.entry(other.ID), "outbox"))
+	_, _ = out.add(stepsWrite("0199eeee-0000-7000-8000-0000000000f1", 0))
+	rt.serve()
+	rt.eventually("the entry's error", func() bool { return readStatus(rt.files.status()).Entries[other.ID].Message == string(errLoginRefused) })
+	if calls := rt.f.callList(); len(calls) != 0 || rt.f.sentCount(changeID("0199eeee-0000-7000-8000-0000000000f1", writeSteps, 0)) != 0 {
+		t.Fatalf("sent with a login not verified: %v", calls)
+	}
+}
+
+func TestARecordedProgramIsStoppedWithoutTheLoginFile(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	cmd := exec.Command("sleep", "600")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	exited := make(chan struct{})
+	go func() { _ = cmd.Wait(); close(exited) }()
+	t.Cleanup(func() { _ = cmd.Process.Kill(); <-exited })
+	started, _ := processStart(context.Background(), cmd.Process.Pid)
+	dir := rt.files.entry(rt.entry.ID)
+	_ = os.MkdirAll(dir, 0o700)
+	_ = writeJournal(dir, journal{Run: "0199eeee-0000-7000-8000-0000000000f2", Task: "SVA-12", Head: journalHead{Seq: 5}, Lease: testLease,
+		Phase: phaseLaunched, PGID: cmd.Process.Pid, ProcStart: started, StartSeq: 3})
+	_ = os.Remove(rt.login)
+	rt.serve()
+	select {
+	case <-exited:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the program recorded in the journal still runs while the login file is gone")
+	}
+	rt.eventually("its end kept in the outbox", func() bool {
+		out, _ := openOutbox(filepath.Join(dir, "outbox"))
+		return out.hasEnd("0199eeee-0000-7000-8000-0000000000f2")
+	})
+}
+
+func TestTheProgramStartsOnlyWithTheLoginThatWasVerified(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
+	srv := newServing(rt.files, rt.host(), testMachine, &syncBuffer{}, "")
+	lock, err := srv.takeFolder(rt.folder, "@someone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	rt.eventually("waiting for the folder", func() bool { return len(rt.f.allRuns()) > 0 && rt.f.allRuns()[0]["reason"] == core.RunFolderBusy })
+	writeJSON(t, rt.login, map[string]string{"url": rt.url, "token": codexToken}) // another login at the path
+	srv.releaseFolder(rt.folder, lock)
+	rt.eventually("the entry's error", func() bool { return readStatus(rt.files.status()).Entries[rt.entry.ID].Message == string(errLoginRefused) })
+	if len(rt.records()) != 0 {
+		t.Fatal("the program started with a login that was not the one verified")
+	}
+}
+
+func TestAnEntryThatStartsPausedHoldsItsProjectWithItsLease(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	if err := os.Rename(rt.folder, rt.folder+".gone"); err != nil {
+		t.Fatal(err)
+	}
+	rt.serve()
+	rt.eventually("a paused hold", func() bool {
+		for _, q := range rt.f.holdList() {
+			if q.Get("paused") == core.PauseFolderMissing {
+				return q.Get("project") == "SVA"
+			}
+		}
+		return false
+	})
+	if files, _ := filepath.Glob(filepath.Join(filepath.Dir(rt.login), "listen-*.lease")); len(files) != 1 {
+		t.Fatalf("lease files %v", files)
+	}
+}
+
+func TestAStaleLeaseIsDiscardedAndAskedAgain(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	c, _ := loginClient(rt.login)
+	lf, err := openLeaseFile(filepath.Dir(rt.login), c, "SVA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lf.keep("ZZZZ3333") // a lease that ended while the runner was away
+	lf.close()
+	rt.serve()
+	rt.eventually("ready with the listener's lease", func() bool {
+		return readStatus(rt.files.status()).Entries[rt.entry.ID].State == statusReady
+	})
+	for _, q := range rt.f.holdList() {
+		if q.Has("take") {
+			t.Fatal("a hold asked to take the lease")
+		}
+	}
+}
+
+func TestAPausedEntrySendsWhatWaitsInItsOutbox(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	rt.pauseUntil(rt.clock.Now().Add(time.Hour))
+	const run = "0199eeee-0000-7000-8000-0000000000f3"
+	rt.f.set(func(f *fakeQuadit) {
+		f.runs = append(f.runs, map[string]any{"id": run, "task": "SVA-12", "agent_id": fakeAgentID, "state": "running", "machine_id": testMachine.ID})
+	})
+	out, _ := openOutbox(filepath.Join(rt.files.entry(rt.entry.ID), "outbox"))
+	w := stepsWrite(run, 0)
+	w.Change.Args["add_steps"] = []any{map[string]any{"tool": "Bash"}}
+	_, _ = out.add(w)
+	rt.serve()
+	rt.eventually("the waiting write sent", func() bool { return rt.f.sentCount(w.ChangeID) == 1 })
+}

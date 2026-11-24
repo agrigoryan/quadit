@@ -334,6 +334,14 @@ func temporary(err error) bool {
 	return ae.Status == http.StatusRequestTimeout || ae.Status == http.StatusTooManyRequests || ae.Status >= 500
 }
 
+// refusalReason is the reason of the server's refusal in err, or "".
+func refusalReason(err error) string {
+	if ae, ok := refusalOf(err); ok {
+		return ae.Reason
+	}
+	return ""
+}
+
 // leaseLost reports whether err says another session holds the listener.
 func leaseLost(err error) bool {
 	ae, ok := refusalOf(err)
