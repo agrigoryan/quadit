@@ -24,7 +24,7 @@ To wake an agent when something needs it, run `quadit listen --exec COMMAND`, wi
 # wake.sh: one inbox item for the agent
 exec codex exec "Quadit woke you for this inbox item:
 $QUADIT_ITEM
-Handle it with the quadit skill, answering where you were asked."
+Handle it with the quadit skill: answer where you were asked, and write nothing when it asks nothing of you."
 ```
 
 While the command runs, `listen` renews its lease every minute, so a run that takes longer than the lease's ninety seconds keeps the item from being handed to another session. Without more, a run that fails is tried again, with longer pauses up to five minutes, until it succeeds. Three optional arguments bound that, for a caller that runs it unattended:
@@ -128,7 +128,9 @@ Files written are not proof that an agent reaches Quadit, and an agent that does
 
 An agent is connected by the first of: a connect code given back, a change made with its own token, its listener's first wait. Reading proves nothing: `quadit login` and `quadit me` do not connect it. The member row and `GET /agents` carry `connected_at`; `GET /agents/connection` is the cheap read of all three, with the tool of the last code the agent gave back, which pages read again while they show it. Each agent there (and in `GET /agents`) also has `listeners` (`[{project_id, project, by, last_heard, live}]`, the listener of everything without a project), `listening_projects` (the ids of the projects something live is handed now) and `listening_outside_projects` (whether something live is handed the items of no project); `listening` is whether anything listens at all.
 
-A person's comment on a task reaches the inbox of the task's assignee and of whoever the task waits on, whether or not they follow it, so the line under the comment box, "@codex is listening and will see this", holds for both. An agent's comment reaches only those who follow the task, those it mentions, and whom it hands the task to, so two agents on one task do not keep answering each other.
+A person's comment on a task that mentions nobody reaches the inbox of the task's assignee and of whoever the task waits on, whether or not they follow it; a reply also reaches whoever wrote earlier in its thread. A comment that mentions members is for them: it reaches no other agent through the task or the thread, though people still hear it as before. Whom a comment hands the task to is told either way. An agent's comment reaches another agent only by mentioning it or handing it the task, or, as a reply, when that agent asked its author by mention earlier in the thread: the one who asked hears the answer without being mentioned, and its own reply after that does not wake the one it asked unless it mentions it again. So agents answer only what is asked of them, and not each other. The line under the comment box follows the draft the same way: it speaks of each agent the comment would reach, in full for one ("@codex is listening and will see this"), in a few words each for several ("@helper is not listening here and sees this when next asked").
+
+An agent follows a task or a page only by choice (`quadit do watch.set '{"type": "task", "subject": "SVA-12"}'`, or `epic`, `doc`), and then hears every comment there; commenting, being mentioned, being assigned or asking a question makes a person follow, not an agent. Upgrading from 0.6.0 or earlier ends the follows of tasks, epics and pages agents had, which cannot be told apart from chosen ones; an agent's follows of projects and views stay.
 
 **Connect codes.** A person who may make the agent a token makes a code for it and the tool it runs in: Settings → the agent → Connect code, the desktop app's Connect, or `POST /connect-codes {"agent": "@codex", "tool": "Codex"}`, which answers `{id, code, …}` with the code this once. It is six characters with no look-alikes, good once for seven days; a new code for the same agent and tool replaces the open one, and `GET /connect-codes/{id}` tells its maker whether it was used. Said in the tool, `Connect to Quadit K7PQ2M` has the agent run:
 
@@ -227,7 +229,7 @@ Everything that changes is one event in one ordered feed per workspace. A commen
 | --- | --- |
 | Pull from a cursor | `GET /events?cursor=main` reads from the place the server keeps for you; `PUT /cursors/main {"seq": N}` marks it handled. A cursor never moves back |
 | Wait | Add `wait=50`: the request is held until something matching arrives. One call, no polling loop |
-| Narrow | `mine=1` (tasks you are assigned, mentioned in or watch), `others=1` (not your own changes), `task=SVA-12`, `types=decision.picked`, or any task filter |
+| Narrow | `mine=1` (tasks you are assigned, waited on, mentioned in or watch), `others=1` (not your own changes), `task=SVA-12`, `types=decision.picked`, or any task filter |
 | Inbox only | `inbox=1`: assignments, mentions, answers to your questions, replies |
 | Push | A webhook "for" the agent gets its inbox items as signed POSTs, in order, retried until they arrive. The server calls public addresses only; one on its own machine or network needs `--allow-private-networks` ([install](install.md#addresses-users-give)) |
 | Listen in a session | `quadit wait [project=KEY]`, again and again, in the agent's own session when the person asks it to listen: one inbox item at a time, of one project or of everything, with the commands to go on ([Connected, and listening](#connected-and-listening)) |
@@ -337,7 +339,7 @@ A task and a page point at each other when one mentions the other (a task key in
 
 ### Comments on a page
 
-People comment on words of a page (the text they select), on a block, or on the page as a whole, and answer each other in a thread. Asked something there, you get an inbox item (`mentioned`, or `replied` when someone answers in a thread you wrote in) whose line ends with what you need to answer:
+People comment on words of a page (the text they select), on a block, or on the page as a whole, and answer each other in a thread. Asked something there, you get an inbox item (`mentioned`, or `replied` when someone answers in a thread you wrote in: for an agent, a person's reply that names nobody else, or the answer of one it asked there) whose line ends with what you need to answer:
 
 ```
 #1207 11-16 10:42 @mia mentioned: Boss fight — @coder is this still three phases?  (page PAGE_ID, comment COMMENT_ID, thread THREAD_ID, on "The boss has three phases.")
@@ -380,7 +382,7 @@ In the page's Markdown (`quadit doc`, `format=md`) the words a thread is on are 
 
 A page as a repository file holds it, and an export, have no spans: there, and in what a repository sync brings in, text that looks like a span is text.
 
-`comments=0` leaves the threads out; `format=md` is the page alone, as `write` takes it back. Whoever wrote in a thread is told of each reply in it. Resolve a thread once the question in it is settled, not to hide one you disagree with. `reply` works on a task's comments too: `quadit show KEY` gives each comment's `id=`.
+`comments=0` leaves the threads out; `format=md` is the page alone, as `write` takes it back. Whoever wrote in a thread is told of each reply in it; an agent, only of one for it (see [Connected, and listening](#connected-and-listening)). Resolve a thread once the question in it is settled, not to hide one you disagree with. `reply` works on a task's comments too: `quadit show KEY` gives each comment's `id=`.
 
 A page that mirrors a Markdown file in a repository is called by the file's opening `# heading` (else by its file name) and does not repeat it in its text; written back, the title is the heading again. Renaming the page changes the heading, not the file name.
 

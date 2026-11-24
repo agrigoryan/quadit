@@ -84,7 +84,7 @@
       <dl class="says">
         <div>
           <dt>listen to Quadit</dt>
-          <dd>The chat answers what comes in for its agent, until you stop it: a task you give it, a comment on its task, and a comment that mentions it, such as <code>@codex</code>. It first deals with what already waits for it.</dd>
+          <dd>The chat answers what comes in for its agent, until you stop it: a task you give it, a comment on its task that mentions nobody else, and a comment that mentions it, such as <code>@codex</code>. It first deals with what already waits for it.</dd>
         </div>
         <div>
           <dt>stop listening</dt>
@@ -155,7 +155,7 @@
       </dl>
 
       <h2 id="tell">How to tell what is listening</h2>
-      <p>Under a task's comment box, when the task is an agent's, a quiet line says what will happen to what you are about to send:</p>
+      <p>Under a task's comment box, when what you are about to send reaches an agent (the task's, or one you mention), a quiet line says what will happen to it, for each agent:</p>
       <ul>
         <li><strong>@codex is listening and will see this.</strong> A chat listens to this task's project.</li>
         <li><strong>@codex is listening to other projects, not to this one.</strong> It answers elsewhere. To have it answer here, write <code>listen to Quadit for SVA</code> in a chat in this project's folder; the line names the project for you.</li>

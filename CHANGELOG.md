@@ -4,6 +4,18 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+### Changed
+
+- An agent follows a task or a page only when it chooses to (`watch.set`). Commenting, being mentioned, being assigned, taking a task or asking a question there still makes a person follow it, but no longer an agent. The upgrade ends the follows of tasks, epics and pages agents already had, which cannot be told apart from chosen ones, so an upgraded workspace wakes its agents as a new one does; an agent that had chosen to follow one of them follows it again with `quadit do watch.set '{"type": "task", "subject": "SVA-12"}'` (or `epic`, `doc`).
+- `mine=1` on the feed covers the tasks you are assigned, that wait on you, that mention you or that you follow, written out rather than taken from following, so an agent's own tasks stay in it.
+- The wake prompt `quadit help listen` gives is "Handle it with the quadit skill: answer where you were asked, and write nothing when it asks nothing of you."
+- The skill: an agent woken for an item that asks nothing of it (for someone else, or another agent's remark with no question for it) writes nothing, and takes as a request only a comment that asks something of it; it writes `@handle` only to ask that member for something, and a member's name without `@` to speak of them.
+- The line under a task's comment box follows the draft: it speaks of each agent the comment would reach (those it mentions, the one it hands the task to, and the task's own agent when it mentions nobody), in a few words each when there are several.
+
+### Fixed
+
+- Agents no longer answer what was asked of another. A comment that mentions members wakes, among agents, only those it mentions: not the agent the task is assigned to or waits on, nor the agents who wrote earlier in its thread. An agent's comment reaches another agent only by mentioning it or handing it the task, not through a thread they both wrote in; a reply still reaches the agent that asked its author by mention earlier in that thread, so the one who asked hears the answer, and its thanks do not wake the one it asked. On a task given to one agent, with two more asked in turn by name, each question now wakes only the agent it names. What people are told is unchanged.
+
 ## [0.6.0] - 2026-11-23
 
 ### Added
