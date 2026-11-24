@@ -121,7 +121,7 @@ describe("MenuBar", () => {
   ])(
     "on %s, adds the servers' workspaces up, says each server's own in its menu, and leaves a removed server out",
     (platform, first) => {
-      const real = Object.getOwnPropertyDescriptor(process, "platform")!;
+      const real = Object.getOwnPropertyDescriptor(process, "platform") ?? { value: process.platform };
       Object.defineProperty(process, "platform", { value: platform });
       try {
         const { store, one, two, bar, show } = setUp();
