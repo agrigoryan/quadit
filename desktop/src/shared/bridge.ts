@@ -105,6 +105,12 @@ export type DesktopOutcome =
       listeners?: HeardListener[];
       pushed?: boolean;
       unheard?: string[];
+      /**
+       * The person who answers for the agent (agent-state): their handle,
+       * without "@", and whether they are the person signed in in the page
+       * that answers; absent when the agent has none, or the page cannot tell.
+       */
+      owner?: { handle: string; me: boolean };
     }
   | { ok: false; message: string; path?: string };
 
@@ -114,6 +120,8 @@ export interface HeardListener {
   by?: string;
   /** Quadit's runner holds it now (agent-runs-contract.md §3.2): Quadit runs the agent for that project on a computer. */
   runner?: boolean;
+  /** With `runner`: that computer's name, as its runner says it (shown as text only). */
+  machine?: string;
 }
 
 export interface QuaditDesktop {
@@ -320,8 +328,23 @@ export function summaryOf(raw: unknown): DesktopSummary | null {
  */
 const PROJECT_KEY = /^[A-Z][A-Z0-9]{1,9}$/;
 
+/** A member's handle, without "@", as the server makes them: it goes into the words that say whose words start a run. */
+const HANDLE = /^[a-z0-9_-]{2,32}$/;
+
+/** A computer's name, as Quadit's runner says it (at most 64 characters): refused with a control character in it. */
+function machineName(raw: unknown): string {
+  // oxlint-disable-next-line no-control-regex -- control characters are what is refused here.
+  if (typeof raw !== "string" || raw.length > 64 || /[\u0000-\u001f\u007f]/.test(raw)) throw refused;
+  return raw;
+}
+
+/** Whether `raw` is a project key as the server makes them (PROJECT_KEY); the app's own checks use it too. */
+export function isProjectKey(raw: unknown): raw is string {
+  return typeof raw === "string" && PROJECT_KEY.test(raw);
+}
+
 function projectKey(raw: unknown): string {
-  if (typeof raw !== "string" || !PROJECT_KEY.test(raw)) throw refused;
+  if (!isProjectKey(raw)) throw refused;
   return raw;
 }
 
@@ -343,6 +366,7 @@ export function outcomeOf(raw: unknown): DesktopOutcome | null {
       listeners,
       pushed,
       unheard,
+      owner,
     } = record(raw);
     const where = optional(path, (v) => exact(v, PATH_MAX));
     if (ok === false) return defined({ ok, message: shown(message, MESSAGE_MAX), path: where });
@@ -378,11 +402,17 @@ export function outcomeOf(raw: unknown): DesktopOutcome | null {
             }),
             by: optional(l.by, (b) => shown(b, LABEL_MAX)),
             runner: optional(l.runner, flag),
+            machine: optional(l.machine, machineName),
           });
         }),
       ),
       pushed: optional(pushed, flag),
       unheard: optional(unheard, (v) => list(v, PROJECTS_MAX, projectKey)),
+      owner: optional(owner, (v) => {
+        const o = record(v);
+        if (typeof o.handle !== "string" || !HANDLE.test(o.handle)) throw refused;
+        return { handle: o.handle, me: flag(o.me) };
+      }),
     });
   });
 }

@@ -136,7 +136,18 @@ async function agentState(agent: string, code: string | undefined): Promise<Desk
     codeUsed: codeState.used,
     codeGone: codeState.gone,
     ...heard(connection.reading, getRow("members", agent)),
+    ...ownerOf(getRow("members", agent)),
   };
+}
+
+/**
+ * Who answers for the agent, for its card in the app to say whose words
+ * start a run of it: their handle, and whether it is the person signed in
+ * here. Nothing when it has no one, or the page does not hold that person.
+ */
+function ownerOf(agent: Member | undefined): Pick<DesktopOutcome & { ok: true }, "owner"> {
+  const owner = agent?.responsible_id ? getRow("members", agent.responsible_id) : undefined;
+  return owner ? { owner: { handle: owner.handle, me: owner.user_id === getState().me?.user_id } } : {};
 }
 
 /**
@@ -160,7 +171,7 @@ function heard(
       {
         ...(project ? { project: { key: project.key, name: project.name } } : {}),
         ...(l.by ? { by: l.by } : {}),
-        ...(l.runner?.holding ? { runner: true } : {}),
+        ...(l.runner?.holding ? { runner: true, machine: l.runner.machine } : {}),
       },
     ];
   });

@@ -44,6 +44,7 @@ beforeEach(() => {
     workspace: { id: "w", slug: "acme" } as Workspace,
     members: [
       { user_id: "u1", name: "Ann", handle: "ann", kind: "person" },
+      { user_id: "b1", name: "Bob", handle: "bob", kind: "person" },
       { user_id: "a1", name: "Claude", handle: "claude", kind: "agent", responsible_id: "u1" },
     ] as Member[],
     projects: [
@@ -212,8 +213,8 @@ const reading = (more: Record<string, unknown>) => ({
   ...more,
 });
 
-/** What the card is told of listeners when nothing listens: none, and every project unheard. */
-const NOTHING_HEARD = { listeners: [], pushed: false, unheard: ["SVA", "GS"] };
+/** What the card is told of listeners when nothing listens: none, and every project unheard; and who answers for the agent. */
+const NOTHING_HEARD = { listeners: [], pushed: false, unheard: ["SVA", "GS"], owner: { handle: "ann", me: true } };
 
 describe("a tool's card in the app's Connect", () => {
   let reads: string[] = [];
@@ -284,6 +285,7 @@ describe("a tool's card in the app's Connect", () => {
         listeners: [{ project: { key: "SVA", name: "Samurai" }, by: "a chat" }],
         pushed: false,
         unheard: ["GS"],
+        owner: { handle: "ann", me: true },
       });
     }
     expect(reads).toEqual(["/api/v1/w/acme/agents/connection"]);
@@ -314,10 +316,19 @@ describe("a tool's card in the app's Connect", () => {
     );
     expect(await answer({ kind: "agent-state", agent: "a1" })).toMatchObject({
       listeners: [
-        { project: { key: "SVA", name: "Samurai" }, by: "Quadit's runner", runner: true },
+        { project: { key: "SVA", name: "Samurai" }, by: "Quadit's runner", runner: true, machine: "Lou's Mac" },
         { project: { key: "GS", name: "Getting started" }, by: "a chat" },
       ],
     });
+  });
+
+  it("says who answers for the agent and whether that is the person here, and nothing when it has no one", async () => {
+    serve([{ user_id: "a1", listening: false }], false);
+    expect(await answer({ kind: "agent-state", agent: "a1" })).toMatchObject({ owner: { handle: "ann", me: true } });
+    patchRow("members", "a1", { responsible_id: "b1" });
+    expect(await answer({ kind: "agent-state", agent: "a1" })).toMatchObject({ owner: { handle: "bob", me: false } });
+    patchRow("members", "a1", { responsible_id: undefined });
+    expect(await answer({ kind: "agent-state", agent: "a1" })).not.toHaveProperty("owner");
   });
 
   it("names as unheard only the projects the agent itself may work in", async () => {

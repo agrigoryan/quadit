@@ -86,6 +86,15 @@ describe("handshakeOf", () => {
     });
   });
 
+  it("carries who answers for the agent, where the page says it, and keeps it while no answer comes", () => {
+    const none = { methods: ["cli" as const], code: null };
+    const owner = { handle: "bob", me: false };
+    const now = handshakeOf(none, { ok: true, connected: true, listening: false, owner }, NOW, undefined);
+    expect(now).toEqual({ state: "connected", listening: false, owner });
+    expect(handshakeOf(none, NO_ANSWER, NOW, now)).toEqual({ state: "connected", listening: null, owner });
+    expect(handshakeOf(none, state(true, false), NOW, now)).toEqual({ state: "connected", listening: false });
+  });
+
   it("waits on no code for a tool connected by MCP alone, which has no command to give one back with", () => {
     const mcp = { methods: ["mcp" as const], code: null };
     expect(handshakeOf(mcp, state(false, false), NOW, undefined)).toEqual({ state: "unknown" });

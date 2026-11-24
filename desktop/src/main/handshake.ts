@@ -45,18 +45,22 @@ export function handshakeOf(
   if (!answer.ok || typeof answer.connected !== "boolean") {
     if (open) return { state: "waiting", code: open.code };
     if (before?.state === "waiting") return { state: "waiting", code: null };
-    // Proven once, it stays connected; whether it listens is only known from an answer.
-    if (before?.state === "connected") return { state: "connected", listening: null };
+    // Proven once, it stays connected; whether it listens is only known from an answer, who answers for it is kept.
+    if (before?.state === "connected")
+      return { state: "connected", listening: null, ...(before.owner ? { owner: before.owner } : {}) };
     return before ?? { state: "unknown" };
   }
   if (answer.codeUsed === true || (answer.connected && !(open && answer.codeGone !== true))) {
-    if (answer.listening !== true) return { state: "connected", listening: false };
+    // Who answers for the agent, where the page says it.
+    const owner = answer.owner ? { owner: answer.owner } : {};
+    if (answer.listening !== true) return { state: "connected", listening: false, ...owner };
     // What listens, where the server's page says it.
-    if (!answer.listeners) return { state: "connected", listening: true };
+    if (!answer.listeners) return { state: "connected", listening: true, ...owner };
     return {
       state: "connected",
       listening: true,
       heard: { listeners: answer.listeners, pushed: answer.pushed === true, unheard: answer.unheard ?? [] },
+      ...owner,
     };
   }
   if (open && answer.codeGone !== true) return { state: "waiting", code: open.code };

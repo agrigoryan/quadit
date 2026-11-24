@@ -91,9 +91,11 @@ export type DesktopOutcome =
        * else, what holds it ("a chat"), and whether Quadit's runner holds it now; whether a webhook pushes to it; the
        * projects (keys) nothing hears.
        */
-      listeners?: { project?: { key: string; name: string }; by?: string; runner?: boolean }[];
+      listeners?: { project?: { key: string; name: string }; by?: string; runner?: boolean; machine?: string }[];
       pushed?: boolean;
       unheard?: string[];
+      /** The person who answers for the agent (agent-state): their handle, and whether it is the person signed in here. */
+      owner?: { handle: string; me: boolean };
     }
   | { ok: false; message: string; path?: string };
 

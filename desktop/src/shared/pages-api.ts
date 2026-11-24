@@ -189,8 +189,14 @@ export interface ConnectView {
  */
 export type Handshake =
   | { state: "waiting"; code: string | null; refused?: string }
-  | { state: "connected"; listening: boolean | null; heard?: Heard }
+  | { state: "connected"; listening: boolean | null; heard?: Heard; owner?: Owner }
   | { state: "unknown" };
+
+/** Who answers for a connected agent: their handle (without "@"), and whether they are the person signed in in its workspace's window. */
+export interface Owner {
+  handle: string;
+  me: boolean;
+}
 
 /**
  * What listens as a connected agent: each live listener (of a project, or,
@@ -251,6 +257,8 @@ export interface RunEntryView {
 export interface RunsView {
   agent: string;
   entries: RunEntryView[];
+  /** The list of what Quadit runs could not be read now (entries is then empty, not known). */
+  unreadable?: true;
 }
 
 /**
