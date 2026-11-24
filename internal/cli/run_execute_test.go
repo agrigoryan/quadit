@@ -873,33 +873,41 @@ func TestAnEndThatCannotBeKeptHoldsTheEntry(t *testing.T) {
 	rt.eventually("the next item run", func() bool { return len(rt.records()) == 2 })
 }
 
-func TestTheEndIsKeptBeforeAnyWriteAfterTheProgramExits(t *testing.T) {
+// What the end decides (the row's ended state, the comment made of the
+// last message, the acknowledgment) is sent only once the end is kept on
+// disk, so a crash in between never loses it nor sends it twice. Writes
+// made while the program ran (its steps, that it took the prompt, its
+// session) may still go out after it exited: the run's helpers send them
+// until the end is kept, and a crash then ends the run interrupted from
+// its journal all the same.
+func TestTheEndIsKeptBeforeAnythingItDecidesIsSent(t *testing.T) {
 	script := []fakeagent.Step{claudeInit(), claudeRunsBash("Run the tests"), {SleepMS: 50}, claudeEnds("done")}
 	rt := newRunTest(t, core.ProgramClaude, script)
 	outbox := filepath.Join(rt.files.entry(rt.entry.ID), "outbox")
 	var mu sync.Mutex
-	checked, missing := 0, 0
+	var decided, early []string
 	rt.f.set(func(f *fakeQuadit) {
-		f.beforeWrite = func() {
-			recs := rt.records()
-			if len(recs) == 0 || alive(recs[0].PID) {
-				return // the barrier is the program's exit
+		f.beforeWrite = func(w fakeChange) {
+			ended := w.Type == "session.update" && w.Args["state"] != nil && w.Args["state"] != core.AgentSessionRunning
+			if !ended && w.Type != "comment.create" && w.Type != "ack" {
+				return
 			}
 			mu.Lock()
 			defer mu.Unlock()
-			checked++
+			decided = append(decided, w.Type)
 			if !terminalOnDisk(outbox) {
-				missing++
+				early = append(early, w.Type)
 			}
 		}
 	})
 	rt.f.addItem(fakeItem{Task: "SVA-12"})
 	rt.serve()
 	rt.ended(0)
+	rt.eventually("the acknowledgment", func() bool { mu.Lock(); defer mu.Unlock(); return slices.Contains(decided, "ack") })
 	mu.Lock()
 	defer mu.Unlock()
-	if checked == 0 || missing > 0 {
-		t.Fatalf("%d writes after the exit, %d of them before the end was on disk", checked, missing)
+	if !slices.Equal(decided, []string{"comment.create", "session.update", "ack"}) || len(early) > 0 {
+		t.Fatalf("sent %q, of them before the end was on disk %q", decided, early)
 	}
 }
 
@@ -910,7 +918,7 @@ func terminalOnDisk(outbox string) bool {
 	for _, f := range files {
 		raw, _ := os.ReadFile(f)
 		var w outboxWrite
-		if json.Unmarshal(raw, &w) == nil && (w.Terminal != nil || w.Write == writeEnd || w.Write == writeAck) {
+		if json.Unmarshal(raw, &w) == nil && (w.Terminal != nil || w.Write == writeEnd || w.Write == writeFallback || w.Write == writeAck) {
 			return true
 		}
 	}

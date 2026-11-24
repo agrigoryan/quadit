@@ -72,7 +72,7 @@ type fakeQuadit struct {
 	stopOnStart    bool
 	refuseEnds     bool
 	writeOnRunning string
-	beforeWrite    func() // called as each write (a change, an acknowledgment) arrives
+	beforeWrite    func(fakeChange) // called as each write arrives: a change, or an acknowledgment as the type "ack"
 	members        map[string]fakeMember
 }
 
@@ -501,17 +501,17 @@ func (f *fakeQuadit) listen(w http.ResponseWriter, r *http.Request, who fakeMemb
 }
 
 func (f *fakeQuadit) ack(w http.ResponseWriter, r *http.Request, who fakeMember, cursor string) {
-	f.mu.Lock()
-	hook := f.beforeWrite
-	f.mu.Unlock()
-	if hook != nil {
-		hook()
-	}
 	var body struct {
 		Seq   int64
 		Lease string
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
+	f.mu.Lock()
+	hook := f.beforeWrite
+	f.mu.Unlock()
+	if hook != nil {
+		hook(fakeChange{Type: "ack"})
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if body.Lease != f.lease || f.chat {
@@ -526,17 +526,17 @@ func (f *fakeQuadit) ack(w http.ResponseWriter, r *http.Request, who fakeMember,
 }
 
 func (f *fakeQuadit) applyChanges(w http.ResponseWriter, r *http.Request, who fakeMember) {
-	f.mu.Lock()
-	hook := f.beforeWrite
-	f.mu.Unlock()
-	if hook != nil {
-		hook()
-	}
 	var body struct {
 		Changes []fakeChange `json:"changes"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 	ch := body.Changes[0]
+	f.mu.Lock()
+	hook := f.beforeWrite
+	f.mu.Unlock()
+	if hook != nil {
+		hook(ch)
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sent[ch.ID]++
