@@ -66,6 +66,7 @@ type fakeQuadit struct {
 	runsAway       bool   // GET /list/sessions answers 503
 	runsAwayHits   int    // how often it did
 	stopsHanded    int    // how often GET /events handed out a stop
+	staleStarts    int    // how many starts it refused as lease_stale
 	changesAwayFor string // the same, for one login's changes alone
 	staleStart     bool
 	stopOnStart    bool
@@ -587,6 +588,7 @@ func (f *fakeQuadit) applyLocked(ch fakeChange, who fakeMember) (int, string) {
 	switch ch.Type {
 	case "session.start":
 		if str("lease") != f.lease || f.chat || f.staleStart {
+			f.staleStarts++
 			return bad(http.StatusConflict, "conflict", "lease_stale", "that lease is not the listener's")
 		}
 		if str("state") == "waiting" {

@@ -83,12 +83,18 @@ func TestAStaleLeaseAtStartStartsNothing(t *testing.T) {
 	rt.f.set(func(f *fakeQuadit) { f.staleStart = true })
 	rt.f.addItem(fakeItem{Task: "SVA-12"})
 	rt.serve()
-	rt.eventually("the item received twice", func() bool { return strings.Count(rt.out.String(), "received #") >= 2 })
+	rt.eventually("two starts refused", func() bool { return rt.f.count(func(f *fakeQuadit) int { return f.staleStarts }) >= 2 })
+	// A chat takes the project: no hold succeeds, so no new start is
+	// queued; the one in flight is refused too. The outbox then empties,
+	// or a refused start stayed in it.
+	rt.f.set(func(f *fakeQuadit) { f.chat = true })
+	outbox := filepath.Join(rt.files.entry(rt.entry.ID), "outbox")
+	rt.eventually("every refused start taken out of the outbox", func() bool {
+		files, _ := filepath.Glob(filepath.Join(outbox, "*.json"))
+		return len(files) == 0 && readStatus(rt.files.status()).Entries[rt.entry.ID].State == statusAside
+	})
 	if len(rt.f.allRuns()) != 0 || len(rt.records()) != 0 || len(rt.f.ackList()) != 0 {
 		t.Fatal("a run refused its lease started something, made a row or acknowledged its head")
-	}
-	if files, _ := filepath.Glob(filepath.Join(rt.files.entry(rt.entry.ID), "outbox", "*.json")); len(files) != 0 {
-		t.Fatalf("the refused start stayed in the outbox: %v", files)
 	}
 }
 
