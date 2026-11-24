@@ -26,6 +26,7 @@ vi.mock("electron", () => ({
 }));
 
 const { MenuBar } = await import("@/main/menu-bar");
+const { PANEL_LABEL } = await import("@/main/menu");
 
 const QUESTION = { title: "Which level?", detail: "SVA-5 Levels", path: "/acme/t/SVA-5", actions: [] };
 const TASK = { key: "SVA-53", title: "Check the new level graphics", who: "@codex", path: "/acme/t/SVA-53" };
@@ -112,18 +113,32 @@ describe("MenuBar", () => {
     expect(bar.total).toBe(3);
   });
 
-  it("adds the servers' workspaces up, says each server's own in its menu, and leaves a removed server out", () => {
-    const { store, one, two, bar, show } = setUp();
-    show([
-      { serverId: one, summary: summary("acme", { waiting: [QUESTION] }) },
-      { serverId: one, summary: summary("games", { waiting: [QUESTION, QUESTION] }) },
-      { serverId: two, summary: summary("acme", { tasks: { items: [TASK], more: 3 } }) },
-    ]);
-    expect(bar.of(one)).toBe(3);
-    expect(bar.of(two)).toBe(4);
-    expect(seen.menu.slice(0, 2)).toEqual(["One (3)", "Two (4)"]);
-    store.remove(two);
-    expect(bar.total).toBe(3);
-    expect(seen.badge).toBe(3);
-  });
+  // On Linux the menu is the tray's only way in: the panel is its first item, before the servers.
+  it.each([
+    ["darwin", []],
+    ["win32", []],
+    ["linux", [PANEL_LABEL]],
+  ])(
+    "on %s, adds the servers' workspaces up, says each server's own in its menu, and leaves a removed server out",
+    (platform, first) => {
+      const real = Object.getOwnPropertyDescriptor(process, "platform")!;
+      Object.defineProperty(process, "platform", { value: platform });
+      try {
+        const { store, one, two, bar, show } = setUp();
+        show([
+          { serverId: one, summary: summary("acme", { waiting: [QUESTION] }) },
+          { serverId: one, summary: summary("games", { waiting: [QUESTION, QUESTION] }) },
+          { serverId: two, summary: summary("acme", { tasks: { items: [TASK], more: 3 } }) },
+        ]);
+        expect(bar.of(one)).toBe(3);
+        expect(bar.of(two)).toBe(4);
+        expect(seen.menu.slice(0, first.length + 2)).toEqual([...first, "One (3)", "Two (4)"]);
+        store.remove(two);
+        expect(bar.total).toBe(3);
+        expect(seen.badge).toBe(3);
+      } finally {
+        Object.defineProperty(process, "platform", real);
+      }
+    },
+  );
 });
