@@ -51,7 +51,17 @@ beforeEach(() => {
   load(ann);
   // What every agent is doing, as the Agents page reads it: the bot's program is listening.
   vi.spyOn(api, "get").mockResolvedValue({
-    agents: [{ user_id: "u2", handle: "bot", state: "idle", listening: true }],
+    agents: [
+      {
+        user_id: "u2",
+        handle: "bot",
+        state: "idle",
+        listening: true,
+        listeners: [{ by: "a chat", live: true }],
+        listening_projects: [],
+        listening_outside_projects: true,
+      },
+    ],
   });
 });
 
