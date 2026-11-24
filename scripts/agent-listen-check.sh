@@ -363,7 +363,7 @@ n=\$(ls "$work/runs" | wc -l | tr -d ' ')
 start=\$(date +%s)
 sh -c "\$AGENT_CHECK_ONE_PROMPT" sh "Quadit woke you for this inbox item:
 \$QUADIT_ITEM
-Handle it with the quadit skill, answering where you were asked.${steer:+ $steer}" >"$work/runs/\$n.log" 2>&1
+Handle it with the quadit skill: answer where you were asked, and write nothing when it asks nothing of you.${steer:+ $steer}" >"$work/runs/\$n.log" 2>&1
 status=\$?
 echo "run \$n: \$((\$(date +%s) - start))s, exit \$status" >>"$work/runs.txt"
 exit \$status
