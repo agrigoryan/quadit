@@ -192,7 +192,7 @@ func TestAnItemFromSomeoneElseIsRecordedAsNotStartedAndAcknowledged(t *testing.T
 	rt.acked(head)
 	row := rt.ended(0)
 	id := row["id"].(string)
-	if row["state"] != core.AgentSessionNotStarted || row["reason"] != core.RunNotResponsible || id != itemRunID(rt.f.items[0].ID) {
+	if row["state"] != core.AgentSessionNotStarted || row["reason"] != core.RunNotResponsible || id != itemRunID(rt.f.itemList()[0].ID) {
 		t.Fatalf("the row %v", row)
 	}
 	if rt.changesOf("session.start")[0].ID != id || len(rt.records()) != 0 {

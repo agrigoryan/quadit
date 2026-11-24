@@ -208,27 +208,30 @@ func (f *fakeQuadit) run(id string) map[string]any {
 	defer f.mu.Unlock()
 	for _, row := range f.runs {
 		if row["id"] == id {
-			return maps.Clone(row)
+			return deepCopy(row)
 		}
 	}
 	return nil
 }
 
-// runsOf are copies of the rows, in the order they were made.
+// The fake's records are handed to a test as copies made under its lock,
+// all the way down: a test never reads what a handler goes on using.
+
+// allRuns are copies of the rows, in the order they were made.
 func (f *fakeQuadit) allRuns() []map[string]any {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	out := make([]map[string]any, len(f.runs))
-	for i, row := range f.runs {
-		out[i] = maps.Clone(row)
-	}
-	return out
+	return deepCopy(f.runs)
 }
 
 func (f *fakeQuadit) changeList() []fakeChange {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return slices.Clone(f.changes)
+	out := make([]fakeChange, len(f.changes))
+	for i, ch := range f.changes {
+		out[i] = fakeChange{ID: ch.ID, Type: ch.Type, Args: deepCopy(ch.Args)}
+	}
+	return out
 }
 
 func (f *fakeQuadit) ackList() []fakeAck {
@@ -240,13 +243,61 @@ func (f *fakeQuadit) ackList() []fakeAck {
 func (f *fakeQuadit) holdList() []url.Values {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return slices.Clone(f.holds)
+	return deepCopy(f.holds)
 }
 
 func (f *fakeQuadit) commentList() []map[string]any {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return slices.Clone(f.comments)
+	return deepCopy(f.comments)
+}
+
+func (f *fakeQuadit) itemList() []fakeItem {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.items)
+}
+
+// deepCopy copies maps and slices all the way down; other values are
+// copied as values are.
+func deepCopy[T any](v T) T {
+	return copyAny(any(v)).(T)
+}
+
+func copyAny(v any) any {
+	switch v := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for k, x := range v {
+			out[k] = copyAny(x)
+		}
+		return out
+	case []any:
+		out := make([]any, len(v))
+		for i, x := range v {
+			out[i] = copyAny(x)
+		}
+		return out
+	case []map[string]any:
+		out := make([]map[string]any, len(v))
+		for i, x := range v {
+			out[i] = copyAny(x).(map[string]any)
+		}
+		return out
+	case url.Values:
+		out := make(url.Values, len(v))
+		for k, x := range v {
+			out[k] = slices.Clone(x)
+		}
+		return out
+	case []url.Values:
+		out := make([]url.Values, len(v))
+		for i, x := range v {
+			out[i] = copyAny(x).(url.Values)
+		}
+		return out
+	}
+	return v
 }
 
 // cursorAt is where @claude's listener's cursor stands.
@@ -333,7 +384,7 @@ func (f *fakeQuadit) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		f.feed(w, r)
 	case r.Method == http.MethodDelete && strings.HasPrefix(path, "/listening/") && strings.HasSuffix(path, "/runner"):
 		f.mu.Lock()
-		f.released = append(f.released, r.URL.Query())
+		f.released = append(f.released, deepCopy(r.URL.Query()))
 		f.calls = append(f.calls, "release")
 		f.mu.Unlock()
 		_, _ = io.WriteString(w, `{"project":"SVA","released":true}`)
@@ -376,11 +427,11 @@ func (it fakeItem) answer() map[string]any {
 
 func (f *fakeQuadit) listen(w http.ResponseWriter, r *http.Request, who fakeMember) {
 	q := r.URL.Query()
+	q.Set("token", who.Handle) // which login held
 	deadline := time.Now().Add(30 * time.Millisecond)
 	for {
 		f.mu.Lock()
-		q.Set("token", who.Handle) // which login held
-		f.holds = append(f.holds, q)
+		f.holds = append(f.holds, deepCopy(q)) // a record of its own: the handler goes on using q
 		if f.chat {
 			f.mu.Unlock()
 			refuse(w, http.StatusConflict, "conflict", "listening_elsewhere", "a chat listens to SVA")
