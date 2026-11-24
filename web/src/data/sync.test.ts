@@ -281,6 +281,37 @@ describe("the tabs of one workspace", () => {
     expect(b.state().seq).toBe(10);
   });
 
+  it("reads a run again when the answer to a Stop stamped it before the stream brought a step made earlier", async () => {
+    const run = {
+      id: "s1",
+      task_id: "t1",
+      agent_id: "a1",
+      state: "running",
+      steps: [],
+      started_at: 1,
+      updated_seq: 10,
+    };
+    const session = (seq: number, data: FeedEvent["data"]): FeedEvent => ({
+      ...retitle(seq, "s1", ""),
+      type: "session.updated",
+      entity_type: "session",
+      data,
+    });
+    server.get(OPEN_PART, copy({ sessions: [run] }));
+    const step = { tool: "Bash", text: "Run the tests" };
+    server.get(`${W}/list/sessions?task=t1`, {
+      sessions: [{ ...run, steps: [step], stop_requested_at: 5, updated_seq: 12 }],
+    });
+    const a = await openLeader();
+    server.post(CHANGES, {
+      results: [{ events: [session(12, { changes: { stop_requested_at: { from: null, to: 5 } } })] }],
+    });
+    await a.mutate({ type: "session.stop", args: { id: "s1" } });
+    a.stream.events(session(11, { appended: { steps: [step] } }));
+    await settle();
+    expect(a.state().collections.sessions.s1).toMatchObject({ steps: [step], stop_requested_at: 5 });
+  });
+
   it("when the leader's tab closes, a follower takes the stream over from its own place", async () => {
     const a = await openLeader();
     const b = await openTab();

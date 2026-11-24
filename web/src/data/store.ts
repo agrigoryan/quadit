@@ -20,6 +20,7 @@ import { create } from "zustand";
 import { applyEvent, CopyOnWrite, normalize, targetsOf } from "@/data/apply";
 import {
   type AnyRow,
+  COLLECTION_OF,
   type CollectionName,
   type Collections,
   type Dict,
@@ -172,9 +173,12 @@ export function applyEvents(events: FeedEvent[], fromStream: boolean) {
   if (!fromStream) for (const ev of fresh) appliedEarly.add(ev.seq);
   for (const ev of fresh) last = Math.max(last, ev.seq);
   keepRecent(toApply);
+  const behind: [CollectionName, string[]][] = [];
   for (const ev of toApply) {
     if (ev.entity_type === "workspace" && ev.data?.changes) continue;
-    applyEvent(d, ev);
+    const keys = applyEvent(d, ev);
+    const name = COLLECTION_OF[ev.entity_type];
+    if (name && keys.length > 0) behind.push([name, keys]);
     // The server's own row for something made here: it is no longer a draft.
     const id = ev.data?.row ? String(ev.data.row.id) : "";
     if (id && id in drafts) {
@@ -193,6 +197,21 @@ export function applyEvents(events: FeedEvent[], fromStream: boolean) {
     drafts: confirmed ?? s.drafts,
   }));
   for (const listener of listeners) listener(fresh);
+  for (const [name, keys] of behind) for (const listener of behindListeners) listener(name, keys);
+}
+
+type BehindListener = (collection: CollectionName, keys: string[]) => void;
+const behindListeners = new Set<BehindListener>();
+
+/**
+ * Hear of rows an event could not bring up to date: it appends items to a
+ * row that something newer had already stamped (the answer to a write made
+ * here can come before the stream's earlier event), so the row lacks them
+ * until it is read again.
+ */
+export function onRowsBehind(listener: BehindListener): () => void {
+  behindListeners.add(listener);
+  return () => behindListeners.delete(listener);
 }
 
 type OwnListener = (events: FeedEvent[], slug: string) => void;

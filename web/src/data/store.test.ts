@@ -13,6 +13,7 @@ import {
   mergeRest,
   mergeRows,
   onReplaced,
+  onRowsBehind,
 } from "@/data/store";
 import type { FeedEvent, Member, User, Workspace } from "@/types/core";
 
@@ -44,6 +45,46 @@ const boot = (over: Partial<BootstrapData> = {}): BootstrapData => ({ seq: 10, .
 beforeEach(() => clearStore());
 
 describe("applyEvents", () => {
+  it("tells who listens which rows an appending event found already stamped newer, in either order of arrival", () => {
+    const run = {
+      id: "s1",
+      task_id: "t1",
+      agent_id: "a1",
+      state: "running",
+      steps: [],
+      started_at: 1,
+      updated_seq: 10,
+    };
+    const step = event(11, {
+      type: "session.updated",
+      entity_type: "session",
+      entity_id: "s1",
+      data: { appended: { steps: [{ tool: "Bash" }] } },
+    });
+    const stop = event(12, {
+      type: "session.updated",
+      entity_type: "session",
+      entity_id: "s1",
+      data: { changes: { stop_requested_at: { from: null, to: 5 } } },
+    });
+    const told: [string, string[]][] = [];
+    const off = onRowsBehind((name, keys) => told.push([name, keys]));
+
+    // The stream first: the step is added, and nothing is behind.
+    loadBootstrap("acme", boot({ sessions: [run] }));
+    applyEvents([step, stop], true);
+    expect(getState().collections.sessions.s1?.steps).toEqual([{ tool: "Bash" }]);
+    expect(told).toEqual([]);
+
+    // The Stop's own answer first: the step that comes after it cannot be added, and the run is said to be behind.
+    loadBootstrap("acme", boot({ sessions: [run] }), { fresh: true });
+    applyEvents([stop], false);
+    applyEvents([step], true);
+    expect(getState().collections.sessions.s1?.steps).toEqual([]);
+    expect(told).toEqual([["sessions", ["s1"]]]);
+    off();
+  });
+
   it("moves seq only for events from the stream", () => {
     loadBootstrap("acme", boot({ tasks: [{ id: "t1", title: "a" }] }));
     applyEvents([retitle(11, "t1", "b")], false);

@@ -36,18 +36,23 @@ import {
   whenReachable,
   workspacePath,
 } from "@/data/api";
+import type { AnyRow } from "@/data/collections";
 import { openEventStream } from "@/data/event-stream";
 import { restoreQueue } from "@/data/mutate";
 import {
   applyEvents,
   type BootstrapData,
   clearStore,
+  type CollectionName,
+  type Collections,
+  type Dict,
   getState,
   loadBootstrap,
   mergeRest,
   mergeRows,
   onEvents,
   onOwnEvents,
+  onRowsBehind,
   type RestData,
   type StreamState,
   useStore,
@@ -417,9 +422,17 @@ function listen(s: Session) {
     if (s.leads) reconnectNow(s);
     else s.tabs?.post({ t: "poke" });
   });
+  // A row an event could not bring up to date (a run whose step came after the answer to a Stop) is read
+  // again, with the rows of its kind on its task.
+  const stopReadingBehind = onRowsBehind((collection, keys) => {
+    const rows: Dict<AnyRow> = getState().collections[collection];
+    const tasks = new Set(keys.map((key) => rows[key]?.task_id).filter((id) => typeof id === "string"));
+    for (const task of tasks) run(readAgain(s, collection, task));
+  });
   signal.addEventListener("abort", () => {
     stopPassingOwn();
     stopHearingBack();
+    stopReadingBehind();
   });
   if (typeof window === "undefined") return;
 
@@ -467,6 +480,15 @@ function listen(s: Session) {
     },
     { signal },
   );
+}
+
+/** Reads again a task's rows of one kind, and puts them in the copy where they are newer than its own. */
+async function readAgain<K extends CollectionName>(s: Session, collection: K, taskId: string) {
+  const out = await api.get<Partial<Record<K, Collections[K][string][]>>>(
+    workspacePath(s.slug, `/list/${collection}?task=${encodeURIComponent(taskId)}`),
+    s.ending.signal,
+  );
+  if (getState().slug === s.slug) mergeRows(collection, out[collection] ?? []);
 }
 
 // ---- the stream (held by the tab that leads) ----

@@ -58,17 +58,23 @@ export class CopyOnWrite {
 /**
  * Applies one feed event to the draft. Applying an event twice is harmless.
  * With `only`, the event touches just the rows it names (used to replay
- * events over rows that arrived after them).
+ * events over rows that arrived after them). Returns the keys of rows that
+ * are behind it: rows of its collection that already carry a newer stamp,
+ * so the items it appends could not be added to them (see appendTo).
  */
-export function applyEvent(d: CopyOnWrite, ev: FeedEvent, only?: (collection: CollectionName, key: string) => boolean) {
+export function applyEvent(
+  d: CopyOnWrite,
+  ev: FeedEvent,
+  only?: (collection: CollectionName, key: string) => boolean,
+): string[] {
   const name = COLLECTION_OF[ev.entity_type];
   const data = ev.data ?? {};
-  if (!name) return;
+  if (!name) return [];
   const wanted = (collection: CollectionName, key: string) => !only || only(collection, key);
 
   if (ev.type === "task.related") {
     applyRelated(d, ev, wanted);
-    return;
+    return [];
   }
 
   for (const att of data.attachments ?? []) {
@@ -80,18 +86,17 @@ export function applyEvent(d: CopyOnWrite, ev: FeedEvent, only?: (collection: Co
     const row = data.row;
     // A task opened earlier keeps nothing stale: the event row is complete.
     if (wanted(name, keyOf(name, row))) d.put(name, row);
-    return;
+    return [];
   }
 
   const id = name === "watchers" ? `${String(data.user_id ?? ev.audience_id)}:${ev.entity_id}` : ev.entity_id;
   if (data.gone === true) {
     if (wanted(name, id)) d.drop(name, id);
-    return;
+    return [];
   }
   if (data.appended) {
-    for (const target of data.ids ?? [id]) {
-      if (wanted(name, target)) appendTo(d, name, target, ev);
-    }
+    // Its changes go with what it appends, all or nothing.
+    return (data.ids ?? [id]).filter((target) => wanted(name, target) && !appendTo(d, name, target, ev));
   }
   if (data.changes) {
     const fields: AnyRow = {};
@@ -105,23 +110,27 @@ export function applyEvent(d: CopyOnWrite, ev: FeedEvent, only?: (collection: Co
       if (wanted(name, target)) d.patch(name, target, fields);
     }
   }
+  return [];
 }
 
 /**
- * Adds an event's appended items to the end of the row's lists (a run's
- * steps and links). The event carries only what is new, so it is applied
- * only to a row older than it: applied twice, or over a copy of the row
- * fetched after it, it changes nothing. When the server's cap dropped
- * steps from the front (the event's `steps_dropped` change), the copy drops
- * as many. The row is stamped with the event's seq here, before the
- * event's changes are patched in, for an event that carries none.
+ * Applies an event that appends items to the end of a row's lists (a run's
+ * steps and links), with its changes. The event carries only what is new,
+ * so it is applied only to a row older than it, whole or not at all:
+ * applied twice, or over a copy of the row fetched after it, it changes
+ * nothing. When the server's cap dropped steps from the front (the event's
+ * `steps_dropped` change), the copy drops as many. False when the row is
+ * held with a newer stamp: an answer to a write made here can stamp it
+ * before the stream brings this event, and then the row lacks these items
+ * and must be read again.
  */
-function appendTo(d: CopyOnWrite, name: CollectionName, id: string, ev: FeedEvent) {
+function appendTo(d: CopyOnWrite, name: CollectionName, id: string, ev: FeedEvent): boolean {
   const row = d.peek(name)[id];
-  const appended = ev.data.appended ?? {};
-  if (!row || ev.seq <= Number(row.updated_seq ?? 0)) return;
+  if (!row) return true;
+  if (ev.seq <= Number(row.updated_seq ?? 0)) return false;
   const fields: AnyRow = { updated_seq: ev.seq };
-  for (const [field, items] of Object.entries(appended)) {
+  for (const [field, change] of Object.entries(ev.data.changes ?? {})) fields[field] = change.to;
+  for (const [field, items] of Object.entries(ev.data.appended ?? {})) {
     const held = Array.isArray(row[field]) ? (row[field] as unknown[]) : [];
     fields[field] = [...held, ...items];
   }
@@ -129,6 +138,7 @@ function appendTo(d: CopyOnWrite, name: CollectionName, id: string, ev: FeedEven
   const after = Number(ev.data.changes?.steps_dropped?.to ?? before);
   if (after > before && Array.isArray(fields.steps)) fields.steps = fields.steps.slice(after - before);
   d.patch(name, id, fields);
+  return true;
 }
 
 /**

@@ -248,6 +248,23 @@ describe("applyEvent on steps appended to a run", () => {
     expect((once.sessions.s1 as AnyRow).steps).toEqual([{ tool: "Read" }, { tool: "Bash" }]);
   });
 
+  it("changes nothing at all with an event no newer than the row, not even its other fields, and says the row is behind it", () => {
+    const c = withRows({ sessions: [run({ steps: [{ tool: "C" }], steps_dropped: 6, updated_seq: 12 })] });
+    const d = new CopyOnWrite(c);
+    const behind = applyEvent(
+      d,
+      appended(11, { appended: { steps: [{ tool: "D" }] }, changes: { steps_dropped: { from: 4, to: 5 } } }),
+    );
+    expect(d.done().sessions.s1).toEqual(c.sessions.s1);
+    expect(behind).toEqual(["s1"]);
+  });
+
+  it("says no row is behind an event it applied, or one for a row it does not hold", () => {
+    const d = new CopyOnWrite(withRows({ sessions: [run()] }));
+    expect(applyEvent(d, appended(11, { appended: { steps: [{ tool: "Bash" }] } }))).toEqual([]);
+    expect(applyEvent(new CopyOnWrite(emptyCollections()), appended(11, { appended: { steps: [] } }))).toEqual([]);
+  });
+
   it("ignores an event no newer than the row, which already holds what it added", () => {
     const c = withRows({ sessions: [run({ steps: [{ tool: "Read" }, { tool: "Bash" }], updated_seq: 12 })] });
     expect(apply(c, appended(11, { appended: { steps: [{ tool: "Bash" }] } })).sessions.s1).toEqual(c.sessions.s1);
