@@ -33,8 +33,9 @@ async function until(check: () => boolean, ms = 5_000) {
 
 /**
  * A Runner over the stand-in quadit in a home of its own, with the agent's
- * login (@claude, who may work in SVA and GS) and a project folder there;
- * `start` the spawner, faked unless given; `env` added to the app's.
+ * login (@claude, who may work in the PROJECTS) and a folder there for each
+ * project, and a claude and a codex on the login shell's PATH; `start` the
+ * spawner, faked unless given; `env` added to the app's.
  */
 function setUp({ start, env = {} }: { start?: typeof startChild; env?: Record<string, string> } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-runner-")));
@@ -47,10 +48,16 @@ function setUp({ start, env = {} }: { start?: typeof startChild; env?: Record<st
   const quadit = join(root, "quadit");
   writeFileSync(quadit, `#!/bin/sh\nexec '${process.execPath}' '${FAKE}' "$@"\n`);
   chmodSync(quadit, 0o755);
+  const bin = join(root, "bin");
+  mkdirSync(bin);
+  for (const program of ["claude", "codex"]) {
+    writeFileSync(join(bin, program), "#!/bin/sh\necho 2.1.331\n");
+    chmodSync(join(bin, program), 0o755);
+  }
   const me = (handle: string) => ({
     handle,
     kind: "agent",
-    projects: ["SVA", "GS"],
+    projects: PROJECTS,
     project_names: { SVA: "Samurai vs Aliens", GS: "Getting started" },
   });
   const login = join(configDir, "claude.json");
@@ -61,6 +68,12 @@ function setUp({ start, env = {} }: { start?: typeof startChild; env?: Record<st
   const site = join(home, "site");
   mkdirSync(game);
   mkdirSync(site);
+  /** A folder of its own for a project. */
+  const folderOf = (project: string) => {
+    const folder = join(home, project.toLowerCase());
+    mkdirSync(folder, { recursive: true });
+    return folder;
+  };
   const started: Started[] = [];
   const logged: string[] = [];
   const fakeStart: typeof startChild = (program, args, options): RunningChild => {
@@ -78,7 +91,7 @@ function setUp({ start, env = {} }: { start?: typeof startChild; env?: Record<st
   };
   const parts = {
     quadit: () => quadit,
-    path: async () => "/opt/homebrew/bin:/usr/bin:/bin",
+    path: async () => `${bin}:/usr/bin:/bin`,
     env: {
       PATH: process.env.PATH ?? "/usr/bin:/bin",
       HOME: home,
@@ -102,15 +115,34 @@ function setUp({ start, env = {} }: { start?: typeof startChild; env?: Record<st
     configDir,
     game,
     site,
+    folderOf,
+    bin,
     quadit,
   };
 }
+
+const PROJECTS = ["SVA", "GS", "ART", "WEB", "API", "DOC", "OPS", "LAB"];
+
+/** An entry's status as a serving runner writes it: every field there. */
+const said = (fields: Record<string, unknown>) => ({
+  state: "",
+  task: "",
+  since: "",
+  pause: "",
+  until: "",
+  message: "",
+  blocked: [],
+  ...fields,
+});
 
 /** Says, as a serving runner, what each entry does (runner/status.json), the lock held by this test. */
 function serving(configDir: string, entries: Record<string, unknown>) {
   mkdirSync(join(configDir, "runner"), { recursive: true });
   writeFileSync(join(configDir, "runner", "runner.lock"), String(process.pid));
-  writeFileSync(join(configDir, "runner", "status.json"), JSON.stringify({ version: 1, entries }));
+  writeFileSync(
+    join(configDir, "runner", "status.json"),
+    JSON.stringify({ version: 1, pid: process.pid, at: "2026-11-24T14:05:00Z", machine: {}, entries }),
+  );
 }
 
 posixOnly("Runner, supervising quadit run", () => {
@@ -118,14 +150,14 @@ posixOnly("Runner, supervising quadit run", () => {
   afterEach(() => vi.useRealTimers());
 
   it("starts it at the app's start only when the registry has an entry, and after an add, with the login shell's PATH and no QUADIT_ setting", async () => {
-    const { runner, again, started, login, game, site, quadit } = setUp();
+    const { runner, again, started, login, game, site, quadit, bin } = setUp();
     await runner.sync();
     expect(started).toHaveLength(0);
     expect(await runner.add({ login, project: "SVA", folder: game, program: "claude" })).toEqual({ ok: true });
     expect(started).toHaveLength(1);
     expect(started[0]?.program).toBe(quadit);
     expect(started[0]?.args).toEqual(["run"]);
-    expect(started[0]?.env.PATH).toBe("/opt/homebrew/bin:/usr/bin:/bin");
+    expect(started[0]?.env.PATH).toBe(`${bin}:/usr/bin:/bin`);
     expect(Object.keys(started[0]?.env ?? {}).filter((key) => key.startsWith("QUADIT_"))).toEqual([]);
     // Another add while it runs starts no second one.
     await runner.add({ login, project: "GS", folder: site, program: "claude" });
@@ -171,6 +203,17 @@ posixOnly("Runner, supervising quadit run", () => {
     await until(() => started.length === 2);
   });
 
+  it("starts it again at once after a remove, which held the runner's lock while it worked", async () => {
+    const { runner, started, login, game, site } = setUp();
+    await runner.add({ login, project: "SVA", folder: game, program: "claude" });
+    await runner.add({ login, project: "GS", folder: site, program: "claude" });
+    started[0]?.end(3);
+    await vi.advanceTimersByTimeAsync(0);
+    const [first] = await runner.entries(login);
+    expect(await runner.remove({ entry: first?.id ?? "" })).toEqual({ ok: true });
+    expect(started).toHaveLength(2);
+  });
+
   it("stops it at quit, never waiting for it, and starts nothing after", async () => {
     const { runner, started, login, game } = setUp();
     await runner.add({ login, project: "SVA", folder: game, program: "claude" });
@@ -198,7 +241,7 @@ posixOnly("Runner, supervising quadit run", () => {
 
 posixOnly("Runner, its commands", () => {
   it("passes the refusals of quadit run add through as they were said, and starts nothing for them", async () => {
-    const { runner, started, login, game } = setUp();
+    const { runner, started, login, game, site } = setUp();
     expect(await runner.add({ login, project: "SVA", folder: "game", program: "claude" })).toEqual({
       ok: false,
       error: "folder= must be an absolute path",
@@ -207,29 +250,44 @@ posixOnly("Runner, its commands", () => {
       ok: false,
       error: "~/game/gone does not exist",
     });
+    expect(await runner.add({ login, project: "XYZ", folder: game, program: "claude" })).toEqual({
+      ok: false,
+      error: `@claude may not work in XYZ: quadit me lists its projects (it may work in ${PROJECTS.join(", ")})`,
+    });
     expect(started).toHaveLength(0);
-    await runner.add({ login, project: "SVA", folder: game, program: "claude" });
-    expect(await runner.add({ login, project: "SVA", folder: game, program: "claude" })).toEqual({
+    expect(await runner.add({ login, project: "sva", folder: game, program: "claude" })).toEqual({ ok: true });
+    expect(await runner.add({ login, project: "SVA", folder: site, program: "claude" })).toEqual({
       ok: false,
       error: "@claude already runs SVA on this computer, in ~/game",
     });
+    expect(await runner.add({ login, project: "GS", folder: game, program: "claude" })).toEqual({
+      ok: false,
+      error: "~/game already runs SVA on this computer: one project per folder",
+    });
+  });
+
+  it("passes on that a program is not found, as quadit run add says it", async () => {
+    const { runner, login, game } = setUp();
+    expect(
+      await runner.add({ login, project: "SVA", folder: game, program: "claude", programPath: "/nowhere/claude" }),
+    ).toEqual({ ok: false, error: "Claude Code was not found on this computer: install it, or give program_path=" });
   });
 
   it("says what each entry of the tool's login does, as a serving runner's status says it", async () => {
-    const { runner, login, otherLogin, game, site, configDir } = setUp();
-    for (const project of ["SVA", "GS", "ART", "WEB", "API", "DOC", "OPS"])
-      await runner.add({ login, project, folder: game, program: "claude" });
+    const { runner, login, otherLogin, site, configDir, folderOf } = setUp();
+    for (const project of PROJECTS) await runner.add({ login, project, folder: folderOf(project), program: "claude" });
     await runner.add({ login: otherLogin, project: "SVA", folder: site, program: "codex" });
     const ids = (await runner.entries(login)).map((e) => e.id);
-    expect(ids).toHaveLength(7);
-    const [ready = "", working = "", paused = "", aside = "", failed = "", removing = ""] = ids;
+    expect(ids).toHaveLength(8);
+    const [ready = "", working = "", paused = "", aside = "", failed = "", removing = "", unsaid = ""] = ids;
     serving(configDir, {
-      [ready]: { state: "ready", blocked: [{ run: "r1", task: "SVA-11", write: "end", error: "forbidden: no" }] },
-      [working]: { state: "working", task: "GS-3", since: "2026-11-24T14:02:10Z" },
-      [paused]: { state: "paused", pause: "usage_limit", until: "2026-11-24T18:00:00Z" },
-      [aside]: { state: "aside" },
-      [failed]: { state: "error", message: "login refused" },
-      [removing]: { state: "removing" },
+      [ready]: said({ state: "ready", blocked: [{ run: "r1", task: "SVA-11", write: "end", error: "forbidden: no" }] }),
+      [working]: said({ state: "working", task: "GS-3", since: "2026-11-24T14:02:10Z" }),
+      [paused]: said({ state: "paused", pause: "usage_limit", until: "2026-11-24T18:00:00Z" }),
+      [aside]: said({ state: "aside" }),
+      [failed]: said({ state: "error", message: "login refused" }),
+      [removing]: said({ state: "removing" }),
+      [unsaid]: said({}),
     });
     const entries = await runner.entries(login);
     expect(entries.map((e) => e.status)).toEqual([
@@ -240,11 +298,12 @@ posixOnly("Runner, its commands", () => {
       { state: "error", message: "login refused" },
       { state: "removing" },
       { state: "starting" },
+      { state: "starting" },
     ]);
     expect(entries[0]).toEqual({
       id: ready,
       project: "SVA",
-      folder: "~/game",
+      folder: "~/sva",
       program: "claude",
       status: { state: "ready" },
       blocked: [{ task: "SVA-11", error: "forbidden: no" }],
@@ -267,7 +326,7 @@ posixOnly("Runner, its commands", () => {
     serving(configDir, {});
     expect(await runner.remove({ login })).toEqual({
       ok: false,
-      error: "Quadit is still telling the server how the last run ended; it is removed once the server answers.",
+      error: "Quadit is still telling the server how @claude's last run ended; it is removed once the server answers.",
     });
     expect((await runner.entries(login))[0]?.status).toEqual({ state: "removing" });
     writeFileSync(join(configDir, "runner", "runner.lock"), "");
@@ -277,13 +336,12 @@ posixOnly("Runner, its commands", () => {
 
   it("gives the projects the agent may work in, as its own login says, and the runner's log", async () => {
     const { runner, login, configDir } = setUp();
-    expect(await runner.projects(login)).toEqual({
-      ok: true,
-      projects: [
-        { key: "SVA", name: "Samurai vs Aliens" },
-        { key: "GS", name: "Getting started" },
-      ],
-    });
+    const projects = await runner.projects(login);
+    expect(projects.ok && projects.projects.slice(0, 3)).toEqual([
+      { key: "SVA", name: "Samurai vs Aliens" },
+      { key: "GS", name: "Getting started" },
+      { key: "ART", name: "ART" },
+    ]);
     expect(await runner.projects(join(configDir, "nobody.json"))).toEqual({
       ok: false,
       error: "cannot reach https://q.example: connection refused",

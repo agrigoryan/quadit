@@ -186,7 +186,9 @@ export class Runner {
     const s = e.status ?? {};
     if (e.removing || s.state === "removing") return { state: "removing" };
     switch (s.state) {
+      // A runner that has not said yet what the entry does: its checks run.
       case undefined:
+      case "":
       case "starting":
         return { state: "starting" };
       case "ready":
@@ -244,6 +246,8 @@ export class Runner {
     this.parts.log(said.out.trim());
     const left = await this.list().catch(() => null);
     if (left?.entries.length === 0) this.stop();
+    // With no runner serving, remove holds the runner's lock while it works: a start meanwhile found it held (exit 3).
+    else if (left) await this.begin();
     this.parts.changed();
     return { ok: true };
   }
