@@ -5,7 +5,7 @@ import { SidebarDocs } from "@/docs/tree/sidebar-docs";
 import { isOnePane } from "@/hooks/breakpoints";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useProjects, useSlug, useUnreadCount, useViews } from "@/data/selectors";
+import { useProjects, useSlug, useUnreadCounts, useViews } from "@/data/selectors";
 import type { Project } from "@/types/core";
 import { ui, useUi } from "@/lib/ui-state";
 import { type DestinationGroup, destinationPath, goKeys, placesIn } from "@/shell/destinations";
@@ -57,7 +57,8 @@ function ProjectNav({ project, slug, collapsed }: { project: Project; slug: stri
 
 /** The places of one part of the sidebar. Folded to icons, each says its keys in its tooltip. */
 function Places({ group, slug, collapsed }: { group: DestinationGroup; slug: string; collapsed: boolean }) {
-  const unread = useUnreadCount();
+  // The number is what needs me; updates I only follow, unread, are a dot.
+  const unread = useUnreadCounts();
   return (
     <>
       {placesIn(group).map((place) => {
@@ -70,7 +71,10 @@ function Places({ group, slug, collapsed }: { group: DestinationGroup; slug: str
             label={t(place.label)}
             icon={place.icon}
             hint={goKeys(place)}
-            count={place.count === "unread" ? unread : undefined}
+            count={place.count === "unread" ? unread.needs : undefined}
+            dot={
+              place.count === "unread" && unread.updates > 0 ? t("nav.unreadUpdates", { n: unread.updates }) : undefined
+            }
             loud={!!place.count}
             collapsed={collapsed}
           />

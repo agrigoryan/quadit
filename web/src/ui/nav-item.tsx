@@ -14,6 +14,8 @@ interface Props {
   /** A count at the right; `loud` gives it the highlighter. */
   count?: number;
   loud?: boolean;
+  /** With no count to show: a quiet dot there instead, said by this label (something waits, none of it urgent). */
+  dot?: string;
   /** Icons only: the label moves into a tooltip. */
   collapsed?: boolean;
   /** The keys that go here, shown in that tooltip. */
@@ -23,7 +25,8 @@ interface Props {
   end?: boolean;
 }
 
-export function NavItem({ to, icon, label, count, loud, collapsed, hint, nested, end }: Props) {
+export function NavItem({ to, icon, label, count, loud, dot, collapsed, hint, nested, end }: Props) {
+  const quiet = !count && dot;
   const link = (
     <NavLink
       to={to}
@@ -54,6 +57,17 @@ export function NavItem({ to, icon, label, count, loud, collapsed, hint, nested,
       )}
       {collapsed && !!count && loud && (
         <span className="absolute mt-[-14px] ml-[14px] size-2 rounded-full bg-move ring-2 ring-sunken" />
+      )}
+      {quiet && (
+        <span
+          // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role -- a dot drawn with CSS, said by its label
+          role="img"
+          aria-label={dot}
+          className={cx(
+            "size-1.5 rounded-full bg-ink-3",
+            collapsed ? "absolute mt-[-14px] ml-[14px] ring-2 ring-sunken" : "mr-1.5 shrink-0",
+          )}
+        />
       )}
     </NavLink>
   );

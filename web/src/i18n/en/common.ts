@@ -147,6 +147,7 @@ export const common = {
   "nav.open": "Open navigation",
   "nav.switchWorkspace": "Switch workspace",
   "nav.unread": "{n} unread",
+  "nav.unreadUpdates": "{n} unread update | {n} unread updates",
 
   "top.search": "Search or jump to…",
   "top.searchShort": "Search",

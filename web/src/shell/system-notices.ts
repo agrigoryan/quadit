@@ -13,7 +13,7 @@
 
 import { useEffect } from "react";
 import { useSession } from "@/auth/session";
-import { getRow, getRowEvenIfGone, useUnreadCount, useWorkspaceId } from "@/data/selectors";
+import { getRow, getRowEvenIfGone, useUnreadCounts, useWorkspaceId } from "@/data/selectors";
 import { getState } from "@/data/store";
 import { onStreamEvents } from "@/data/sync";
 import { docPath } from "@/docs/area";
@@ -26,7 +26,8 @@ import type { DesktopAction, DesktopNotification } from "@/types/desktop";
 
 /** Keeps the computer told about the workspace open in the shell, for as long as the shell is on screen. */
 export function useSystemNotices() {
-  const unread = useUnreadCount();
+  // What needs the person, as the sidebar counts it: updates they only follow make no number.
+  const unread = useUnreadCounts().needs;
   // The app adds up the workspaces of a server, each once however many of its windows report it.
   const workspace = useWorkspaceId();
 

@@ -28,6 +28,12 @@ export const pages = {
   "inbox.markUnread": "Mark unread",
   "inbox.empty": "You are all caught up",
   "inbox.emptyHint": "Mentions, questions asked of you and tasks handed to you will show up here.",
+  "inbox.tabs": "Inbox",
+  "inbox.tab.needs": "Needs you",
+  "inbox.tab.updates": "Updates",
+  "inbox.needsNone": "Nothing needs you.",
+  "inbox.showUpdates": "Show {n} unread update | Show {n} unread updates",
+  "inbox.updatesNone": "No updates.",
 
   "trash.count": "{n} item in the trash | {n} items in the trash",
   "trash.tasks": "Tasks",

@@ -34,7 +34,7 @@ import {
   useTemplates,
   useTrashed,
   useTrashedTasks,
-  useUnreadCount,
+  useUnreadCounts,
   useViews,
 } from "@/data/selectors";
 import { type BootstrapData, clearStore, getState, loadBootstrap, patchRow } from "@/data/store";
@@ -97,6 +97,8 @@ const fixture: BootstrapData = {
     { id: "n1", user_id: "u1" },
     { id: "n2", user_id: "u1", archived_at: 3 },
     { id: "n3", user_id: "u2" },
+    { id: "n4", user_id: "u1", addressed: true },
+    { id: "n5", user_id: "u1", addressed: true, read_at: 4 },
   ],
   docs: [
     { id: "doc1", title: "Live" },
@@ -141,7 +143,8 @@ describe("lists hold live rows only", () => {
     expect(ids(hook(useViews))).toEqual(["v1"]);
     expect(Object.keys(hook(useOpenDecisions))).toEqual(["t1"]);
     expect(ids(hook(useOpenDecisions).t1 ?? [])).toEqual(["d1"]);
-    expect(hook(useUnreadCount)).toBe(1);
+    // Unread, my own and live: one needs me, one is an update I follow.
+    expect(hook(useUnreadCounts)).toEqual({ needs: 1, updates: 1 });
   });
 
   it("useLookup has the live rows by id, useLookupEvenIfGone all of them", () => {

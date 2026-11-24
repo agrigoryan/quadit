@@ -41,7 +41,7 @@ export interface Destination {
   listedAs?: Key;
   /** More words the palette's search should match. */
   words?: string;
-  /** A number the sidebar shows beside it, in the highlighter: what waits unread. */
+  /** A number the sidebar shows beside it, in the highlighter: what waits unread and needs the person; updates are a dot. */
   count?: "unread";
   /** Left out where it does not apply: a project without cycles, a person who does not run the install. */
   needs?: "cycles" | "installAdmin";

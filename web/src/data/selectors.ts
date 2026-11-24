@@ -23,6 +23,7 @@ import {
   isDoneCategory,
   type Label,
   type Member,
+  type Notification,
   type Project,
   type Status,
   type Task,
@@ -321,14 +322,29 @@ export function useOpenDecisions(): Dict<Decision[]> {
   return useStore((s) => openDecisions(s.collections.decisions));
 }
 
-export function useUnreadCount(): number {
+/**
+ * Whether an inbox item needs its member: the change that made it was for
+ * them (they were assigned, handed, asked, answered, mentioned, replied to,
+ * told, or the task is theirs), not one they only hear of as a follower.
+ * Items from before the server kept this read as updates.
+ */
+export const needsYou = (item: Pick<Notification, "addressed">) => !!item.addressed;
+
+/** How many of my inbox items are unread: those that need me, and the updates I only follow. */
+export function useUnreadCounts(): { needs: number; updates: number } {
   const notifications = useRows("notifications");
   const me = useMe();
   // Only the viewer's own: the page can hold a notice written for someone else.
-  return useMemo(
-    () => notifications.filter((n) => n.user_id === me.user_id && !n.read_at).length,
-    [notifications, me.user_id],
-  );
+  return useMemo(() => {
+    let needs = 0;
+    let updates = 0;
+    for (const n of notifications) {
+      if (n.user_id !== me.user_id || n.read_at) continue;
+      if (needsYou(n)) needs++;
+      else updates++;
+    }
+    return { needs, updates };
+  }, [notifications, me.user_id]);
 }
 
 export const sortByRank = <T extends { rank?: string }>(rows: T[]): T[] => [...rows].sort(byRank);

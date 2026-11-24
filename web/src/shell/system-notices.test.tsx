@@ -97,7 +97,11 @@ beforeEach(() => {
         })),
       },
     ],
-    notifications: [{ id: "n1", user_id: "u1", seq: 5, type: "comment", actor_id: "u2", created_at: 1 }],
+    notifications: [
+      { id: "n1", user_id: "u1", seq: 5, type: "mentioned", actor_id: "u2", created_at: 1, addressed: true },
+      // An update on a task I follow: it waits unread, and counts on no icon.
+      { id: "n0", user_id: "u1", seq: 4, type: "comment", actor_id: "u2", created_at: 1 },
+    ],
   });
 });
 
@@ -183,10 +187,12 @@ describe("in the desktop app", () => {
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it("keeps the badge at the workspace's unread count, naming the workspace so the app adds each once", () => {
+  it("keeps the badge at what needs the person, unread, naming the workspace so the app adds each once", () => {
     const { unmount } = renderHook(() => useSystemNotices());
     expect(setBadge).toHaveBeenLastCalledWith(1, "w");
-    streamed(created({ task_id: "t1", title: "SVA-5 Jump feels floaty" }));
+    streamed(created({ task_id: "t1", title: "SVA-5 Jump feels floaty", addressed: true }));
+    expect(setBadge).toHaveBeenLastCalledWith(2, "w");
+    streamed(created({ task_id: "t1", title: "SVA-5 Jump feels floaty", type: "comment" }));
     expect(setBadge).toHaveBeenLastCalledWith(2, "w");
     // Signing out takes this window's count off: it shows no workspace.
     unmount();
@@ -225,7 +231,7 @@ describe("in a browser", () => {
     expect(setBadge).not.toHaveBeenCalled();
   });
 
-  it("puts the unread count on the installed app's icon where the browser can", () => {
+  it("puts what needs the person, unread, on the installed app's icon where the browser can", () => {
     const setAppBadge = vi.fn(() => Promise.resolve());
     const clearAppBadge = vi.fn(() => Promise.resolve());
     Object.assign(navigator, { setAppBadge, clearAppBadge });

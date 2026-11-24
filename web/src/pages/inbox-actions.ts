@@ -96,21 +96,8 @@ export function archiveRead(shown: Notification[]) {
   if (ids.length > 0) archive(ids);
 }
 
-/** Marks everything shown as read; items that arrive after the newest one shown stay unread. */
+/** Marks everything shown as read, in one step to undo; items that arrive meanwhile stay unread. */
 export function markAllRead(shown: Notification[]) {
-  const unread = shown.filter((n) => !n.read_at);
-  if (unread.length === 0) return;
-  const now = Date.now();
-  const upTo = Math.max(...shown.map((n) => n.seq));
-  const ids = unread.map((n) => n.id);
-  sendUndoable(
-    t("undo.read", { n: ids.length }),
-    {
-      changes: [{ type: "notification.read", args: { all: true, up_to: upTo } }],
-      show: (tx) => {
-        for (const id of ids) tx.patch("notifications", id, { read_at: now });
-      },
-    },
-    reading(ids, false),
-  );
+  const ids = shown.filter((n) => !n.read_at).map((n) => n.id);
+  if (ids.length > 0) setRead(ids, true);
 }
