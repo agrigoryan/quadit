@@ -29,13 +29,13 @@ import type { WebContents, WebContentsView } from "electron";
 import type { AppPages } from "@/main/app-pages";
 import { type Connections, homely } from "@/main/connections";
 import type { Runner } from "@/main/runner";
-import { isProjectKey } from "@/shared/bridge";
+import { type ConnectFocus, isProjectKey } from "@/shared/bridge";
 import type { SelfRuns } from "@/main/self-runs";
 import type { ServerWindows } from "@/main/server-windows";
-import type { ConnectChoice, ConnectTarget, Refused } from "@/shared/pages-api";
+import type { ConnectChoice, ConnectFocusView, ConnectTarget, Refused } from "@/shared/pages-api";
 
 export interface ConnectPageParts {
-  pages: Pick<AppPages, "answer" | "view">;
+  pages: Pick<AppPages, "answer" | "view" | "changed">;
   connections: Pick<
     Connections,
     | "state"
@@ -49,6 +49,7 @@ export interface ConnectPageParts {
     | "updateSkill"
     | "runAs"
     | "skillForRuns"
+    | "agentsOf"
   >;
   windows: Pick<ServerWindows, "cover" | "uncover" | "isCovered">;
   /** Whether `serverId` is the server the app runs on this computer. */
@@ -75,15 +76,22 @@ export interface ConnectPageParts {
 
 const NOT_RUN: Refused = { ok: false, error: "Quadit cannot run this tool for a project." };
 
-/** Connect agents over one server's window; `byPage`: another server's page asked for it, not the person. */
+/**
+ * Connect agents over one server's window; `byPage`: another server's page
+ * asked for it, not the person; `focus`, where that page wants it, and the
+ * number of that ask.
+ */
 interface Shown {
   view: WebContentsView;
   serverId: string;
   byPage: boolean;
+  focus: { asked: ConnectFocus; id: number } | null;
 }
 
 export class ConnectPage {
   private shown: Shown | undefined;
+  /** How many focused asks there have been: each focus has its own number, so the page does each once. */
+  private asks = 0;
 
   constructor(private parts: ConnectPageParts) {
     const { pages, connections } = parts;
@@ -92,7 +100,9 @@ export class ConnectPage {
       connectTarget: (sender) => {
         const shown = own(sender);
         const target = shown && parts.target(shown.serverId);
-        return target ? { ...target, openedByPage: shown.byPage } : null;
+        if (!target) return null;
+        const focus = this.focusOf(shown, target);
+        return { ...target, openedByPage: shown.byPage, ...(focus ? { focus } : {}) };
       },
       closeConnect: (sender) => {
         const shown = own(sender);
@@ -173,16 +183,46 @@ export class ConnectPage {
    * through): laid over its window unless the first run covers it. Asked
    * again while there, nothing changes.
    */
-  asked(serverId: string) {
-    if (this.shown?.serverId === serverId || this.parts.windows.isCovered(serverId)) return;
-    this.open(serverId, !this.parts.isLocal(serverId));
+  asked(serverId: string, focus: ConnectFocus | null = null) {
+    if (this.parts.windows.isCovered(serverId)) return;
+    const asked = focus ? { asked: focus, id: ++this.asks } : null;
+    if (this.shown?.serverId === serverId) {
+      // There already: only a new focus changes anything, which the page is told of.
+      if (!asked) return;
+      this.shown.focus = asked;
+      this.parts.pages.changed();
+      return;
+    }
+    this.open(serverId, !this.parts.isLocal(serverId), asked);
+  }
+
+  /**
+   * Where the page that asked wants Connect agents, as the page is to do it
+   * (ConnectFocusView): at the card of the tool that works as that agent of
+   * the workspace shown, else at that agent, when the workspace has it;
+   * nothing when neither (another workspace's agent, or none).
+   */
+  private focusOf(shown: Shown, target: Omit<ConnectTarget, "openedByPage">): ConnectFocusView | null {
+    const { focus } = shown;
+    const workspace = target.summary?.workspace.id;
+    if (!focus?.asked.agent || !workspace) return null;
+    const { agent, intent } = focus.asked;
+    const tool = this.parts.connections.agentsOf(shown.serverId, workspace).find((a) => a.agent === agent)?.tool;
+    const handle = target.summary?.agents.find((a) => a.id === agent)?.handle;
+    if (!tool && !handle) return null;
+    return {
+      id: focus.id,
+      ...(intent ? { intent } : {}),
+      ...(tool ? { tool } : {}),
+      ...(handle ? { agent: { id: agent, handle } } : {}),
+    };
   }
 
   /** Lays a new Connect over the window of `serverId`, the one shown elsewhere going first. */
-  private open(serverId: string, byPage: boolean) {
+  private open(serverId: string, byPage: boolean, focus: Shown["focus"] = null) {
     const { pages, windows } = this.parts;
     if (this.shown) this.close(this.shown);
-    const next: Shown = { view: pages.view("connect.html"), serverId, byPage };
+    const next: Shown = { view: pages.view("connect.html"), serverId, byPage, focus };
     if (!windows.cover(next.view, serverId, () => this.close(next))) {
       windows.uncover(next.view);
       return;

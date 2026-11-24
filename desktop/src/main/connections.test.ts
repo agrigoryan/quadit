@@ -951,6 +951,18 @@ posixOnly("Quadit running a connected tool's agent (agent-runs-contract.md §8.2
     expect(connections.runAs("gemini")).toBeNull();
   });
 
+  it("tells a workspace's page only of the tools that work as its agents, never another server's or workspace's", async () => {
+    const { connections, connect, choice, configDir } = setUp();
+    await connect(choice("claude"));
+    await connect(choice("pi"));
+    expect(connections.agentsOf("s1", "w1")).toEqual([
+      { tool: "claude", name: "Claude Code", agent: "u2", login: join(configDir, "claude.json") },
+      { tool: "pi", name: "pi", agent: "u2", login: null },
+    ]);
+    expect(connections.agentsOf("s1", "w2")).toEqual([]);
+    expect(connections.agentsOf("s2", "w1")).toEqual([]);
+  });
+
   it("runs none connected by MCP alone: it has no login of its own", async () => {
     const { connections, connect, choice } = setUp();
     await connect(choice("claude", { methods: ["mcp"] }));

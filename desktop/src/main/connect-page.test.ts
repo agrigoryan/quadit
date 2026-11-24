@@ -4,6 +4,9 @@ import type { PageHandlers } from "@/main/app-pages";
 import { ConnectPage } from "@/main/connect-page";
 import type { ConnectTarget, RunEntryView } from "@/shared/pages-api";
 
+const CLAUDE = "0190f3a2-7b1c-7d4e-9a0b-1c2d3e4f5a6b";
+const HELPER = "0190f3a2-7b1c-7d4e-9a0b-1c2d3e4f5a6c";
+
 /** An entry of quadit run's registry, ready. */
 const entry = (id: string, project: string): RunEntryView => ({
   id,
@@ -20,13 +23,16 @@ const entry = (id: string, project: string): RunEntryView => ({
  * `covered`, when given, has another of the app's pages over it already;
  * "local" is the server the app runs on this computer. Quadit runs Claude
  * Code as @claude (its login /q/claude.json) for SVA, and Codex as @codex
- * for GS; `available`: the app carries a quadit.
+ * for GS; `available`: the app carries a quadit. With `workspace`, each
+ * window shows the workspace w1, whose agents are @claude (Claude Code works
+ * as it here, on s1 and local only) and @helper (no tool works as it).
  */
 function harness({
   covered = "",
   available = true,
   unreadable = false,
-}: { covered?: string; available?: boolean; unreadable?: boolean } = {}) {
+  workspace = false,
+}: { covered?: string; available?: boolean; unreadable?: boolean; workspace?: boolean } = {}) {
   let handlers: Partial<PageHandlers> = {};
   const said: string[] = [];
   const logins: Record<string, { login: string; agent: string; program: "claude" | "codex" }> = {
@@ -44,10 +50,15 @@ function harness({
     pages: {
       answer: (given) => (handlers = { ...handlers, ...given }),
       view: () => ({ webContents: { id: ++views } }) as unknown as WebContentsView,
+      changed: () => void said.push("changed"),
     },
     connections: {
       dropPlans: () => void said.push("drop plans"),
       runAs: (id: string) => logins[id] ?? null,
+      agentsOf: (serverId: string, workspaceId: string) =>
+        (serverId === "s1" || serverId === "local") && workspaceId === "w1"
+          ? [{ tool: "claude", name: "Claude Code", agent: CLAUDE, login: "/q/claude.json" }]
+          : [],
       skillForRuns: async (id: string) =>
         id === "codex" ? { ok: false, error: "The Quadit skill for Codex was changed by hand…" } : { ok: true },
     } as unknown as ConstructorParameters<typeof ConnectPage>[0]["connections"],
@@ -68,7 +79,18 @@ function harness({
     target: (serverId): Omit<ConnectTarget, "openedByPage"> => ({
       serverId,
       serverName: `Server ${serverId}`,
-      summary: null,
+      summary: workspace
+        ? {
+            workspace: { id: "w1", slug: "acme", name: "Acme" },
+            me: { name: "Ann", canCreateAgents: true },
+            waiting: [],
+            agents: [
+              { id: CLAUDE, handle: "claude", name: "Claude", state: "idle", detail: "", path: "/acme", usable: true },
+              { id: HELPER, handle: "helper", name: "Helper", state: "idle", detail: "", path: "/acme", usable: true },
+            ],
+            projects: [],
+          }
+        : null,
     }),
     copy: async () => {},
     selfRuns: { self: () => null, logOf: (id) => `/logs/${id}.log` },
@@ -223,6 +245,55 @@ describe("ConnectPage, Run by Quadit", () => {
     expect(await call(2, "pickFolder")).toBeNull();
     await call(1, "showRunnerLog");
     expect(said).toEqual(["show /q/runner/runner.log"]);
+  });
+});
+
+describe("ConnectPage, asked by a page at one of its agents", () => {
+  it("opens at the card of the tool that works as that agent, for what the page meant", async () => {
+    const { connect, call } = harness({ workspace: true });
+    connect.asked("local", { agent: CLAUDE, intent: "run" });
+    expect(await call(1, "connectTarget")).toMatchObject({
+      openedByPage: false,
+      focus: { id: 1, intent: "run", tool: "claude", agent: { id: CLAUDE, handle: "claude" } },
+    });
+  });
+
+  it("names the agent to connect a tool as when no tool works as it here", async () => {
+    const { connect, call } = harness({ workspace: true });
+    connect.asked("local", { agent: HELPER, intent: "connect" });
+    const target = (await call(1, "connectTarget")) as ConnectTarget;
+    expect(target.focus).toEqual({ id: 1, intent: "connect", agent: { id: HELPER, handle: "helper" } });
+  });
+
+  it("opens as without a focus for an agent the workspace shown does not have, or before it shows one", async () => {
+    const shown = harness({ workspace: true });
+    shown.connect.asked("local", { agent: "0190f3a2-7b1c-7d4e-9a0b-1c2d3e4f5a6d", intent: "connect" });
+    expect(await shown.call(1, "connectTarget")).not.toHaveProperty("focus");
+    const none = harness();
+    none.connect.asked("local", { agent: CLAUDE, intent: "run" });
+    expect(await none.call(1, "connectTarget")).not.toHaveProperty("focus");
+  });
+
+  it("holds input on another server's page as before, and finds only that server's tools", async () => {
+    const { connect, call } = harness({ workspace: true });
+    connect.asked("s2", { agent: CLAUDE, intent: "disconnect" });
+    expect(await call(1, "connectTarget")).toMatchObject({
+      openedByPage: true,
+      // Claude Code works as @claude of s1 and of this computer's server, not of s2: no card to go to there.
+      focus: { id: 1, intent: "disconnect", agent: { id: CLAUDE, handle: "claude" } },
+    });
+    expect(((await call(1, "connectTarget")) as ConnectTarget).focus).not.toHaveProperty("tool");
+  });
+
+  it("takes a new focus while it is there, telling its page, each with its own number", async () => {
+    const { connect, call, said } = harness({ workspace: true });
+    connect.asked("local", { agent: CLAUDE });
+    connect.asked("local", { agent: CLAUDE, intent: "disconnect" });
+    expect(said).toEqual(["cover local with 1", "changed"]);
+    expect(await call(1, "connectTarget")).toMatchObject({ focus: { id: 2, intent: "disconnect", tool: "claude" } });
+    // Asked again without one: nothing changes.
+    connect.asked("local");
+    expect(said).toEqual(["cover local with 1", "changed"]);
   });
 });
 

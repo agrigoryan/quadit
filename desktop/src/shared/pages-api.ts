@@ -272,6 +272,22 @@ export interface ConnectTarget {
   serverName: string;
   summary: DesktopSummary | null;
   openedByPage: boolean;
+  /** Where the page that asked for it wants it to open; absent: as it opens by itself. */
+  focus?: ConnectFocusView;
+}
+
+/**
+ * Where Connect agents opens, as the page that asked wants it (the bridge's
+ * ConnectFocus), resolved here: `tool`, the tool that works as that agent on
+ * this computer, whose card is shown ready for `intent`; else `agent`, that
+ * agent of the workspace, which a Connect then makes a tool work as. `id`
+ * tells one ask from the next: each is done once.
+ */
+export interface ConnectFocusView {
+  id: number;
+  intent?: "connect" | "run" | "disconnect";
+  tool?: string;
+  agent?: { id: string; handle: string };
 }
 
 export interface ConnectChoice {

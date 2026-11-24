@@ -47,6 +47,8 @@ interface Listed {
   id: string;
   login: string;
   project: string;
+  /** The project's id, as the registry binds it. */
+  project_id?: string;
   folder: string;
   program: string;
   removing?: boolean;
@@ -62,6 +64,8 @@ interface Listed {
 
 /** What `quadit run list --json` says: whether a runner serves the registry now, and its entries. */
 export interface RunList {
+  /** This computer's name, as the registry has it ("" before it is first written). */
+  machine: string;
   serving: boolean;
   entries: Listed[];
 }
@@ -140,9 +144,10 @@ export class Runner {
   private async readList(): Promise<RunList> {
     const said = await this.run(["run", "list", "--json"], COMMAND_MS);
     if (said.code !== 0) throw new Error(said.words);
-    const raw = JSON.parse(said.out) as { serving?: unknown; entries?: unknown };
+    const raw = JSON.parse(said.out) as { machine?: { name?: unknown }; serving?: unknown; entries?: unknown };
     const entries = Array.isArray(raw.entries) ? (raw.entries as Partial<Listed>[]) : [];
     return {
+      machine: typeof raw.machine?.name === "string" ? raw.machine.name : "",
       serving: raw.serving === true,
       entries: entries.filter(
         (e): e is Listed =>
@@ -151,6 +156,18 @@ export class Runner {
           [e.id, e.login, e.project, e.folder, e.program].every((v) => typeof v === "string"),
       ),
     };
+  }
+
+  /**
+   * This computer's name, and the ids of the projects Quadit runs the agent
+   * of the login `login` for (matched by real path); nothing when the list
+   * cannot be read.
+   */
+  async projectsOf(login: string): Promise<{ machine: string; projects: string[] }> {
+    const list = this.available ? await this.list().catch(() => null) : null;
+    if (!list) return { machine: "", projects: [] };
+    const projects = list.entries.flatMap((e) => (sameFile(e.login, login) && e.project_id ? [e.project_id] : []));
+    return { machine: list.machine, projects };
   }
 
   /**

@@ -142,9 +142,58 @@ export interface QuaditDesktop {
   onRequest(handler: (request: DesktopRequest) => Promise<DesktopOutcome>): () => void;
   /**
    * Opens the app's Connect agents page over this page's window, for its
-   * server and workspace. Present only where the app can connect tools (not on Windows).
+   * server and workspace; with `focus`, at the tool that works as that agent
+   * of the workspace, ready for what the person meant (ConnectFocus): the
+   * person still does it there. Present only where the app can connect tools
+   * (not on Windows).
    */
-  openConnect?(): void;
+  openConnect?(focus?: ConnectFocus): void;
+  /**
+   * The tools on this computer that work as agents of this page's own
+   * server and workspace (LocalAgent). Present only where openConnect is.
+   */
+  localAgents?(): Promise<LocalAgent[]>;
+}
+
+/**
+ * Where Connect agents opens when a page asks: at `agent` (a member's user
+ * id); `intent`, what the person meant to do there: connect a tool as it,
+ * run it by Quadit, or disconnect it.
+ */
+export interface ConnectFocus {
+  agent?: string;
+  intent?: "connect" | "run" | "disconnect";
+}
+
+/** A tool on this computer that works as an agent of a page's workspace, as the page is told of it. */
+export interface LocalAgent {
+  /** The agent's user id. */
+  agent: string;
+  /** The tool (the harness id: "claude", "codex", …), and its name ("Claude Code"). */
+  program: string;
+  programName: string;
+  /** This computer's name as Quadit's runner reports it, or "". */
+  computer: string;
+  /** Whether Run by Quadit is offered for it here. */
+  canRun: boolean;
+  /** The ids of the projects Quadit runs it for on this computer. */
+  runs: string[];
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const INTENTS: readonly string[] = ["connect", "run", "disconnect"] satisfies ConnectFocus["intent"][];
+
+/**
+ * What a page sent with openConnect, as a focus: an agent's id (a UUID) and
+ * one of the intents; null for anything else, and Connect agents then opens
+ * as it does without one.
+ */
+export function focusOf(raw: unknown): ConnectFocus | null {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
+  const { agent, intent } = raw as Record<string, unknown>;
+  if (typeof agent !== "string" || !UUID.test(agent)) return null;
+  if (intent !== undefined && (typeof intent !== "string" || !INTENTS.includes(intent))) return null;
+  return intent === undefined ? { agent } : { agent, intent: intent as ConnectFocus["intent"] };
 }
 
 export const BRIDGE_NOTIFY = "bridge:notify";
@@ -157,8 +206,10 @@ export const BRIDGE_REQUEST = "bridge:request";
 export const BRIDGE_OUTCOME = "bridge:outcome";
 /** Page to app: whether the page has a request handler now. */
 export const BRIDGE_LISTENING = "bridge:listening";
-/** Page to app: open the Connect agents page over this window (no payload). */
+/** Page to app: open the Connect agents page over this window; its payload, a ConnectFocus or null (focusOf). */
 export const BRIDGE_OPEN_CONNECT = "bridge:open-connect";
+/** Page to app, answered: the LocalAgent list of the page's own server and workspace. */
+export const BRIDGE_LOCAL_AGENTS = "bridge:local-agents";
 /**
  * The preload to the app, synchronously: the origin of the server whose
  * window it runs in ("" when none). Asked at each page load, so a window made

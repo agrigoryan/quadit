@@ -80,7 +80,10 @@ import {
   BRIDGE_BADGE,
   BRIDGE_LISTENING,
   BRIDGE_NOTIFY,
+  BRIDGE_LOCAL_AGENTS,
   BRIDGE_OPEN_CONNECT,
+  type ConnectFocus,
+  type LocalAgent,
   BRIDGE_ORIGIN,
   BRIDGE_OUTCOME,
   BRIDGE_PUBLISH,
@@ -141,8 +144,10 @@ export interface WindowsSetup {
   signInWithoutForm(serverId: string, fetch: Fetch): Promise<boolean>;
   /** Whether a server's window, its session reached through `fetch`, is signed in, where the app can ask (as for signInWithoutForm). */
   isSignedIn(serverId: string, fetch: Fetch): Promise<boolean>;
-  /** A server's page asked for Connect agents over its window (open-connect.ts); connect-page.ts decides. */
-  openConnect(serverId: string): void;
+  /** A server's page asked for Connect agents over its window (open-connect.ts), at `focus`; connect-page.ts decides. */
+  openConnect(serverId: string, focus: ConnectFocus | null): void;
+  /** The tools on this computer that work as agents of that server's workspace (local-agents.ts). */
+  localAgents(serverId: string, workspaceId: string): Promise<LocalAgent[]>;
   /**
    * A server's page (`contents`) holds on to itself as it would be unloaded
    * (its beforeunload: an upload under way): whether it is let go
@@ -198,8 +203,16 @@ export class ServerWindows {
       const serverId = this.owners.get(event.sender.id);
       event.returnValue = (serverId && this.store.get(serverId)?.origin) || "";
     });
-    const connectAsks = new OpenConnect((serverId) => setup.openConnect(serverId));
-    ipcMain.on(BRIDGE_OPEN_CONNECT, (event) => connectAsks.asked(this.bridgeSender(event)?.id ?? null));
+    const connectAsks = new OpenConnect((serverId, focus) => setup.openConnect(serverId, focus));
+    ipcMain.on(BRIDGE_OPEN_CONNECT, (event, raw: unknown) =>
+      connectAsks.asked(this.bridgeSender(event)?.id ?? null, raw),
+    );
+    // Only of the asking page's own server, and of the workspace it published: nothing of another's.
+    ipcMain.handle(BRIDGE_LOCAL_AGENTS, async (event) => {
+      const server = this.bridgeSender(event);
+      const workspace = server && setup.requests.summaryOf(event.sender.id)?.workspace.id;
+      return server && workspace ? setup.localAgents(server.id, workspace) : [];
+    });
     this.appSignIn = new AppSignIn({
       signIn: (serverId) => setup.signInWithoutForm(serverId, this.fetcher(serverId)),
       isSignedIn: (serverId) => setup.isSignedIn(serverId, this.fetcher(serverId)),
@@ -790,7 +803,7 @@ export class ServerWindows {
   }
 
   /** The server a bridge message came from, or undefined when its sender is not that server's own page. */
-  private bridgeSender(event: IpcMainEvent): Server | undefined {
+  private bridgeSender(event: Pick<IpcMainEvent, "sender" | "senderFrame">): Server | undefined {
     const serverId = this.owners.get(event.sender.id);
     const server = serverId ? this.store.get(serverId) : undefined;
     const frame = event.senderFrame;

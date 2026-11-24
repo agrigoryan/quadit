@@ -860,6 +860,24 @@ export class Connections {
     return { login: connection.token.config, agent: `@${connection.agent.handle}`, program: harness.id };
   }
 
+  /**
+   * The tools Connect set up that work as an agent of the workspace
+   * `workspaceId` of the server `serverId` (never another's): the tool, the
+   * agent's user id, and the login file Quadit runs it with (runAs), null
+   * when Quadit cannot run it.
+   */
+  agentsOf(
+    serverId: string,
+    workspaceId: string,
+  ): { tool: string; name: string; agent: string; login: string | null }[] {
+    return Object.entries(this.ledger().harnesses).flatMap(([id, connection]) => {
+      const harness = HARNESSES.find((h) => h.id === id);
+      const member = harness && memberOfRecord(connection, harness);
+      if (!harness || !member || connection.serverId !== serverId || connection.workspaceId !== workspaceId) return [];
+      return [{ tool: id, name: harness.name, agent: member.id, login: this.runAs(id)?.login ?? null }];
+    });
+  }
+
   /** The connect codes still open, of the tools waiting to be proven connected. */
   waitingCodes(): { id: string; code: string }[] {
     return Object.entries(this.ledger().harnesses).flatMap(([id, c]) =>

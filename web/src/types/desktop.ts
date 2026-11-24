@@ -120,8 +120,36 @@ export interface QuaditDesktop {
   publish?(summary: DesktopSummary | null): void;
   /** The one handler for requests the person made in the app; returns a function that stops it. */
   onRequest?(handler: (r: DesktopRequest) => Promise<DesktopOutcome>): () => void;
-  /** Opens the app's Connect agents window for this server. Present only where the app can connect tools (not on Windows). */
-  openConnect?(): void;
+  /**
+   * Opens the app's Connect agents over this window, for its server and workspace; with `focus`, at the tool that
+   * works as that agent (a user id), ready for what the person meant, which they still do there. Without an agent, or
+   * with anything the app does not take, it opens as without a focus. Present only where the app can connect tools
+   * (not on Windows).
+   */
+  openConnect?(focus?: ConnectFocus): void;
+  /** The tools on this computer that work as agents of this window's server and workspace. Present only where openConnect is. */
+  localAgents?(): Promise<LocalAgent[]>;
+}
+
+/** Where the app's Connect agents opens: at an agent (its user id), for what the person meant to do there. */
+export interface ConnectFocus {
+  agent?: string;
+  intent?: "connect" | "run" | "disconnect";
+}
+
+/** A tool on this computer that works as an agent of this window's workspace, as the app tells it. */
+export interface LocalAgent {
+  /** The agent's user id. */
+  agent: string;
+  /** The tool's id ("claude", "codex", …) and its name ("Claude Code"). */
+  program: string;
+  programName: string;
+  /** This computer's name as Quadit's runner reports it, or "". */
+  computer: string;
+  /** Whether Run by Quadit is offered for it here. */
+  canRun: boolean;
+  /** The ids of the projects Quadit runs it for on this computer. */
+  runs: string[];
 }
 
 declare global {

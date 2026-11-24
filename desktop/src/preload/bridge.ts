@@ -14,6 +14,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import {
   BRIDGE_BADGE,
   BRIDGE_LISTENING,
+  BRIDGE_LOCAL_AGENTS,
   BRIDGE_NOTIFY,
   BRIDGE_OPEN_CONNECT,
   BRIDGE_ORIGIN,
@@ -24,6 +25,7 @@ import {
   type DesktopNotification,
   type DesktopOutcome,
   type DesktopRequest,
+  type LocalAgent,
   notificationOf,
   outcomeOf,
   type QuaditDesktop,
@@ -95,9 +97,18 @@ if (typeof origin === "string" && origin && window.location.origin === origin) {
     ...(process.platform === "win32"
       ? {}
       : {
-          openConnect() {
-            ipcRenderer.send(BRIDGE_OPEN_CONNECT);
+          // The app checks what it is sent (focusOf); a page's object is never handed on as it is.
+          openConnect(focus?: unknown) {
+            const { agent, intent } = (typeof focus === "object" && focus !== null ? focus : {}) as Record<
+              string,
+              unknown
+            >;
+            ipcRenderer.send(
+              BRIDGE_OPEN_CONNECT,
+              typeof agent === "string" ? { agent, ...(typeof intent === "string" ? { intent } : {}) } : null,
+            );
           },
+          localAgents: () => ipcRenderer.invoke(BRIDGE_LOCAL_AGENTS) as Promise<LocalAgent[]>,
         }),
   };
   contextBridge.exposeInMainWorld("quaditDesktop", Object.freeze(bridge));

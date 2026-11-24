@@ -411,6 +411,15 @@ posixOnly("Runner, its commands", () => {
     expect(await runner.projects(odd)).toEqual({ ok: true, projects: [{ key: "SVA", name: "SVA" }] });
   });
 
+  it("gives this computer's name and the ids of the projects it runs a login's agent for", async () => {
+    const { runner, login, otherLogin, game, site } = setUp();
+    await runner.add({ login, project: "SVA", folder: game, program: "claude" });
+    await runner.add({ login: otherLogin, project: "GS", folder: site, program: "codex" });
+    expect(await runner.projectsOf(login)).toEqual({ machine: "Test Mac", projects: ["id-SVA"] });
+    expect(await runner.projectsOf("")).toEqual({ machine: "Test Mac", projects: [] });
+    runner.quit();
+  });
+
   it("offers nothing without a quadit of the app's own, and has nothing to remove", async () => {
     const runner = new Runner({
       quadit: () => null,

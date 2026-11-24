@@ -45,6 +45,7 @@ import { SignInFlows } from "@/main/handoff";
 import { HARNESSES } from "@/main/harnesses";
 import { ActivateAfterStart, coldStart, Quiet, secondStart, windowsToReopen } from "@/main/launch";
 import { LocalServer, loopbackPorts } from "@/main/local-server";
+import { localAgents } from "@/main/local-agents";
 import { appendLog } from "@/main/log-file";
 import { menuTemplate } from "@/main/menu";
 import { Panel } from "@/main/panel";
@@ -212,7 +213,8 @@ function start() {
     changed: () => refreshMenu(),
     whenReachable: (serverId) =>
       serverId === list.localServer()?.id ? local.whenRunning() : Promise.resolve({ ok: true as const }),
-    openConnect: (serverId) => connect.asked(serverId),
+    openConnect: (serverId, focus) => connect.asked(serverId, focus),
+    localAgents: (serverId, workspaceId) => localAgents({ connections, runner }, serverId, workspaceId),
     signInWithoutForm: (serverId, fetch) =>
       serverId === list.localServer()?.id ? local.signInOwner(fetch) : Promise.resolve(false),
     letUnload: (contents) => quitting.letGo(contents),

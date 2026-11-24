@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isConnectCode, notificationOf, outcomeOf, summaryOf } from "@/shared/bridge";
+import { focusOf, isConnectCode, notificationOf, outcomeOf, summaryOf } from "@/shared/bridge";
 
 const action = (extra: Record<string, unknown> = {}) => ({ label: "Ship it", request: "pick:d1:o1", ...extra });
 
@@ -195,5 +195,31 @@ describe("isConnectCode", () => {
     expect(outcomeOf({ ok: true, token: { id: "t1" } })).toBeNull();
     expect(outcomeOf({ ok: true, path: "/" + "p".repeat(3000) })).toBeNull();
     expect(outcomeOf({ ok: true, agent: { id: "u", handle: 3, name: "n" } })).toBeNull();
+  });
+});
+
+describe("focusOf", () => {
+  const agent = "0190f3a2-7b1c-7d4e-9a0b-1c2d3e4f5a6b";
+
+  it("takes an agent's id and one of the three intents, and nothing else a page sends", () => {
+    expect(focusOf({ agent })).toEqual({ agent });
+    for (const intent of ["connect", "run", "disconnect"])
+      expect(focusOf({ agent, intent })).toEqual({ agent, intent });
+    expect(focusOf({ agent, intent: "run", folder: "/", token: "qd_x" })).toEqual({ agent, intent: "run" });
+  });
+
+  it("is none for an agent that is not a UUID, an intent it does not know, or no agent", () => {
+    for (const raw of [
+      null,
+      "x",
+      [agent],
+      {},
+      { intent: "connect" },
+      { agent: agent.toUpperCase() },
+      { agent: `${agent}\n` },
+      { agent, intent: "delete" },
+      { agent, intent: 3 },
+    ])
+      expect(focusOf(raw)).toBeNull();
   });
 });
