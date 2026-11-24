@@ -583,7 +583,7 @@ type runnerShown struct {
 // task each runner works on there now.
 type listenerReads struct {
 	keys    map[string]string
-	working map[runnerAt]string // the key of the task of the newest open run
+	working map[runnerAt]string // the key of the task of the run it works on, or takes next
 }
 
 // runnerAt is one agent's runner on one machine, for one project.
@@ -612,15 +612,25 @@ func (who *viewer) listenerReads(ctx context.Context) (listenerReads, error) {
 	return reads, nil
 }
 
-// openRuns are the runs Quadit's runners have open (waiting or running),
-// newest first, on tasks the viewer may read, of the projects given (nil:
-// of every project), with those tasks by id.
+// openRuns are the runs Quadit's runners have open, on tasks the viewer
+// may read, of the projects given (nil: of every project), with those
+// tasks by id. They come in the order a machine works through them: those
+// whose program took its prompt (running) first, then those that wait,
+// oldest first; so the first of a machine's is the one it works on now, or
+// the one it takes next.
 func (who *viewer) openRuns(ctx context.Context, projects []string) ([]core.AgentSession, map[string]core.Task, error) {
 	var runs []core.AgentSession
 	if err := who.db.List(ctx, &runs, store.Q{Where: []store.Cond{store.In("state", []string{core.AgentSessionWaiting, core.AgentSessionRunning}),
-		store.Ne("machine_id", "")}, Order: "-started_at,id"}); err != nil {
+		store.Ne("machine_id", "")}, Order: "started_at,id"}); err != nil {
 		return nil, nil, err
 	}
+	running := func(run core.AgentSession) int {
+		if run.State == core.AgentSessionRunning {
+			return 0
+		}
+		return 1
+	}
+	slices.SortStableFunc(runs, func(a, b core.AgentSession) int { return cmp.Compare(running(a), running(b)) })
 	var ids []string
 	for _, run := range runs {
 		ids = append(ids, run.TaskID)

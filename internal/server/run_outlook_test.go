@@ -151,3 +151,41 @@ func TestTheOutlook(t *testing.T) {
 		})
 	})
 }
+
+// TestTheOutlookNamesTheRunThatWorksOnTheMachine: of the runs open on the
+// runner's machine, the outlook names the one whose program took its
+// prompt, or else the oldest that waits, which comes next; never merely the
+// newest.
+func TestTheOutlookNamesTheRunThatWorksOnTheMachine(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		working, next, last := r.task(t, nil), r.task(t, nil), r.task(t, nil)
+		runs := map[string]string{}
+		for i, key := range []string{working, next, last} {
+			runs[key] = r.change(t, nil, r.claude, "session.start", M{"task": key, "state": "waiting", "program": "claude", "machine_id": "3f9c0a7d5e21b864",
+				"machine_name": "Aram's MacBook Pro", "folder": "~/devel/game", "lease": r.lease, "item_seq": 1})["ref"].(string)
+			// Started in this order, a second apart.
+			if _, err := st.Update(context.Background(), "agent_sessions", map[string]any{"started_at": time.Now().Add(time.Duration(i-10) * time.Second).UnixMilli()},
+				store.Eq("id", runs[key])); err != nil {
+				t.Fatal(err)
+			}
+		}
+		running := func(t *testing.T) string {
+			t.Helper()
+			got := r.outlookOf(t, r.owner, "", working, "@claude", "comment")
+			if len(got) != 1 || got[0].Outcome != "queued" {
+				t.Fatalf("the outlook is %+v", got)
+			}
+			return got[0].Running
+		}
+		if got := running(t); got != working {
+			t.Errorf("with every run waiting, the outlook names %s, not the oldest, %s", got, working)
+		}
+		r.change(t, nil, r.claude, "session.update", M{"id": runs[next], "state": "running"})
+		r.change(t, nil, r.claude, "session.update", M{"id": runs[working], "reason": "folder_busy"})
+		if got := running(t); got != next {
+			t.Errorf("the outlook names %s, not %s, whose program works", got, next)
+		}
+	})
+}
