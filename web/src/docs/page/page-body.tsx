@@ -6,6 +6,7 @@
 import { GitBranch, Sparkles } from "lucide-react";
 import { lazy, type ReactNode, Suspense, useRef, useState } from "react";
 import { useCan } from "@/data/access";
+import { useReadWhenSeen } from "@/data/inbox-read";
 import { overlayOpen, useHotkeys } from "@/hooks/hotkeys";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
@@ -52,6 +53,8 @@ export function PageBody({ doc, compact }: Props) {
   const headReadOnly = !!doc.generated || !!doc.deleted_at || !mayEdit;
 
   usePresence(doc.id, block, page.status === "ready" && !isDatabase);
+  // Loaded and looked at for a moment, its inbox items are read.
+  useReadWhenSeen({ docId: doc.id, ready: page.status === "ready" && !doc.deleted_at });
   useHotkeys(
     {
       // Ctrl+M on every system, as on a task: the command key with M is the Mac's own (it puts the window away).

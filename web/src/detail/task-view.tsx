@@ -92,8 +92,8 @@ export function TaskView({ taskKey, layout, onClose, onExpand, queue }: Props) {
   const lost = useLostProject(taskKey.split("-")[0]);
   const status = useTaskDetail(task?.id);
   useRevealFromHash(!!task);
-  // Looked at for a moment, its inbox items are read.
-  useReadWhenSeen({ taskId: task?.id });
+  // Loaded and looked at for a moment, its inbox items are read; not in the trash, where nothing can be marked.
+  useReadWhenSeen({ taskId: task?.id, ready: status === "ready" && !!task && !task.deleted_at });
   const drop = useFileDrop(task);
   useHotkeys(
     {
