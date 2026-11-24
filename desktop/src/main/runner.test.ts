@@ -437,6 +437,26 @@ posixOnly("Runner, its commands", () => {
     expect(await runner.waiting(login, "SVA")).toBeNull();
   });
 
+  it("keeps what it read of the projects a few seconds, reading again at once after the app itself changed them", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const { runner, again, login, game, folderOf } = setUp();
+      const claude = { login, server: "https://q.example", workspace: "w1", agent: "id-@claude" };
+      await runner.add({ login, project: "SVA", folder: game, program: "claude" });
+      expect((await runner.projectsOf(claude)).projects).toEqual(["id-SVA"]);
+      // Another start of the app adds one: not this app's own change, seen once the few seconds are over.
+      await again().add({ login, project: "GS", folder: folderOf("GS"), program: "claude" });
+      expect((await runner.projectsOf(claude)).projects).toEqual(["id-SVA"]);
+      vi.setSystemTime(Date.now() + 6_000);
+      expect((await runner.projectsOf(claude)).projects).toEqual(["id-SVA", "id-GS"]);
+      await runner.remove({ login });
+      expect((await runner.projectsOf(claude)).projects).toEqual([]);
+      runner.quit();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("gives this computer's name and the ids of the projects it runs a login's agent for, of that server and workspace", async () => {
     const { runner, login, otherLogin, game, site } = setUp();
     await runner.add({ login, project: "SVA", folder: game, program: "claude" });

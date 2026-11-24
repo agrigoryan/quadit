@@ -85,6 +85,8 @@ const STEADY_MS = 60_000;
 const ANOTHER_WAIT_MS = 5 * 60_000;
 /** How often the registry is read again while an entry is still being removed (quadit run remove gave up waiting). */
 const RECHECK_MS = 30_000;
+/** How long the projects a page is told of (projectsOf) are kept before the list is read again. */
+const KEEP_MS = 5_000;
 /** How long a command may take: add checks the server and the program (10 s each); remove waits up to 60 s for a serving runner. */
 const COMMAND_MS = 20_000;
 const ADD_MS = 60_000;
@@ -134,6 +136,10 @@ export class Runner {
   private listing: Promise<RunList> | null = null;
   /** What the last failed read of the list said, logged once. */
   private listFailed = "";
+  /** The list projectsOf read last, and when: a page may ask often, and each read starts a quadit run. */
+  private kept: { list: RunList; at: number } | null = null;
+  /** How many times the app changed the registry: a read begun before a change is not kept after it. */
+  private changes = 0;
 
   constructor(private parts: RunnerParts) {}
 
@@ -178,7 +184,7 @@ export class Runner {
     workspace: string;
     agent: string;
   }): Promise<{ machine: string; projects: string[] }> {
-    const list = this.available ? await this.list().catch(() => null) : null;
+    const list = this.available ? await this.recentList().catch(() => null) : null;
     if (!list) return { machine: "", projects: [] };
     const projects = list.entries.flatMap((e) =>
       sameFile(e.login, of.login) &&
@@ -190,6 +196,21 @@ export class Runner {
         : [],
     );
     return { machine: list.machine, projects };
+  }
+
+  /** The app changed the registry: what projectsOf kept is old. */
+  private forgetKept() {
+    this.kept = null;
+    this.changes++;
+  }
+
+  /** The list as read in the last few seconds, read again past them or once the app itself changed the registry. */
+  private async recentList(): Promise<RunList> {
+    if (this.kept && Date.now() - this.kept.at < KEEP_MS) return this.kept.list;
+    const before = this.changes;
+    const list = await this.list();
+    if (before === this.changes) this.kept = { list, at: Date.now() };
+    return list;
   }
 
   /**
@@ -278,6 +299,7 @@ export class Runner {
     const said = await this.run(args, ADD_MS, { PATH: await this.parts.path() });
     if (said.code !== 0) return { ok: false, error: said.words };
     this.parts.log(said.out.trim());
+    this.forgetKept();
     await this.begin();
     this.parts.changed();
     return { ok: true };
@@ -310,6 +332,7 @@ export class Runner {
       if (said.code === 0) this.parts.log(said.out.trim());
       else words ||= said.words;
     }
+    this.forgetKept();
     const left = await this.reconcile();
     this.parts.changed();
     const still = left ? left.entries.filter((e) => ids.includes(e.id)) : [];
