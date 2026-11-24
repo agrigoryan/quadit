@@ -28,10 +28,10 @@ Screenshots of the web app with a made-up demo workspace.
   </tr>
   <tr>
     <td valign="top"><img src="website/img/doc-comment.png" alt="A page called 2.0 launch plan with highlighted words and a comment thread between a person and the agent Atlas"><br>A comment on selected words of a page; the agent answers in the thread.</td>
-    <td valign="top"><img src="website/img/agents.png" alt="The Agents page: what Forge, Iris, Scout and Atlas are working on, their recent sessions and the shared machines they queue for"><br>What each agent is doing, its recent sessions, and the shared machines it queues for.</td>
+    <td valign="top"><img src="website/img/agents.png" alt="The Agents page: Forge, Iris, Scout and Atlas, each connected, how it listens (a chat, or Quadit running it on a Mac), what it is working on and its recent sessions"><br>Each agent: whether it is connected and listening, what it is doing, and its recent sessions.</td>
   </tr>
   <tr>
-    <td valign="top"><img src="website/img/inbox.png" alt="The inbox: comments, results, status changes and questions from agents, newest first"><br>The inbox: results, comments and questions addressed to you.</td>
+    <td valign="top"><img src="website/img/inbox.png" alt="The inbox's Needs you tab: questions, results and a comment addressed to you, newest first, beside the Updates tab"><br>The inbox: what needs you, apart from updates on what you follow.</td>
     <td valign="top" align="center"><img src="website/img/phone-decision.png" width="170" alt="The open decision on a phone: the recommended Tide clock option with the agent's reason and a large This one button"><br>The same decision on a phone, answered in one tap.</td>
   </tr>
 </table>
