@@ -81,13 +81,20 @@ export function useEntries(): Entry[] {
   }, [decisions, tasks, projects, me]);
 }
 
+/**
+ * Who answered a question: picked an option, or sent it back. Not whoever
+ * closed one as no longer needed, which `decided_by` also names.
+ */
+export const answeredBy = (d: Decision): string | undefined =>
+  d.state === "picked" || d.state === "sent_back" ? d.decided_by : undefined;
+
 /** Whether an entry passes the filters; `skip` leaves one filter out (to count what it would show). */
 export function matches(entry: Entry, f: Filters, skip?: keyof Filters): boolean {
   const d = entry.decision;
   if (skip !== "state" && f.state !== "all" && entry.standing !== f.state) return false;
   if (skip !== "project" && f.project && entry.task.project_id !== f.project) return false;
   if (skip !== "asked" && f.asked && d.asked_id !== f.asked) return false;
-  if (skip !== "by" && f.by && d.decided_by !== f.by) return false;
+  if (skip !== "by" && f.by && answeredBy(d) !== f.by) return false;
   if (skip !== "q") {
     for (const word of f.q.toLowerCase().split(/\s+/)) {
       if (word && !entry.text.includes(word)) return false;
@@ -106,7 +113,7 @@ export function countBy(entries: Entry[], f: Filters, field: "state" | "project"
         ? e.task.project_id
         : field === "asked"
           ? e.decision.asked_id
-          : e.decision.decided_by;
+          : answeredBy(e.decision);
   for (const entry of entries) {
     if (!matches(entry, f, field)) continue;
     const key = keyOf(entry);

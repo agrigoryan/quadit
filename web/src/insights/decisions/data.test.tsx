@@ -35,7 +35,7 @@ function entries() {
       decision("picked", 9, { state: "picked", asked_id: "u1", decided_at: 9 }),
       decision("askedOfMe", 2, { state: "open", asked_id: "u1" }),
       decision("sentBackByMe", 8, { state: "sent_back", asked_id: "u1", decided_by: "u1", decided_at: 8 }),
-      decision("closed", 3, { state: "not_needed", asked_id: "u1", decided_at: 3 }),
+      decision("closed", 3, { state: "not_needed", asked_id: "u1", decided_by: "u1", decided_at: 3 }),
       decision("sentBackToMe", 5, { state: "sent_back", created_by: "u1", asked_id: "u2", decided_at: 5 }),
       decision("askedOfOther", 7, { state: "open", created_by: "u1", asked_id: "u2" }),
     ],
@@ -62,5 +62,14 @@ describe("the decision log's groups", () => {
       "askedOfOther",
     ]);
     expect(countBy(all, noFilters, "state")).toEqual({ all: 6, yours: 2, others: 2, settled: 2 });
+  });
+
+  it("counts and filters by who answered only questions answered, not one closed as no longer needed", () => {
+    const all = entries();
+    // u1 sent one back and closed another: only the first was answered by them.
+    expect(countBy(all, noFilters, "by").u1).toBe(1);
+    expect(all.filter((e) => matches(e, { ...noFilters, by: "u1" })).map((e) => e.decision.id)).toEqual([
+      "sentBackByMe",
+    ]);
   });
 });

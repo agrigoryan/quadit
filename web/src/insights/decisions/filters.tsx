@@ -13,6 +13,7 @@ import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 import { type PickerItem, Select } from "@/ui/picker";
 import {
+  answeredBy,
   countBy,
   type Entry,
   type Filters,
@@ -63,7 +64,7 @@ export function FilterBar({ entries, filters, onChange }: Props) {
   const people = (field: "asked" | "by"): PickerItem[] => {
     const ids = new Set<string>();
     for (const e of entries) {
-      const id = field === "asked" ? e.decision.asked_id : e.decision.decided_by;
+      const id = field === "asked" ? e.decision.asked_id : answeredBy(e.decision);
       if (id) ids.add(id);
     }
     const list = [...ids]
