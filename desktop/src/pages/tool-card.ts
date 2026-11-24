@@ -15,7 +15,10 @@
 // and what the app does by itself (desktop contract §11, third amendment):
 // "Connecting…" while it gives the code back, and the reason when it could
 // not (above the line to paste); and, connected, Run by Quadit for a Claude
-// Code or Codex with an agent's login of its own (run-by-quadit.ts);
+// Code or Codex with an agent's login of its own (run-by-quadit.ts): while
+// Quadit's runner serves a project of it, the agent is heard there, so the
+// next step is not shown and what the runner holds is said only by Run by
+// Quadit's lines, never as a chat;
 // and, set up but where it stands not known here (it works as another
 // server's login, or no answer came yet), a plain line saying so, never
 // "Connected". A set-up card asks the app where its tool stands every couple
@@ -37,6 +40,8 @@ const api = window.quaditPages as PagesApi;
 const ASK_EVERY_MS = 2_000;
 /** What the card calls this computer. */
 const HERE = navigator.userAgent.includes("Macintosh") ? "this Mac" : "this computer";
+/** The states of an entry Quadit's runner serves: the agent is heard there. */
+const SERVED: ReadonlySet<string> = new Set(["ready", "working", "paused", "aside"]);
 
 export interface CardTool {
   id: string;
@@ -103,6 +108,8 @@ export class ToolCard {
   private tileEl: HTMLSpanElement;
   private act: HTMLDivElement;
   private stand: HTMLDivElement;
+  /** Under Run by Quadit's lines: how a chat adds another project, while Quadit runs some (they come first). */
+  private afterRuns: HTMLDivElement;
   private gives: HTMLParagraphElement;
   private diskText: Text;
   private error: HTMLParagraphElement;
@@ -111,6 +118,8 @@ export class ToolCard {
   private connectButton: HTMLButtonElement;
   /** Run by Quadit, under where it stands: shown only once it is connected and Quadit can run it. */
   private runs: RunByQuadit;
+  /** The projects Quadit's runner serves for its agent now (ready, working, paused, or waiting for a chat), by key. */
+  private served: string[] = [];
   /** Room under the card's text for what a page adds (Connect agents' More options). */
   readonly extra: HTMLDivElement;
 
@@ -136,6 +145,7 @@ export class ToolCard {
     head.append(name, this.act);
 
     this.stand = make("div", "", "stand");
+    this.afterRuns = make("div", "", "stand");
     this.runs = new RunByQuadit(tool, HERE);
     this.gives = make("p", "", "gives");
     const disk = make("p", "", "disk");
@@ -161,6 +171,7 @@ export class ToolCard {
       head,
       this.stand,
       this.runs.element,
+      this.afterRuns,
       this.gives,
       disk,
       unverified,
@@ -253,9 +264,11 @@ export class ToolCard {
       return;
     }
     this.runs.show(runs);
-    if (JSON.stringify([now, self]) === JSON.stringify([this.handshake, this.self])) return;
+    const served = (runs?.entries ?? []).filter((e) => SERVED.has(e.status.state)).map((e) => e.project);
+    if (JSON.stringify([now, self, served]) === JSON.stringify([this.handshake, this.self, this.served])) return;
     this.handshake = now;
     this.self = self;
+    this.served = served;
     this.show();
     this.actions.changed();
   }
@@ -342,7 +355,12 @@ export class ToolCard {
     // Its nodes are replaced only when what they show changes: focus, a selection or a click in them survive the rest.
     const { self } = this;
     // What is drawn from: of what the app does by itself, only what the waiting state shows.
-    const drawn = JSON.stringify([stands, handshake, stands === "waiting" ? (self?.proving ?? null) : null]);
+    const drawn = JSON.stringify([
+      stands,
+      handshake,
+      stands === "waiting" ? (self?.proving ?? null) : null,
+      stands === "connected" ? this.served : null,
+    ]);
     if (drawn === this.drawn) return;
     this.drawn = drawn;
     // The buttons beside its name follow where it stands only: what listens changing leaves focus on Disconnect.
@@ -359,12 +377,15 @@ export class ToolCard {
         this.act.replaceChildren(this.connectButton);
       } else this.act.replaceChildren(...(stands === "connected" ? [badge, back] : [back]));
     }
+    this.afterRuns.replaceChildren();
     if (stands === "found") {
       this.stand.replaceChildren();
       return;
     }
     if (handshake?.state === "connected") {
-      this.stand.replaceChildren(this.listening(handshake));
+      const [lines, after] = this.listening(handshake, new Set(this.served));
+      this.stand.replaceChildren(...lines);
+      this.afterRuns.replaceChildren(...after);
       return;
     }
     if (handshake?.state === "unknown")
@@ -423,16 +444,22 @@ export class ToolCard {
 
   /**
    * Whether the connected tool's agent listens (null: no answer to tell).
-   * Listening: what listens (heardLines). Not: the person's next step, set
-   * apart as the card's main thing, with how a chat of the tool listens
-   * where that was verified; or, connected by MCP alone, that it cannot
-   * listen.
+   * Listening, or Quadit running it for a project (`run`, the projects its
+   * runner serves): what listens (heardLines), nothing when only Quadit's
+   * runner does, since Run by Quadit's lines say it (what goes under those
+   * lines comes second). Not: the person's next
+   * step, set apart as the card's main thing, with how a chat of the tool
+   * listens where that was verified; or, connected by MCP alone, that it
+   * cannot listen.
    */
-  private listening(handshake: Extract<Handshake, { state: "connected" }>): HTMLElement {
+  private listening(
+    handshake: Extract<Handshake, { state: "connected" }>,
+    run: ReadonlySet<string>,
+  ): [HTMLElement[], HTMLElement[]] {
     const { name, chatListens, mcpOnly } = this.tool;
     const { listening, heard } = handshake;
-    if (listening === null) return make("p", "Cannot tell right now whether it is listening.", "listen");
-    if (listening) return heardLines(heard, !mcpOnly);
+    if (listening === null) return [[make("p", "Cannot tell right now whether it is listening.", "listen")], []];
+    if (listening || run.size > 0) return heardLines(heard, !mcpOnly, run);
     const step = make("div", "", "next-step");
     step.setAttribute("role", "group");
     step.setAttribute("aria-label", `Next: have ${name} listen`);
@@ -445,7 +472,7 @@ export class ToolCard {
           "next-said",
         ),
       );
-      return step;
+      return [[step], []];
     }
     step.append(
       make(
@@ -465,7 +492,7 @@ export class ToolCard {
           "next-said",
         ),
       );
-    return step;
+    return [[step], []];
   }
 }
 
@@ -477,9 +504,16 @@ export class ToolCard {
  * listening to projects only, another is added from a chat in its folder
  * (`mayAdd`: not for a tool connected by MCP alone, which cannot listen).
  * A page of an older server says nothing of what listens: then only that
- * it listens.
+ * it listens. What Quadit's runner holds, and the projects `run` it serves,
+ * are not said here: Run by Quadit's lines say them, and a runner is no chat;
+ * while it serves one, how a chat adds another project goes under those
+ * lines (the second list). Nothing to say: no lines.
  */
-function heardLines(heard: Heard | undefined, mayAdd: boolean): HTMLElement {
+function heardLines(
+  heard: Heard | undefined,
+  mayAdd: boolean,
+  run: ReadonlySet<string>,
+): [HTMLElement[], HTMLElement[]] {
   const box = make("div", "", "listening");
   const on = (text: string) => {
     const line = make("p", "", "listen on");
@@ -488,19 +522,23 @@ function heardLines(heard: Heard | undefined, mayAdd: boolean): HTMLElement {
   };
   const said = (text: string) => make("p", text, "listen-said");
   if (!heard) {
+    if (run.size > 0) return [[], []];
     box.append(on("Listening"), said("It answers what you assign to it or ask it in Quadit."));
-    return box;
+    return [[box], []];
   }
-  const { listeners, pushed, unheard } = heard;
+  const { pushed } = heard;
+  const listeners = heard.listeners.filter((l) => !l.runner);
+  const byRunner = run.size > 0 || listeners.length < heard.listeners.length;
+  const unheard = heard.unheard.filter((key) => !run.has(key));
   // Everything leaves out a project that listens by itself, and one whose own listener stopped (nothing hears it).
-  const own = listeners.some((l) => l.project) || unheard.length > 0;
+  const own = heard.listeners.some((l) => l.project) || byRunner || heard.unheard.length > 0;
   for (const l of listeners) {
     const what = l.project ? l.project.name : own ? "everything else" : "everything";
     box.append(on(`Listening to ${what}${l.by ? `, from ${l.by}` : ""}`));
   }
   if (pushed) box.append(on("A webhook pushes to it"));
   // Listening to a project the page does not show: only that it listens.
-  if (!box.hasChildNodes()) box.append(on("Listening"));
+  if (!box.hasChildNodes() && !byRunner) box.append(on("Listening"));
   const chats = listeners.filter((l) => l.by === "a chat").length;
   if (chats === 1)
     box.append(
@@ -516,17 +554,18 @@ function heardLines(heard: Heard | undefined, mayAdd: boolean): HTMLElement {
     );
   if (listeners.some((l) => l.by === "a companion"))
     box.append(said("A companion runs in a terminal, and stops with Ctrl-C or when that terminal closes."));
-  // Listening to projects only: how to add another, named when it is the one left.
-  const onlyProjects = !pushed && listeners.length > 0 && listeners.every((l) => l.project);
-  if (mayAdd && onlyProjects && unheard.length > 0)
-    box.append(
-      said(
-        unheard.length === 1
-          ? `To have it listen to ${unheard[0]} too, write “${LISTEN_LINE} for ${unheard[0]}” in a chat in that project’s folder.`
-          : `To have it listen to another project too, write “${LISTEN_LINE}” in a chat in that project’s folder.`,
-      ),
-    );
-  return box;
+  // Listening to projects only (Quadit's runner's among them): how a chat adds another, named when it is the one left.
+  const onlyProjects = !pushed && (listeners.length > 0 || byRunner) && listeners.every((l) => l.project);
+  const another =
+    mayAdd && onlyProjects && unheard.length > 0
+      ? said(
+          unheard.length === 1
+            ? `To have it listen to ${unheard[0]} too, write “${LISTEN_LINE} for ${unheard[0]}” in a chat in that project’s folder.`
+            : `To have it listen to another project too, write “${LISTEN_LINE}” in a chat in that project’s folder.`,
+        )
+      : null;
+  if (another && run.size === 0) box.append(another);
+  return [box.hasChildNodes() ? [box] : [], another && run.size > 0 ? [another] : []];
 }
 
 /**

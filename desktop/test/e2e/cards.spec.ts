@@ -400,3 +400,65 @@ test("a card says nothing of Run by Quadit for a tool Quadit cannot run, nor bef
   await expect(card.getByText("Connect to Quadit K7QX4M")).toBeVisible({ timeout: 10_000 });
   await expect(card.getByText(/^Quadit can start/)).toHaveCount(0);
 });
+
+test("while Quadit runs a project for the agent, the card asks no chat to listen and never calls the runner a chat", async ({
+  page,
+}) => {
+  const ready = {
+    id: "e1",
+    project: "SVA",
+    folder: "~/devel/game",
+    program: "claude",
+    status: { state: "ready" },
+    blocked: [],
+  };
+  // Served, though the server does not say it listens yet: no next step.
+  await open(page, {
+    connected: true,
+    handshake: { state: "connected", listening: false },
+    runs: { agent: "@claude-code", entries: [ready] },
+    slowMs: 0,
+  });
+  const card = page.getByRole("article", { name: "Claude Code" });
+  await expect(card.getByText("Runs SVA in ~/devel/game.")).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByRole("group", { name: "Next: have Claude Code listen" })).toHaveCount(0);
+
+  // The runner holds SVA's listener: no line of its own, nothing of a chat; a chat may still listen to GS.
+  await page.evaluate(() => {
+    (window as unknown as { stand: Stand }).stand.handshake = {
+      state: "connected",
+      listening: true,
+      heard: {
+        listeners: [{ project: { key: "SVA", name: "Samurai vs Aliens" }, by: "Quadit's runner", runner: true }],
+        pushed: false,
+        unheard: ["GS"],
+      },
+    };
+  });
+  await expect(
+    card.getByText("To have it listen to GS too, write “listen to Quadit for GS” in a chat in that project’s folder."),
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByText(/^Listening/)).toHaveCount(0);
+  await expect(card.getByText(/while that chat is open/)).toHaveCount(0);
+
+  // A chat listening to GS keeps its lines.
+  await page.evaluate(() => {
+    (window as unknown as { stand: Stand }).stand.handshake = {
+      state: "connected",
+      listening: true,
+      heard: {
+        listeners: [
+          { project: { key: "SVA", name: "Samurai vs Aliens" }, by: "Quadit's runner", runner: true },
+          { project: { key: "GS", name: "Getting started" }, by: "a chat" },
+        ],
+        pushed: false,
+        unheard: [],
+      },
+    };
+  });
+  await expect(card.getByText("Listening to Getting started, from a chat")).toBeVisible({ timeout: 10_000 });
+  await expect(
+    card.getByText(/^It answers what you assign to it or ask it in Quadit while that chat is open/),
+  ).toBeVisible();
+  await expect(card.getByText("Listening to Samurai vs Aliens, from Quadit's runner")).toHaveCount(0);
+});
