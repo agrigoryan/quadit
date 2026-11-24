@@ -22182,6 +22182,15 @@ SVA Done: 1
  "listening": false
 }
 
+=== GET /api/v1/w/games/listening/OPS/waiting
+403
+{
+ "error": {
+  "code": "forbidden",
+  "message": "this login is @aram's, a person's, not an agent's: a runner runs an agent with its own login"
+ }
+}
+
 === GET /api/v1/w/games/tasks/OPS-1/run-outlook?agents=@ops,@artist,@nobody&cause=comment
 404
 {

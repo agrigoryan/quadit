@@ -748,6 +748,7 @@ func (rw *richWorkspace) reads() []read {
 	add(inWS("/agents", "/agents", "/agents?format=text")...)
 	add(inWS("/agents/connection", "/agents/connection")...)
 	add(inWS("/listening", "/listening")...)
+	add(inWS("/listening/{key}/waiting", "/listening/OPS/waiting")...)
 	add(inWS("/tasks/{ref}/run-outlook", "/tasks/OPS-1/run-outlook?agents=@ops,@artist,@nobody&cause=comment", "/tasks/OPS-2/run-outlook?agents=@ops&cause=assign",
 		"/tasks/OPS-1/run-outlook?agents=@ops&cause=assign", "/tasks/SVA-1/run-outlook?agents=@ops,@artist&cause=comment", "/tasks/OPS-1/run-outlook?agents=@ops&cause=nope",
 		"/tasks/OPS-1/run-outlook?cause=comment", "/tasks/NOPE-1/run-outlook?agents=@ops&cause=comment")...)

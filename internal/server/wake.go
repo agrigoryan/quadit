@@ -1,11 +1,12 @@
 // The wake rule: what Quadit's runner does with one of its agent's inbox
 // items, which decides whose words start the agent's program on a person's
 // computer. It is said here once, for an item handed out (GET /listen) and
-// for one about to be written (the outlook, run_outlook.go). Only the
-// words of the agent's responsible person, or of an agent of theirs that
-// they control, start a run, and only in a change applied in person: what
-// the server writes in someone's name (a rule, a sync, a view's news) never
-// does.
+// for one about to be written (the outlook, run_outlook.go); an item from
+// before the runner began is first held to what still waits
+// (run_waiting.go). Only the words of the agent's responsible person, or of
+// an agent of theirs that they control, start a run, and only in a change
+// applied in person: what the server writes in someone's name (a rule, a
+// sync, a view's news) never does.
 // Any read the rule needs that fails is returned, never decided: the hold
 // that asked hands nothing out.
 
@@ -56,9 +57,11 @@ type wakeItem struct {
 
 // wakeOf decides it for an item handed out: ev is its notification.created
 // event (whose data says whether a rule made it), and the item's row is
-// read as it is stored now (none: it was taken back). A failed read is
-// returned, never decided.
-func (who *viewer) wakeOf(ctx context.Context, agent core.Member, ev core.Event) (wake, error) {
+// read as it is stored now (none: it was taken back). began is where the
+// runner of the listener that hands it out began (Listener.RunnerBeganSeq,
+// 0 for none): an item from before then that no longer waits on the agent
+// (waits) is acknowledged. A failed read is returned, never decided.
+func (who *viewer) wakeOf(ctx context.Context, agent core.Member, ev core.Event, began int64) (wake, error) {
 	data, err := ev.Payload()
 	if err != nil {
 		return wake{}, err
@@ -70,7 +73,17 @@ func (who *viewer) wakeOf(ctx context.Context, agent core.Member, ev core.Event)
 		return wake{}, err
 	case !there:
 		return wake{wakeAck, "gone"}, nil
-	case data.Rule != "":
+	}
+	if ev.Seq <= began {
+		_, waiting, err := who.waits(ctx, who.db, agent.UserID, note, ev.ProjectID)
+		if err != nil {
+			return wake{}, err
+		}
+		if !waiting {
+			return wake{wakeAck, "before"}, nil
+		}
+	}
+	if data.Rule != "" {
 		return wake{wakeAck, "rule"}, nil
 	}
 	return who.wakeRule(ctx, agent, wakeItem{typ: note.Type, authorID: note.ActorID, addressed: note.Addressed, entityType: note.EntityType,

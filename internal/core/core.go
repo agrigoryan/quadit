@@ -281,6 +281,12 @@ type Listener struct {
 	// RunnerHolds is whether the lease is the runner's: set by a hold that
 	// names the machine, cleared by any other hold (a chat taking over).
 	RunnerHolds bool `json:"-" db:"runner_holds"`
+	// RunnerBeganSeq is the feed's position when the listener gained a
+	// runner where it had none (0: it has none, or gained it before this was
+	// kept). An item at or before it starts a run only if it still waits on
+	// the agent (agent-runs-contract.md, "The runner takes what waits").
+	// Cleared with the mark.
+	RunnerBeganSeq int64 `json:"-" db:"runner_began_seq"`
 }
 
 // LeaseLives reports whether the listener's lease lives at now (Unix ms):

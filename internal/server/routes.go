@@ -59,6 +59,7 @@ func (s *Server) allRoutes() []route {
 		s.connectRoutes(),        // connect_codes.go
 		s.listenerRoutes(),       // listener.go
 		s.runOutlookRoutes(),     // run_outlook.go
+		s.runWaitingRoutes(),     // run_waiting.go
 		s.webhookRoutes(),        // dispatch.go
 		s.githubRoutes(),         // github.go
 		s.secretRoutes(),         // secrets.go

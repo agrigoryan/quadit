@@ -36,6 +36,14 @@ const runnerOf = "machine_id=3f9c0a7d5e21b864&machine_name=Aram%27s+MacBook+Pro&
 
 func newRunner(t *testing.T, st store.Store) *aRunner {
 	t.Helper()
+	r := beforeTheRunner(t, st)
+	r.hold(t, "")
+	return r
+}
+
+// beforeTheRunner is newRunner's site before its runner's first hold.
+func beforeTheRunner(t *testing.T, st store.Store) *aRunner {
+	t.Helper()
 	s := newSite(t, st)
 	r := &aRunner{site: s, st: st, claude: s.agentToken(t, "claude"), codex: s.agentToken(t, "codex")}
 	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
@@ -48,7 +56,6 @@ func newRunner(t *testing.T, st store.Store) *aRunner {
 	}
 	r.claudeID = claude.UserID
 	r.bea, r.beaID = s.invitedPerson(t)
-	r.hold(t, "")
 	return r
 }
 
