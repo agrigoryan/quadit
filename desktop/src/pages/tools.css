@@ -885,6 +885,31 @@ dialog.sheet[open] {
   margin: 0;
 }
 
+/* The same content in the flow of a page that is itself the dialog (Connect agents' sheet of one agent). */
+.sheet.inline {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--rule);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.sheet.inline .sheet-h {
+  padding: 16px 18px 14px;
+}
+
+.sheet.inline .sheet-b {
+  padding: 16px 18px;
+}
+
+.sheet.inline .sheet-f {
+  padding: 12px 18px;
+}
+
 .sheet-h {
   /* Below the window's buttons' strip, which the page under keeps for dragging. */
   padding: max(24px, env(titlebar-area-height, 0px)) 28px 18px;

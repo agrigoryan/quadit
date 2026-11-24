@@ -25,6 +25,12 @@ export interface SheetSetup {
   action?: { label: string; run(planId: string): Promise<{ ok: true } | Refused> };
   /** The sheet closed, by any of its ways. */
   closed?(): void;
+  /**
+   * Shows it inside `within` instead, in the flow of the page and not over
+   * it (Connect agents opened at one agent is itself the dialog): no
+   * backdrop and no modal, the rest the same.
+   */
+  within?: HTMLElement;
 }
 
 /** The sheet open now, so that a second replaces it. */
@@ -39,7 +45,7 @@ export function openSheet(setup: SheetSetup) {
   const { tool, kind } = setup;
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-  const sheet = make("dialog", "", "sheet");
+  const sheet = setup.within ? make("div", "", "sheet inline") : make("dialog", "", "sheet");
   sheet.setAttribute("aria-labelledby", "sheet-title");
 
   const head = make("div", "", "sheet-h");
@@ -68,7 +74,7 @@ export function openSheet(setup: SheetSetup) {
   const close = () => {
     if (open !== handle) return;
     open = null;
-    sheet.close();
+    if (sheet instanceof HTMLDialogElement) sheet.close();
     sheet.remove();
     opener?.focus();
     setup.closed?.();
@@ -84,8 +90,10 @@ export function openSheet(setup: SheetSetup) {
   sheet.addEventListener("click", (event) => {
     if (event.target === sheet) close();
   });
-  document.body.append(sheet);
-  sheet.showModal();
+  if (sheet instanceof HTMLDialogElement) {
+    document.body.append(sheet);
+    sheet.showModal();
+  } else setup.within?.append(sheet);
   closeButton.focus();
 
   const load = async () => {

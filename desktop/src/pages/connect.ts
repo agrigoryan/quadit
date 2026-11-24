@@ -14,16 +14,20 @@
 // A redraw keeps each tool's card and changes it in place: its nodes are
 // replaced only when what it shows changes, so focus, a selection or a click
 // in it survive the redraw after a Connect or a Disconnect.
-// Opened by a page at one of its agents (ConnectTarget's focus), it shows
-// the card of the tool that works as that agent, focused and ready for what
-// the page meant (Run by Quadit's choice, or the Disconnect sheet), or, with
-// none and to connect, says that agent at the top and makes a Connect use it
-// until it closes. It only prepares: the person still does it.
+// Opened by a page at one of its agents (ConnectTarget's focus), it is a
+// sheet of that agent alone over the page, as a dialog of that page's card
+// (focus-sheet.ts): the card of the tool that works as that agent, focused
+// and ready for what the page meant (Run by Quadit's choice, or the
+// Disconnect content in its place), or, with none and to connect, that agent
+// said and the cards that could work as it, a Connect using it until the
+// page closes. "All agents on this computer" turns it into the whole page;
+// a click outside closes it. It only prepares: the person still does it.
 
 import { button, element, make, separated } from "@/pages/dom";
 import { openSheet } from "@/pages/files-sheet";
 import { letInputIn } from "@/pages/hold-input";
 import { listenSteps } from "@/pages/listen-steps";
+import { type Sheet, sheetOf } from "@/pages/focus-sheet";
 import { HERE, tile, ToolCard } from "@/pages/tool-card";
 import { defaultChoice, handleOf } from "@/shared/default-choice";
 import { defaultLoginWords } from "@/shared/change-words";
@@ -75,6 +79,10 @@ let harnesses: HarnessView[] = [];
 let focused = -1;
 /** The agent a Connect makes a tool work as, as the page that asked chose; null: the usual one. Ends with the page. */
 let connectAs: { id: string; handle: string } | null = null;
+/** The sheet of one agent shown instead of the whole page (focus-sheet.ts); null: the whole page. */
+let sheet: Sheet | null = null;
+/** The tool whose Disconnect content the sheet shows in place of its card, while it does. */
+let disconnecting: string | null = null;
 
 /** The workspace to connect to, once the window's page shows one. */
 function chosen(): { serverId: string; summary: NonNullable<ConnectTarget["summary"]> } | undefined {
@@ -129,12 +137,13 @@ function reviewConnect(h: HarnessView, plan: () => Promise<Planned>) {
  * Shows what disconnecting does in the sheet, whose button does it; resolves
  * with how that went and what the person should know (closed: nothing).
  */
-function reviewDisconnect(h: HarnessView): Promise<Disconnected | Refused> {
+function reviewDisconnect(h: HarnessView, within?: HTMLElement): Promise<Disconnected | Refused> {
   return new Promise((settle) => {
     let done = false;
     openSheet({
       tool: h,
       kind: "disconnect",
+      ...(within ? { within } : {}),
       plan: () => api.planDisconnect(h.id),
       action: {
         label: `Disconnect ${h.name}`,
@@ -424,6 +433,7 @@ async function render() {
     .map((h) => api.toolHandshake(h.id).then((handshake) => void known.set(h.id, handshake)));
   await Promise.race([Promise.all(asked), new Promise((done) => setTimeout(done, FIRST_LOOK_MS))]);
   placeCards(here, addsCommand, known);
+  arrange();
   await showTarget();
   if (!shownOnce) {
     shownOnce = true;
@@ -505,9 +515,37 @@ async function showTarget() {
   openedBy.textContent = target?.openedByPage ? `Opened by ${target.serverName}` : "";
   element("no-workspace").hidden = !!at;
   for (const shown of shownCards.values()) shown.fill?.();
-  if (target?.focus && target.focus.id !== focused) {
-    focused = target.focus.id;
-    whenInputIn(() => goTo(target?.focus));
+  const focus = target?.focus;
+  if (focus && focus.id !== focused) {
+    focused = focus.id;
+    // Which cards the sheet holds is decided now, once: a card that connects there stays in it.
+    sheet = sheetOf(
+      focus,
+      harnesses
+        .filter((h) => h.installed || h.connected)
+        .map((h) => ({ id: h.id, found: h.installed, setUp: !!h.connected, defaultLogin: workingAs(h) !== null })),
+      HERE,
+    );
+    connectAs = sheet?.connectAs ?? null;
+    const line = element("focus-line");
+    line.textContent = sheet?.line ?? "";
+    line.hidden = !sheet?.line;
+    arrange();
+    whenInputIn(() => goTo(focus));
+  }
+  document.body.classList.remove("starting");
+}
+
+/**
+ * Shows the sheet of one agent (sheet) or the whole page: in the sheet, only
+ * its cards, the one whose Disconnect content shows in its place left out;
+ * each card says the agent a Connect makes it work as, when one was chosen.
+ */
+function arrange() {
+  document.body.classList.toggle("sheet-mode", sheet !== null);
+  for (const [id, shown] of shownCards) {
+    shown.card.element.hidden = (sheet !== null && !sheet.tools.includes(id)) || disconnecting === id;
+    shown.card.setConnectAs(connectAs?.handle ?? null);
   }
 }
 
@@ -518,27 +556,26 @@ function whenInputIn(then: () => void) {
 }
 
 /**
- * Does what the page that asked for Connect agents wanted (`focus`): the
- * card of the tool that works as its agent, brought forward, with Run by
- * Quadit's choice or the Disconnect sheet open for `run` or `disconnect`;
- * with none, and to connect, its agent said at the top and used by a Connect.
+ * Does what the page that asked for Connect agents wanted (`focus`) with the
+ * card of the tool that works as its agent: brought forward, with Run by
+ * Quadit's choice open for `run`, or its Disconnect content in its place
+ * (in the sheet; over the page on the whole page) for `disconnect`.
  */
-function goTo(focus: ConnectFocusView | undefined) {
-  if (!focus) return;
+function goTo(focus: ConnectFocusView) {
   const shown = focus.tool ? shownCards.get(focus.tool) : undefined;
   const h = harnesses.find((one) => one.id === focus.tool);
-  if (shown && h) {
-    shown.card.bringForward();
-    if (focus.intent === "run") shown.card.openRun();
-    else if (focus.intent === "disconnect" && shown.card.isSetUp) void reviewDisconnect(h);
-    return;
+  if (!shown || !h) return;
+  shown.card.bringForward();
+  if (focus.intent === "run") shown.card.openRun();
+  else if (focus.intent === "disconnect" && shown.card.isSetUp) {
+    if (!sheet) return void reviewDisconnect(h);
+    disconnecting = h.id;
+    arrange();
+    void reviewDisconnect(h, element("inline")).then(() => {
+      disconnecting = null;
+      arrange();
+    });
   }
-  if (focus.intent !== "connect" || !focus.agent) return;
-  connectAs = focus.agent;
-  const line = element("focus-line");
-  line.textContent = `Choose what should work as @${focus.agent.handle} on ${HERE}.`;
-  line.hidden = false;
-  for (const one of shownCards.values()) one.card.setConnectAs(focus.agent.handle);
 }
 
 // The steps to an agent that answers, and the other ways, named so a person who wants one knows it is there:
@@ -551,7 +588,16 @@ how.append(
     "how-other",
   ),
 );
+how.classList.add("full-only");
 element("tools").prepend(how);
+// The sheet of one agent: the whole page at a click, closed by a click outside it.
+element("all-agents").addEventListener("click", () => {
+  sheet = null;
+  arrange();
+});
+document.addEventListener("click", (event) => {
+  if (sheet && (event.target === document.body || event.target === document.documentElement)) void api.closeConnect();
+});
 element("backups").addEventListener("click", () => void api.showBackups());
 element("done").addEventListener("click", () => void api.closeConnect());
 // Escape goes back to the page under this one; with the sheet open, it closes the sheet (files-sheet.ts).

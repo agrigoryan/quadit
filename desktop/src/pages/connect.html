@@ -10,7 +10,8 @@
     <link rel="stylesheet" href="pages.css" />
     <link rel="stylesheet" href="tools.css" />
   </head>
-  <body>
+  <!-- "starting": shown once it knows whether it is the whole page or the sheet of one agent (connect.ts). -->
+  <body class="starting">
     <div class="window-strip"></div>
     <!-- Inert until the page has shown what it shows (src/pages/hold-input.ts). -->
     <main id="connect" class="page connect" aria-labelledby="connect-title" inert>
@@ -19,9 +20,9 @@
         <button id="done" type="button" class="btn btn-line btn-sm">Done</button>
       </header>
       <p id="opened-by" class="opened-by" hidden></p>
-      <p id="where" class="hint"></p>
+      <p id="where" class="hint full-only"></p>
       <p id="focus-line" class="notice" hidden></p>
-      <p class="hint">
+      <p class="hint full-only">
         Connect an agent here, then tell it to listen from a chat. You can see every file connecting changes first, and
         Disconnect takes it back.
       </p>
@@ -32,20 +33,24 @@
 
       <section id="tools" aria-label="Agents">
         <p id="no-workspace" class="notice" hidden>Open a workspace in this window first.</p>
-        <ul id="notices" class="list"></ul>
-        <p id="none-found" class="notice" hidden>
+        <ul id="notices" class="list full-only"></ul>
+        <p id="none-found" class="notice full-only" hidden>
           No AI tools found on this computer. Quadit works with Claude Code, Codex, Gemini CLI and others: install one,
           then come back here.
         </p>
         <div id="cards" class="tools"></div>
-        <p id="others" class="others"></p>
-        <details id="all-tools" hidden>
+        <div id="inline"></div>
+        <p id="others" class="others full-only"></p>
+        <details id="all-tools" class="full-only" hidden>
           <summary>Show all AI tools</summary>
           <ul id="all-harnesses" class="list"></ul>
         </details>
         <p id="result" class="notice" role="status" hidden></p>
-        <p id="cli" class="hint"></p>
-        <button id="backups" type="button" class="quiet">Show backups</button>
+        <p id="cli" class="hint full-only"></p>
+        <button id="backups" type="button" class="quiet full-only">Show backups</button>
+        <p class="sheet-only all-agents">
+          <button id="all-agents" type="button" class="link-blue">All agents on this computer</button>
+        </p>
       </section>
     </main>
     <script src="connect.js"></script>

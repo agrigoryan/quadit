@@ -32,6 +32,8 @@ interface Stand {
   focus?: unknown;
   /** The choices the page planned a Connect with. */
   planned?: unknown[];
+  /** The page asked to be taken away. */
+  closed?: boolean;
   /** How long connectState takes, as the app's does while it asks the login shell and quadit. */
   slowMs: number;
   asks: number;
@@ -146,7 +148,9 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
         },
         onChanged() {},
         showBackups: async () => {},
-        closeConnect: async () => {},
+        closeConnect: async () => {
+          state.closed = true;
+        },
       };
     },
     { ...stand, asks: 0, targets: 0 },
@@ -566,7 +570,7 @@ test("opened at an agent's card to run it, the card is in view and focused, with
   expect(await page.evaluate(() => (window as unknown as { stand: Stand }).stand.started)).toBeUndefined();
 });
 
-test("opened at an agent's card to disconnect it, the Disconnect sheet is open for the person to confirm", async ({
+test("opened at an agent's card to disconnect it, the sheet holds what disconnecting does, for the person to confirm", async ({
   page,
 }) => {
   await open(page, {
@@ -575,9 +579,15 @@ test("opened at an agent's card to disconnect it, the Disconnect sheet is open f
     focus: { id: 1, intent: "disconnect", tool: "claude" },
     slowMs: 0,
   });
-  const sheet = page.getByRole("dialog");
-  await expect(sheet.getByRole("button", { name: "Disconnect Claude Code" })).toBeVisible({ timeout: 10_000 });
+  // In the sheet itself, in the card's place: no sheet over the sheet.
+  await expect(page.getByRole("button", { name: "Disconnect Claude Code" }).last()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("What disconnecting Claude Code changes")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("article", { name: "Claude Code" })).toBeHidden();
   expect(await page.evaluate(() => (window as unknown as { stand: Stand }).stand.connected)).toBe(true);
+  // Closed without disconnecting: the card is back, in the sheet.
+  await page.getByRole("button", { name: "Close", exact: true }).last().click();
+  await expect(page.getByRole("article", { name: "Claude Code" })).toBeVisible();
 });
 
 test("opened at an agent's card with nothing more to do, the card is brought forward and focused", async ({ page }) => {
@@ -612,4 +622,44 @@ test("opened to connect an agent no tool works as here, it says which, and a car
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { stand: Stand }).stand.planned))
     .toEqual([expect.objectContaining({ harness: "claude", agent: { id: helper } })]);
+});
+
+test("opened at an agent, it is a sheet of that agent alone over the page: the whole page at a click, closed by a click outside", async ({
+  page,
+}) => {
+  await open(page, {
+    connected: true,
+    handshake: { state: "connected", listening: false, owner: ME },
+    focus: { id: 1, intent: "connect", tool: "claude" },
+    slowMs: 0,
+  });
+  await expect(page.getByRole("article", { name: "Claude Code" })).toBeFocused({ timeout: 10_000 });
+  const steps = page.getByRole("region", { name: "To have an agent answer you in Quadit" });
+  await expect(steps).toBeHidden();
+  await expect(page.getByText(/^Connect an agent here, then tell it to listen/)).toBeHidden();
+
+  await page.getByRole("button", { name: "All agents on this computer" }).click();
+  await expect(steps).toBeVisible();
+  await expect(page.getByRole("button", { name: "All agents on this computer" })).toBeHidden();
+});
+
+test("a click outside the sheet of one agent closes it; nothing is done", async ({ page }) => {
+  await open(page, {
+    connected: true,
+    handshake: { state: "connected", listening: false, owner: ME },
+    focus: { id: 1, intent: "connect", tool: "claude" },
+    slowMs: 0,
+  });
+  await expect(page.getByRole("article", { name: "Claude Code" })).toBeFocused({ timeout: 10_000 });
+  await page.mouse.click(5, 300);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { stand: Stand }).stand.closed)).toBe(true);
+  expect(await page.evaluate(() => (window as unknown as { stand: Stand }).stand.connected)).toBe(true);
+});
+
+test("opened without an agent, it is the whole page as before", async ({ page }) => {
+  await open(page, { connected: true, handshake: { state: "connected", listening: false, owner: ME }, slowMs: 0 });
+  await expect(page.getByRole("region", { name: "To have an agent answer you in Quadit" })).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByRole("button", { name: "All agents on this computer" })).toBeHidden();
 });
