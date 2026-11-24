@@ -152,6 +152,21 @@ describe("Requests", () => {
     await expect(answer).resolves.toEqual({ ok: true });
   });
 
+  it("lets the panel's Stop of a run open now go to the workspace that offered it", async () => {
+    const { requests, page, lastTo } = setUp();
+    page(1, "s1");
+    const run = { agent: "@claude", key: "SVA-1", title: "Boss", state: "Working", since: 1, path: "/x" };
+    requests.publish(1, "s1", {
+      ...summaryOf("acme"),
+      working: { items: [{ ...run, stop: { label: "Stop", request: "stop:r1" } }], more: 0 },
+    });
+    const answer = requests.act("s1", "acme", { request: "stop:r1" });
+    expect(lastTo(1)?.request).toEqual({ kind: "action", request: "stop:r1" });
+    requests.answer(1, { id: lastTo(1)?.id, outcome: { ok: true } });
+    await expect(answer).resolves.toEqual({ ok: true });
+    await expect(requests.act("s1", "acme", { request: "stop:r2" })).resolves.toMatchObject({ ok: false });
+  });
+
   it("lists one summary per workspace, the newest publisher's, and says when one changes", () => {
     const { requests, page, changes } = setUp();
     page(1, "s1", "acme");

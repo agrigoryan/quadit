@@ -136,15 +136,18 @@ export class Requests {
 
   /**
    * The panel's button: `action.request` must be one of the actions the
-   * workspace's summary offers, so a request goes only to the server that
-   * made it, whatever the panel was told.
+   * workspace's summary offers (a decision's answers, a run's Stop), so a
+   * request goes only to the server that made it, whatever the panel was told.
    */
   act(serverId: string, workspaceId: string, action: { request: string; text?: string }): Promise<Answer> {
     const summary = this.summaries().find(
       (s) => s.serverId === serverId && s.summary.workspace.id === workspaceId,
     )?.summary;
-    const offered = summary?.waiting.some((item) => item.actions.some((a) => a.request === action.request));
-    if (!offered) return Promise.resolve({ ok: false, message: "That decision is no longer waiting on you." });
+    const offered = [
+      ...(summary?.waiting.flatMap((item) => item.actions) ?? []),
+      ...(summary?.working?.items.flatMap((run) => (run.stop ? [run.stop] : [])) ?? []),
+    ].some((a) => a.request === action.request);
+    if (!offered) return Promise.resolve({ ok: false, message: "That is no longer in the panel: it changed since." });
     return this.toWorkspace(serverId, workspaceId, {
       kind: "action",
       request: action.request,
