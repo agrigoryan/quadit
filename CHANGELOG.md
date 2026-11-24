@@ -8,7 +8,7 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 - Listening by project: `quadit wait project=KEY` and `quadit listen project=KEY` listen to one project, and the lines `wait` prints keep it. One session listens to each project at a time, and one to everything else; a project once listened to by itself keeps its items for its next listener instead of handing them to everything, until `quadit listening forget project=KEY` (`DELETE /listening/{key}`) gives them back. `quadit listening` says what listens to each project and what everything leaves out; against an older server, a wait with `project=` stops and says to listen without it.
 - `GET /agents/connection`, `GET /agents` and the dashboard's agents carry `listeners` (`[{project_id, project, by, last_heard, live}]`), `listening_projects` and `listening_outside_projects`.
-- The skill picks what a chat listens to: the project the person named, else the one the repository's instruction file for agents names, else the agent's only project, else it asks once, with everything as a choice.
+- The skill picks what a chat listens to: the project the person named, else the one the repository's instruction file for agents names, else everything when the agent has one project or none, else it asks once, with everything as a choice.
 
 ### Changed
 
