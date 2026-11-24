@@ -97,7 +97,8 @@ export type DesktopOutcome =
       codeGone?: boolean;
       /**
        * What listens as the agent (agent-state): each live listener, of a
-       * project (its key and name) or, without one, of everything else, and
+       * project (its key, a project key, and its name, shown as text only)
+       * or, without one, of everything else, and
        * what holds it in its own words ("a chat"); whether a webhook pushes
        * to it; the projects (keys) nothing hears now.
        */
@@ -309,6 +310,19 @@ export function summaryOf(raw: unknown): DesktopSummary | null {
   });
 }
 
+/**
+ * A project key, as the server makes them (2 to 10 upper-case letters or
+ * digits, starting with a letter): the only text of a page's that goes into
+ * a line the person is told to write in their agent ("listen to Quadit for
+ * SVA"), so a page cannot put words of its own there.
+ */
+const PROJECT_KEY = /^[A-Z][A-Z0-9]{1,9}$/;
+
+function projectKey(raw: unknown): string {
+  if (typeof raw !== "string" || !PROJECT_KEY.test(raw)) throw refused;
+  return raw;
+}
+
 /** `raw` as a page's answer to a request, as fresh plain data, or null when it is none. */
 export function outcomeOf(raw: unknown): DesktopOutcome | null {
   return kept((): DesktopOutcome => {
@@ -358,14 +372,14 @@ export function outcomeOf(raw: unknown): DesktopOutcome | null {
           return defined({
             project: optional(l.project, (p) => {
               const project = record(p);
-              return { key: exact(project.key, ID_MAX), name: shown(project.name, TITLE_MAX) };
+              return { key: projectKey(project.key), name: shown(project.name, TITLE_MAX) };
             }),
             by: optional(l.by, (b) => shown(b, LABEL_MAX)),
           });
         }),
       ),
       pushed: optional(pushed, flag),
-      unheard: optional(unheard, (v) => list(v, PROJECTS_MAX, (key) => exact(key, ID_MAX))),
+      unheard: optional(unheard, (v) => list(v, PROJECTS_MAX, projectKey)),
     });
   });
 }
