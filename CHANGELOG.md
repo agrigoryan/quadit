@@ -15,7 +15,8 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 - The Agents page and Settings → Agents say what runs an agent ("Runs SVA on Aram's MacBook Pro, in ~/devel/game, with Claude Code") and whether it is ready, working on a task, paused and why, offline, or set aside while a chat listens. `GET /listening`, `GET /agents`, `GET /agents/connection` and the dashboard's agents carry `runner` for such a listener, and `quadit listening` names it ("SVA: Quadit's runner on Aram's MacBook Pro listens"); `DELETE /listening/{key}/runner` lets a computer's runner go; `GET /me` carries `workspace.id`.
 - The desktop app's Run by Quadit, on the card of a connected Claude Code or Codex that works with an agent's own login, for any server: pick one of the agent's projects and its folder, and the app runs its own `quadit run` and shows what each entry does, with Stop running and Show log.
 - The skill's "Started by Quadit": an agent Quadit started works for the person its prompt names and their agents, does the work in the folder, asks through decisions and ends its turn, and ends each run with one result or one comment.
-- `scripts/agent-run-check.sh claude|codex` checks runs by hand with the real program on a throwaway server, one PASS or FAIL line per step.
+- `scripts/agent-run-check.sh claude|codex` checks runs by hand with the real program on a throwaway server, one PASS or FAIL line per step. The reading of both programs' output is tested against real output of Claude Code 2.1.331 and Codex 0.170.0.
+- A runner's entry pauses when the program's own settings, the user's or the project folder's, could make it work as another Quadit login.
 
 ### Changed
 
