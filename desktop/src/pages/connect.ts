@@ -14,16 +14,22 @@
 // A redraw keeps each tool's card and changes it in place: its nodes are
 // replaced only when what it shows changes, so focus, a selection or a click
 // in it survive the redraw after a Connect or a Disconnect.
+// Opened by a page at one of its agents (ConnectTarget's focus), it shows
+// the card of the tool that works as that agent, focused and ready for what
+// the page meant (Run by Quadit's choice, or the Disconnect sheet), or, with
+// none and to connect, says that agent at the top and makes a Connect use it
+// until it closes. It only prepares: the person still does it.
 
 import { button, element, make, separated } from "@/pages/dom";
 import { openSheet } from "@/pages/files-sheet";
 import { letInputIn } from "@/pages/hold-input";
 import { listenSteps } from "@/pages/listen-steps";
-import { tile, ToolCard } from "@/pages/tool-card";
+import { HERE, tile, ToolCard } from "@/pages/tool-card";
 import { defaultChoice, handleOf } from "@/shared/default-choice";
 import { defaultLoginWords } from "@/shared/change-words";
 import type {
   ConnectChoice,
+  ConnectFocusView,
   ConnectTarget,
   ConnectView,
   Disconnected,
@@ -63,6 +69,12 @@ interface Shown {
 const shownCards = new Map<string, Shown>();
 /** Whether the page has shown its cards yet: input is let in once it has. */
 let shownOnce = false;
+/** The harnesses as the last look found them. */
+let harnesses: HarnessView[] = [];
+/** The number of the last focus done (ConnectFocusView): each once. */
+let focused = -1;
+/** The agent a Connect makes a tool work as, as the page that asked chose; null: the usual one. Ends with the page. */
+let connectAs: { id: string; handle: string } | null = null;
 
 /** The workspace to connect to, once the window's page shows one. */
 function chosen(): { serverId: string; summary: NonNullable<ConnectTarget["summary"]> } | undefined {
@@ -146,6 +158,14 @@ function reviewDisconnect(h: HarnessView): Promise<Disconnected | Refused> {
   });
 }
 
+/** The plan of a Connect of `h` with its defaults, but working as the agent `agent` where a choice of agent holds. */
+function planAs(h: HarnessView, agent: string): Promise<Planned> {
+  const at = chosen();
+  if (!at) return Promise.resolve(NO_WORKSPACE);
+  const choice = defaultChoice(h, at.serverId, at.summary);
+  return api.planConnect(choice.agent ? { ...choice, agent: { id: agent } } : choice);
+}
+
 /** A new card for `h`, set up or not as `h` says, with where it stands when known (`handshake`). */
 function newCard(h: HarnessView, made: string, addsCommand: boolean, handshake: Handshake | null): Shown {
   const plainPlan = (): Promise<Planned> => {
@@ -156,7 +176,7 @@ function newCard(h: HarnessView, made: string, addsCommand: boolean, handshake: 
   const tool = { ...h, ownLogin: h.cliIdentity === "own", worksAs: workingAs(h), mcpOnly: mcpOnly(h) };
   const card: ToolCard = new ToolCard(tool, addsCommand, {
     connect: async () => {
-      const planned = await plainPlan();
+      const planned = await (connectAs ? planAs(h, connectAs.id) : plainPlan());
       if (!planned.ok) return planned;
       const done = await api.applyConnect(planned.plan.id);
       if (!done.ok) return done;
@@ -172,6 +192,7 @@ function newCard(h: HarnessView, made: string, addsCommand: boolean, handshake: 
     changed: () => {},
   });
   card.markSetUp(!!h.connected, handshake);
+  card.setConnectAs(connectAs?.handle ?? null);
   const left = takenBack.get(h.id);
   if (h.connected) takenBack.delete(h.id);
   else if (left) card.takenBack(left);
@@ -391,6 +412,7 @@ async function render() {
         ]
       : []),
   );
+  harnesses = view.harnesses;
   const here = view.harnesses.filter((h) => h.installed || h.connected);
   const away = view.harnesses.filter((h) => !h.installed && !h.connected);
   const addsCommand = !view.cli.found && view.cli.linkInto !== null;
@@ -483,6 +505,40 @@ async function showTarget() {
   openedBy.textContent = target?.openedByPage ? `Opened by ${target.serverName}` : "";
   element("no-workspace").hidden = !!at;
   for (const shown of shownCards.values()) shown.fill?.();
+  if (target?.focus && target.focus.id !== focused) {
+    focused = target.focus.id;
+    whenInputIn(() => goTo(target?.focus));
+  }
+}
+
+/** Runs `then` once the page takes input (hold-input.ts: a moment after a server's page opened it). */
+function whenInputIn(then: () => void) {
+  if (element("connect").inert) setTimeout(() => whenInputIn(then), 100);
+  else then();
+}
+
+/**
+ * Does what the page that asked for Connect agents wanted (`focus`): the
+ * card of the tool that works as its agent, brought forward, with Run by
+ * Quadit's choice or the Disconnect sheet open for `run` or `disconnect`;
+ * with none, and to connect, its agent said at the top and used by a Connect.
+ */
+function goTo(focus: ConnectFocusView | undefined) {
+  if (!focus) return;
+  const shown = focus.tool ? shownCards.get(focus.tool) : undefined;
+  const h = harnesses.find((one) => one.id === focus.tool);
+  if (shown && h) {
+    shown.card.bringForward();
+    if (focus.intent === "run") shown.card.openRun();
+    else if (focus.intent === "disconnect" && shown.card.isSetUp) void reviewDisconnect(h);
+    return;
+  }
+  if (focus.intent !== "connect" || !focus.agent) return;
+  connectAs = focus.agent;
+  const line = element("focus-line");
+  line.textContent = `Choose what should work as @${focus.agent.handle} on ${HERE}.`;
+  line.hidden = false;
+  for (const one of shownCards.values()) one.card.setConnectAs(focus.agent.handle);
 }
 
 // The steps to an agent that answers, and the other ways, named so a person who wants one knows it is there:

@@ -162,6 +162,10 @@ export class RunByQuadit {
   private more: HTMLParagraphElement;
   private another: HTMLButtonElement;
   private error: HTMLParagraphElement;
+  /** Whether the card has said what Quadit runs (show) at least once. */
+  private known = false;
+  /** The choice is to open once it is offered (want). */
+  private wanted = false;
   /** Who answers for the agent; null: not known, and nothing is offered. */
   private owner: Owner | null = null;
   /** Why nothing is offered, or nothing is shown (the list unreadable): one quiet line. */
@@ -192,7 +196,23 @@ export class RunByQuadit {
     this.quiet = make("p", "", "run-said");
     section.append(this.offer, this.list, this.more, this.quiet, this.error);
     this.element = section;
-    this.show(null, null);
+    this.element.hidden = true;
+  }
+
+  /**
+   * Opens the choice as soon as it is offered (a page asked for it: Connect
+   * agents opened to run this agent), once what Quadit runs is known; when
+   * it is not offered then, nothing.
+   */
+  want() {
+    this.wanted = true;
+    if (this.known) this.settleWant();
+  }
+
+  private settleWant() {
+    if (!this.wanted) return;
+    this.wanted = false;
+    if (this.runs && this.owner && !this.runs.unreadable) this.choose();
   }
 
   /**
@@ -203,9 +223,11 @@ export class RunByQuadit {
   show(runs: RunsView | null, owner: Owner | null) {
     this.runs = runs;
     this.owner = owner;
+    this.known = true;
     this.element.hidden = runs === null;
     if (!runs) {
       this.close();
+      this.settleWant();
       return;
     }
     const { entries, agent } = runs;
@@ -256,6 +278,7 @@ export class RunByQuadit {
     });
     this.place();
     if (focusLost) (entries.length > 0 ? this.another : this.offerButton).focus();
+    this.settleWant();
   }
 
   /**

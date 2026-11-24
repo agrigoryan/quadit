@@ -28,6 +28,10 @@ interface Stand {
   /** What the page asked Quadit to start and stop running. */
   started?: string[][];
   stopped?: string[];
+  /** Where the page that asked wants Connect agents (ConnectFocusView); absent: none. */
+  focus?: unknown;
+  /** The choices the page planned a Connect with. */
+  planned?: unknown[];
   /** How long connectState takes, as the app's does while it asks the login shell and quadit. */
   slowMs: number;
   asks: number;
@@ -57,9 +61,20 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
       };
       const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
       (window as unknown as { quaditPages: unknown }).quaditPages = {
+        planConnect: async (choice: unknown) => {
+          state.planned = [...(state.planned ?? []), choice];
+          return { ok: true, plan };
+        },
+        applyConnect: async () => ({ ok: true, hint: "" }),
         connectTarget: async () => {
           state.targets++;
-          return { serverId: "s1", serverName: "Work", summary, openedByPage: false };
+          return {
+            serverId: "s1",
+            serverName: "Work",
+            summary,
+            openedByPage: false,
+            ...(state.focus ? { focus: state.focus } : {}),
+          };
         },
         connectState: async () => {
           await wait(state.slowMs);
@@ -531,4 +546,70 @@ test("a card says when it cannot read what Quadit runs, rather than offering to 
     card.getByText(`Quadit could not read which projects it runs on ${HERE}. It tries again in a moment.`),
   ).toBeVisible({ timeout: 10_000 });
   await expect(card.getByRole("button", { name: "Run Claude Code by Quadit for a project" })).toBeHidden();
+});
+
+test("opened at an agent's card to run it, the card is in view and focused, with Run by Quadit's choice open", async ({
+  page,
+}) => {
+  await open(page, {
+    connected: true,
+    handshake: { state: "connected", listening: false, owner: ME },
+    runs: { agent: "@claude-code", entries: [] },
+    focus: { id: 1, intent: "run", tool: "claude", agent: { id: "u2", handle: "claude-code" } },
+    slowMs: 0,
+  });
+  const card = page.getByRole("article", { name: "Claude Code" });
+  await expect(card.getByLabel("Which project?")).toBeFocused({ timeout: 10_000 });
+  await expect(card.getByRole("button", { name: "Start running" })).toBeDisabled();
+  await expect(card).toBeInViewport();
+  // It only prepares: nothing started.
+  expect(await page.evaluate(() => (window as unknown as { stand: Stand }).stand.started)).toBeUndefined();
+});
+
+test("opened at an agent's card to disconnect it, the Disconnect sheet is open for the person to confirm", async ({
+  page,
+}) => {
+  await open(page, {
+    connected: true,
+    handshake: { state: "connected", listening: false, owner: ME },
+    focus: { id: 1, intent: "disconnect", tool: "claude" },
+    slowMs: 0,
+  });
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByRole("button", { name: "Disconnect Claude Code" })).toBeVisible({ timeout: 10_000 });
+  expect(await page.evaluate(() => (window as unknown as { stand: Stand }).stand.connected)).toBe(true);
+});
+
+test("opened at an agent's card with nothing more to do, the card is brought forward and focused", async ({ page }) => {
+  await open(page, {
+    connected: true,
+    handshake: { state: "connected", listening: false, owner: ME },
+    focus: { id: 1, intent: "connect", tool: "claude" },
+    slowMs: 0,
+  });
+  await expect(page.getByRole("article", { name: "Claude Code" })).toBeFocused({ timeout: 10_000 });
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("opened to connect an agent no tool works as here, it says which, and a card's Connect uses that agent", async ({
+  page,
+}) => {
+  const helper = "0190f3a2-7b1c-7d4e-9a0b-1c2d3e4f5a6c";
+  await open(page, {
+    connected: false,
+    handshake: null,
+    focus: { id: 1, intent: "connect", agent: { id: helper, handle: "helper" } },
+    slowMs: 0,
+  });
+  await expect(page.getByText(`Choose what should work as @helper on ${HERE}.`)).toBeVisible({ timeout: 10_000 });
+  const card = page.getByRole("article", { name: "Claude Code" });
+  await expect(
+    card.getByText(
+      "Claude Code will work as @helper, and be able to take tasks, ask you questions and report back here.",
+    ),
+  ).toBeVisible();
+  await card.getByRole("button", { name: "Connect Claude Code" }).click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { stand: Stand }).stand.planned))
+    .toEqual([expect.objectContaining({ harness: "claude", agent: { id: helper } })]);
 });

@@ -39,7 +39,7 @@ const api = window.quaditPages as PagesApi;
 /** How often a set-up card asks where its tool stands: calm, and soon enough to see the tool connect. */
 const ASK_EVERY_MS = 2_000;
 /** What the card calls this computer. */
-const HERE = navigator.userAgent.includes("Macintosh") ? "this Mac" : "this computer";
+export const HERE = navigator.userAgent.includes("Macintosh") ? "this Mac" : "this computer";
 /** The states of an entry Quadit's runner serves: the agent is heard there. */
 const SERVED: ReadonlySet<string> = new Set(["ready", "working", "paused", "aside"]);
 
@@ -103,6 +103,8 @@ export class ToolCard {
   /** Where it stood when the buttons beside its name were last drawn. */
   private actFor = "";
   private addsCommand: boolean;
+  /** The agent a Connect of it makes it work as, chosen by the page that asked for Connect agents; null: the usual one. */
+  private connectAs: string | null = null;
   private asking = false;
   private timer: ReturnType<typeof setInterval> | undefined;
   private tileEl: HTMLSpanElement;
@@ -214,6 +216,30 @@ export class ToolCard {
    * Whether connecting puts the quadit command on this computer too: not
    * once another card's connecting put it there, and the card's line says so.
    */
+  /**
+   * Says the agent (`handle`) a Connect makes the tool work as, in the
+   * card's own words; null: the usual one, said as usual. Not for a tool
+   * that works as this computer's default login, which no choice changes.
+   */
+  setConnectAs(handle: string | null) {
+    const as = this.tool.worksAs ? null : handle;
+    if (this.connectAs === as) return;
+    this.connectAs = as;
+    this.show();
+  }
+
+  /** Brings the card into view and focus, as a page asked (Connect agents opened at its agent). */
+  bringForward() {
+    this.element.tabIndex = -1;
+    this.element.scrollIntoView({ block: "center" });
+    this.element.focus({ preventScroll: true });
+  }
+
+  /** Opens Run by Quadit's choice as soon as it is offered (a page asked to run its agent). */
+  openRun() {
+    this.runs.want();
+  }
+
   setAddsCommand(adds: boolean) {
     if (this.addsCommand === adds) return;
     this.addsCommand = adds;
@@ -353,7 +379,9 @@ export class ToolCard {
       this.gives,
       stands === "connected"
         ? `${tool.name} can now take tasks, ask you questions and report back${where} when you ask it in a chat.`
-        : `${tool.name} will be able to take tasks, ask you questions and report back${where}.`,
+        : this.connectAs && !setUp
+          ? `${tool.name} will work as @${this.connectAs}, and be able to take tasks, ask you questions and report back${where}.`
+          : `${tool.name} will be able to take tasks, ask you questions and report back${where}.`,
     );
     setText(this.diskText, diskLine(tool, this.addsCommand && !setUp, setUp));
 
