@@ -46,3 +46,39 @@ func TestSearchFindsWhatTheReaderMayOpen(t *testing.T) {
 		})
 	})
 }
+
+// TestAQuestionNoLongerNeededIsInTheLogAndNotAnAnswer: the decision log
+// lists a question closed as no longer needed among those settled, and as
+// itself with state=not_needed, saying so in its line; the answers that
+// guide later work (the dashboard's) leave it out.
+func TestAQuestionNoLongerNeededIsInTheLogAndNotAnAnswer(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		key := r.task(t, nil)
+		d := r.change(t, nil, r.claude, "decision.open", M{"task": key, "question": "Which sky?", "options": []M{{"label": "Day"}, {"label": "Night"}}})["ref"]
+		r.change(t, r.owner, "", "decision.close", M{"id": d, "note": "settled in the comments"})
+		var listed struct{ Decisions []struct{ ID, State string } }
+		r.call(t, r.owner, "", "GET", w+"/decisions?state=not_needed", nil, 200, &listed)
+		if len(listed.Decisions) != 1 || listed.Decisions[0].ID != d || listed.Decisions[0].State != "not_needed" {
+			t.Fatalf("state=not_needed lists %+v", listed.Decisions)
+		}
+		r.call(t, r.owner, "", "GET", w+"/decisions", nil, 200, &listed)
+		if len(listed.Decisions) != 1 {
+			t.Fatalf("the settled questions are %+v", listed.Decisions)
+		}
+		text := r.call(t, r.owner, "", "GET", w+"/decisions?format=text", nil, 200, nil)
+		if !strings.Contains(text, `"Which sky?" -> no longer needed: settled in the comments`) {
+			t.Fatalf("the log says\n%s", text)
+		}
+		var dash struct {
+			Decisions []struct{ ID string } `json:"recent_decisions"`
+		}
+		answered := r.change(t, nil, r.claude, "decision.open", M{"task": key, "question": "Which boss?", "options": []M{{"label": "Big"}, {"label": "Small"}}})["ref"]
+		r.change(t, r.owner, "", "decision.pick", M{"id": answered, "option": 1})
+		r.call(t, r.owner, "", "GET", w+"/dashboard", nil, 200, &dash)
+		if len(dash.Decisions) != 1 || dash.Decisions[0].ID != answered {
+			t.Fatalf("the dashboard's recent answers are %+v, want only %s", dash.Decisions, answered)
+		}
+	})
+}

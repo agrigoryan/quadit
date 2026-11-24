@@ -250,6 +250,23 @@ func TestTheWakeRule(t *testing.T) {
 				r.change(t, r.owner, "", "decision.unclear", M{"id": question, "note": "how big?"})
 				r.change(t, nil, r.claude, "decision.pick", M{"id": question, "option": 2})
 			}, "ack answered"},
+			{"a question asked of it, closed since as no longer needed", func(t *testing.T) {
+				key := r.task(t, nil)
+				question := r.change(t, r.owner, "", "decision.open", M{"task": key, "question": "Which boss?", "options": []M{{"label": "Big"}, {"label": "Small"}}, "ask": "@claude"})["ref"]
+				r.change(t, r.owner, "", "decision.close", M{"id": question})
+			}, "ack answered"},
+			{"its own question closed by the owner without a note", func(t *testing.T) {
+				key := r.task(t, nil)
+				question := r.change(t, nil, r.claude, "decision.open", M{"task": key, "question": "Which arena?", "options": []M{{"label": "Day"}, {"label": "Night"}}})["ref"]
+				r.drain(t)
+				r.change(t, r.owner, "", "decision.close", M{"id": question})
+			}, "ack closed"},
+			{"its own question closed by the owner with a note", func(t *testing.T) {
+				key := r.task(t, nil)
+				question := r.change(t, nil, r.claude, "decision.open", M{"task": key, "question": "Which sky?", "options": []M{{"label": "Day"}, {"label": "Night"}}})["ref"]
+				r.drain(t)
+				r.change(t, r.owner, "", "decision.close", M{"id": question, "note": "Use the night sky from the mockup."})
+			}, "run for_you"},
 			{"a follower's comment", func(t *testing.T) {
 				key := r.task(t, nil)
 				r.change(t, nil, r.claude, "watch.set", M{"subject": key})

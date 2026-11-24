@@ -166,7 +166,7 @@ func (who *viewer) waitingOnMe(ctx context.Context, scope dashboardScope) ([]tas
 // preferences.
 func (who *viewer) recentDecisions(ctx context.Context, scope dashboardScope) ([]decisionView, []core.Preference, error) {
 	var picked []core.Decision
-	if err := who.db.List(ctx, &picked, store.Q{Where: []store.Cond{store.Ne("state", core.StateOpen), store.Live}, Order: "-updated_seq", Limit: 60}); err != nil {
+	if err := who.db.List(ctx, &picked, store.Q{Where: []store.Cond{store.In("state", []string{core.StatePicked, core.StateSentBack}), store.Live}, Order: "-updated_seq", Limit: 60}); err != nil {
 		return nil, nil, err
 	}
 	picked = keep(picked, func(decision core.Decision) bool { return scope.covered[decision.TaskID] })

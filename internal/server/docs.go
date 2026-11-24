@@ -475,6 +475,9 @@ func (who *viewer) generatedPage(ctx context.Context, page core.Doc) (string, er
 				fmt.Fprintf(&b, " — asked of %s by %s on %s", firstNonEmpty(v.Asked, "anyone"), v.By, at)
 			} else {
 				ans := firstNonEmpty(v.PickedLabel, v.Outcome)
+				if v.State == core.StateNotNeeded {
+					ans = "no longer needed"
+				}
 				fmt.Fprintf(&b, " → **%s**", ans)
 				if v.Outcome != "" && v.Outcome != ans && v.Outcome != core.OutcomeAsIs {
 					b.WriteString(" (" + strings.ReplaceAll(v.Outcome, "_", " ") + ")")

@@ -133,7 +133,7 @@ func (s *Server) coreRoutes() []route {
 		{"GET " + w + "/tasks/{ref}/context", s.workspaceMember(s.handleShowTaskContext), "The context pack: the task, its parents, epic, standing preferences, recent decisions, linked docs.", "full: true", "find"},
 		{"GET " + w + "/inbox", s.workspaceMember(s.handleListInbox), "The caller's inbox.", "all: true to include read items; limit", "find"},
 		{"GET " + w + "/search", s.workspaceMember(s.handleSearch), "Full-text search across tasks, decisions, comments and docs.", "q: text; kind: task, comment, decision, doc; limit", "find"},
-		{"GET " + w + "/decisions", s.workspaceMember(s.handleListDecisions), "The decision log.", "state: answered, open, picked, sent_back, all; project; q; asked; trash: true for deleted ones; limit; offset", "find"},
+		{"GET " + w + "/decisions", s.workspaceMember(s.handleListDecisions), "The decision log.", "state: answered (any but open), open, picked, sent_back, not_needed, all; project; q; asked; trash: true for deleted ones; limit; offset", "find"},
 		{"GET " + w + "/projects/{key}/layout", s.workspaceMember(s.handleShowProjectLayout), "A project's statuses, labels, members, epics, cycles and templates, by name.", "", "orient"},
 		{"GET " + w + "/list/{collection}", s.workspaceMember(s.handleListCollection), "Rows of one kind as stored: members, projects, statuses, labels, epics, milestones, cycles, views, templates, preferences, resources, secrets, claims, sessions, relations, attachments, links, webhooks, deliveries, rules, integrations.", "project; task; trash: true; limit; offset", "sync"},
 		// Tokens and files.

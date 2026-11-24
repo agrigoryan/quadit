@@ -54,7 +54,7 @@ var tools = []tool{
 	{Name: "ack", Desc: "Mark the feed handled up to a position, for a server-kept cursor.", Props: map[string]arg{"!seq": integer("feed position"), "cursor": text("cursor name, default main"), "dry_run": flag("true checks the position without moving the cursor")},
 		Run: toolAck},
 	{Name: "decisions", Desc: "The decision log: questions with their options, the answer, the reason and the date.",
-		Props: map[string]arg{"state": text("answered (default), open, picked, sent_back, all"), "project": text("project key"), "q": text("text in the question"), "asked": text("me or @handle")}, Run: readPathTool("/decisions")},
+		Props: map[string]arg{"state": text("answered (default: any but open), open, picked, sent_back, not_needed, all"), "project": text("project key"), "q": text("text in the question"), "asked": text("me or @handle")}, Run: readPathTool("/decisions")},
 	{Name: "layout", Desc: "A project's statuses, labels, members, agents, epics, cycles and templates, by name.", Props: map[string]arg{"!project": text("project key")},
 		Run: readPathTool("/projects/{project}/layout", "project")},
 	{Name: "docs", Desc: "The page tree with ids.", Run: readPathTool("/docs")},

@@ -303,7 +303,18 @@ func (d decisionView) text() string {
 		}
 		b.WriteString("\n")
 	}
-	if d.Outcome != "" {
+	switch {
+	case d.State == core.StateNotNeeded:
+		b.WriteString("no longer needed")
+		if d.DecidedBy != "" {
+			b.WriteString(", closed by " + d.DecidedBy)
+		}
+		fmt.Fprintf(&b, " at %s", d.DecidedAt)
+		if d.Note != "" {
+			b.WriteString(": " + d.Note)
+		}
+		b.WriteString("\n")
+	case d.Outcome != "":
 		fmt.Fprintf(&b, "answer: %s by %s at %s", d.Outcome, d.DecidedBy, d.DecidedAt)
 		if d.Note != "" {
 			b.WriteString(": " + d.Note)

@@ -144,7 +144,17 @@ func (e *exporter) decisionMarkdown(b *strings.Builder, n int, d core.Decision) 
 	if d.AskedID != "" {
 		b.WriteString(" of " + names.handle(d.AskedID))
 	}
-	if d.Outcome != "" {
+	switch {
+	case d.State == core.StateNotNeeded:
+		b.WriteString(". No longer needed")
+		if d.DecidedBy != "" {
+			b.WriteString(", closed by " + names.handle(d.DecidedBy))
+		}
+		b.WriteString(" on " + formatTime(d.DecidedAt))
+		if d.OutcomeNote != "" {
+			b.WriteString(": " + d.OutcomeNote)
+		}
+	case d.Outcome != "":
 		fmt.Fprintf(b, ". Answer: %s by %s on %s", strings.ReplaceAll(d.Outcome, "_", " "), names.handle(d.DecidedBy), formatTime(d.DecidedAt))
 		if d.OutcomeNote != "" {
 			b.WriteString(": " + d.OutcomeNote)

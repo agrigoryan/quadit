@@ -151,7 +151,7 @@ func (pack *contextPack) preferences() error {
 func (pack *contextPack) recentDecisions() error {
 	who, ctx, t := pack.who, pack.ctx, pack.t
 	var picked []core.Decision
-	if err := who.db.List(ctx, &picked, store.Q{Where: []store.Cond{store.Ne("state", core.StateOpen), store.Live}, Order: "-updated_seq", Limit: packDecisionsToCheck}); err != nil {
+	if err := who.db.List(ctx, &picked, store.Q{Where: []store.Cond{store.In("state", []string{core.StatePicked, core.StateSentBack}), store.Live}, Order: "-updated_seq", Limit: packDecisionsToCheck}); err != nil {
 		return err
 	}
 	var recent []core.Decision

@@ -125,6 +125,7 @@ cycle.update (member): id (required), name, starts_on, ends_on
 dbview.create (member): id, database, name, type, config, rank
 dbview.delete (member): id (required)
 dbview.update (member): id, database, name, type, config, rank
+decision.close (member): id (required), note
 decision.delete (member): id (required)
 decision.open (member): id, task (required), kind, question (required), details, options, recommended, recommendation, ask, action, args
 decision.pick (member): id (required), option, outcome, note
@@ -240,6 +241,7 @@ surface: 2.0 (within 2.x nothing is removed or renamed)
   "decision.opened",
   "decision.picked",
   "decision.unclear",
+  "decision.closed",
   "decision.updated",
   "decision.deleted",
   "decision.restored",
@@ -6109,6 +6111,7 @@ SVA-1 "Which explosion?" -> Burst: reads better small
    "open",
    "picked",
    "sent_back",
+   "not_needed",
    "all"
   ],
   "code": "invalid",

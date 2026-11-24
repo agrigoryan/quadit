@@ -124,10 +124,11 @@ func (x *c) decisionConds() ([]store.Cond, error) {
 		}
 		conds = append(conds, store.Ne("state", core.StateOpen))
 	case "all":
-	case core.StateOpen, core.StatePicked, core.StateSentBack:
+	case core.StateOpen, core.StatePicked, core.StateSentBack, core.StateNotNeeded:
 		conds = append(conds, store.Eq("state", state))
 	default:
-		return nil, &engine.Error{Code: engine.CodeInvalid, Field: "state", Message: "unknown state " + state, Allowed: []string{"answered", "open", "picked", "sent_back", "all"}}
+		return nil, &engine.Error{Code: engine.CodeInvalid, Field: "state", Message: "unknown state " + state,
+			Allowed: []string{"answered", "open", "picked", "sent_back", "not_needed", "all"}}
 	}
 	if since := x.intParam("since", -1); since >= 0 {
 		conds = append(conds, store.Gt("updated_seq", int64(since))) // only what changed after that position
@@ -180,8 +181,11 @@ func decisionLogLine(d decisionView) string {
 	if d.PickedLabel != "" {
 		ans = fmt.Sprintf("%s (%s)", d.PickedLabel, d.Outcome)
 	}
-	if d.State == core.StateOpen {
+	switch d.State {
+	case core.StateOpen:
 		ans = "open, asked " + d.Asked
+	case core.StateNotNeeded:
+		ans = "no longer needed"
 	}
 	at := d.DecidedAt
 	if at == "" {

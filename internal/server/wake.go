@@ -38,7 +38,7 @@ const (
 
 // The item types that may start a run; any other is acknowledged.
 var wakingTypes = []string{core.NoteAssigned, core.NoteMentioned, core.NoteWaitingOn, core.NoteAsked, core.NotePicked, core.NoteUnclear,
-	core.NoteReplied, core.NoteComment, core.NoteResult}
+	core.NoteReplied, core.NoteComment, core.NoteResult, core.NoteNotNeeded}
 
 // wakeItem is what the rule reads of an item.
 type wakeItem struct {
@@ -128,6 +128,11 @@ func (who *viewer) wakeRule(ctx context.Context, agent core.Member, item wakeIte
 		if !open {
 			return wake{wakeAck, "answered"}, nil
 		}
+	case item.typ == core.NoteNotNeeded && !item.addressed:
+		// A question closed as no longer needed asks nothing of its asker;
+		// only a note of whoever closed it, which makes the item addressed,
+		// may.
+		return wake{wakeAck, "closed"}, nil
 	case (item.typ == core.NoteComment || item.typ == core.NoteResult) && !item.addressed:
 		return wake{wakeAck, "follow"}, nil
 	case !slices.Contains(wakingTypes, item.typ):
