@@ -12,6 +12,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Change } from "@/main/config-edits";
+import type { ChatListens } from "@/shared/pages-api";
 
 export interface Harness {
   id: string;
@@ -36,6 +37,14 @@ export interface Harness {
    */
   listenVerified: boolean;
   /**
+   * How a chat of it listens, as the skill's cases say and the check saw
+   * (docs/agents.md's table), for its card: "background", its tool wakes it
+   * for a background command, so the chat stays free (case 2); "busy", it
+   * cannot be woken, so listening keeps the chat busy (case 3). Absent where
+   * that was not verified.
+   */
+  chatListens?: ChatListens;
+  /**
    * The changes that set QUADIT_CONFIG=`config` for the commands its agent
    * runs. Only where its setting for that is documented and was seen to
    * reach those commands; without one, the quadit command in it works as
@@ -51,7 +60,7 @@ export interface Harness {
    * there is none.
    */
   allowCli?: { changes(home: string, quadit: string | null): Change[]; said: string }[];
-  /** Said with the files when the app runs it by itself with its permission checks off (its one-prompt form needs that). */
+  /** Said with the files when the app runs it by itself (to give its code back) with its permission checks off (its one-prompt form needs that). */
   selfRunSaid?: string;
   mcp?: {
     /** The changes that add Quadit's MCP server at `url`. */
@@ -63,8 +72,8 @@ export interface Harness {
   };
   /**
    * Its one-prompt command's arguments for `prompt` (desktop contract §11,
-   * third amendment): the app runs it to give a connect code back and to
-   * answer an inbox item. An argument list, never a shell's line. Absent
+   * third amendment): the app runs it to give a connect code back (and,
+   * were the app to answer by itself, an inbox item: self-runs.ts). An argument list, never a shell's line. Absent
    * where the form is not confirmed: such a tool keeps the line to paste.
    */
   oneShot?: (prompt: string) => string[];
@@ -90,6 +99,7 @@ export const HARNESSES: readonly Harness[] = [
     appCopies: [{ home: "Library/Application Support/Claude/claude-code/*/*/claude.app/Contents/MacOS/claude" }],
     skills: ".claude/skills",
     listenVerified: true,
+    chatListens: "background",
     env: (home, config) => [
       { kind: "json", path: join(home, ".claude", "settings.json"), keyPath: ["env", "QUADIT_CONFIG"], value: config },
     ],
@@ -139,6 +149,7 @@ export const HARNESSES: readonly Harness[] = [
     appCopies: [{ apps: "ChatGPT.app/Contents/Resources/codex-cli/bin/codex" }],
     skills: ".agents/skills",
     listenVerified: true,
+    chatListens: "busy",
     env: (home, config) => [
       {
         kind: "toml",
@@ -227,9 +238,11 @@ export const HARNESSES: readonly Harness[] = [
     command: "agy",
     trace: ".gemini/antigravity-cli",
     oneShot: (prompt) => ["-p", prompt, "--dangerously-skip-permissions"],
-    selfRunSaid: "Quadit runs Antigravity CLI by itself to answer, with its permission checks off for those runs.",
+    selfRunSaid:
+      "To connect it, Quadit runs Antigravity CLI once by itself, with its permission checks off for that run.",
     skills: ".gemini/config/skills",
     listenVerified: true,
+    chatListens: "background",
     mcp: {
       changes: (home, url) => [
         {
@@ -249,7 +262,7 @@ export const HARNESSES: readonly Harness[] = [
     command: "cursor-agent",
     trace: ".cursor",
     oneShot: (prompt) => ["-p", "--force", prompt],
-    selfRunSaid: "Quadit runs Cursor by itself to answer, with its permission checks off for those runs.",
+    selfRunSaid: "To connect it, Quadit runs Cursor once by itself, with its permission checks off for that run.",
     skills: ".agents/skills",
     listenVerified: false,
     mcp: {

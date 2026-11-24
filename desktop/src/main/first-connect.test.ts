@@ -152,7 +152,7 @@ describe("FirstConnect", () => {
   it("finds every tool Connect knows, saying which are on this computer, whom a tool on this computer's login works as and whether its listening was verified, but leaves alone those connected before", async () => {
     const { first } = setUp({
       harnesses: [
-        harness("claude", "Claude Code", { installed: true }),
+        harness("claude", "Claude Code", { installed: true, chatListens: "background" }),
         harness("codex", "Codex", {
           installed: true,
           connected: { methods: ["cli"], server: "x", workspace: "y", agent: "@codex" },
@@ -171,6 +171,7 @@ describe("FirstConnect", () => {
           ownLogin: true,
           worksAs: null,
           listenVerified: true,
+          chatListens: "background",
           allows: false,
         },
         {

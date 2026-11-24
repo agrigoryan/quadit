@@ -77,6 +77,7 @@ export class FirstConnect {
         ownLogin: h.cliIdentity === "own",
         worksAs: h.cliIdentity === "default" ? defaultLoginWords(defaultLogin) : null,
         listenVerified: h.listenVerified,
+        chatListens: h.chatListens,
         allows: h.allows,
       }));
     this.offered = tools.filter((t) => t.found);

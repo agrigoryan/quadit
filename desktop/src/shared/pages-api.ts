@@ -72,6 +72,12 @@ export interface SetupState {
   signedIn: string[];
 }
 
+/**
+ * How a chat of a tool listens (main/harnesses.ts): "background", the chat
+ * stays free; "busy", listening keeps that chat busy.
+ */
+export type ChatListens = "background" | "busy";
+
 /** An agent tool as the first run shows it: its name, its tile's letters, and whether it is on this computer. */
 export interface ToolView {
   id: string;
@@ -88,6 +94,8 @@ export interface ToolView {
   worksAs: string | null;
   /** Whether an agent in it was seen to listen (main/harnesses.ts); its card says so when not. */
   listenVerified: boolean;
+  /** How a chat of it listens; absent where not verified. */
+  chatListens?: ChatListens;
   /** Whether connecting also lets it run quadit without asking each time (it has settings for that, which Connect writes). */
   allows: boolean;
 }
@@ -128,6 +136,8 @@ export interface HarnessView {
   cliIdentity: "own" | "default";
   /** Whether an agent in it was seen to listen (main/harnesses.ts). */
   listenVerified: boolean;
+  /** How a chat of it listens; absent where not verified. */
+  chatListens?: ChatListens;
   /** Whether connecting also lets it run quadit without asking each time (it has settings for that, which Connect writes). */
   allows: boolean;
   /** Connected, its Quadit skill was changed by hand since the app wrote it, so the app does not update it by itself. */

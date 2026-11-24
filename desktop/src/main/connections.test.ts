@@ -833,7 +833,7 @@ posixOnly("letting each tool use Quadit without asking (desktop contract §11, s
     const agy = await connections.planConnect(choice("antigravity"));
     if (!agy.ok) throw new Error(agy.error);
     expect(agy.plan.warnings).toContain(
-      "Quadit runs Antigravity CLI by itself to answer, with its permission checks off for those runs.",
+      "To connect it, Quadit runs Antigravity CLI once by itself, with its permission checks off for that run.",
     );
     expect((await connections.state()).harnesses.map((h) => [h.id, h.allows])).toEqual([
       ["claude", true],

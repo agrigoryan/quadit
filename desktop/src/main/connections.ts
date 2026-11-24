@@ -234,6 +234,7 @@ export class Connections {
           mcp: !!harness.mcp,
           cliIdentity: harness.env ? "own" : "default",
           listenVerified: harness.listenVerified,
+          chatListens: harness.chatListens,
           allows: !!harness.allowCli,
           skillChangedByHand: !!connection && skill !== null && this.skillState(ledger, harness, skill) === "by hand",
           connected: connection
