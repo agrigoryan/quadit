@@ -20,6 +20,7 @@ import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/badge";
 import { DecisionMark, StatusIcon } from "@/ui/icons";
+import { ListenerLines } from "@/ui/listener-lines";
 
 const SHOWN = 4;
 const label = "text-xs font-medium text-ink-2";
@@ -156,9 +157,12 @@ function Reach({ member, state, now }: { member: Member; state: AgentState; now:
   return (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
       {connection === "listening" ? (
-        <span className="inline-flex items-center gap-1 text-ink-2" title={t("agents.connection.listeningHint")}>
+        <span
+          className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-ink-2"
+          title={t("agents.connection.listeningHint")}
+        >
           <Ear className="size-3" aria-hidden />
-          {t("agents.connection.listening")}
+          <ListenerLines reading={state} />
         </span>
       ) : connection === "connected" ? (
         <NotListening urgent={isStranded(state)} />

@@ -15,6 +15,9 @@ const state = (more: Partial<AgentState>): AgentState => ({
   name: "Codex",
   state: "idle",
   listening: false,
+  listeners: [],
+  listening_projects: [],
+  listening_outside_projects: false,
   open_tasks: 0,
   waiting_on_it: 0,
   ...more,
@@ -29,6 +32,16 @@ describe("connectionOf", () => {
     expect(connectionOf({ ...agent, connected_at: 1 }, state({}))).toBe("connected");
     expect(connectionOf(agent, state({ connected_at: "2026-11-21 14:02" }))).toBe("connected");
     expect(connectionOf({ ...agent, connected_at: 1 }, undefined)).toBe("connected");
+  });
+
+  it("is listening at a place only while something hears it: that project, or, outside any, what listens to everything", () => {
+    const reading = state({ listening: true, connected_at: "2026-11-21 14:02", listening_projects: ["p1"] });
+    expect(connectionOf(agent, reading, "p1")).toBe("listening");
+    expect(connectionOf(agent, reading, "p2")).toBe("connected");
+    expect(connectionOf(agent, reading, null)).toBe("connected");
+    expect(connectionOf(agent, { ...reading, listening_outside_projects: true }, null)).toBe("listening");
+    // A place about no one place: the whole agent.
+    expect(connectionOf(agent, reading)).toBe("listening");
   });
 
   it("is not connected yet otherwise", () => {

@@ -69,8 +69,14 @@ export interface AgentState {
   waits_on?: string;
   /** When it first proved it reached Quadit from inside its tool, "2026-11-21 14:02" UTC; missing: not connected yet. */
   connected_at?: string;
-  /** Its listener holds its lease (`quadit wait`, `quadit listen`), or a webhook pushes to it. */
+  /** One of its listeners holds its lease (`quadit wait`, `quadit listen`), or a webhook pushes to it. */
   listening: boolean;
+  /** Its listeners, the one of everything first, then by project key; a project's stays when nothing holds it. */
+  listeners: ListenerShown[];
+  /** The projects (ids) whose items something live is handed now. */
+  listening_projects: string[];
+  /** Whether something live is handed the items of no project. */
+  listening_outside_projects: boolean;
   /** The tool of the last connect code it gave back ("Codex"), when it has. */
   tool?: string;
   last_seen?: string;
@@ -79,8 +85,31 @@ export interface AgentState {
   waiting_on_it: number;
 }
 
+/**
+ * One of an agent's listeners as pages are told (Go's listenerShown): of a
+ * project (its id and key), or, without one, of everything else; `by`, what
+ * holds it in its own words ("a chat", "a companion").
+ */
+export interface ListenerShown {
+  project_id?: string;
+  project?: string;
+  by?: string;
+  last_heard?: string;
+  live: boolean;
+}
+
 /** How far an agent is connected: GET /agents/connection, the cheap part of GET /agents. */
-export type AgentConnection = Pick<AgentState, "handle" | "user_id" | "connected_at" | "listening" | "tool">;
+export type AgentConnection = Pick<
+  AgentState,
+  | "handle"
+  | "user_id"
+  | "connected_at"
+  | "listening"
+  | "tool"
+  | "listeners"
+  | "listening_projects"
+  | "listening_outside_projects"
+>;
 
 export interface StatusCount {
   status: string;

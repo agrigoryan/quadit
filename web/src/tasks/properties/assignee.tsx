@@ -22,7 +22,7 @@ import {
   type TaskProperty,
 } from "@/tasks/properties/property";
 import { memberOf, memberWord } from "@/tasks/properties/query-words";
-import { memberItems, noneItem } from "@/tasks/property-picker";
+import { memberItems, noneItem, oneProject } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { ConnectionMark } from "@/ui/connection-mark";
 import { ListeningDot } from "@/ui/listening-dot";
@@ -41,7 +41,7 @@ function AssigneeRow(panel: PanelProps) {
         panel={panel}
         value={name}
         empty={!person}
-        after={person?.kind === "agent" && <AgentConnection agent={person} />}
+        after={person?.kind === "agent" && <AgentConnection agent={person} project={panel.task.project_id} />}
       >
         <Avatar member={person} size="xs" />
         <span className="truncate">{name}</span>
@@ -64,16 +64,16 @@ function AssigneeRow(panel: PanelProps) {
   );
 }
 
-/** How far an agent assignee is connected: whether what is written on the task reaches it. */
-function AgentConnection({ agent }: { agent: Member }) {
-  const reach = useConnection()(agent);
+/** How far an agent assignee is connected: whether what is written on the task (in `project`) reaches it. */
+function AgentConnection({ agent, project }: { agent: Member; project: string }) {
+  const reach = useConnection()(agent, project);
   return reach ? <ConnectionMark connection={reach.connection} /> : null;
 }
 
 function AssigneePill({ project, value, onChange }: CreateProps) {
   const members = useMembers().filter((m) => mayBeGivenWork(m, project.id));
   const me = useMe();
-  const listening = useListening();
+  const listening = useListening(project.id);
   const person = members.find((m) => m.user_id === value.assigneeId);
   return (
     <Picker
@@ -103,7 +103,7 @@ function AssigneePill({ project, value, onChange }: CreateProps) {
 function useChoices(task: Task): Choice[] {
   const members = useMembers();
   const me = useMe();
-  const listening = useListening();
+  const listening = useListening(task.project_id);
   return [
     {
       id: "nobody",
@@ -147,8 +147,8 @@ export const assignee = {
       // work they cannot see.
       const members = useMembers().filter((m) => tasks.every((task) => mayBeGivenWork(m, task.project_id)));
       const me = useMe();
-      // Asked of the server only while the list is open.
-      const listening = useListening();
+      // Asked of the server only while the list is open; of the tasks' project when they share one.
+      const listening = useListening(oneProject(tasks));
       return {
         items: [noneItem(t("task.unassigned")), ...memberItems(members, me.user_id, listening)],
         value: shared(tasks, (task) => task.assignee_id ?? NONE),

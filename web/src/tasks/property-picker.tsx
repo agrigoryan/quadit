@@ -26,6 +26,16 @@ export const noneChoice = (label: string, checked: boolean, apply: () => void): 
   apply,
 });
 
+/**
+ * The project the tasks share, for whether something listens there
+ * (data/listening.ts Where); undefined when they are of several: the whole
+ * agent.
+ */
+export function oneProject(tasks: Task[]): string | undefined {
+  const first = tasks[0]?.project_id;
+  return first && tasks.every((task) => task.project_id === first) ? first : undefined;
+}
+
 /** Says whether something is listening for an agent; nothing for a person. From useListening (data/listening.ts). */
 export type Listening = (member: Member | undefined) => boolean | undefined;
 

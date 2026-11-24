@@ -45,15 +45,16 @@ test("the comment box says what happens to a comment in each of the agent's stat
   await expect(page.getByText("Connected: Codex gave the code back.")).toBeVisible();
 
   await page.goto(`/${WORKSPACE.slug}/task/${key}`);
+  const projectKey = key.split("-")[0] ?? "";
   await expect(
     activity.getByText(
-      `@${handle} is not listening. To have it answer here, say “listen to Quadit” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.`,
+      `@${handle} is not listening. To have it answer here, say “listen to Quadit for ${projectKey}” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.`,
     ),
   ).toBeVisible();
 
   // The person asked it to listen: its first wait takes the lease, and starts at the present, so the assignment
   // from before is not handed over again. Nothing in the feed says so: the line is read again while it is shown.
-  const waited = await agent("wait", "for=1");
+  const waited = await agent("wait", `project=${projectKey}`, "for=1");
   expect(waited).toMatch(/^IDLE\n/);
   await expect(activity.getByText(`@${handle} is listening and will see this.`)).toBeVisible({ timeout: 30_000 });
 });

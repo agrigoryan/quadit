@@ -14,6 +14,13 @@ export const agentStrings = {
   "agents.notListeningHint":
     "Nothing is waiting for this agent's work. Tasks given to it wait until it looks; say “listen to Quadit” to it in a chat to have it answer them as they come.",
   "agents.connection.listening": "Listening",
+  "agents.listener.to": "Listening to {what}",
+  "agents.listener.toFrom": "Listening to {what}, from {by}",
+  "agents.listener.everything": "everything",
+  "agents.listener.everythingElse": "everything else",
+  "agents.listener.webhook": "A webhook pushes to it",
+  "agents.listener.idle":
+    "{project}: nothing listens now; its items wait. Say “listen to Quadit for {project}” to it in a chat.",
   "agents.connection.connected": "Connected, not listening",
   "agents.connection.not_connected": "Not connected yet",
   "agents.connection.listeningHint":

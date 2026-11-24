@@ -23,7 +23,7 @@ import {
   type TaskProperty,
 } from "@/tasks/properties/property";
 import { memberOf, memberWord } from "@/tasks/properties/query-words";
-import { memberItems, noneItem } from "@/tasks/property-picker";
+import { memberItems, noneItem, oneProject } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Input, Textarea } from "@/ui/input";
@@ -34,8 +34,8 @@ function useItems(tasks: Task[]) {
   // on someone who cannot see it.
   const members = useMembers().filter((m) => tasks.every((task) => mayBeGivenWork(m, task.project_id)));
   const me = useMe();
-  // Asked of the server only while the list is open.
-  const listening = useListening();
+  // Asked of the server only while the list is open; of the tasks' project when they share one.
+  const listening = useListening(oneProject(tasks));
   return {
     items: [
       noneItem(t("prop.nobody")),

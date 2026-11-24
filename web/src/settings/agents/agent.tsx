@@ -18,6 +18,7 @@ import { StateBadge } from "@/settings/agents/agents";
 import { type AgentMember } from "@/settings/agents/data";
 import { connectionOf, useAgentStates, useFreshStates } from "@/data/listening";
 import { ConnectionMark } from "@/ui/connection-mark";
+import { ListenerLines } from "@/ui/listener-lines";
 import { isFinishedHelper, useHelperLabel } from "@/settings/agents/helper-agents";
 import { AgentConnectCode } from "@/settings/agents/connect-code";
 import { AgentTokens } from "@/settings/agents/tokens";
@@ -131,6 +132,12 @@ function AgentBody({ agent }: { agent: AgentMember }) {
           </Fact>
           {agent.last_action && <Fact label={t("agents.lastAction")}>{agent.last_action}</Fact>}
           {state?.doing && <Fact label={state.task ?? ""}>{state.doing}</Fact>}
+          {state && (
+            // What it listens to, and a project whose own listener stopped: its items wait for it.
+            <span className="grid basis-full gap-0.5 text-ink-2 empty:hidden">
+              <ListenerLines reading={fresh(state)} idle />
+            </span>
+          )}
         </Card>
       </Section>
 

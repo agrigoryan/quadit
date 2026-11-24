@@ -15,11 +15,27 @@ import type { AgentConnection, AgentState } from "@/types/dashboard";
 
 /**
  * How far an agent is connected: it has never proven it reached Quadit from
- * inside its tool; it has, and works when asked there; or its listener
- * holds its lease (or a webhook pushes to it), so it will see what is
- * written here.
+ * inside its tool; it has, and works when asked there; or one of its
+ * listeners holds its lease (or a webhook pushes to it), so it will see
+ * what is written here.
  */
 export type Connection = "not_connected" | "connected" | "listening";
+
+/**
+ * Where something is written, as listening goes by: a project (its id), or
+ * null for what is in no project. A place that is about no one place (a
+ * member's card, a list of members) leaves it out: the whole agent.
+ */
+export type Where = string | null;
+
+type Reading = Pick<AgentState, "connected_at" | "listening" | "listening_projects" | "listening_outside_projects">;
+
+/** Whether something live hears what is written at `where`; without `where`, anything at all. */
+export function hears(reading: Reading | undefined, where?: Where): boolean {
+  if (!reading) return false;
+  if (where === undefined) return reading.listening;
+  return where === null ? reading.listening_outside_projects : reading.listening_projects.includes(where);
+}
 
 /** How often what is shown of the agents' connection is read again while it is on screen. */
 const REREAD_MS = 20_000;
@@ -64,45 +80,61 @@ export function useFreshStates(): (state: AgentState) => AgentState {
     (state: AgentState) => {
       const fresh = connections?.[state.user_id];
       return fresh
-        ? { ...state, connected_at: fresh.connected_at, listening: fresh.listening, tool: fresh.tool }
+        ? {
+            ...state,
+            connected_at: fresh.connected_at,
+            listening: fresh.listening,
+            tool: fresh.tool,
+            listeners: fresh.listeners,
+            listening_projects: fresh.listening_projects,
+            listening_outside_projects: fresh.listening_outside_projects,
+          }
         : state;
     },
     [connections],
   );
 }
 
-/** How far an agent is connected, from its row (which the feed keeps current) and the server's reading. */
-export function connectionOf(
-  member: Member,
-  reading: Pick<AgentState, "connected_at" | "listening"> | undefined,
-): Connection {
-  if (reading?.listening) return "listening";
+/**
+ * How far an agent is connected, from its row (which the feed keeps
+ * current) and the server's reading: listening when something hears
+ * `where` (hears).
+ */
+export function connectionOf(member: Member, reading: Reading | undefined, where?: Where): Connection {
+  if (hears(reading, where)) return "listening";
   return member.connected_at || reading?.connected_at ? "connected" : "not_connected";
 }
 
 /**
- * How far each agent is connected, and the tool it was last connected
- * from, for what shows it (a task's assignee, the comment box, a picker).
- * Undefined for a person, and for an agent until the server has answered.
+ * How far each agent is connected as `where` goes (see Where), the tool it
+ * was last connected from, and, when it is not listening there, whether it
+ * listens elsewhere: for what shows it (a task's assignee, the comment box,
+ * a picker). Undefined for a person, and for an agent until the server has
+ * answered.
  */
-export function useConnection(): (member: Member | undefined) => { connection: Connection; tool?: string } | undefined {
+export function useConnection(): (
+  member: Member | undefined,
+  where?: Where,
+) => { connection: Connection; tool?: string; elsewhere: boolean } | undefined {
   const connections = useAgentConnections();
-  return (member) => {
+  return (member, where) => {
     if (!member || member.kind !== "agent" || !connections) return undefined;
     const reading = connections[member.user_id];
-    return { connection: connectionOf(member, reading), tool: reading?.tool };
+    const connection = connectionOf(member, reading, where);
+    return { connection, tool: reading?.tool, elsewhere: connection !== "listening" && hears(reading) };
   };
 }
 
 /**
- * Whether something is listening for a member's work, for lists where
- * people choose one. Undefined for people, and until the server answers:
- * the member row's own mark is not kept current, so it is not a guess.
+ * Whether something is listening for a member's work at `where` (see
+ * Where), for lists where people choose one. Undefined for people, and
+ * until the server answers: the member row's own mark is not kept current,
+ * so it is not a guess.
  */
-export function useListening(): (member: Member | undefined) => boolean | undefined {
+export function useListening(where?: Where): (member: Member | undefined) => boolean | undefined {
   const connection = useConnection();
   return (member) => {
-    const c = connection(member);
+    const c = connection(member, where);
     return c === undefined ? undefined : c.connection === "listening";
   };
 }

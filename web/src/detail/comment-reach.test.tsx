@@ -31,9 +31,25 @@ function load(agent: Member) {
   });
 }
 
-/** What GET /agents/connection answers about @codex: whether it listens, and the tool of its last connect code. */
-function agents(listening: boolean, tool?: string) {
-  vi.spyOn(api, "get").mockResolvedValue({ agents: [{ user_id: "a1", handle: "@codex", listening, tool }] });
+/**
+ * What GET /agents/connection answers about @codex: whether it listens (to
+ * every project, unless `projects` names those it does), and the tool of
+ * its last connect code.
+ */
+function agents(listening: boolean, tool?: string, projects = listening ? ["p1"] : []) {
+  vi.spyOn(api, "get").mockResolvedValue({
+    agents: [
+      {
+        user_id: "a1",
+        handle: "@codex",
+        listening,
+        tool,
+        listeners: [],
+        listening_projects: projects,
+        listening_outside_projects: listening,
+      },
+    ],
+  });
 }
 
 function show(task: Task) {
@@ -67,7 +83,17 @@ describe("the line under the comment box", () => {
     show({ ...base, assignee_id: "u1", waiting_on_id: "a1" });
     expect(
       await screen.findByText(
-        "@codex is not listening. To have it answer here, say “listen to Quadit” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.",
+        "@codex is not listening. To have it answer here, say “listen to Quadit for SVA” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says when the agent listens only to other projects, and the line that has it listen to this one", async () => {
+    agents(true, "Codex", ["p2"]);
+    show({ ...base, assignee_id: "a1" });
+    expect(
+      await screen.findByText(
+        "@codex is listening to other projects, not to this one. To have it answer here, say “listen to Quadit for SVA” to it in a chat in this project’s folder. Until then it sees this when you next ask it, for example “check Quadit”.",
       ),
     ).toBeTruthy();
   });
@@ -77,7 +103,7 @@ describe("the line under the comment box", () => {
     show({ ...base, assignee_id: "a1" });
     expect(
       await screen.findByText(
-        "@codex is not listening. To have it answer here, say “listen to Quadit” to it in a chat. Until then it sees this when you next ask it to check Quadit.",
+        "@codex is not listening. To have it answer here, say “listen to Quadit for SVA” to it in a chat. Until then it sees this when you next ask it to check Quadit.",
       ),
     ).toBeTruthy();
   });
