@@ -74,7 +74,7 @@ git clone https://github.com/agrigoryan/quadit && cd quadit
 make build          # bin/quadit, with the web app inside
 ```
 
-The desktop app is the quickest way in: on macOS and Linux it can run Quadit on your computer with no terminal ("Run Quadit on this computer"). It also opens your servers in windows of their own, sets your agent harnesses up to work in Quadit, lets you answer questions from a notification or the menu bar, and captures a task from anywhere with a shortcut. It is on the same [Releases](https://github.com/agrigoryan/quadit/releases) page under the `desktop-v…` releases: a `.dmg` for macOS (Apple silicon or Intel), an `.exe` installer for Windows, and an AppImage or a `.deb` for Linux. Builds so far are pre-releases, and your system may warn the first time one is opened: [how to open it](docs/install.md#the-desktop-app).
+The desktop app is the quickest way in: on macOS and Linux it can run Quadit on your computer with no terminal ("Set up on this computer"). It also opens your servers in windows of their own, sets your agent harnesses up to work in Quadit, lets you answer questions from a notification or the menu bar, and captures a task from anywhere with a shortcut. It is on the same [Releases](https://github.com/agrigoryan/quadit/releases) page under the `desktop-v…` releases: a `.dmg` for macOS (Apple silicon or Intel), an `.exe` installer for Windows, and an AppImage or a `.deb` for Linux. Builds so far are pre-releases, and your system may warn the first time one is opened: [how to open it](docs/install.md#the-desktop-app).
 
 ## First run
 
