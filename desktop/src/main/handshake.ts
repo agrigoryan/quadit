@@ -49,9 +49,17 @@ export function handshakeOf(
     if (before?.state === "connected") return { state: "connected", listening: null };
     return before ?? { state: "unknown" };
   }
-  if (answer.codeUsed === true) return { state: "connected", listening: answer.listening === true };
+  if (answer.codeUsed === true || (answer.connected && !(open && answer.codeGone !== true))) {
+    if (answer.listening !== true) return { state: "connected", listening: false };
+    // What listens, where the server's page says it.
+    if (!answer.listeners) return { state: "connected", listening: true };
+    return {
+      state: "connected",
+      listening: true,
+      heard: { listeners: answer.listeners, pushed: answer.pushed === true, unheard: answer.unheard ?? [] },
+    };
+  }
   if (open && answer.codeGone !== true) return { state: "waiting", code: open.code };
-  if (answer.connected) return { state: "connected", listening: answer.listening === true };
   if (!connection.methods.includes("cli")) return { state: "unknown" };
   return { state: "waiting", code: null };
 }

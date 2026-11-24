@@ -194,7 +194,7 @@ test("a card set up from the Agents page turns Connected when the agent gives it
 
     // Told to listen, it holds the lease while it waits: the card says so.
     listener = tool.start(["wait", "for=30"]);
-    await expect(card.getByText("Listening", { exact: true })).toBeVisible({ timeout: 15_000 });
+    await expect(card.getByText("Listening to everything, from a chat")).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText(/Not listening/)).toBeHidden();
     await expect(step).toHaveCount(0);
     await screen(connect, "14-connect-listening.png");

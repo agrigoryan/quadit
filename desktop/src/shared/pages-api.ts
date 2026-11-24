@@ -3,7 +3,7 @@
 // may ask of the app, through the preload src/preload/pages.ts. The server's
 // web pages never see this: they get only the bridge of the contract.
 
-import type { DesktopOutcome, DesktopSummary } from "@/shared/bridge";
+import type { DesktopOutcome, DesktopSummary, HeardListener } from "@/shared/bridge";
 
 export interface ServerView {
   id: string;
@@ -179,7 +179,9 @@ export interface ConnectView {
  *              version of the app), for which a new one is to be made;
  *              `refused` is why the last code asked for was not made;
  *   connected  the server says it proved it, and whether it listens now
- *              (null: cannot tell right now, no answer came since);
+ *              (null: cannot tell right now, no answer came since), with,
+ *              while it listens, what does (`heard`; absent where the
+ *              server's page does not say);
  *   unknown    set up; whether it reached Quadit is not known here: the
  *              server has not answered yet, or the tool works as a login
  *              this server does not know (another server's), which the app
@@ -187,8 +189,19 @@ export interface ConnectView {
  */
 export type Handshake =
   | { state: "waiting"; code: string | null; refused?: string }
-  | { state: "connected"; listening: boolean | null }
+  | { state: "connected"; listening: boolean | null; heard?: Heard }
   | { state: "unknown" };
+
+/**
+ * What listens as a connected agent: each live listener (of a project, or,
+ * without one, of everything else) and what holds it; whether a webhook
+ * pushes to it; the projects (keys) nothing hears now.
+ */
+export interface Heard {
+  listeners: HeardListener[];
+  pushed: boolean;
+  unheard: string[];
+}
 
 /**
  * What the app does by itself for a tool Connect set up (desktop contract

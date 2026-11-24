@@ -76,7 +76,8 @@ export type DesktopRequest =
    * What the server says of the agent `agent` (a member id): the outcome's
    * `connected`, `listening`, and, of the code whose id is `code`,
    * `codeUsed` (it was given back) and `codeGone` (it no longer exists, or
-   * ran out unused).
+   * ran out unused); and what listens as it: `listeners`, `pushed`,
+   * `unheard` (a page of an older server says nothing of them).
    */
   | { kind: "agent-state"; agent: string; code?: string };
 
@@ -94,8 +95,23 @@ export type DesktopOutcome =
       listening?: boolean;
       codeUsed?: boolean;
       codeGone?: boolean;
+      /**
+       * What listens as the agent (agent-state): each live listener, of a
+       * project (its key and name) or, without one, of everything else, and
+       * what holds it in its own words ("a chat"); whether a webhook pushes
+       * to it; the projects (keys) nothing hears now.
+       */
+      listeners?: HeardListener[];
+      pushed?: boolean;
+      unheard?: string[];
     }
   | { ok: false; message: string; path?: string };
+
+/** A live listener of an agent, as a page tells the app (DesktopOutcome's listeners). */
+export interface HeardListener {
+  project?: { key: string; name: string };
+  by?: string;
+}
 
 export interface QuaditDesktop {
   /** App version, e.g. "0.1.0". */
@@ -296,7 +312,22 @@ export function summaryOf(raw: unknown): DesktopSummary | null {
 /** `raw` as a page's answer to a request, as fresh plain data, or null when it is none. */
 export function outcomeOf(raw: unknown): DesktopOutcome | null {
   return kept((): DesktopOutcome => {
-    const { ok, path, message, agent, token, id, code, connected, listening, codeUsed, codeGone } = record(raw);
+    const {
+      ok,
+      path,
+      message,
+      agent,
+      token,
+      id,
+      code,
+      connected,
+      listening,
+      codeUsed,
+      codeGone,
+      listeners,
+      pushed,
+      unheard,
+    } = record(raw);
     const where = optional(path, (v) => exact(v, PATH_MAX));
     if (ok === false) return defined({ ok, message: shown(message, MESSAGE_MAX), path: where });
     if (ok !== true) throw refused;
@@ -320,6 +351,21 @@ export function outcomeOf(raw: unknown): DesktopOutcome | null {
       listening: optional(listening, flag),
       codeUsed: optional(codeUsed, flag),
       codeGone: optional(codeGone, flag),
+      // One for everything else, and at most one for each project.
+      listeners: optional(listeners, (v) =>
+        list(v, PROJECTS_MAX + 1, (item): HeardListener => {
+          const l = record(item);
+          return defined({
+            project: optional(l.project, (p) => {
+              const project = record(p);
+              return { key: exact(project.key, ID_MAX), name: shown(project.name, TITLE_MAX) };
+            }),
+            by: optional(l.by, (b) => shown(b, LABEL_MAX)),
+          });
+        }),
+      ),
+      pushed: optional(pushed, flag),
+      unheard: optional(unheard, (v) => list(v, PROJECTS_MAX, (key) => exact(key, ID_MAX))),
     });
   });
 }

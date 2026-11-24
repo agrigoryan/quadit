@@ -28,7 +28,7 @@ import { button, lineIcon, make } from "@/pages/dom";
 import { LISTEN_LINE } from "@/pages/listen-steps";
 import { isConnectCode } from "@/shared/bridge";
 import { diskLine, unrevokedWords } from "@/shared/change-words";
-import type { ChatListens, Disconnected, Handshake, PagesApi, Refused, SelfRun } from "@/shared/pages-api";
+import type { ChatListens, Disconnected, Handshake, Heard, PagesApi, Refused, SelfRun } from "@/shared/pages-api";
 
 const api = window.quaditPages as PagesApi;
 
@@ -340,7 +340,7 @@ export class ToolCard {
       badge.setAttribute("role", "status");
       badge.append(lineIcon(["M20 6 9 17l-5-5"]), document.createTextNode("Connected"));
       this.act.replaceChildren(badge, back);
-      this.stand.replaceChildren(this.listening(handshake.listening), ...this.answering());
+      this.stand.replaceChildren(this.listening(handshake), ...this.answering());
       return;
     }
     this.act.replaceChildren(back);
@@ -451,28 +451,16 @@ export class ToolCard {
 
   /**
    * Whether the connected tool's agent listens (null: no answer to tell).
-   * Listening: what it answers, and how to stop it, in the skill's words.
-   * Not: the person's next step, set apart as the card's main thing, with how
-   * a chat of the tool listens where that was verified; or, connected by MCP
-   * alone, that it cannot listen.
+   * Listening: what listens (heardLines). Not: the person's next step, set
+   * apart as the card's main thing, with how a chat of the tool listens
+   * where that was verified; or, connected by MCP alone, that it cannot
+   * listen.
    */
-  private listening(listening: boolean | null): HTMLElement {
+  private listening(handshake: Extract<Handshake, { state: "connected" }>): HTMLElement {
     const { name, chatListens, mcpOnly } = this.tool;
+    const { listening, heard } = handshake;
     if (listening === null) return make("p", "Cannot tell right now whether it is listening.", "listen");
-    if (listening) {
-      const box = make("div", "", "listening");
-      const line = make("p", "", "listen on");
-      line.append(make("span", "", "found-dot"), document.createTextNode("Listening"));
-      box.append(
-        line,
-        make(
-          "p",
-          "It answers what you assign to it or ask it in Quadit while that chat is open. One chat listens at a time. To stop, tell that chat to stop listening.",
-          "listen-said",
-        ),
-      );
-      return box;
-    }
+    if (listening) return heardLines(heard);
     const step = make("div", "", "next-step");
     step.setAttribute("role", "group");
     step.setAttribute("aria-label", `Next: have ${name} listen`);
@@ -507,6 +495,64 @@ export class ToolCard {
       );
     return step;
   }
+}
+
+/**
+ * What listens as a listening agent, a line for each, and what the person
+ * should know of each kind, in the skill's words: a chat answers while it is
+ * open and stops when told to stop listening; a companion runs in a
+ * terminal; a webhook pushes. One chat listens to a project at a time, and,
+ * listening to projects only, another is added from a chat in its folder.
+ * A page of an older server says nothing of what listens: then only that
+ * it listens.
+ */
+function heardLines(heard: Heard | undefined): HTMLElement {
+  const box = make("div", "", "listening");
+  const on = (text: string) => {
+    const line = make("p", "", "listen on");
+    line.append(make("span", "", "found-dot"), document.createTextNode(text));
+    return line;
+  };
+  const said = (text: string) => make("p", text, "listen-said");
+  if (!heard) {
+    box.append(on("Listening"), said("It answers what you assign to it or ask it in Quadit."));
+    return box;
+  }
+  const { listeners, pushed, unheard } = heard;
+  const own = listeners.some((l) => l.project);
+  for (const l of listeners) {
+    const what = l.project ? l.project.name : own ? "everything else" : "everything";
+    box.append(on(`Listening to ${what}${l.by ? `, from ${l.by}` : ""}`));
+  }
+  if (pushed) box.append(on("A webhook pushes to it"));
+  // Listening to a project the page does not show: only that it listens.
+  if (!box.hasChildNodes()) box.append(on("Listening"));
+  const chats = listeners.filter((l) => l.by === "a chat").length;
+  if (chats === 1)
+    box.append(
+      said(
+        "It answers what you assign to it or ask it in Quadit while that chat is open. One chat listens to a project at a time. To stop, tell that chat to stop listening.",
+      ),
+    );
+  else if (chats > 1)
+    box.append(
+      said(
+        "It answers what you assign to it or ask it in Quadit while those chats are open. One chat listens to a project at a time. To stop one, tell its chat to stop listening.",
+      ),
+    );
+  if (listeners.some((l) => l.by === "a companion"))
+    box.append(said("A companion runs in a terminal, and stops with Ctrl-C or when that terminal closes."));
+  // Listening to projects only: how to add another, named when it is the one left.
+  const onlyProjects = !pushed && listeners.length > 0 && listeners.every((l) => l.project);
+  if (onlyProjects && unheard.length > 0)
+    box.append(
+      said(
+        unheard.length === 1
+          ? `To have it listen to ${unheard[0]} too, write “${LISTEN_LINE} for ${unheard[0]}” in a chat in that project’s folder.`
+          : `To have it listen to another project too, write “${LISTEN_LINE}” in a chat in that project’s folder.`,
+      ),
+    );
+  return box;
 }
 
 /**

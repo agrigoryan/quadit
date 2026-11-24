@@ -203,17 +203,48 @@ test("a connected card that is not listening makes the line to write its main st
     .poll(() => page.evaluate(() => (window as unknown as { stand: Stand }).stand.copied))
     .toBe("listen to Quadit");
 
-  // Listening: what it answers, and how to stop it; the step is gone.
+  // Listening to one project from a chat: what listens, what it answers, how to stop it, and how to add the project
+  // nothing hears; the step is gone.
   await page.evaluate(() => {
-    (window as unknown as { stand: Stand }).stand.handshake = { state: "connected", listening: true };
+    (window as unknown as { stand: Stand }).stand.handshake = {
+      state: "connected",
+      listening: true,
+      heard: {
+        listeners: [{ project: { key: "SVA", name: "Samurai vs Aliens" }, by: "a chat" }],
+        pushed: false,
+        unheard: ["GS"],
+      },
+    };
   });
-  await expect(card.getByText("Listening", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByText("Listening to Samurai vs Aliens, from a chat")).toBeVisible({ timeout: 10_000 });
   await expect(
     card.getByText(
-      "It answers what you assign to it or ask it in Quadit while that chat is open. One chat listens at a time. To stop, tell that chat to stop listening.",
+      "It answers what you assign to it or ask it in Quadit while that chat is open. One chat listens to a project at a time. To stop, tell that chat to stop listening.",
     ),
   ).toBeVisible();
+  await expect(
+    card.getByText("To have it listen to GS too, write “listen to Quadit for GS” in a chat in that project’s folder."),
+  ).toBeVisible();
   await expect(step).toHaveCount(0);
+
+  // A project from a chat and everything else from a companion: a line each, and how a companion stops.
+  await page.evaluate(() => {
+    (window as unknown as { stand: Stand }).stand.handshake = {
+      state: "connected",
+      listening: true,
+      heard: {
+        listeners: [{ by: "a companion" }, { project: { key: "SVA", name: "Samurai vs Aliens" }, by: "a chat" }],
+        pushed: false,
+        unheard: [],
+      },
+    };
+  });
+  await expect(card.getByText("Listening to everything else, from a companion")).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByText("Listening to Samurai vs Aliens, from a chat")).toBeVisible();
+  await expect(
+    card.getByText("A companion runs in a terminal, and stops with Ctrl-C or when that terminal closes."),
+  ).toBeVisible();
+  await expect(card.getByText(/^To have it listen to/)).toHaveCount(0);
 });
 
 // The app no longer answers by itself (main/self-runs.ts, answers: false), so it never says "on", "paused" or

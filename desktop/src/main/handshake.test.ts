@@ -70,6 +70,22 @@ describe("handshakeOf", () => {
     expect(handshakeOf(odd, state(false, false), NOW, undefined)).toEqual({ state: "waiting", code: null });
   });
 
+  it("carries what listens, where the page says it, only while the agent listens", () => {
+    const none = { methods: ["cli" as const], code: null };
+    const listeners = [{ project: { key: "SVA", name: "Samurai vs Aliens" }, by: "a chat" }];
+    expect(
+      handshakeOf(none, { ok: true, connected: true, listening: true, listeners, unheard: ["GS"] }, NOW, undefined),
+    ).toEqual({
+      state: "connected",
+      listening: true,
+      heard: { listeners, pushed: false, unheard: ["GS"] },
+    });
+    expect(handshakeOf(none, { ok: true, connected: true, listening: false, listeners: [] }, NOW, undefined)).toEqual({
+      state: "connected",
+      listening: false,
+    });
+  });
+
   it("waits on no code for a tool connected by MCP alone, which has no command to give one back with", () => {
     const mcp = { methods: ["mcp" as const], code: null };
     expect(handshakeOf(mcp, state(false, false), NOW, undefined)).toEqual({ state: "unknown" });

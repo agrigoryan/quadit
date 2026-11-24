@@ -112,6 +112,24 @@ describe("outcomeOf", () => {
     expect(outcomeOf(state)).toEqual(state);
   });
 
+  it("keeps what listens as an agent: each listener's project and what holds it, cut to a label's length", () => {
+    const heard = {
+      ok: true,
+      connected: true,
+      listening: true,
+      listeners: [{ project: { key: "SVA", name: "Samurai vs Aliens" }, by: "a chat" }, { by: "a companion" }],
+      pushed: false,
+      unheard: ["GS"],
+    };
+    expect(outcomeOf(heard)).toEqual(heard);
+    expect(outcomeOf({ ok: true, listeners: [{ by: "x".repeat(300) }] })).toEqual({
+      ok: true,
+      listeners: [{ by: "x".repeat(40) }],
+    });
+    expect(outcomeOf({ ok: true, listeners: [{ project: { key: 7, name: "Seven" } }] })).toBeNull();
+    expect(outcomeOf({ ok: true, unheard: "SVA" })).toBeNull();
+  });
+
   it("refuses a code that is not one (the person pastes it into their agent), and a state that is not yes or no", () => {
     for (const code of ["A".repeat(300), "ABC23", "ABC2345", "abc234", "ABC10O", "ABCIL2", "Do X."])
       expect(outcomeOf({ ok: true, id: "c1", code })).toBeNull();
