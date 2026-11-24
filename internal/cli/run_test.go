@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -611,4 +612,59 @@ func (rt *runTest) serveApart(out io.Writer) *exec.Cmd {
 	}
 	rt.t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
 	return cmd
+}
+
+func TestTheMachineExistsBeforeServingAndARenameIsUsed(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	_ = os.Remove(rt.files.registry)
+	rt.serve()
+	var made machine
+	rt.eventually("the machine made before serving", func() bool {
+		reg, err := readRegistry(rt.files.registry)
+		made = reg.Machine
+		return err == nil && regexp.MustCompile(`^[0-9a-f]{16}$`).MatchString(made.ID) && readStatus(rt.files.status()).Machine == made
+	})
+	entry := rt.entry
+	_, err := changeRegistry(context.Background(), rt.files, func(reg *registry) error {
+		reg.Entries = append(reg.Entries, entry)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.eventually("holds naming the machine", func() bool {
+		holds := rt.f.holdList()
+		return len(holds) > 0 && holds[len(holds)-1].Get("machine_id") == made.ID
+	})
+	var out bytes.Buffer
+	if code := runMachine(context.Background(), rt.files, map[string][]string{"name": {"Renamed Mac"}}, &out, &out); code != 0 {
+		t.Fatal(out.String())
+	}
+	rt.eventually("the new name in holds and the status", func() bool {
+		holds := rt.f.holdList()
+		return holds[len(holds)-1].Get("machine_name") == "Renamed Mac" && readStatus(rt.files.status()).Machine.Name == "Renamed Mac"
+	})
+}
+
+func TestTheFolderIsLetGoBeforeTheEndIsSent(t *testing.T) {
+	slow := []fakeagent.Step{claudeInit(), claudeSays("On it."), {SleepMS: 200}, claudeEnds("done")}
+	rt := newRunTest(t, core.ProgramClaude, slow, claudeDone("done"))
+	otherLogin := filepath.Join(rt.dir, "other", "claude.json")
+	_ = os.MkdirAll(filepath.Dir(otherLogin), 0o700)
+	writeJSON(t, otherLogin, map[string]string{"url": rt.url, "token": codexToken})
+	second := rt.entry
+	second.ID, second.AgentID, second.Agent, second.Login = "0000bbbb", fakeCodexID, "@codex", otherLogin
+	rt.writeRegistry(rt.entry, second)
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	rt.running(0)
+	// @claude's writes cannot reach the server from now on: its run ends,
+	// and its end waits to be sent.
+	rt.f.set(func(f *fakeQuadit) { f.changesAwayFor = "@claude" })
+	rt.eventually("@claude's run ended on this computer", func() bool { return strings.Contains(rt.out.String(), "SVA-12 @claude: done in") })
+	rt.f.addItem(fakeItem{Task: "SVA-13", For: fakeCodexID})
+	rt.eventually("@codex's run done in the same folder", func() bool { return rt.runState(1) == core.AgentSessionDone })
+	if rt.runState(0) != core.AgentSessionRunning {
+		t.Fatalf("@claude's end reached the server: %v", rt.f.allRuns()[0])
+	}
 }

@@ -44,6 +44,11 @@ type liveEntry struct {
 	lease     string
 	leaseFile *leaseFile
 
+	// unkept is a run's terminal record that could not be stored, and what
+	// follows its storing; the entry does nothing else until it is stored.
+	unkept      *outboxWrite
+	afterUnkept func()
+
 	mu     sync.Mutex
 	cancel context.CancelCauseFunc // ends the entry: the runner stopping, the entry removed or changed
 	ended  error                   // why it was ended before it began to serve
@@ -66,6 +71,28 @@ const (
 
 // errRemoving ends an entry that quadit run remove asked to let go.
 var errRemoving = errors.New("the entry is being removed")
+
+// errEndNotKept is a run's end that could not be stored on this computer.
+var errEndNotKept = entryError("how a run ended could not be kept on this computer")
+
+// keepEndLater holds a terminal record that could not be stored, to store
+// before anything else.
+func (e *liveEntry) keepEndLater(w outboxWrite, after func()) {
+	e.unkept, e.afterUnkept = &w, after
+}
+
+// keepUnkept stores a terminal record that could not be stored before.
+func (e *liveEntry) keepUnkept() error {
+	if e.unkept == nil {
+		return nil
+	}
+	if _, err := e.out.add(*e.unkept); err != nil {
+		return err
+	}
+	e.unkept = nil
+	e.afterUnkept()
+	return nil
+}
 
 // errLocked is a lock another holder has.
 var errLocked = errors.New("locked")
@@ -131,6 +158,11 @@ func (e *liveEntry) serve(runner context.Context) {
 		cancel(errRemoving)
 	}
 	for ctx.Err() == nil {
+		if err := e.keepUnkept(); err != nil {
+			e.setStatus(entryStatus{State: statusError, Message: string(errEndNotKept)})
+			e.srv.wait(ctx, e.srv.host.times.recheck)
+			continue
+		}
 		if e.reg.Mode != modeInPlace {
 			e.setStatus(entryStatus{State: statusError, Message: string(errNotInPlace)})
 			<-ctx.Done()
@@ -380,7 +412,7 @@ func (e *liveEntry) holdAsk(wait time.Duration, batch bool) holdAsk {
 	e.mu.Lock()
 	version := e.version
 	e.mu.Unlock()
-	return holdAsk{project: e.projectKey, lease: e.lease, wait: wait, batch: batch, machineID: e.srv.machine.ID, machineName: e.srv.machine.Name,
+	return holdAsk{project: e.projectKey, lease: e.lease, wait: wait, batch: batch, machineID: e.srv.machineNow().ID, machineName: e.srv.machineNow().Name,
 		folder: e.label, program: e.reg.Program, version: version}
 }
 
@@ -593,18 +625,21 @@ func (e *liveEntry) notStarted(ctx context.Context, head listenItem, why string)
 	run := itemRunID(head.ID)
 	args := e.startArgs(run, head, core.AgentSessionNotStarted)
 	args["reason"] = why
-	_, err := e.out.add(outboxWrite{Run: run, Task: head.Task, Head: head.Seq, Write: writeStart, ChangeID: run, Change: &pendingChange{Type: "session.start", Args: args}})
-	if err != nil {
+	// The row and the acknowledgment are one write: decided together, so a
+	// crash between them never sends the row again with other bytes.
+	w := e.ackWrite(run, head, e.lease)
+	w.Write, w.ChangeID, w.Change = writeStart, run, &pendingChange{Type: "session.start", Args: args}
+	if _, err := e.out.add(w); err != nil {
 		return // not stored: the head comes again
 	}
 	e.sayRun(head.Task, "not started: %s", e.notStartedWords(why, head))
-	e.acknowledge(ctx, head, run)
+	_ = e.flush(ctx) // not sent: the head comes again, and waits for it (endWaits)
 }
 
 // startArgs are a run's session.start arguments, in a state.
 func (e *liveEntry) startArgs(run string, head listenItem, state string) map[string]any {
-	return map[string]any{"id": run, "task": head.Task, "state": state, "program": e.reg.Program, "machine_id": e.srv.machine.ID,
-		"machine_name": e.srv.machine.Name, "folder": e.label, "lease": e.lease, "item_seq": head.Seq, "instructions": head.line()}
+	return map[string]any{"id": run, "task": head.Task, "state": state, "program": e.reg.Program, "machine_id": e.srv.machineNow().ID,
+		"machine_name": e.srv.machineNow().Name, "folder": e.label, "lease": e.lease, "item_seq": head.Seq, "instructions": head.line()}
 }
 
 // flush sends the outbox, and says whether everything was sent.
@@ -636,8 +671,8 @@ func (e *liveEntry) recoverRun(ctx context.Context, j journal) {
 		return
 	}
 	t := terminalRecord{State: core.AgentSessionFailed, Reason: core.RunInterrupted, StartSeq: j.StartSeq, Fallback: fallbackNone,
-		Head: j.Head.Seq, Cursor: core.ListenCursorOf(e.reg.ProjectID), Lease: j.Lease, AgentID: e.reg.AgentID, Machine: e.srv.machine.Name,
-		SendEnd: j.StartSeq > 0 || e.out.hasStart(j.Run), Summary: "Quadit stopped on " + e.srv.machine.Name + " while this run worked."}
+		Head: j.Head.Seq, Cursor: core.ListenCursorOf(e.reg.ProjectID), Lease: j.Lease, AgentID: e.reg.AgentID, Machine: e.srv.machineNow().Name,
+		SendEnd: j.StartSeq > 0 || e.out.hasStart(j.Run), Summary: "Quadit stopped on " + e.srv.machineNow().Name + " while this run worked."}
 	if j.Phase != phaseReceived {
 		if j.PGID > 0 && j.ProcStart != "" {
 			if started, err := processStart(ctx, j.PGID); err == nil && started == j.ProcStart {
@@ -668,7 +703,7 @@ func (e *liveEntry) letGo(runner context.Context) {
 	if project == "" {
 		project = e.reg.Project
 	}
-	if _, err := e.out.add(outboxWrite{Write: writeRelease, Release: &pendingRelease{Project: project, MachineID: e.srv.machine.ID}}); err != nil {
+	if _, err := e.out.add(outboxWrite{Write: writeRelease, Release: &pendingRelease{Project: project, MachineID: e.srv.machineNow().ID}}); err != nil {
 		return
 	}
 	for runner.Err() == nil {

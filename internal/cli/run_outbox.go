@@ -56,6 +56,7 @@ const (
 	writeEnd            = "end" // a terminal record, then the change that ends the run's row
 	writeAck            = "ack"
 	writeRelease        = "release"
+	writeOrphanClose    = "orphan-close" // the end of an open run of this machine no journal holds
 )
 
 // pendingChange is a change as it is sent.
@@ -131,25 +132,29 @@ type outbox struct {
 	// run found to have changed nothing on its task, or something.
 	blocked func(w outboxWrite, err error)
 	quiet   func(task, run string, quiet bool)
-	// answered holds the answers to start writes, by file, for the run
-	// that waits on one.
-	answered map[string]Result
 }
 
 func openOutbox(dir string) (*outbox, error) {
 	if err := os.MkdirAll(filepath.Join(dir, "failed"), 0o700); err != nil {
 		return nil, err
 	}
-	return &outbox{dir: dir, blocked: func(outboxWrite, error) {}, quiet: func(string, string, bool) {}, answered: map[string]Result{}}, nil
+	return &outbox{dir: dir, blocked: func(outboxWrite, error) {}, quiet: func(string, string, bool) {}}, nil
 }
 
 // outboxName is a file's name: its number, and for a write a terminal
 // record was resolved into, its place after it.
 var outboxName = regexp.MustCompile(`^(\d{8})(?:-(\d+))?\.json$`)
 
+// lastNumber is the file that keeps the last number the outbox gave, so a
+// number is never given twice, even after the outbox emptied.
+const lastNumber = "last"
+
 // files are the outbox's files, in the order they are sent.
-func (o *outbox) files() []string {
-	entries, _ := os.ReadDir(o.dir) // an outbox that cannot be read has nothing to send now
+func (o *outbox) files() ([]string, error) {
+	entries, err := os.ReadDir(o.dir)
+	if err != nil {
+		return nil, err
+	}
 	type named struct {
 		name    string
 		n, part int
@@ -174,17 +179,29 @@ func (o *outbox) files() []string {
 	for i, f := range list {
 		names[i] = f.name
 	}
-	return names
+	return names, nil
 }
 
-// add stores a write as the outbox's last file, and gives its name.
+// add stores a write as the outbox's last file, under a number never
+// given before, and gives its name.
 func (o *outbox) add(w outboxWrite) (string, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	files, err := o.files()
+	if err != nil {
+		return "", err
+	}
 	next := 1
-	if files := o.files(); len(files) > 0 {
-		n, _ := strconv.Atoi(files[len(files)-1][:8])
+	if raw, err := os.ReadFile(filepath.Join(o.dir, lastNumber)); err == nil {
+		n, _ := strconv.Atoi(strings.TrimSpace(string(raw))) // unreadable: the files say
 		next = n + 1
+	}
+	if len(files) > 0 {
+		n, _ := strconv.Atoi(files[len(files)-1][:8])
+		next = max(next, n+1)
+	}
+	if err := writeWhole(filepath.Join(o.dir, lastNumber), []byte(strconv.Itoa(next)+"\n")); err != nil {
+		return "", err
 	}
 	name := fmt.Sprintf("%08d.json", next)
 	return name, writeWhole(filepath.Join(o.dir, name), plainJSON(w))
@@ -204,7 +221,8 @@ func (o *outbox) read(name string) (outboxWrite, error) {
 func (o *outbox) writes() (names []string, writes []outboxWrite) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	for _, name := range o.files() {
+	files, _ := o.files() // an outbox that cannot be read shows nothing here; flush says why
+	for _, name := range files {
 		if w, err := o.read(name); err == nil {
 			names, writes = append(names, name), append(writes, w)
 		}
@@ -212,11 +230,13 @@ func (o *outbox) writes() (names []string, writes []outboxWrite) {
 	return names, writes
 }
 
-// empty reports whether nothing waits to be sent.
+// empty reports whether nothing waits to be sent; an outbox that cannot
+// be read is not empty.
 func (o *outbox) empty() bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return len(o.files()) == 0
+	files, err := o.files()
+	return err == nil && len(files) == 0
 }
 
 // endWaits reports whether the end of a run whose head is head waits to
@@ -225,7 +245,7 @@ func (o *outbox) empty() bool {
 func (o *outbox) endWaits(head int64) bool {
 	_, writes := o.writes()
 	return slices.ContainsFunc(writes, func(w outboxWrite) bool {
-		return w.Head == head && (w.Terminal != nil || w.Write == writeEnd || w.Write == writeFallback || w.Write == writeAck)
+		return w.Head == head && (w.Terminal != nil || w.Write == writeEnd || w.Write == writeFallback || w.Ack != nil)
 	})
 }
 
@@ -244,19 +264,22 @@ func (o *outbox) hasStart(run string) bool {
 }
 
 // drop removes one file, and dropRun every file of a run.
-func (o *outbox) drop(name string) {
+func (o *outbox) drop(name string) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	os.Remove(filepath.Join(o.dir, name))
+	return removeDurably(filepath.Join(o.dir, name))
 }
 
-func (o *outbox) dropRun(run string) {
+func (o *outbox) dropRun(run string) error {
 	names, writes := o.writes()
 	for i, w := range writes {
 		if w.Run == run {
-			o.drop(names[i])
+			if err := o.drop(names[i]); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 // blockedWrite is a write the server refused for good, as status.json
@@ -298,71 +321,102 @@ func (e *startRefused) Error() string { return e.err.Error() }
 var errOutboxWaits = errors.New("the outbox waits for the server")
 
 // flush sends the outbox in order, until it is empty, or, when until
-// names a file, until that file was sent; it gives that file's answer. It
-// stops with errOutboxWaits at a write that cannot be sent now; with a
-// *startRefused at the start of until; and with the refusal at until
-// refused for good. Any other write refused for good is moved to failed/
-// and does not hold the writes after it, nor does an acknowledgment of a
-// lease that is no longer the runner's, which is dropped: whoever holds
-// the lease now owns the item. A start refused before until is dropped,
-// with every later write of its run.
+// names a change id, until the write of that id was sent: it gives that
+// write's own answer (an answer is given to no other). It stops with
+// errOutboxWaits at a write that cannot be sent now, or at an outbox that
+// cannot be read or changed; with a *startRefused at until's start; and
+// with the refusal of until refused for good. Any other write refused for
+// good is moved to failed/ and does not hold the writes after it, nor does
+// an acknowledgment of a lease that is no longer the runner's, which is
+// dropped: whoever holds the lease now owns the item. A start refused
+// before until is dropped, with every later write of its run.
 func (o *outbox) flush(ctx context.Context, srv outboxServer, until string) (Result, error) {
 	o.sending.Lock()
 	defer o.sending.Unlock()
+	waits := func(err error) (Result, error) { return Result{}, errors.Join(errOutboxWaits, err) }
 	for {
-		if res, ok := o.answered[until]; ok && until != "" {
-			delete(o.answered, until)
-			return res, nil
-		}
 		o.mu.Lock()
-		files := o.files()
+		files, err := o.files()
 		o.mu.Unlock()
+		if err != nil {
+			return waits(err)
+		}
 		if len(files) == 0 {
+			if until != "" {
+				return waits(errors.New("the write waited for is no longer in the outbox"))
+			}
 			return Result{}, nil
 		}
 		name := files[0]
 		w, err := o.read(name)
 		if err != nil {
-			o.moveToFailed(name, w, err)
+			if err := o.moveToFailed(name, w, err); err != nil {
+				return waits(err)
+			}
 			continue
 		}
 		if w.Terminal != nil {
 			if err := o.resolve(ctx, srv, name, w); err != nil {
-				return Result{}, errors.Join(errOutboxWaits, err)
+				return waits(err)
 			}
 			continue
 		}
 		res, err := o.send(ctx, srv, w)
+		mine := until != "" && w.Change != nil && w.ChangeID == until
 		if err == nil {
-			if w.Write == writeStart {
-				o.answered[name] = res
+			if err := o.sent(name, w); err != nil {
+				return waits(err)
 			}
-			o.drop(name)
+			if mine {
+				return res, nil
+			}
 			continue
 		}
 		if ctx.Err() != nil || temporary(err) {
-			return Result{}, errors.Join(errOutboxWaits, err)
+			return waits(err)
 		}
 		ae, _ := refusalOf(err)
+		var stored error
 		switch {
-		case w.Write == writeAck && leaseLost(err):
-			o.drop(name)
+		case w.Change == nil && w.Ack != nil && leaseLost(err):
+			stored = o.drop(name)
+		case w.Change != nil && w.Ack != nil && ae.Code == "conflict" && ae.Reason == "":
+			// An item's row sent again under a new lease: its id was used
+			// already, so the row stands; its acknowledgment goes next.
+			stored = o.sent(name, w)
 		case w.Write == writeStart && (ae.Reason == "lease_stale" || ae.Reason == "run_open" || ae.Reason == "in_use"):
-			if name == until {
+			if mine {
 				return Result{}, &startRefused{file: name, reason: ae.Reason, err: err}
 			}
-			o.dropRun(w.Run)
+			stored = o.dropRun(w.Run)
 		default:
-			o.moveToFailed(name, w, err)
+			stored = o.moveToFailed(name, w, err)
 			o.blocked(w, err)
-			if name == until {
+			if mine {
 				return Result{}, err
 			}
+		}
+		if stored != nil {
+			return waits(stored)
 		}
 	}
 }
 
-// send sends one write.
+// sent takes out of the outbox what the server took: the file, or, for a
+// change that carries its acknowledgment, the change, leaving the
+// acknowledgment to be sent next.
+func (o *outbox) sent(name string, w outboxWrite) error {
+	if w.Change != nil && w.Ack != nil {
+		w.Change, w.ChangeID = nil, ""
+		o.mu.Lock()
+		defer o.mu.Unlock()
+		return writeWhole(filepath.Join(o.dir, name), plainJSON(w))
+	}
+	return o.drop(name)
+}
+
+// send sends one write: its change if it has one, else its
+// acknowledgment, else its release.
 func (o *outbox) send(ctx context.Context, srv outboxServer, w outboxWrite) (Result, error) {
 	switch {
 	case w.Change != nil:
@@ -376,15 +430,30 @@ func (o *outbox) send(ctx context.Context, srv outboxServer, w outboxWrite) (Res
 }
 
 // moveToFailed keeps a write the server refused for good in failed/, with
-// why.
-func (o *outbox) moveToFailed(name string, w outboxWrite, err error) {
+// why, under the write's own identity (its run, name and ordinal), so no
+// refusal overwrites another's. A change that carries its acknowledgment
+// leaves the acknowledgment to be sent: the item was decided either way.
+func (o *outbox) moveToFailed(name string, w outboxWrite, err error) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	w.Error = err.Error()
-	failed := filepath.Join(o.dir, "failed", name)
-	if writeWhole(failed, plainJSON(w)) == nil {
-		os.Remove(filepath.Join(o.dir, name))
+	kept := w
+	kept.Error = err.Error()
+	kept.Ack = nil
+	if w.Change == nil {
+		kept.Ack = w.Ack
 	}
+	identity := fmt.Sprintf("%s-%s-%d.json", kept.Run, kept.Write, kept.Ordinal)
+	if kept.Run == "" {
+		identity = fmt.Sprintf("%s-%s.json", kept.Write, strings.TrimSuffix(name, ".json"))
+	}
+	if err := writeWhole(filepath.Join(o.dir, "failed", identity), plainJSON(kept)); err != nil {
+		return err
+	}
+	if w.Change != nil && w.Ack != nil {
+		w.Change, w.ChangeID = nil, ""
+		return writeWhole(filepath.Join(o.dir, name), plainJSON(w))
+	}
+	return removeDurably(filepath.Join(o.dir, name))
 }
 
 // resolve decides what a terminal record left to decide, keeping each
@@ -473,7 +542,7 @@ func (o *outbox) resolve(ctx context.Context, srv outboxServer, name string, w o
 			return err
 		}
 	}
-	return os.Remove(filepath.Join(o.dir, name))
+	return removeDurably(filepath.Join(o.dir, name))
 }
 
 // changeID is the id of a run's write: the same for the same run, name and

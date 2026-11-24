@@ -41,6 +41,7 @@ type fakeQuadit struct {
 	// answer to each change id.
 	changes  []fakeChange
 	answered map[string]string
+	bodies   map[string]string // the change each applied id was, as sent
 	acks     []fakeAck
 	holds    []url.Values
 	released []url.Values
@@ -62,6 +63,7 @@ type fakeQuadit struct {
 	// that ends a run; writeOnRunning is an event the agent emits (as its
 	// program would) when a run goes running.
 	changesAway    bool
+	changesAwayFor string // the same, for one login's changes alone
 	staleStart     bool
 	stopOnStart    bool
 	refuseEnds     bool
@@ -120,7 +122,7 @@ const (
 
 func newFakeQuadit() *fakeQuadit {
 	return &fakeQuadit{lease: testLease, seq: 1000, answered: map[string]string{}, lose: map[string]int{}, changed: make(chan struct{}),
-		cursors: map[string]int64{}, sent: map[string]int{},
+		cursors: map[string]int64{}, sent: map[string]int{}, bodies: map[string]string{},
 		members: map[string]fakeMember{
 			agentToken:    {Handle: "@claude", Kind: "agent", UserID: fakeAgentID, Responsible: "@aram"},
 			codexToken:    {Handle: "@codex", Kind: "agent", UserID: fakeCodexID, Responsible: "@aram"},
@@ -448,9 +450,15 @@ func (f *fakeQuadit) applyChanges(w http.ResponseWriter, r *http.Request, who fa
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sent[ch.ID]++
-	if f.changesAway {
+	if f.changesAway || f.changesAwayFor == who.Handle {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = io.WriteString(w, `{"error":{"code":"unavailable","message":"the server is busy"}}`)
+		return
+	}
+	sentAs, _ := json.Marshal(ch)
+	if first, ok := f.bodies[ch.ID]; ok && first != string(sentAs) {
+		// As the server does: a change id used again for another change.
+		refuse(w, http.StatusConflict, "conflict", "", "change id "+ch.ID+" was already used for a different change")
 		return
 	}
 	if first, ok := f.answered[ch.ID]; ok {
@@ -464,6 +472,7 @@ func (f *fakeQuadit) applyChanges(w http.ResponseWriter, r *http.Request, who fa
 		return
 	}
 	f.changes = append(f.changes, ch)
+	f.bodies[ch.ID] = string(sentAs)
 	f.calls = append(f.calls, ch.Type)
 	f.answered[ch.ID] = answer
 	if f.lose[ch.Type] > 0 {

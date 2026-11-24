@@ -176,8 +176,29 @@ func writeWhole(path string, data []byte) error {
 	}
 	if err != nil {
 		os.Remove(tmp.Name())
+		return err
 	}
-	return err
+	return syncDir(filepath.Dir(path))
+}
+
+// removeDurably removes a file and makes its removal durable; one already
+// gone is removed.
+func removeDurably(path string) error {
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return syncDir(filepath.Dir(path))
+}
+
+// syncDir flushes a folder's entries to the disk: the renames and
+// removals the crash boundaries rely on survive a power loss.
+func syncDir(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	return d.Sync()
 }
 
 // plainJSON is one of the runner's own values as indented JSON, as its

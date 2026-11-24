@@ -126,11 +126,7 @@ func (e *liveEntry) run(ctx context.Context, items []listenItem, continuing bool
 	end, folder := r.work(ctx, resume)
 	stopHelpers()
 	wg.Wait()
-	r.finish(ctx, end)
-	if folder != nil {
-		e.srv.releaseFolder(e.reg.Folder, folder) // once the run's end is stored, not when the server has it
-	}
-	return nil
+	return r.finish(ctx, end, folder)
 }
 
 // start records the run on the server (waiting) and waits until the
@@ -147,44 +143,61 @@ func (r *agentRun) start(ctx context.Context) (int64, error) {
 		args["program_session"] = r.session
 		r.sentSession = r.session
 	}
-	name, err := e.out.add(r.write(writeStart, &pendingChange{Type: "session.start", Args: args}))
-	if err != nil {
+	startW := r.write(writeStart, &pendingChange{Type: "session.start", Args: args})
+	if _, err := e.out.add(startW); err != nil {
 		_ = clearJournal(e.dir) // nothing was sent: the head comes again
 		e.sayRun(r.key, "not started: the run could not be kept on this computer (%v)", err)
 		return 0, nil
 	}
 	away, retried := e.srv.host.times.awayFirst, false
+	// given up drops the start (no row was made) and the journal; a start
+	// that cannot be dropped stays to be sent, so the entry waits.
+	givenUp := func(file string) error {
+		if err := e.out.drop(file); err != nil {
+			return fmt.Errorf("a run's start could not be taken back from the outbox: %w", err)
+		}
+		_ = clearJournal(e.dir) // the head comes again, and is decided again
+		return nil
+	}
 	for {
-		res, err := e.out.flush(ctx, e.api, name)
+		res, err := e.out.flush(ctx, e.api, startW.ChangeID)
 		var refused *startRefused
 		switch {
 		case err == nil:
 			return res.Seq, nil
 		case errors.As(err, &refused) && refused.reason == "lease_stale":
-			e.out.drop(refused.file)
-			_ = clearJournal(e.dir) // no row was made: the head goes to whoever holds the lease
-			return 0, nil
+			return 0, givenUp(refused.file) // the head goes to whoever holds the lease
 		case errors.As(err, &refused) && refused.reason == "in_use":
 			// The run exists already: go on from its row, never close it.
-			e.out.drop(refused.file)
 			if seq, ok := r.existing(ctx); ok {
-				return seq, nil
+				return seq, e.out.drop(refused.file)
 			}
-			_ = clearJournal(e.dir) // the run is not open: its head comes again and is decided again
-			return 0, nil
+			return 0, givenUp(refused.file)
 		case errors.As(err, &refused):
-			if !retried && r.closeOrphans(ctx) {
-				retried = true
-				continue
+			// The start waits aside while the orphans are closed: it was
+			// not applied, and is added again as it was (same id, same body).
+			if err := e.out.drop(refused.file); err != nil {
+				return 0, fmt.Errorf("a run's start could not be taken back from the outbox: %w", err)
 			}
-			e.out.drop(refused.file)
-			_ = clearJournal(e.dir) // this run is not made; the item's not_started row stands for it
-			e.notStarted(ctx, head, core.RunOpenElsewhere)
-			return 0, nil
+			closed, known := r.closeOrphans(ctx)
+			if known && (!closed || retried) {
+				_ = clearJournal(e.dir) // this run is not made: the item's not_started row stands for it
+				e.notStarted(ctx, head, core.RunOpenElsewhere)
+				return 0, nil
+			}
+			if !known {
+				e.srv.wait(ctx, away) // who owns the open run is not known yet: ask again
+				away = min(away*2, e.srv.host.times.awayMax)
+			}
+			retried = retried || closed
+			if _, err := e.out.add(startW); err != nil {
+				_ = clearJournal(e.dir) // nothing waits to be sent: the head comes again
+				return 0, err
+			}
 		case errors.Is(err, errOutboxWaits):
 			if ctx.Err() != nil {
 				r.finish(ctx, runEnding{state: core.AgentSessionFailed, reason: core.RunInterrupted, summary: r.stoppedSummary(),
-					line: "interrupted: Quadit stopped before this run started"})
+					line: "interrupted: Quadit stopped before this run started"}, nil)
 				return 0, ctx.Err() // the entry ends: whoever ended it does not wait on this
 			}
 			e.srv.wait(ctx, away)
@@ -214,8 +227,9 @@ func (r *agentRun) existing(ctx context.Context) (int64, bool) {
 // closeOrphans ends the open runs of this agent on the task that this
 // machine started and no journal holds (a run left by a crash, or whose
 // end was refused): they would keep every later run from starting. It
-// reports whether there were any, all closed.
-func (r *agentRun) closeOrphans(ctx context.Context) bool {
+// reports whether it closed any, and whether it knows: a failed read of
+// the runs tells nothing (it is not "another machine's").
+func (r *agentRun) closeOrphans(ctx context.Context) (closed, known bool) {
 	e := r.e
 	var orphans []string
 	elsewhere := false
@@ -223,24 +237,29 @@ func (r *agentRun) closeOrphans(ctx context.Context) bool {
 		if row.AgentID != e.reg.AgentID || row.ID == r.id || (row.State != core.AgentSessionWaiting && row.State != core.AgentSessionRunning) {
 			return false
 		}
-		if row.MachineID == e.srv.machine.ID {
+		if row.MachineID == e.srv.machineNow().ID {
 			orphans = append(orphans, row.ID)
 		} else {
 			elsewhere = true
 		}
 		return false
 	})
-	if err != nil || elsewhere || len(orphans) == 0 {
-		return false
+	if err != nil {
+		return false, false
+	}
+	if elsewhere || len(orphans) == 0 {
+		return false, true
 	}
 	for _, orphan := range orphans {
+		// A close of an orphan is its own write, under its own id: never
+		// the id of the run's own end, whose body could differ.
 		args := map[string]any{"id": orphan, "state": core.AgentSessionFailed, "reason": core.RunInterrupted, "summary": r.stoppedSummary()}
-		w := outboxWrite{Run: orphan, Task: r.key, Write: writeEnd, ChangeID: changeID(orphan, writeEnd, 0), Change: &pendingChange{Type: "session.update", Args: args}}
+		w := outboxWrite{Run: orphan, Task: r.key, Write: writeOrphanClose, ChangeID: changeID(orphan, writeOrphanClose, 0), Change: &pendingChange{Type: "session.update", Args: args}}
 		if _, err := e.out.add(w); err != nil {
-			return false
+			return false, false
 		}
 	}
-	return e.flush(ctx) == nil
+	return e.flush(ctx) == nil, true
 }
 
 // work is the run from the folder on: it takes the folder, waits for the
@@ -285,7 +304,7 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 			}
 			return runEnding{state: core.AgentSessionFailed, reason: reason, resetsAt: time.UnixMilli(p.Until), line: "failed: " + pauseWords(p.Reason, e.prog.Title(), time.UnixMilli(p.Until))}
 		}
-		prompt, err := buildPrompt(promptFacts{Agent: e.me.Handle, Owner: e.me.Responsible, Key: r.key, Run: r.id, Machine: e.srv.machine.Name,
+		prompt, err := buildPrompt(promptFacts{Agent: e.me.Handle, Owner: e.me.Responsible, Key: r.key, Run: r.id, Machine: e.srv.machineNow().Name,
 			Folder: e.label, Program: e.prog.Title(), Items: r.items, Resuming: resume != "", Continue: r.continuing && resume != "", Lost: lost}, randomHex(6))
 		if err != nil {
 			return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, ack: true, line: "failed: " + err.Error()}
@@ -345,7 +364,7 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 			}
 		default:
 			return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, ack: true,
-				line: fmt.Sprintf("failed: %s did not start on %s (%s)", e.prog.Title(), e.srv.machine.Name, out.Detail)}
+				line: fmt.Sprintf("failed: %s did not start on %s (%s)", e.prog.Title(), e.srv.machineNow().Name, out.Detail)}
 		}
 	}
 }
@@ -362,7 +381,7 @@ func (r *agentRun) stoppedEnd(final string) runEnding {
 
 // stoppedSummary says the runner stopped while the run worked.
 func (r *agentRun) stoppedSummary() string {
-	return "Quadit stopped on " + r.e.srv.machine.Name + " while this run worked."
+	return "Quadit stopped on " + r.e.srv.machineNow().Name + " while this run worked."
 }
 
 // sessionWords say which session an attempt uses, for the printed line.
@@ -719,9 +738,12 @@ func (r *agentRun) sawEvents(events []programEvent, at time.Time) {
 }
 
 // finish ends the run: the steps left and the terminal record are stored
-// before any network call, the folder is let go (by the caller's defer),
-// the state is recorded, the journal cleared; then the outbox is sent.
-func (r *agentRun) finish(ctx context.Context, end runEnding) {
+// before any network call; then the folder is let go (it is not held
+// while the server is told), the state is recorded, the journal cleared,
+// and the outbox sent. A terminal record that cannot be stored is kept
+// by the entry, which stores it before it does anything else
+// (errEndNotKept): nothing is acknowledged, nothing new starts meanwhile.
+func (r *agentRun) finish(ctx context.Context, end runEnding, folder *os.File) error {
 	e := r.e
 	r.queueSteps()
 	r.mu.Lock()
@@ -730,47 +752,58 @@ func (r *agentRun) finish(ctx context.Context, end runEnding) {
 	r.mu.Unlock()
 	eligible := end.state == core.AgentSessionDone || (end.state == core.AgentSessionFailed &&
 		(end.reason == core.RunProgramError || end.reason == core.RunIdle || end.reason == core.RunTimeLimit))
+	m := e.srv.machineNow()
 	t := terminalRecord{State: end.state, Reason: end.reason, Final: end.final, Summary: end.summary, StartSeq: r.j.StartSeq, Fallback: fallbackNone,
 		SendEnd: true, Head: r.items[0].Seq, Ack: end.ack, Cursor: core.ListenCursorOf(e.reg.ProjectID), Lease: r.lease,
-		AgentID: e.reg.AgentID, Machine: e.srv.machine.Name}
+		AgentID: e.reg.AgentID, Machine: m.Name}
 	if end.reason == core.RunUsageLimit && end.resetsAt.After(r.received) {
 		t.ResetsAt = end.resetsAt.UnixMilli()
 	}
-	if eligible && cleanedFinal(end.final, e.srv.machine.Name) != "" {
+	if eligible && cleanedFinal(end.final, m.Name) != "" {
 		t.Fallback = decidePending
 	}
 	if eligible && accepted {
 		t.Quiet = decidePending
 	}
-	if _, err := e.out.add(outboxWrite{Run: r.id, Task: r.key, Head: r.items[0].Seq, Write: writeEnd, Terminal: &t}); err != nil {
-		e.sayRun(r.key, "could not keep how this run ended (%v); it is ended at the next start", err)
-		return
-	}
-	_ = e.state.changeTask(r.key, func(ts *taskState) { // not written: the next run reads the state of the run before
-		if path, ok := e.prog.SessionFile(e.srv.host.home, session, e.reg.Folder); session != "" && ok {
-			if st, err := os.Stat(path); err == nil {
-				ts.SessionFile = &fileMark{MTime: st.ModTime().UnixMilli(), Size: st.Size()}
+	kept := func() {
+		_ = e.state.changeTask(r.key, func(ts *taskState) { // not written: the next run reads the state of the run before
+			if path, ok := e.prog.SessionFile(e.srv.host.home, session, e.reg.Folder); session != "" && ok {
+				if st, err := os.Stat(path); err == nil {
+					ts.SessionFile = &fileMark{MTime: st.ModTime().UnixMilli(), Size: st.Size()}
+				}
 			}
-		}
-		if r.continuing && end.reason != core.RunUsageLimit && end.reason != core.RunNotSignedIn {
-			ts.Continue = nil
-		}
-	})
-	if end.reason != core.RunUsageLimit && accepted {
-		_ = e.state.change(func(s *entryState) { // the back-off of a usage limit starts over after a run that worked
-			if s.Pause != nil && s.Pause.Reason == "" {
-				s.Pause = nil
+			if r.continuing && end.reason != core.RunUsageLimit && end.reason != core.RunNotSignedIn {
+				ts.Continue = nil
 			}
 		})
+		if end.reason != core.RunUsageLimit && accepted {
+			_ = e.state.change(func(s *entryState) { // the back-off of a usage limit starts over after a run that worked
+				if s.Pause != nil && s.Pause.Reason == "" {
+					s.Pause = nil
+				}
+			})
+		}
+		_ = clearJournal(e.dir) // the outbox's record wins over a journal left behind
+		e.sayRun(r.key, "%s", end.line)
 	}
-	_ = clearJournal(e.dir) // the outbox's record wins over a journal left behind
-	e.sayRun(r.key, "%s", end.line)
+	w := outboxWrite{Run: r.id, Task: r.key, Head: r.items[0].Seq, Write: writeEnd, Terminal: &t}
+	_, err := e.out.add(w)
+	if folder != nil {
+		e.srv.releaseFolder(e.reg.Folder, folder) // the program ended; the server is told without holding the folder
+	}
+	if err != nil {
+		e.keepEndLater(w, kept)
+		e.sayRun(r.key, "could not keep how this run ended (%v); nothing goes on until it is kept", err)
+		return errEndNotKept
+	}
+	kept()
 	sendCtx, cancel := ctx, context.CancelFunc(func() {})
 	if ctx.Err() != nil {
 		sendCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), e.srv.host.times.sendOnStop)
 	}
 	defer cancel()
 	_ = e.flush(sendCtx) // what is not sent now is sent at the next chance
+	return nil
 }
 
 // duration says how long something took: 4m 12s.

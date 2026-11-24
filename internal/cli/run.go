@@ -181,11 +181,13 @@ func systemHost() (runHost, error) {
 
 // serving is one quadit run at work: what its entries share.
 type serving struct {
-	files   runFiles
-	host    runHost
-	machine machine
-	print   *printer
-	status  *statusBoard
+	files  runFiles
+	host   runHost
+	print  *printer
+	status *statusBoard
+
+	machineMu sync.Mutex
+	machine   machine // this computer as the registry names it now
 
 	foldersMu sync.Mutex
 	holders   map[string]string // who works in each folder now, by folder
@@ -208,6 +210,25 @@ func newServing(files runFiles, host runHost, m machine, out io.Writer, logPath 
 		status: &statusBoard{path: files.status(), machine: m, clock: host.clock, entries: map[string]statusEntry{}}}
 }
 
+// machineNow is this computer as the registry names it now.
+func (srv *serving) machineNow() machine {
+	srv.machineMu.Lock()
+	defer srv.machineMu.Unlock()
+	return srv.machine
+}
+
+// setMachine takes a renamed machine from the registry, for later holds
+// and the status.
+func (srv *serving) setMachine(m machine) {
+	srv.machineMu.Lock()
+	changed := srv.machine != m
+	srv.machine = m
+	srv.machineMu.Unlock()
+	if changed {
+		srv.status.setMachine(m)
+	}
+}
+
 // serve serves every entry of the registry until ctx ends, then stops each
 // entry's program, keeps how each run ended, and returns. One runner
 // serves a computer: a second is refused (exitAnotherRun).
@@ -226,12 +247,14 @@ func serve(ctx context.Context, files runFiles, host runHost, stdout, stderr io.
 		return exitFailed
 	}
 	defer lock.Close()
-	reg, err := readRegistry(files.registry)
+	// The machine is made before serving: every hold names it.
+	reg, err := changeRegistry(ctx, files, func(*registry) error { return nil })
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return exitFailed
 	}
 	srv := newServing(files, host, reg.Machine, stdout, files.runnerLog())
+	srv.status.setMachine(reg.Machine) // status.json says who serves, entries or not
 	n := "entries"
 	if len(reg.Entries) == 1 {
 		n = "entry"
@@ -254,6 +277,7 @@ func serve(ctx context.Context, files runFiles, host runHost, stdout, stderr io.
 			if mark := registryMark(files.registry); mark != seen {
 				if next, err := readRegistry(files.registry); err == nil {
 					seen, reg = mark, next
+					srv.setMachine(reg.Machine)
 				}
 			}
 			srv.reconcile(ctx, reg)

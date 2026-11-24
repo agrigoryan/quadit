@@ -263,10 +263,4 @@ func writeJournal(entryDir string, j journal) error {
 }
 
 // clearJournal says no run is in flight.
-func clearJournal(entryDir string) error {
-	err := os.Remove(journalPath(entryDir))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	return err
-}
+func clearJournal(entryDir string) error { return removeDurably(journalPath(entryDir)) }

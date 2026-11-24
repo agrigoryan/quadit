@@ -80,6 +80,14 @@ func (b *statusBoard) set(id string, st entryStatus, blocked []blockedWrite) {
 	b.write()
 }
 
+// setMachine names the machine anew, as the registry renamed it.
+func (b *statusBoard) setMachine(m machine) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.machine = m
+	b.write()
+}
+
 // drop says nothing more of an entry that is no longer served.
 func (b *statusBoard) drop(id string) {
 	b.mu.Lock()

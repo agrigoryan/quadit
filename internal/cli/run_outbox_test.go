@@ -131,3 +131,110 @@ func TestAResolvedTerminalRecordIsNeverDecidedAgain(t *testing.T) {
 		t.Fatalf("sent %v, quiet %v", srv.sent, quiet)
 	}
 }
+
+func startWrite(run string) outboxWrite {
+	return outboxWrite{Run: run, Write: writeStart, ChangeID: changeID(run, writeStart, 0), Change: &pendingChange{Type: "session.start", Args: map[string]any{"id": run}}}
+}
+
+func TestAnAnswerGoesOnlyToTheWriteThatAskedForIt(t *testing.T) {
+	out, _ := openOutbox(t.TempDir())
+	ctx := context.Background()
+	const before, run = "0199eeee-0000-7000-8000-0000000000d1", "0199eeee-0000-7000-8000-0000000000d2"
+	// An item's not_started row is sent with nobody waiting for its answer.
+	if _, err := out.add(startWrite(before)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := out.flush(ctx, &recordingServer{}, ""); err != nil || !out.empty() {
+		t.Fatalf("flush: %v", err)
+	}
+	// The next run's start is refused: its own refusal comes back, never the
+	// answer to the earlier write.
+	w := startWrite(run)
+	if _, err := out.add(w); err != nil {
+		t.Fatal(err)
+	}
+	srv := &recordingServer{refuse: func(string) error {
+		return &APIError{Status: http.StatusConflict, Code: "conflict", Reason: "lease_stale"}
+	}}
+	var refused *startRefused
+	if _, err := out.flush(ctx, srv, w.ChangeID); !errors.As(err, &refused) {
+		t.Fatalf("the run's start got %v, not its own refusal", err)
+	}
+	if !slices.Equal(srv.sent, []string{w.ChangeID}) {
+		t.Fatalf("sent %v", srv.sent)
+	}
+}
+
+func TestTheOutboxNeverReusesANumber(t *testing.T) {
+	out, _ := openOutbox(t.TempDir())
+	first, _ := out.add(stepsWrite("0199eeee-0000-7000-8000-0000000000d3", 0))
+	if _, err := out.flush(context.Background(), &recordingServer{}, ""); err != nil {
+		t.Fatal(err)
+	}
+	if second, _ := out.add(stepsWrite("0199eeee-0000-7000-8000-0000000000d3", 1)); second <= first {
+		t.Fatalf("after a drain the outbox numbered %s after %s", second, first)
+	}
+}
+
+func TestRefusedWritesAreKeptEachUnderItsOwnName(t *testing.T) {
+	dir := t.TempDir()
+	out, _ := openOutbox(dir)
+	forbidden := &recordingServer{refuse: func(string) error { return &APIError{Status: http.StatusForbidden, Code: "forbidden"} }}
+	for _, run := range []string{"0199eeee-0000-7000-8000-0000000000d4", "0199eeee-0000-7000-8000-0000000000d5"} {
+		_, _ = out.add(stepsWrite(run, 0))
+		if _, err := out.flush(context.Background(), forbidden, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := out.failed(); len(got) != 2 {
+		t.Fatalf("failed/ keeps %d of two refused writes", len(got))
+	}
+}
+
+func TestARefusalAndItsAcknowledgmentAreKeptTogether(t *testing.T) {
+	out, _ := openOutbox(t.TempDir())
+	const run = "0199eeee-0000-7000-8000-0000000000d6"
+	w := startWrite(run)
+	w.Ack = &pendingAck{Cursor: "listen:p", Seq: 7, Lease: "KQ7MX4PA"}
+	if _, err := out.add(w); err != nil {
+		t.Fatal(err)
+	}
+	names, _ := out.writes()
+	if len(names) != 1 {
+		t.Fatalf("a refusal and its acknowledgment are %d files", len(names))
+	}
+	ackAway := true
+	srv := &recordingServer{refuse: func(what string) error {
+		if what == "ack 7" && ackAway {
+			return errors.New("connection refused")
+		}
+		return nil
+	}}
+	if _, err := out.flush(context.Background(), srv, ""); !errors.Is(err, errOutboxWaits) {
+		t.Fatal(err)
+	}
+	ackAway = false
+	if _, err := out.flush(context.Background(), srv, ""); err != nil || !out.empty() {
+		t.Fatal(err)
+	}
+	if !slices.Equal(srv.sent, []string{w.ChangeID, "ack 7", "ack 7"}) {
+		t.Fatalf("sent %v: the change once, then the acknowledgment until it went", srv.sent)
+	}
+}
+
+func TestAnOutboxThatCannotBeChangedIsNotSentInALoop(t *testing.T) {
+	dir := t.TempDir()
+	out, _ := openOutbox(dir)
+	_, _ = out.add(stepsWrite("0199eeee-0000-7000-8000-0000000000d7", 0))
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(dir, 0o700)
+	srv := &recordingServer{}
+	if _, err := out.flush(context.Background(), srv, ""); err == nil {
+		t.Fatal("a write that could not be taken out of the outbox was taken as sent")
+	}
+	if len(srv.sent) != 1 {
+		t.Fatalf("sent %d times", len(srv.sent))
+	}
+}
