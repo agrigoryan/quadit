@@ -64,7 +64,7 @@ type listened struct {
 	Project string
 	Seq     int64
 	Line    string
-	Item  *struct {
+	Item    *struct {
 		Seq  int64
 		Type string
 		By   string
