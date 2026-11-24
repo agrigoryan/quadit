@@ -171,6 +171,7 @@ quadit ask SVA-12 "Which explosion?" \
 - The task now waits on them. While you are listening, their answer comes to you as an item. In a run Quadit started, end your turn instead of waiting: the answer starts you again. Otherwise wait with `quadit events cursor=main mine=1 others=1 wait=50` (it returns as soon as something happens), or stop and pick it up next session from `quadit work`.
 - The answer arrives as `decision.picked … -> 2) B: burst (with_changes): Make it 20% larger.` Follow the note exactly.
 - If the answer does not settle it, say what is unclear in one line: `quadit unclear DECISION_ID "Larger in radius, or in duration?"`. Do not guess.
+- When a person's comment makes your open question moot, close it instead of leaving it open: `quadit close DECISION_ID "Settled in the comments: the ring."`. A question sent back to you (no option picked, a note instead) is settled when you ask again or post your result. A question closed by someone else comes to you as `not_needed`; act on its note when it has one.
 
 If a change is refused with `needs_approval`, ask with `quadit approval KEY "…" action=task.delete` (for a change that is not on that task, add `args='{…}'` with the exact arguments you will send) and resend the same change with `approval=DECISION_ID` once approved. An approval covers that one change, once.
 

@@ -225,6 +225,9 @@ change dbview.update arg id
 change dbview.update arg name
 change dbview.update arg rank
 change dbview.update arg type
+change decision.close
+change decision.close arg id
+change decision.close arg note
 change decision.delete
 change decision.delete arg id
 change decision.open
@@ -719,6 +722,7 @@ cli ask
 cli assign
 cli attach
 cli changes
+cli close
 cli comment
 cli comments
 cli connect

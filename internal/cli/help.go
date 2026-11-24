@@ -43,6 +43,7 @@ act       new PROJECT TITLE [field=value ...]      description=- reads it from s
           approval KEY QUESTION [action=task.delete [args=JSON]] [ask=@WHO] [file=PATH ...]
           pick DECISION OPTION|approved|declined|none [note=...]
           unclear DECISION NOTE
+          close DECISION [NOTE]      a question no longer needed: closed, kept in the history, the note says why
           attach KEY PATH ... [option=ID] | upload PATH | read [all | ID ...]
           do TYPE JSON               send any change; "changes" lists them all
 secrets   secrets                    the keys I may use (names only; values are never shown)

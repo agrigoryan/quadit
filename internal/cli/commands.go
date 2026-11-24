@@ -75,6 +75,7 @@ var commands = []command{
 	{names: []string{"approval"}, args: 2, usage: "approval KEY QUESTION ...", run: (*runner).ask},
 	{names: []string{"pick"}, args: 2, usage: "pick DECISION OPTION|approved|declined|none [note=...]", run: (*runner).pick},
 	{names: []string{"unclear"}, args: 2, usage: "unclear DECISION NOTE", run: (*runner).unclear},
+	{names: []string{"close"}, args: 1, usage: "close DECISION [NOTE]", run: (*runner).closeQuestion},
 
 	// files (cmd_files.go)
 	{names: []string{"attach"}, args: 2, usage: "attach KEY PATH ...", run: (*runner).attach},

@@ -90,6 +90,16 @@ func (r *runner) pick(in input) error {
 	return r.change("decision.pick", a, in.approval)
 }
 
+// closeQuestion closes a question that is no longer needed, open or sent
+// back, with a short note saying why when one is given.
+func (r *runner) closeQuestion(in input) error {
+	a := map[string]any{"id": in.pos[0]}
+	if note := strings.Join(in.pos[1:], " "); note != "" {
+		a["note"] = note
+	}
+	return r.change("decision.close", a, in.approval)
+}
+
 // unclear answers a decision by saying the question is not clear, and why.
 func (r *runner) unclear(in input) error {
 	return r.change("decision.unclear", map[string]any{"id": in.pos[0], "note": strings.Join(in.pos[1:], " ")}, in.approval)
