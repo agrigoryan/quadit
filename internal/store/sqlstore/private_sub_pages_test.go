@@ -115,7 +115,10 @@ func TestUpgradeMakesThePagesUnderAPrivatePagePrivate(t *testing.T) {
 // today's engine: openWritableAt adds these columns for the writing, and
 // upgrade takes them out again before upgrading, so the upgrades meet the
 // schema they were written for. A version that adds a column to a table
-// the engine writes adds it here.
+// the engine writes adds it here, with the type its migration gives it on
+// Postgres: a test that reads a row before the upgrade and again after
+// reuses the connection's prepared statement, which Postgres refuses once
+// a column it returns has changed type.
 var columnsAddedSince = map[int][]string{
 	12: {"members handoff_limit INTEGER", "tasks handoff_limit INTEGER"},
 	13: {"comments quote TEXT", "comments detached_at BIGINT"},
@@ -125,7 +128,7 @@ var columnsAddedSince = map[int][]string{
 	27: {"agent_sessions program TEXT", "agent_sessions program_session TEXT", "agent_sessions machine_id TEXT", "agent_sessions machine_name TEXT",
 		"agent_sessions folder TEXT", "agent_sessions reason TEXT", "agent_sessions resets_at BIGINT", "agent_sessions item_seq BIGINT",
 		"agent_sessions items_through BIGINT", "agent_sessions accepted_at BIGINT", "agent_sessions stop_requested_at BIGINT",
-		"agent_sessions stop_requested_by TEXT", "agent_sessions steps_dropped INTEGER", "comments session_id TEXT",
+		"agent_sessions stop_requested_by UUID", "agent_sessions steps_dropped INTEGER", "comments session_id UUID",
 		"notifications addressed BOOLEAN"},
 }
 
