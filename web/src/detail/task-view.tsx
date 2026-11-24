@@ -8,6 +8,7 @@ import { overlayOpen, useHotkeys } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { useRowEvenIfGone, useSlug } from "@/data/selectors";
 import { useFindTask } from "@/data/find-task";
+import { useReadWhenSeen } from "@/data/inbox-read";
 import { useTaskDetail } from "@/data/task-detail";
 import { usePageTitle } from "@/lib/ui-state";
 import type { Task } from "@/types/core";
@@ -91,6 +92,8 @@ export function TaskView({ taskKey, layout, onClose, onExpand, queue }: Props) {
   const lost = useLostProject(taskKey.split("-")[0]);
   const status = useTaskDetail(task?.id);
   useRevealFromHash(!!task);
+  // Looked at for a moment, its inbox items are read.
+  useReadWhenSeen({ taskId: task?.id });
   const drop = useFileDrop(task);
   useHotkeys(
     {

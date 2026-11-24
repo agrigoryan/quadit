@@ -2,6 +2,7 @@ import { FileQuestion, Trash2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useCan } from "@/data/access";
+import { useReadWhenSeen } from "@/data/inbox-read";
 import { t } from "@/lib/i18n";
 import { isNotFound, readError } from "@/data/query";
 import { useRowEvenIfGone, useSlug } from "@/data/selectors";
@@ -27,6 +28,9 @@ export function DocPage({ id }: { id: string }) {
   usePageTitle(doc ? docTitle(doc) : t("docs.title"));
   // Escape is the comments column's own while it is open.
   useEscapeBack(useDocsArea().base, !usePageUi((s) => s.commentsOpen));
+
+  // Looked at for a moment, its inbox items are read.
+  useReadWhenSeen({ docId: doc && !doc.deleted_at ? doc.id : undefined });
 
   // Comments of another page are not this page's.
   useEffect(() => pageUi.closeComments, [id]);
