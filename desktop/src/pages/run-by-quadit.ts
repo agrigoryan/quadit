@@ -159,9 +159,15 @@ function toneOf(status: RunEntryView["status"]): string {
   }
 }
 
-/** Whether Start running may be pressed: a project and a folder chosen, and nothing under way. */
-export function mayStart(chosen: { project: string; folder: string | null; busy: boolean }): boolean {
-  return !!chosen.project && !!chosen.folder && !chosen.busy;
+/** How long Start running waits for what it starts at once to be told: a slow server does not hold it longer. */
+const WAITING_WAIT_MS = 2_000;
+
+/**
+ * Whether Start running may be pressed: a project and a folder chosen, what
+ * it starts at once told (not still `asking`), and nothing under way.
+ */
+export function mayStart(chosen: { project: string; folder: string | null; asking: boolean; busy: boolean }): boolean {
+  return !!chosen.project && !!chosen.folder && !chosen.asking && !chosen.busy;
 }
 
 /** An entry's nodes, kept while it is there. */
@@ -408,16 +414,28 @@ export class RunByQuadit {
     refused.setAttribute("role", "alert");
 
     const note = make("p", "", "run-note");
-    // What Start running starts at once, for the project chosen: said once known, nothing meanwhile.
+    // What Start running starts at once, for the project chosen: said once known, nothing meanwhile. Start running
+    // waits for it, so the person sees what starts before starting it, but not past WAITING_WAIT_MS.
     const waits = make("div", "", "run-waits");
     waits.setAttribute("aria-live", "polite");
     let askedFor = "";
+    let asking = false;
+    let waitEnd: ReturnType<typeof setTimeout> | undefined;
     const askWaiting = () => {
       const project = select.value;
       if (project === askedFor) return;
       askedFor = project;
       waits.replaceChildren();
+      clearTimeout(waitEnd);
+      asking = !!project;
       if (!project) return;
+      const answered = () => {
+        if (askedFor !== project || !asking) return;
+        clearTimeout(waitEnd);
+        asking = false;
+        update();
+      };
+      waitEnd = setTimeout(answered, WAITING_WAIT_MS);
       void api()
         .runWaiting(this.tool.id, project)
         .then((waiting) => {
@@ -431,7 +449,10 @@ export class RunByQuadit {
             ...(words.tasks.length > 0 ? [list] : []),
             ...(words.more ? [make("p", words.more, "run-more-tasks")] : []),
           );
-        });
+        })
+        // Not told (the app's answer failed): Start running is let go all the same.
+        .catch(() => {})
+        .finally(answered);
     };
     let busy = false;
     const start = button("Start running", () => void go(), "btn btn-move btn-sm");
@@ -442,10 +463,10 @@ export class RunByQuadit {
     form.addEventListener("submit", (e) => e.preventDefault());
 
     const update = () => {
-      start.disabled = !mayStart({ project: select.value, folder, busy });
+      askWaiting();
+      start.disabled = !mayStart({ project: select.value, folder, asking, busy });
       if (this.owner)
         setText(note, choosingNote(this.words, this.runs?.agent ?? agent, select.value || null, this.owner));
-      askWaiting();
     };
     select.addEventListener("change", update);
     const go = async () => {

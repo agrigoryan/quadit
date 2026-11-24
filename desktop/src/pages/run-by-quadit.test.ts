@@ -55,12 +55,14 @@ describe("Run by Quadit's words", () => {
     expect(choosingNote(CLAUDE, "@claude", null, ME)).toContain("a task in the project or comment on one.");
   });
 
-  it("lets Start running be pressed only with a project and a folder chosen, and nothing under way", () => {
-    expect(mayStart({ project: "", folder: null, busy: false })).toBe(false);
-    expect(mayStart({ project: "SVA", folder: null, busy: false })).toBe(false);
-    expect(mayStart({ project: "", folder: "/Users/lou/devel/game", busy: false })).toBe(false);
-    expect(mayStart({ project: "SVA", folder: "/Users/lou/devel/game", busy: true })).toBe(false);
-    expect(mayStart({ project: "SVA", folder: "/Users/lou/devel/game", busy: false })).toBe(true);
+  it("lets Start running be pressed only with a project and a folder chosen, what starts at once told, and nothing under way", () => {
+    const at = { asking: false, busy: false };
+    expect(mayStart({ ...at, project: "", folder: null })).toBe(false);
+    expect(mayStart({ ...at, project: "SVA", folder: null })).toBe(false);
+    expect(mayStart({ ...at, project: "", folder: "/Users/lou/devel/game" })).toBe(false);
+    expect(mayStart({ ...at, project: "SVA", folder: "/Users/lou/devel/game", busy: true })).toBe(false);
+    expect(mayStart({ ...at, project: "SVA", folder: "/Users/lou/devel/game", asking: true })).toBe(false);
+    expect(mayStart({ ...at, project: "SVA", folder: "/Users/lou/devel/game" })).toBe(true);
   });
 
   it("says what each project runs in, and what it does now, in each state", () => {
