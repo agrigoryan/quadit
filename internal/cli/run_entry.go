@@ -735,7 +735,7 @@ func (e *liveEntry) handle(ctx context.Context, ans held) error {
 	}
 	task := e.state.task(head.Task)
 	continuing := task.Continue != nil && task.Continue.Seq == head.Seq
-	covered, known, err := e.covered(ctx, head, task)
+	covered, err := e.covered(ctx, head, task)
 	switch {
 	case err != nil:
 		// What the head's task covers could not be read: it is never taken
@@ -753,12 +753,13 @@ func (e *liveEntry) handle(ctx context.Context, ans held) error {
 			return nil
 		}
 	}
-	// The other items of the task go with the head only when what the task
-	// covers is known, and never with a continuation, which carries
-	// nothing new: what came during its pause comes as its own head.
+	// The other items of the task go with the head, never with a
+	// continuation, which carries nothing new: what came during its pause
+	// comes as its own head. They come after the head, which no program
+	// took, so none took them either.
 	items := []listenItem{head}
 	for _, b := range ans.Batch {
-		if b.Wake.Do == wakeRun && known && !continuing {
+		if b.Wake.Do == wakeRun && !continuing {
 			items = append(items, *b.Item)
 		}
 	}
@@ -767,25 +768,24 @@ func (e *liveEntry) handle(ctx context.Context, ans held) error {
 
 // covered reports whether a program of this task already took the head:
 // by the entry's own record, or, when it has none, by a run of this agent
-// on the task that the server says its program took. known says whether
-// either told; when neither does, nothing is covered and the head runs
-// alone. A read of the server's runs that failed is an error, never
-// "nothing covered".
-func (e *liveEntry) covered(ctx context.Context, head listenItem, task taskState) (covered, known bool, err error) {
+// on the task that the server says its program took. With neither, no
+// program took anything of the task. A read of the server's runs that
+// failed is an error, never "nothing covered".
+func (e *liveEntry) covered(ctx context.Context, head listenItem, task taskState) (bool, error) {
 	if task.Through > 0 {
-		return head.Seq <= task.Through, true, nil
+		return head.Seq <= task.Through, nil
 	}
 	through := int64(0)
-	err = e.api.eachRun(ctx, head.Task, func(row runRow) bool {
+	err := e.api.eachRun(ctx, head.Task, func(row runRow) bool {
 		if row.AgentID == e.reg.AgentID && row.AcceptedAt > 0 {
 			through = max(through, row.ItemsThrough)
 		}
 		return false
 	})
 	if err != nil {
-		return false, false, err
+		return false, err
 	}
-	return through > 0 && head.Seq <= through, through > 0, nil
+	return head.Seq <= through, nil
 }
 
 // The guards on automatic runs.

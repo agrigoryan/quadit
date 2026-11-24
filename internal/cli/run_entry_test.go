@@ -681,15 +681,22 @@ func TestAFailedCoverageReadIsRetriedNeverTakenAsNothingCovered(t *testing.T) {
 	}
 }
 
-func TestWithCoverageUnknownTheHeadRunsAlone(t *testing.T) {
+// TestTheItemsOfATaskNoProgramTookAreOneRun: with no record of the entry's
+// and no run on the server whose program took an item of the task (what
+// waited when the runner was set up), the head and the other items of its
+// task that would start a run are one run.
+func TestTheItemsOfATaskNoProgramTookAreOneRun(t *testing.T) {
 	rt := newRunTest(t, core.ProgramClaude, claudeDone("one"), claudeDone("two"))
 	rt.f.addItem(fakeItem{Task: "SVA-12"})
 	second := rt.f.addItem(fakeItem{Task: "SVA-12"})
 	rt.serve()
 	rt.acked(second)
 	recs := rt.records()
-	if len(recs) != 2 || strings.Contains(recs[0].Stdin, "#"+strconv.FormatInt(second, 10)) {
-		t.Fatalf("%d starts; the first prompt:\n%s", len(recs), recs[0].Stdin)
+	if len(recs) != 1 || !strings.Contains(recs[0].Stdin, "#"+strconv.FormatInt(second, 10)) || len(rt.f.allRuns()) != 1 {
+		t.Fatalf("%d starts, %d rows; the first prompt:\n%s", len(recs), len(rt.f.allRuns()), recs[0].Stdin)
+	}
+	if rt.f.allRuns()[0]["items_through"] != float64(second) {
+		t.Fatalf("items_through %v", rt.f.allRuns()[0]["items_through"])
 	}
 }
 

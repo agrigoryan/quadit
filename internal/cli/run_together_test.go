@@ -190,13 +190,17 @@ func TestQuaditRunsTheAgentForATaskOnARealServer(t *testing.T) {
 			}
 			return runs[n]["state"].(string)
 		}
-		rt.serve()
-		rt.eventually("the runner listening", func() bool { return strings.Contains(rt.out.String(), ": listening") })
-
-		// The owner assigns: a run goes waiting, running, done, and the
-		// fake's final message is the marked comment.
+		// The owner assigns, and comments, before the runner starts: what
+		// waits is its queue, and the two items of the task are one run,
+		// which goes waiting, running, done, and the fake's final message
+		// is the marked comment.
 		q.change(owner, "task.create", map[string]any{"project": "RC", "title": "Add a line", "assignee": "@claude"})
+		q.change(owner, "comment.create", map[string]any{"task": "RC-1", "body": "Mind the README"})
+		rt.serve()
 		rt.eventually("the first run working", func() bool { return state(0) == core.AgentSessionRunning })
+		if p := rt.records()[0].Stdin; !strings.Contains(p, "assigned") || !strings.Contains(p, "Mind the README") {
+			t.Fatalf("the first run's prompt does not carry both items that waited:\n%s", p)
+		}
 		// A comment during the run becomes a second run, in the same session.
 		q.change(owner, "comment.create", map[string]any{"task": "RC-1", "body": "Now add a second line"})
 		rt.eventually("the second run done", func() bool { return state(1) == core.AgentSessionDone })
