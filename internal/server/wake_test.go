@@ -255,6 +255,13 @@ func TestTheWakeRule(t *testing.T) {
 				question := r.change(t, r.owner, "", "decision.open", M{"task": key, "question": "Which boss?", "options": []M{{"label": "Big"}, {"label": "Small"}}, "ask": "@claude"})["ref"]
 				r.change(t, r.owner, "", "decision.close", M{"id": question})
 			}, "ack answered"},
+			{"an answer sent back to it, of a question closed since", func(t *testing.T) {
+				key := r.task(t, nil)
+				question := r.change(t, nil, r.claude, "decision.open", M{"task": key, "question": "Which floor?", "options": []M{{"label": "Wood"}, {"label": "Stone"}}})["ref"]
+				r.drain(t)
+				r.change(t, r.owner, "", "decision.pick", M{"id": question, "outcome": "none", "note": "talk to me first"})
+				r.change(t, nil, r.claude, "decision.close", M{"id": question})
+			}, "ack closed"},
 			{"its own question closed by the owner without a note", func(t *testing.T) {
 				key := r.task(t, nil)
 				question := r.change(t, nil, r.claude, "decision.open", M{"task": key, "question": "Which arena?", "options": []M{{"label": "Day"}, {"label": "Night"}}})["ref"]

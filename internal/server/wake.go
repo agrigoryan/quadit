@@ -128,6 +128,17 @@ func (who *viewer) wakeRule(ctx context.Context, agent core.Member, item wakeIte
 		if !open {
 			return wake{wakeAck, "answered"}, nil
 		}
+	case item.typ == core.NotePicked:
+		// An answer to a question closed since as no longer needed (or put in
+		// the trash) is about something that no longer stands.
+		var d core.Decision
+		stands, err := store.Find(ctx, who.db, &d, store.Eq("id", item.entityID), store.Live, store.Ne("state", core.StateNotNeeded))
+		if err != nil {
+			return wake{}, err
+		}
+		if !stands {
+			return wake{wakeAck, "closed"}, nil
+		}
 	case item.typ == core.NoteNotNeeded && !item.addressed:
 		// A question closed as no longer needed asks nothing of its asker;
 		// only a note of whoever closed it, which makes the item addressed,
