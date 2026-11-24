@@ -16,7 +16,8 @@
 // How the package is laid out:
 //
 //	core.go     roles, users, members, tokens, projects, statuses, labels,
-//	            tasks, relations, comments, decisions, events and cursors
+//	            tasks, relations, comments, decisions, events, cursors and
+//	            listeners
 //	tasks.go    what organizes tasks: epics, milestones, cycles, views, links
 //	            to code, mentions, templates, preferences, old keys
 //	inbox.go    watchers and notifications
@@ -152,18 +153,10 @@ type Member struct {
 	HandoffLimit int    `json:"handoff_limit,omitempty" db:"handoff_limit,null"`
 	LastSeenAt   int64  `json:"last_seen_at,omitempty" db:"last_seen_at,null"`
 	LastAction   string `json:"last_action,omitempty" db:"last_action"`
-	// ListeningUntil is when the lease of the member's listener ends (the
-	// one session that delivers its inbox from the cursor ListenCursor):
-	// the member counts as listening until then. ListenLease is that
-	// lease's id, which the session gives with each wait and acknowledgment,
-	// and ListenHeardAt when it last waited. The lease is no one else's
-	// business, so it is not in the row others read.
-	ListeningUntil int64  `json:"listening_until,omitempty" db:"listening_until,null"`
-	ListenLease    string `json:"-" db:"listen_lease,null"`
-	ListenHeardAt  int64  `json:"-" db:"listen_heard_at,null"`
-	// ListenBy is what holds the lease, in words a person reads ("a chat",
-	// "a companion", "the Quadit app"), as the holder said.
-	ListenBy string `json:"-" db:"listen_by,null"`
+	// ListeningUntil is when the last of the leases of the member's
+	// listeners ends (Listener.LeaseUntil): the member counts as listening,
+	// to something, until then. It is written with the lease.
+	ListeningUntil int64 `json:"listening_until,omitempty" db:"listening_until,null"`
 	// ConnectedAt is when an agent first proved it reached Quadit from
 	// inside its tool: a connect code given back, a change made with its
 	// own credential, or its listener's first lease. A read proves nothing.
@@ -229,8 +222,39 @@ type ConnectCode struct {
 const MemberTints = 8
 
 // ListenCursor is the cursor an agent's inbox is delivered from, by `quadit
-// wait` and `quadit listen`; one session at a time holds its lease.
+// wait` and `quadit listen`, when they listen to everything; one session at
+// a time holds its lease. A listener of one project delivers from a cursor
+// of its own (ListenCursorOf).
 const ListenCursor = "listen"
+
+// ListenCursorOf is the cursor the listener of a project (by id) delivers
+// from; for "", the listener of everything, ListenCursor.
+func ListenCursorOf(projectID string) string {
+	if projectID == "" {
+		return ListenCursor
+	}
+	return ListenCursor + ":" + projectID
+}
+
+// Listener is the hold one session has on delivering an agent's inbox, in
+// one scope: the items of one project (ProjectID), or, with no project,
+// everything else. One session at a time holds a listener's lease; while
+// it lives (LeaseUntil) the agent listens in that scope. A project's row
+// stays when its session stops, so that the project keeps waiting for its
+// next listener instead of falling to the listener of everything, until
+// the agent forgets it. The lease is no one else's business, so it is not
+// in what others read.
+type Listener struct {
+	WorkspaceID string `json:"-" db:"workspace_id"`
+	AgentID     string `json:"agent_id" db:"agent_id"`
+	ProjectID   string `json:"project_id,omitempty" db:"project_id,null"`
+	Lease       string `json:"-" db:"lease"`
+	LeaseUntil  int64  `json:"lease_until" db:"lease_until"`
+	HeardAt     int64  `json:"heard_at" db:"heard_at"` // when its session last waited
+	// HeldBy is what holds the lease, in words a person reads ("a chat",
+	// "a companion", "the Quadit app"), as the holder said.
+	HeldBy string `json:"held_by,omitempty" db:"held_by"`
+}
 
 // ListenerLabel is the form of what a listener says it is (by=, "the
 // Quadit app"): a few plain words, at most 40 letters, digits, spaces, -

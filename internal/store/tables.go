@@ -72,6 +72,7 @@ var tables = []*Table{
 	table[core.Event]("events", "event", inWorkspace),
 	table[core.AppliedChange]("changes", "change", inWorkspace),
 	table[core.Cursor]("cursors", "cursor", inWorkspace),
+	table[core.Listener]("listeners", "listener", inWorkspace),
 	table[core.View]("views", "view", inWorkspace),
 	table[core.Watcher]("watchers", "watcher", inWorkspace),
 	table[core.Notification]("notifications", "notification", inWorkspace),

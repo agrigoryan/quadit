@@ -387,6 +387,14 @@ export interface Label {
   deleted_at?: number;
 }
 
+export interface Listener {
+  agent_id: string;
+  project_id?: string;
+  lease_until: number;
+  heard_at: number;
+  held_by?: string;
+}
+
 export interface Member {
   workspace_id: string;
   user_id: string;

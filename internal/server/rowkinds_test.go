@@ -19,6 +19,7 @@ var notRowKinds = map[string]string{
 	"doc_sources":   "GET /sources",
 	"changes":       "never read out: the engine's record of what it applied",
 	"cursors":       "GET /cursors/{name}, each member's own",
+	"listeners":     "GET /listening, each agent's own, and what /agents and /agents/connection say each listens to",
 	"refs":          "with the task or the page that is mentioned",
 	"doc_presence":  "POST /docs/{id}/presence, with the page",
 	"task_keys":     "never read out: the keys a task had before it moved",

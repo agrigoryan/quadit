@@ -82,7 +82,7 @@ func (s *Server) handleReadFeed(x *c) error {
 	cursor := v.Get("cursor")
 	if cursor != "" {
 		if ack := x.intParam("ack", 0); ack > 0 {
-			if err := s.setCursor(x, cursor, int64(ack), ""); err != nil {
+			if _, err := s.setCursor(x, cursor, int64(ack), ""); err != nil {
 				return err
 			}
 		}
@@ -217,33 +217,37 @@ func hasTaskFilter(q core.TaskQuery) bool {
 	return string(raw) != "{}"
 }
 
-// setCursor moves a cursor forward; a cursor never moves back. A move made
-// with the listener's lease is made only while that lease is the live one,
-// checked in the same write as the move, so a takeover cannot land between
-// the two (leaseLets).
-func (s *Server) setCursor(x *c, name string, seq int64, lease string) error {
+// setCursor moves a cursor forward, and says which: a cursor never moves
+// back. A move made with a listener's lease moves that listener's cursor,
+// named listen (as every listener's acknowledgment names it) or by its own
+// name, and only while the lease is still its listener's, checked in the
+// same write as the move, so a takeover cannot land between the two
+// (listenerHolding).
+func (s *Server) setCursor(x *c, name string, seq int64, lease string) (moved string, err error) {
 	if err := s.checkCursorPosition(x, name, seq); err != nil {
-		return err
+		return "", err
 	}
 	// One conditional statement, so acknowledgments racing each other
 	// leave the cursor at the furthest, whichever lands last.
-	move := func(db store.DB) error {
+	move := func(db store.DB, name string) error {
 		return db.Advance(x.ctx(), core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: name, Seq: seq, UpdatedAt: time.Now().UnixMilli()},
 			"seq", "workspace_id", "user_id", "name")
 	}
 	if lease == "" {
-		return move(x.db)
+		return name, move(x.db, name)
 	}
-	return s.st.Write(x.ctx(), x.ws.ID, func(tx store.Tx) error {
-		var m core.Member
-		if err := tx.Get(x.ctx(), &m, store.Eq("user_id", x.member.UserID)); err != nil {
+	err = s.st.Write(x.ctx(), x.ws.ID, func(tx store.Tx) error {
+		held, err := listenerHolding(x.ctx(), tx, x.member, lease)
+		if err != nil {
 			return err
 		}
-		if err := leaseLets(m, lease); err != nil {
-			return err
+		moved = core.ListenCursorOf(held.ProjectID)
+		if name != core.ListenCursor && name != moved {
+			return &engine.Error{Code: engine.CodeInvalid, Field: "lease", Message: fmt.Sprintf("a lease moves its listener's cursor, %s: the cursor %s is moved without one", moved, name)}
 		}
-		return move(tx)
+		return move(tx, moved)
 	})
+	return moved, err
 }
 
 // checkCursorPosition refuses a cursor name the server cannot keep, and a
@@ -267,20 +271,25 @@ func (s *Server) checkCursorPosition(x *c, name string, seq int64) error {
 	return nil
 }
 
-// handleShowFeedCursor says where one of the caller's cursors stands; one
-// never moved stands at 0.
+// handleShowFeedCursor says where one of the caller's cursors stands.
 func (s *Server) handleShowFeedCursor(x *c) error {
+	return showCursor(x, x.r.PathValue("name"))
+}
+
+// showCursor answers where the caller's cursor of that name stands; one
+// never moved stands at 0.
+func showCursor(x *c, name string) error {
 	var cursor core.Cursor
-	if _, err := store.Find(x.ctx(), x.db, &cursor, store.Eq("user_id", x.member.UserID), store.Eq("name", x.r.PathValue("name"))); err != nil {
+	if _, err := store.Find(x.ctx(), x.db, &cursor, store.Eq("user_id", x.member.UserID), store.Eq("name", name)); err != nil {
 		return err
 	}
-	return x.ok(map[string]any{"name": x.r.PathValue("name"), "seq": cursor.Seq})
+	return x.ok(map[string]any{"name": name, "seq": cursor.Seq})
 }
 
 // handleMoveFeedCursor marks everything up to seq as handled. dry_run=1
 // checks the position and says where the cursor would stand, without
 // moving it.
-// The cursor "listen" is moved with its lease, given in the body.
+// A listener's cursor is moved with its lease, given in the body.
 func (s *Server) handleMoveFeedCursor(x *c) error {
 	var body struct {
 		Seq   int64  `json:"seq"`
@@ -291,10 +300,11 @@ func (s *Server) handleMoveFeedCursor(x *c) error {
 	}
 	name := x.r.PathValue("name")
 	if !truthyParam(x.r.URL.Query(), "dry_run") {
-		if err := s.setCursor(x, name, body.Seq, body.Lease); err != nil {
+		moved, err := s.setCursor(x, name, body.Seq, body.Lease)
+		if err != nil {
 			return err
 		}
-		return s.handleShowFeedCursor(x)
+		return showCursor(x, moved)
 	}
 	if err := s.checkCursorPosition(x, name, body.Seq); err != nil {
 		return err

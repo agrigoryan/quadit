@@ -4,6 +4,7 @@ api DELETE /api/v1/auth/passkeys/{id}
 api DELETE /api/v1/auth/sessions/{id}
 api DELETE /api/v1/push/subscriptions
 api DELETE /api/v1/w/{workspace}/invites/{id}
+api DELETE /api/v1/w/{workspace}/listening/{key}
 api DELETE /api/v1/w/{workspace}/samples
 api DELETE /api/v1/w/{workspace}/tokens/{id}
 api GET /.well-known/oauth-authorization-server

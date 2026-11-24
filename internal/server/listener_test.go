@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -24,6 +25,33 @@ func (s *site) listeningUntil(t *testing.T, st store.Store, handle string) int64
 	return m.ListeningUntil
 }
 
+// runOut ends the lease of the listener holding it, as if its session had
+// stopped asking a while ago.
+func runOut(t *testing.T, st store.Store, lease string) {
+	t.Helper()
+	if _, err := st.Update(context.Background(), "listeners", map[string]any{"lease_until": time.Now().Add(-time.Second).UnixMilli()}, store.Eq("lease", lease)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// blockedOn returns once a wait of twenty seconds made with lease has
+// blocked: its lease is held for those and ninety more.
+func blockedOn(t *testing.T, st store.Store, lease string) {
+	t.Helper()
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		var l core.Listener
+		if err := st.Get(context.Background(), &l, store.Eq("lease", lease)); err != nil {
+			t.Fatal(err)
+		}
+		if time.Until(time.UnixMilli(l.LeaseUntil)) > leaseOfAWaitOf(10*time.Second) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the wait never blocked")
+		}
+	}
+}
+
 // leaseOfAWaitOf is how long a lease lives past now for a wait of d.
 func leaseOfAWaitOf(d time.Duration) time.Duration { return d + 90*time.Second }
 
@@ -32,9 +60,10 @@ var leaseForm = regexp.MustCompile(`^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$`)
 
 // listened is the answer of GET /listen.
 type listened struct {
-	Lease string
-	Seq   int64
-	Line  string
+	Lease   string
+	Project string
+	Seq     int64
+	Line    string
 	Item  *struct {
 		Seq  int64
 		Type string
@@ -153,6 +182,7 @@ func TestTheListener(t *testing.T) {
 				t.Fatalf("after a wait of twenty seconds the lease lives %s more, want those and ninety", left)
 			}
 			// The agent handled the item for longer than that, and nobody took the lease meanwhile.
+			runOut(t, st, first.Lease)
 			if _, err := st.Update(context.Background(), "members", map[string]any{"listening_until": time.Now().Add(-time.Second).UnixMilli()}, store.Eq("handle", "coder")); err != nil {
 				t.Fatal(err)
 			}
@@ -202,19 +232,7 @@ func TestAWaitThatSleptThroughATakeoverHandsNothingOver(t *testing.T) {
 			resp.Body.Close()
 			blocked <- resp.StatusCode
 		}()
-		// The first wait has blocked once its lease is held for its twenty seconds and ninety more.
-		for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(20 * time.Millisecond) {
-			var m core.Member
-			if err := st.Get(context.Background(), &m, store.Eq("handle", "coder")); err != nil {
-				t.Fatal(err)
-			}
-			if time.Until(time.UnixMilli(m.ListeningUntil)) > leaseOfAWaitOf(10*time.Second) {
-				break
-			}
-			if time.Now().After(deadline) {
-				t.Fatal("the first wait never blocked")
-			}
-		}
+		blockedOn(t, st, first.Lease)
 		var taken listened
 		s.call(t, nil, coder, "GET", w+"/listen?wait=0&take=1", nil, 200, &taken)
 		s.change(t, s.owner, "", "task.create", M{"project": "OPS", "title": "Rotate keys", "assignee": "@coder"})
@@ -428,8 +446,8 @@ func TestAnAcknowledgmentCannotSlipPastATakeover(t *testing.T) {
 			go func() {
 				defer close(done)
 				_ = plain.Write(context.Background(), ws.ID, func(tx store.Tx) error { // an error leaves landed false, which the test then says
-					_, err := tx.Update(context.Background(), "members", map[string]any{"listen_lease": "TAKENXYZ", "listening_until": time.Now().Add(time.Hour).UnixMilli()},
-						store.Eq("handle", "coder"))
+					_, err := tx.Update(context.Background(), "listeners", map[string]any{"lease": "TAKENXYZ", "lease_until": time.Now().Add(time.Hour).UnixMilli()},
+						store.Eq("lease", held.Lease))
 					return err
 				})
 			}()
@@ -487,5 +505,407 @@ func TestWhatListensIsToldWithoutTakingTheLease(t *testing.T) {
 			t.Fatalf("a second session is told %q", r.Error.Message)
 		}
 		s.call(t, nil, coder, "GET", w+"/listen?wait=0&lease="+held.Lease+"&by=a+companion%3B+rm+-rf", nil, 400, nil)
+	})
+}
+
+// projectListening is a site with an agent, @coder, and two projects, SVA
+// and ART, for the tests of listening by project.
+type projectListening struct {
+	*site
+	st    store.Store
+	coder string // its token
+}
+
+func newProjectListening(t *testing.T, st store.Store) projectListening {
+	t.Helper()
+	s := newSite(t, st)
+	p := projectListening{site: s, st: st, coder: s.agentToken(t, "coder")}
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "project.create", M{"key": "ART", "name": "Art"})
+	return p
+}
+
+// project is a project of the site's, by key.
+func (p projectListening) project(t *testing.T, key string) core.Project {
+	t.Helper()
+	var project core.Project
+	if err := p.st.Get(context.Background(), &project, store.Eq("key", key)); err != nil {
+		t.Fatal(err)
+	}
+	return project
+}
+
+// listen is one wait of a session: GET /listen with the query given.
+func (p projectListening) listen(t *testing.T, query string) listened {
+	t.Helper()
+	var got listened
+	p.call(t, nil, p.coder, "GET", w+"/listen?"+query, nil, 200, &got)
+	return got
+}
+
+// give makes an item for @coder: a task of the project given, assigned to
+// it, whose key is returned.
+func (p projectListening) give(t *testing.T, project string) string {
+	t.Helper()
+	return p.change(t, p.owner, "", "task.create", M{"project": project, "title": "Work in " + project, "assignee": "@coder"})["key"].(string)
+}
+
+// mention makes an item of no project for @coder: a mention in a comment
+// on a page of the workspace's.
+func (p projectListening) mention(t *testing.T) string {
+	t.Helper()
+	page := p.change(t, p.owner, "", "doc.create", M{"title": "Handbook"})["ref"].(string)
+	p.change(t, p.owner, "", "comment.create", M{"doc": page, "body": "@coder is this still how we work?"})
+	return page
+}
+
+// TestEachSessionIsHandedOnlyWhatItListensTo: the behaviour approved for a
+// person working in two folders, each with a chat of the same agent: a
+// listener of a project is handed its project's items only; with a
+// listener of everything beside, the named project wins; a project whose
+// listener stops keeps its items for its next listener instead of letting
+// them fall to the listener of everything; with only listeners of
+// projects, an item of no project waits in the inbox.
+func TestEachSessionIsHandedOnlyWhatItListensTo(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newProjectListening(t, st)
+		a := p.listen(t, "wait=0&project=SVA&by=a+chat")
+		b := p.listen(t, "wait=0&project=art")
+		if a.Lease == b.Lease || a.Project != "SVA" || b.Project != "ART" {
+			t.Fatalf("two projects' first waits answered %+v and %+v", a, b)
+		}
+
+		t.Run("two sessions listening to two projects are each handed only their project's items", func(t *testing.T) {
+			sva, art := p.give(t, "SVA"), p.give(t, "ART")
+			gotA, gotB := p.listen(t, "wait=0&project=SVA&by=a+chat&lease="+a.Lease), p.listen(t, "wait=0&project=ART&lease="+b.Lease)
+			if gotA.Item == nil || gotA.Item.Task != sva || gotB.Item == nil || gotB.Item.Task != art {
+				t.Fatalf("SVA's session got %+v, ART's %+v; want %s and %s", gotA.Item, gotB.Item, sva, art)
+			}
+			p.call(t, nil, p.coder, "PUT", w+"/cursors/listen", M{"seq": gotA.Seq, "lease": a.Lease}, 200, nil)
+			p.call(t, nil, p.coder, "PUT", w+"/cursors/listen", M{"seq": gotB.Seq, "lease": b.Lease}, 200, nil)
+			if again := p.listen(t, "wait=0&project=SVA&by=a+chat&lease="+a.Lease); again.Item != nil {
+				t.Fatalf("after its acknowledgment SVA's session got %+v", again.Item)
+			}
+		})
+
+		t.Run("a second session asking for the same project is refused, told what listens to it, and takes over with take=1", func(t *testing.T) {
+			var r refusal
+			p.call(t, nil, p.coder, "GET", w+"/listen?wait=0&project=SVA&by=a+chat", nil, 409, &r)
+			if r.Error.Reason != "listening_elsewhere" || !strings.Contains(r.Error.Message, "@coder is already listening to SVA from another session (a chat, last heard ") {
+				t.Fatalf("a second SVA session is refused with %+v", r.Error)
+			}
+			taken := p.listen(t, "wait=0&project=SVA&take=1&by=a+chat")
+			if taken.Lease == "" || taken.Lease == a.Lease {
+				t.Fatalf("taking SVA over answered %+v", taken)
+			}
+			p.call(t, nil, p.coder, "GET", w+"/listen?wait=0&project=SVA&lease="+a.Lease, nil, 409, &r)
+			if r.Error.Reason != "listening_elsewhere" {
+				t.Fatalf("the session SVA was taken from is refused with %+v", r.Error)
+			}
+			p.call(t, nil, p.coder, "GET", w+"/listen?wait=0&project=ART&lease="+b.Lease, nil, 200, nil) // ART's session is not touched
+			a = taken
+		})
+
+		var c listened
+		t.Run("beside a listener of everything, the named project wins and everything gets the rest", func(t *testing.T) {
+			c = p.listen(t, "wait=0&by=a+companion")
+			if c.Project != "" {
+				t.Fatalf("the listener of everything answered the project %q", c.Project)
+			}
+			sva := p.give(t, "SVA")
+			if got := p.listen(t, "wait=0&lease="+c.Lease); got.Item != nil {
+				t.Fatalf("the listener of everything was handed %+v, an item of SVA, which listens by itself", got.Item)
+			}
+			got := p.listen(t, "wait=0&project=SVA&lease="+a.Lease)
+			if got.Item == nil || got.Item.Task != sva {
+				t.Fatalf("SVA's session got %+v, want %s", got.Item, sva)
+			}
+			p.call(t, nil, p.coder, "PUT", w+"/cursors/listen", M{"seq": got.Seq, "lease": a.Lease}, 200, nil)
+			// A project that has no listener of its own (a new one), and an item of no project, are everything's.
+			p.change(t, p.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
+			ops := p.give(t, "OPS")
+			got = p.listen(t, "wait=0&lease="+c.Lease)
+			if got.Item == nil || got.Item.Task != ops {
+				t.Fatalf("the listener of everything got %+v, want %s", got.Item, ops)
+			}
+			p.call(t, nil, p.coder, "PUT", w+"/cursors/listen", M{"seq": got.Seq, "lease": c.Lease}, 200, nil)
+			page := p.mention(t)
+			if got := p.listen(t, "wait=0&lease="+c.Lease); got.Item == nil || got.Item.Task != "" {
+				t.Fatalf("the listener of everything got %+v, want the mention on page %s", got.Item, page)
+			} else {
+				p.call(t, nil, p.coder, "PUT", w+"/cursors/listen", M{"seq": got.Seq, "lease": c.Lease}, 200, nil)
+			}
+		})
+
+		t.Run("when a project's session stops, its items wait for its next one and do not fall to everything", func(t *testing.T) {
+			runOut(t, st, a.Lease)
+			sva := p.give(t, "SVA")
+			if got := p.listen(t, "wait=0&lease="+c.Lease); got.Item != nil {
+				t.Fatalf("with SVA's session gone the listener of everything was handed %+v", got.Item)
+			}
+			next := p.listen(t, "wait=0&project=SVA&by=a+chat")
+			if next.Lease == a.Lease || next.Item == nil || next.Item.Task != sva {
+				t.Fatalf("SVA's next session got %+v, want a new lease and %s", next, sva)
+			}
+		})
+
+		t.Run("with only listeners of projects, an item of no project waits in the inbox", func(t *testing.T) {
+			runOut(t, st, c.Lease)
+			before := unread(t, p)
+			p.mention(t)
+			for _, q := range []string{"wait=0&project=SVA&take=1", "wait=0&project=ART&take=1"} {
+				if got := p.listen(t, q); got.Item != nil && got.Item.Task == "" {
+					t.Fatalf("a listener of a project was handed %+v, an item of no project", got.Item)
+				}
+			}
+			if after := unread(t, p); after != before+1 {
+				t.Fatalf("the inbox holds %d unread, want %d", after, before+1)
+			}
+		})
+	})
+}
+
+// unread is how many of @coder's inbox items are unread.
+func unread(t *testing.T, p projectListening) int {
+	t.Helper()
+	var me struct{ Unread int }
+	p.call(t, nil, p.coder, "GET", w+"/me", nil, 200, &me)
+	return me.Unread
+}
+
+// TestAnAcknowledgmentMovesTheCursorOfTheListenerOfItsLease: the
+// acknowledgment every listener sends names the cursor listen; its lease
+// says which listener's cursor it moves. A lease taken over is refused for
+// its own listener only, and a lease cannot move a cursor not its
+// listener's.
+func TestAnAcknowledgmentMovesTheCursorOfTheListenerOfItsLease(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newProjectListening(t, st)
+		everything := p.listen(t, "wait=0")
+		sva := p.listen(t, "wait=0&project=SVA")
+		p.give(t, "SVA")
+		got := p.listen(t, "wait=0&project=SVA&lease="+sva.Lease)
+		project := p.project(t, "SVA")
+		var moved struct {
+			Name string
+			Seq  int64
+		}
+		p.call(t, nil, p.coder, "PUT", w+"/cursors/listen", M{"seq": got.Seq, "lease": sva.Lease}, 200, &moved)
+		if moved.Name != "listen:"+project.ID || moved.Seq != got.Seq {
+			t.Fatalf("the acknowledgment with SVA's lease answered %+v, want the cursor listen:%s at %d", moved, project.ID, got.Seq)
+		}
+		var listen struct{ Seq int64 }
+		p.call(t, nil, p.coder, "GET", w+"/cursors/listen", nil, 200, &listen)
+		if listen.Seq >= got.Seq {
+			t.Fatalf("the cursor of everything moved to %d with SVA's acknowledgment", listen.Seq)
+		}
+		var r refusal
+		p.call(t, nil, p.coder, "PUT", w+"/cursors/main", M{"seq": got.Seq, "lease": sva.Lease}, 400, &r)
+		if !strings.Contains(r.Error.Message, "the cursor main is moved without one") {
+			t.Fatalf("a lease moving another cursor is refused with %+v", r.Error)
+		}
+
+		p.listen(t, "wait=0&project=SVA&take=1")
+		p.call(t, nil, p.coder, "PUT", w+"/cursors/listen", M{"seq": got.Seq, "lease": sva.Lease}, 409, &r)
+		if r.Error.Reason != "lease_stale" {
+			t.Fatalf("an acknowledgment with SVA's lease taken over is refused with %+v", r.Error)
+		}
+		p.call(t, nil, p.coder, "PUT", w+"/cursors/listen", M{"seq": got.Seq, "lease": everything.Lease}, 200, nil)
+	})
+}
+
+// TestAProjectsFirstWaitStartsAtThePresent: a project first listened to
+// does not have its history replayed, even when the agent had a cursor for
+// everything.
+func TestAProjectsFirstWaitStartsAtThePresent(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newProjectListening(t, st)
+		p.listen(t, "wait=0")
+		p.give(t, "SVA")
+		first := p.listen(t, "wait=0&project=SVA")
+		if first.Item != nil {
+			t.Fatalf("SVA's first wait handed over %+v from before it", first.Item)
+		}
+		key := p.give(t, "SVA")
+		if next := p.listen(t, "wait=0&project=SVA&lease="+first.Lease); next.Item == nil || next.Item.Task != key {
+			t.Fatalf("SVA's next wait answered %+v, want %s", next.Item, key)
+		}
+	})
+}
+
+// TestAWaitForEverythingHandsNothingOfAProjectThatGotItsOwnListener: a
+// wait of the listener of everything blocked when a project gets a
+// listener of its own does not hand over that project's item when it
+// comes: the project's listener does.
+func TestAWaitForEverythingHandsNothingOfAProjectThatGotItsOwnListener(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newProjectListening(t, st)
+		everything := p.listen(t, "wait=0")
+		blocked := make(chan listened, 1)
+		go func() {
+			req, _ := http.NewRequest(http.MethodGet, p.url+w+"/listen?wait=20&lease="+everything.Lease, nil)
+			req.Header.Set("Authorization", "Bearer "+p.coder)
+			var got listened
+			if resp, err := http.DefaultClient.Do(req); err == nil {
+				_ = json.NewDecoder(resp.Body).Decode(&got) // a body that is not an answer leaves got empty, which the test then says
+				resp.Body.Close()
+			}
+			blocked <- got
+		}()
+		blockedOn(t, st, everything.Lease)
+		sva := p.listen(t, "wait=0&project=SVA")
+		key := p.give(t, "SVA")
+		select {
+		case got := <-blocked:
+			if got.Lease != everything.Lease || got.Item != nil {
+				t.Fatalf("the wait of everything answered %+v (item %+v), want its lease and no item", got, got.Item)
+			}
+		case <-time.After(15 * time.Second):
+			t.Fatal("the wait of everything did not wake for the item")
+		}
+		if got := p.listen(t, "wait=0&project=SVA&lease="+sva.Lease); got.Item == nil || got.Item.Task != key {
+			t.Fatalf("SVA's listener got %+v, want %s", got.Item, key)
+		}
+	})
+}
+
+// TestAProjectsListenerIsForgottenOnlyWhenNothingHoldsIt: the way back for
+// a project that should go to the listener of everything again: forgetting
+// its listener, refused while its lease lives, drops it and its cursor;
+// forgetting one that is not there is done already.
+func TestAProjectsListenerIsForgottenOnlyWhenNothingHoldsIt(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newProjectListening(t, st)
+		everything := p.listen(t, "wait=0")
+		sva := p.listen(t, "wait=0&project=SVA&by=a+chat")
+		var r refusal
+		p.call(t, nil, p.coder, "DELETE", w+"/listening/SVA", nil, 409, &r)
+		if r.Error.Reason != "listening_elsewhere" || !strings.Contains(r.Error.Message, "already listening to SVA from another session (a chat, ") {
+			t.Fatalf("forgetting a live listener is refused with %+v", r.Error)
+		}
+		runOut(t, st, sva.Lease)
+		type forgot struct {
+			Project   string
+			Forgotten bool
+			DryRun    bool `json:"dry_run"`
+		}
+		var dry forgot
+		p.call(t, nil, p.coder, "DELETE", w+"/listening/SVA?dry_run=1", nil, 200, &dry)
+		if !dry.Forgotten || !dry.DryRun || p.listenersOf(t) != 2 {
+			t.Fatalf("a dry run answered %+v and left %d listeners, want both", dry, p.listenersOf(t))
+		}
+		var done forgot
+		p.call(t, nil, p.coder, "DELETE", w+"/listening/sva", nil, 200, &done)
+		if done.Project != "SVA" || !done.Forgotten || p.listenersOf(t) != 1 {
+			t.Fatalf("forgetting answered %+v and left %d listeners", done, p.listenersOf(t))
+		}
+		var cursors struct{ Cursors map[string]int64 }
+		p.call(t, nil, p.coder, "GET", w+"/me", nil, 200, &cursors)
+		for name := range cursors.Cursors {
+			if strings.HasPrefix(name, "listen:") {
+				t.Fatalf("the forgotten listener's cursor %s stays", name)
+			}
+		}
+		key := p.give(t, "SVA")
+		if got := p.listen(t, "wait=0&lease="+everything.Lease); got.Item == nil || got.Item.Task != key {
+			t.Fatalf("after SVA was forgotten the listener of everything got %+v, want %s", got.Item, key)
+		}
+		p.call(t, nil, p.coder, "DELETE", w+"/listening/SVA", nil, 200, &done)
+		if done.Forgotten {
+			t.Fatalf("forgetting again answered %+v", done)
+		}
+		p.call(t, nil, p.coder, "DELETE", w+"/listening/NOPE", nil, 404, nil)
+	})
+}
+
+// listenersOf counts @coder's listeners, as stored.
+func (p projectListening) listenersOf(t *testing.T) int {
+	t.Helper()
+	n, err := p.st.Count(context.Background(), "listeners")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// TestWhatListensToEachProjectIsTold: GET /listening keeps its first fields
+// for the listener of everything and lists every listener; /agents and
+// /agents/connection say, beside whether the agent listens at all, which
+// projects (and whether items of no project) a live listener is handed,
+// held to the same rule as delivery.
+func TestWhatListensToEachProjectIsTold(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newProjectListening(t, st)
+		ids := map[string]string{"SVA": p.project(t, "SVA").ID, "ART": p.project(t, "ART").ID}
+		type shown struct {
+			ProjectID string `json:"project_id"`
+			Project   string
+			By        string
+			LastHeard string `json:"last_heard"`
+			Live      bool
+		}
+		type reach struct {
+			Handle                   string
+			Listening                bool
+			Listeners                []shown
+			ListeningProjects        []string `json:"listening_projects"`
+			ListeningOutsideProjects bool     `json:"listening_outside_projects"`
+		}
+		connection := func(path string) reach {
+			t.Helper()
+			var out struct{ Agents []reach }
+			p.call(t, p.owner, "", "GET", w+path, nil, 200, &out)
+			for _, a := range out.Agents {
+				if a.Handle == "@coder" {
+					return a
+				}
+			}
+			t.Fatalf("%s has no @coder", path)
+			return reach{}
+		}
+		type listening struct {
+			Listening bool
+			By        string
+			Listeners []shown
+		}
+
+		var none listening
+		p.call(t, nil, p.coder, "GET", w+"/listening", nil, 200, &none)
+		if got := connection("/agents/connection"); none.Listening || none.Listeners == nil || len(none.Listeners) != 0 ||
+			got.Listening || len(got.ListeningProjects) != 0 || got.ListeningOutsideProjects {
+			t.Fatalf("with nothing listening /listening says %+v and /agents/connection %+v", none, got)
+		}
+
+		sva := p.listen(t, "wait=0&project=SVA&by=a+chat")
+		var one listening
+		p.call(t, nil, p.coder, "GET", w+"/listening", nil, 200, &one)
+		if one.Listening || len(one.Listeners) != 1 || one.Listeners[0].Project != "SVA" || one.Listeners[0].ProjectID != ids["SVA"] ||
+			one.Listeners[0].By != "a chat" || !one.Listeners[0].Live || one.Listeners[0].LastHeard == "" {
+			t.Fatalf("with SVA's listener only, /listening says %+v", one)
+		}
+		for _, path := range []string{"/agents/connection", "/agents"} {
+			if got := connection(path); !got.Listening || strings.Join(got.ListeningProjects, ",") != ids["SVA"] || got.ListeningOutsideProjects {
+				t.Fatalf("with SVA's listener only, %s says %+v", path, got)
+			}
+		}
+
+		p.listen(t, "wait=0&by=a+companion")
+		runOut(t, st, sva.Lease)
+		var both listening
+		p.call(t, nil, p.coder, "GET", w+"/listening", nil, 200, &both)
+		if !both.Listening || both.By != "a companion" || len(both.Listeners) != 2 || both.Listeners[0].Project != "" || !both.Listeners[0].Live ||
+			both.Listeners[1].Project != "SVA" || both.Listeners[1].Live {
+			t.Fatalf("with everything live and SVA's gone, /listening says %+v", both)
+		}
+		// SVA waits for its own listener: everything is not handed its items, and the pages are told so.
+		if got := connection("/agents/connection"); !got.Listening || strings.Join(got.ListeningProjects, ",") != ids["ART"] || !got.ListeningOutsideProjects {
+			t.Fatalf("with everything live and SVA's gone, /agents/connection says %+v", got)
+		}
 	})
 }

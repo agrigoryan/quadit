@@ -28,16 +28,18 @@ type agentState struct {
 	Since   string `json:"since,omitempty"`
 	WaitsOn string `json:"waits_on,omitempty"`
 	// ConnectedAt is when it first proved it reached Quadit from inside its
-	// tool (Member.ConnectedAt); empty: not connected yet. Listening: its
-	// listener holds its lease, or a webhook is heard (listener.go). Tool:
-	// the tool of the last connect code it gave back, when it has.
+	// tool (Member.ConnectedAt); empty: not connected yet. Listening: one
+	// of its listeners holds its lease, or a webhook is heard
+	// (listener.go); what each listens to is in listenersReach. Tool: the
+	// tool of the last connect code it gave back, when it has.
 	ConnectedAt string `json:"connected_at,omitempty"`
 	Listening   bool   `json:"listening"`
 	Tool        string `json:"tool,omitempty"`
-	LastSeen    string `json:"last_seen,omitempty"`
-	LastDid     string `json:"last_action,omitempty"`
-	Open        int    `json:"open_tasks"`
-	Queue       int    `json:"waiting_on_it"`
+	listenersReach
+	LastSeen string `json:"last_seen,omitempty"`
+	LastDid  string `json:"last_action,omitempty"`
+	Open     int    `json:"open_tasks"`
+	Queue    int    `json:"waiting_on_it"`
 }
 
 // agentStates says what every agent is doing right now. With projects,
@@ -152,7 +154,7 @@ func actsIn(action string, keys map[string]bool) bool {
 func (w *agentWork) stateOf(m core.Member) agentState {
 	a := agentState{Handle: "@" + m.Handle, Name: m.Name, UserID: m.UserID, State: "idle", LastSeen: formatTime(m.LastSeenAt), LastDid: w.lastAction(m)}
 	c := w.reach.of(m, w.now)
-	a.ConnectedAt, a.Listening, a.Tool = c.ConnectedAt, c.Listening, c.Tool
+	a.ConnectedAt, a.Listening, a.Tool, a.listenersReach = c.ConnectedAt, c.Listening, c.Tool, c.listenersReach
 
 	// The open tasks: what waits on it, what is its own, which of those wait
 	// on someone else, and the task it holds (which makes it working).
@@ -283,19 +285,23 @@ type agentConnection struct {
 	ConnectedAt string `json:"connected_at,omitempty"`
 	Listening   bool   `json:"listening"`
 	Tool        string `json:"tool,omitempty"`
+	listenersReach
 }
 
 // agentReach is what says how far each agent is connected beside its own
-// row: who a working webhook pushes to, and the tool of the last connect
-// code each gave back.
+// row: who a working webhook pushes to, the tool of the last connect code
+// each gave back, and each one's listeners, among the projects the viewer
+// may read.
 type agentReach struct {
-	pushed map[string]bool
-	tools  map[string]string
+	pushed    map[string]bool
+	tools     map[string]string
+	listeners map[string]agentListeners // by agent
+	keys      map[string]string         // readableProjectKeys
 }
 
 // agentReach reads it.
 func (who *viewer) agentReach(ctx context.Context) (agentReach, error) {
-	r := agentReach{pushed: map[string]bool{}, tools: map[string]string{}}
+	r := agentReach{pushed: map[string]bool{}, tools: map[string]string{}, listeners: map[string]agentListeners{}}
 	var hooks []core.Webhook
 	if err := who.db.List(ctx, &hooks, store.Where(store.Live, store.Eq("active", true), store.NotNull("user_id"))); err != nil {
 		return r, err
@@ -315,13 +321,23 @@ func (who *viewer) agentReach(ctx context.Context) (agentReach, error) {
 			r.tools[code.AgentID] = code.Tool
 		}
 	}
-	return r, nil
+	var listeners []core.Listener
+	if err := who.db.List(ctx, &listeners, store.Q{}); err != nil {
+		return r, err
+	}
+	for _, l := range listeners {
+		r.listeners[l.AgentID] = append(r.listeners[l.AgentID], l)
+	}
+	var err error
+	r.keys, err = who.readableProjectKeys(ctx)
+	return r, err
 }
 
 // of is how far agent m is connected at now.
 func (r agentReach) of(m core.Member, now time.Time) agentConnection {
 	return agentConnection{Handle: "@" + m.Handle, UserID: m.UserID, ConnectedAt: formatTime(m.ConnectedAt),
-		Listening: m.ListeningUntil > now.UnixMilli() || r.pushed[m.UserID], Tool: r.tools[m.UserID]}
+		Listening: m.ListeningUntil > now.UnixMilli() || r.pushed[m.UserID], Tool: r.tools[m.UserID],
+		listenersReach: reachOf(r.listeners[m.UserID], r.pushed[m.UserID], r.keys, now)}
 }
 
 // handleListAgentConnections is how far every agent is connected: the
