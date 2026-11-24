@@ -43,23 +43,23 @@ When you cannot tell case 2 from case 3, it is case 3.
 
 **What to listen to:** one project, or everything. Take the first that settles it, and ask only at the last:
 
-1. The person named a project ("listen to Quadit for SVA", by key or name): that one. "Everything" or "all projects": everything.
+1. The person named a project ("listen to Quadit for SVA", by key or name; `quadit me` lists each project's key, then its name in parentheses): that one. "Everything" or "all projects": everything.
 2. The repository's instruction file for agents (CLAUDE.md, AGENTS.md or your tool's own) names its Quadit project: that one.
 3. `quadit me` lists one project: that one.
-4. Otherwise ask once, listing the projects by key, with everything as a choice; then say in one sentence that a line naming the Quadit project in the repository's instruction file saves the question next time.
+4. Otherwise ask once, listing the projects by key and name, with everything as a choice; then say in one sentence that a line naming the Quadit project in the repository's instruction file saves the question next time.
 
-Say in plain words what you listen to ("Listening to SVA, Samurai vs Aliens"). For a project, every `quadit wait` and `quadit listen` below takes `project=KEY`, and say once that items outside any project (a comment on a page outside one) reach you when asked to check Quadit, unless something listens to everything. If the server is older and cannot listen to one project, listen without `project=` and tell the person you listen to everything because the server cannot listen by project yet.
+Say in plain words what you listen to ("Listening to SVA, Samurai vs Aliens"). For a project, every `quadit wait` and `quadit listen` below takes `project=KEY`, and say once that items outside any project (a comment on a page outside one) reach you when asked to check Quadit, unless something listens to everything. If the server is older and cannot listen to one project, listen without `project=` and tell the person you listen to everything because the server cannot listen by project yet. If the lines `quadit wait project=KEY` prints carry no `project=`, your quadit command is older and ignores it: this chat listens to everything; tell the person (updating quadit fixes it).
 
 **Before the first wait, in a chat with a person:**
 
 - Find out what already listens as you: run `quadit listening` (it takes nothing). If something other than this chat already listens to what you would take (that project, or, for everything, everything else), tell the person: "Quadit is already answering as me for <it> (<what `quadit listening` says>). You do not need this chat for that." and stop there. A listener of another project is no reason to stop.
 - If each `quadit` command you run asks the person for approval, say so once, and how to stop that: the Quadit app's Connect allows the quadit command when it connects a tool, so connecting again from the app does it; for a tool set up by hand, allow the `quadit` command in that tool's own settings (its list of commands it may run without asking). Start only when they have allowed it, or tell you to go on anyway.
-- Listening hands you only what comes from now on: first deal with what `quadit work` shows is waiting on you.
+- Listening hands you only what comes from now on: first deal with what `quadit work` shows is waiting on you (for a project, only what is in it: keys starting `KEY-`).
 
 **From a chat that cannot be woken** (case 3), when nothing listens as you yet: say plainly that from this chat you can listen only by keeping the chat busy, and offer the two real choices in one or two sentences:
 
 - keep this chat busy: then say "Listening keeps this chat busy until you stop me; use another chat to talk to me meanwhile." and listen in the foreground (below);
-- or a companion, which listens outside any chat: give the person this command to run in a terminal, with your tool's one-prompt command in it, and say they stop it with Ctrl-C or by closing that terminal. Do not start it yourself unless they tell you to.
+- or a companion, which listens outside any chat: give the person this command to run in a terminal in this project's folder, with your tool's one-prompt command in it and, when `QUADIT_CONFIG` is set in your environment, `QUADIT_CONFIG='<its value>'` in front, so it works as you; say they stop it with Ctrl-C or by closing that terminal. Do not start it yourself unless they tell you to.
 
 ```bash
 quadit listen project=KEY --exec sh -c 'codex exec -s workspace-write -c sandbox_workspace_write.network_access=true "Quadit woke you for this inbox item:
@@ -98,7 +98,7 @@ quadit wait project=KEY   # blocks until the next item for you, then prints ITEM
 - `IDLE`: run the `quadit wait …` line it printed again, and say nothing.
 - Run the lines exactly as printed: they carry your lease, which keeps this session the one that listens, and your project.
 
-If the person asks you to listen again in this same chat, after you stopped, run the last `quadit wait …` line you were given (in the background, in case 2), not a new `quadit wait`: it carries your lease.
+If the person asks you to listen again in this same chat, after you stopped, to the same project (or everything) as before, run the last `quadit wait …` line you were given (in the background, in case 2), not a new `quadit wait`: it carries your lease. For another, start anew.
 
 Stop when the person says so or interrupts you, leaving what you had not finished unacknowledged: it comes back to whoever listens next. Stop too, with one plain sentence to the person, when `quadit wait` is refused: because another session already listens to it (run the `take=1` line it printed only if the person then tells you to take over), because this login is a person's and not an agent's, or because your access was taken away.
 
