@@ -10,7 +10,9 @@
 // first. "Done" and Escape take the page away, showing the one under it.
 // Opened by another server's page rather than by the person, it says which
 // server asked, and takes no input for its first moment on screen
-// (hold-input.ts).
+// (hold-input.ts), nor for as long again whenever that page's later
+// publication changes what it shows (a focus that makes it a sheet or the
+// whole page, other cards).
 // A redraw keeps each tool's card and changes it in place: its nodes are
 // replaced only when what it shows changes, so focus, a selection or a click
 // in it survive the redraw after a Connect or a Disconnect.
@@ -509,6 +511,7 @@ async function showTarget() {
   openedBy.textContent = target?.openedByPage ? `Opened by ${target.serverName}` : "";
   element("no-workspace").hidden = !!at;
   for (const shown of shownCards.values()) shown.fill?.();
+  const before = shapeShown();
   const focus = target?.focus;
   if (focus && focus.id !== focused) {
     focused = focus.id;
@@ -526,9 +529,17 @@ async function showTarget() {
     line.textContent = sheet?.line ?? "";
     line.hidden = !sheet?.line;
     arrange();
+    // What the page published put other controls where the person may be about to click: input is held again.
+    if (shownOnce && target?.openedByPage && shapeShown() !== before) letInputIn(element("connect"), true);
     whenInputIn(() => goTo(focus));
   }
   document.body.classList.remove("starting");
+}
+
+/** What the page shows to click, as a whole: the sheet or the whole page, its title and line, and the cards. */
+function shapeShown(): string {
+  const cards = [...shownCards].filter(([, shown]) => !shown.card.element.hidden).map(([id]) => id);
+  return JSON.stringify([sheet?.title ?? null, sheet?.line ?? null, cards]);
 }
 
 /**

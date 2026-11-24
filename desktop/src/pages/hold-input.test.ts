@@ -20,4 +20,19 @@ describe("letInputIn", () => {
     vi.advanceTimersByTime(1);
     expect(page.inert).toBe(false);
   });
+
+  it("holds it again for 700 ms when asked again later, the earlier hold's end letting nothing in", () => {
+    const page = { inert: true };
+    letInputIn(page, true);
+    vi.advanceTimersByTime(HOLD_MS);
+    expect(page.inert).toBe(false);
+    letInputIn(page, true);
+    expect(page.inert).toBe(true);
+    vi.advanceTimersByTime(500);
+    letInputIn(page, true);
+    vi.advanceTimersByTime(HOLD_MS - 1);
+    expect(page.inert).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(page.inert).toBe(false);
+  });
 });
