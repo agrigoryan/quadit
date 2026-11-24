@@ -3,7 +3,8 @@
 // its pages API, which the test steers. No app, no server: what is checked
 // is that the page changes a card's nodes only when what the card shows
 // changes, so that focus, a selection or a click inside it survive an
-// answer about where its tool stands and the redraw after a Disconnect.
+// answer about where its tool stands and the redraw after a Disconnect; and
+// Run by Quadit's states on a connected card (agent-runs-contract.md §8.2).
 
 import { join } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
@@ -18,6 +19,11 @@ interface Stand {
   self?: unknown;
   /** The last line the page put on the clipboard. */
   copied?: string;
+  /** What Quadit runs the tool for (RunsView); absent: Quadit cannot run it. */
+  runs?: { agent: string; entries: Record<string, unknown>[] } | null;
+  /** What the page asked Quadit to start and stop running. */
+  started?: string[][];
+  stopped?: string[];
   /** How long connectState takes, as the app's does while it asks the login shell and quadit. */
   slowMs: number;
   asks: number;
@@ -78,6 +84,34 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
           };
         },
         toolSelf: async () => (state.connected ? (state.self ?? { proving: null }) : null),
+        runEntries: async () => state.runs ?? null,
+        agentProjects: async () => ({
+          ok: true,
+          projects: [
+            { key: "SVA", name: "Samurai vs Aliens" },
+            { key: "GS", name: "Getting started" },
+          ],
+        }),
+        pickFolder: async () => ({ path: "/Users/ann/devel/game", shown: "~/devel/game" }),
+        startRunning: async (id: string, project: string, folder: string) => {
+          state.started = [...(state.started ?? []), [id, project, folder]];
+          const entry = {
+            id: "e1",
+            project,
+            folder: "~/devel/game",
+            program: "claude",
+            status: { state: "starting" },
+            blocked: [],
+          };
+          state.runs = { agent: state.runs?.agent ?? "", entries: [...(state.runs?.entries ?? []), entry] };
+          return { ok: true };
+        },
+        stopRunning: async (_id: string, entry: string) => {
+          state.stopped = [...(state.stopped ?? []), entry];
+          if (state.runs) state.runs = { ...state.runs, entries: state.runs.entries.filter((e) => e.id !== entry) };
+          return { ok: true };
+        },
+        showRunnerLog: async () => {},
         toolHandshake: async () => {
           state.asks++;
           return state.connected ? state.handshake : null;
@@ -282,4 +316,87 @@ test("a card says what the app does by itself: Connecting, and why it could not"
     ),
   ).toBeVisible({ timeout: 10_000 });
   await expect(card.getByText("Connect to Quadit K7QX4M")).toBeVisible();
+});
+
+test("a connected card offers Run by Quadit, chooses a project and a folder in the card, and says what each project does", async ({
+  page,
+}) => {
+  await open(page, {
+    connected: true,
+    handshake: { state: "connected", listening: false },
+    runs: { agent: "@claude-code", entries: [] },
+    slowMs: 0,
+  });
+  const card = page.getByRole("article", { name: "Claude Code" });
+  await expect(
+    card.getByText(
+      "Quadit can start Claude Code for you when you assign @claude-code a task or comment on one, in the project’s folder on this Mac.",
+    ),
+  ).toBeVisible({ timeout: 10_000 });
+
+  // Choosing, in the card: Start running only once a project and a folder are chosen.
+  await card.getByRole("button", { name: "Run Claude Code by Quadit for a project" }).click();
+  const start = card.getByRole("button", { name: "Start running" });
+  await expect(start).toBeDisabled();
+  await card.getByLabel("Which project?").selectOption("GS");
+  await expect(start).toBeDisabled();
+  await card.getByRole("button", { name: "Choose folder…" }).click();
+  await expect(card.getByText("~/devel/game", { exact: true })).toBeVisible();
+  await expect(
+    card.getByText(
+      "Claude Code runs there with full access, as you, whenever you assign @claude-code a task in GS or comment on one. Only your words, or those of your other agents, start it.",
+    ),
+  ).toBeVisible();
+  await start.click();
+  expect(await page.evaluate(() => (window as unknown as { stand: Stand }).stand.started)).toEqual([
+    ["claude", "GS", "/Users/ann/devel/game"],
+  ]);
+  await expect(card.getByText("Runs GS in ~/devel/game.")).toBeVisible();
+  await expect(card.getByText("Starting…")).toBeVisible();
+
+  // A line changing under a focused Stop running leaves focus there; a refused write is said under its line.
+  const stop = card.getByRole("button", { name: "Stop running GS for @claude-code" });
+  await stop.focus();
+  await stop.evaluate((el) => el.setAttribute("data-test-mark", "stop"));
+  await page.evaluate(() => {
+    const runs = (window as unknown as { stand: Stand }).stand.runs;
+    if (runs)
+      runs.entries = runs.entries.map((e) => ({
+        ...e,
+        status: { state: "working", task: "GS-3" },
+        blocked: [{ task: "GS-2", error: "forbidden: no" }],
+      }));
+  });
+  await expect(card.getByText("Working on GS-3.")).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByText("Quadit could not record how a run on GS-2 ended (forbidden: no).")).toBeVisible();
+  expect(await page.evaluate(() => document.activeElement?.getAttribute("data-test-mark"))).toBe("stop");
+  await expect(card.getByRole("button", { name: "Run @claude-code by Quadit for another project" })).toBeVisible();
+
+  // Stop running: the line goes, and the offer is back.
+  await stop.click();
+  expect(await page.evaluate(() => (window as unknown as { stand: Stand }).stand.stopped)).toEqual(["e1"]);
+  await expect(card.getByText("Runs GS in ~/devel/game.")).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Run Claude Code by Quadit for a project" })).toBeVisible();
+});
+
+test("a card says nothing of Run by Quadit for a tool Quadit cannot run, nor before it is connected", async ({
+  page,
+}) => {
+  await open(page, {
+    connected: true,
+    handshake: { state: "connected", listening: false },
+    runs: null,
+    slowMs: 0,
+  });
+  const card = page.getByRole("article", { name: "Claude Code" });
+  await expect(card.getByText(/^Not listening yet/)).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByText(/^Quadit can start/)).toHaveCount(0);
+
+  await page.evaluate(() => {
+    const stand = (window as unknown as { stand: Stand }).stand;
+    stand.runs = { agent: "@claude-code", entries: [] };
+    stand.handshake = { state: "waiting", code: "K7QX4M" };
+  });
+  await expect(card.getByText("Connect to Quadit K7QX4M")).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByText(/^Quadit can start/)).toHaveCount(0);
 });

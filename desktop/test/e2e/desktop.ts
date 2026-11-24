@@ -122,6 +122,13 @@ export class Desktop {
     return this.pageOf("file://", join(APP_DIR, "out/pages", file));
   }
 
+  /** Has the app's next folder picker answer with `folder`, as a person choosing it (by default, cancelled). */
+  async chooseNextFolder(folder: string) {
+    await this.app.evaluate((_electron, chosen) => {
+      (globalThis as unknown as { e2e: { folders: string[] } }).e2e.folders.push(chosen);
+    }, folder);
+  }
+
   /** Has the app's next dialog answered with its button `index`, as a person pressing it (by default, its cancel button). */
   async answerNextDialog(index: number) {
     await this.app.evaluate((_electron, button) => {
@@ -340,11 +347,9 @@ export function slowToStart(binary: string, seconds: number): string {
  * With `quadit` (the run's real quadit), the stand-in quadit hands it every
  * other command (connect, listen, comment…), and a stand-in `claude` on the
  * PATH acts as a one-prompt tool (`claude -p PROMPT`): told "Connect to
- * Quadit CODE" it gives the code back; woken for an inbox item, it answers
- * the item's task with "Answered by the stand-in to: " and the item's line
- * of its prompt (ITEM #… from @…), so a test sees which item woke it.
- * Without it, the app
- * finds no program to run Claude Code with.
+ * Quadit CODE" it gives the code back. It also answers what quadit run asks
+ * of a program before it runs it (`--version`, `auth status`: signed in).
+ * Without it, the app finds no program to run Claude Code with.
  */
 export function fakeComputer({ claudeCode = true, quadit = "" }: { claudeCode?: boolean; quadit?: string } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
@@ -386,13 +391,13 @@ ${
     writeFileSync(
       join(bin, "claude"),
       `#!/bin/sh
-[ "$1" = "-p" ] || exit 2
-case "$2" in
-  "Connect to Quadit "*) exec quadit connect "\${2#Connect to Quadit }" ;;
-  "Quadit woke you"*)
-    item=$(printf '%s\n' "$2" | sed -n 2p)
-    key=$(printf '%s' "$item" | grep -oE '[A-Z][A-Z0-9]+-[0-9]+' | head -n 1)
-    exec quadit comment "$key" "Answered by the stand-in to: $item" ;;
+case "$1" in
+  --version) echo "2.1.331 (Claude Code)"; exit 0 ;;
+  auth) [ "$2" = "status" ] && exit 0 ;;
+  -p)
+    case "$2" in
+      "Connect to Quadit "*) exec quadit connect "\${2#Connect to Quadit }" ;;
+    esac ;;
 esac
 exit 3
 `,

@@ -182,10 +182,11 @@ test("a tool the app can run gives its code back by itself in the first run, and
     // No line to paste: the app ran the tool, which gave the code back; the server's word turns the card.
     await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(card.getByText(/^Connect to Quadit/)).toHaveCount(0);
-    // The app does not answer by itself: the card's next step is the line to write in a chat of the tool.
+    // The app answers nothing by itself: the card's next step is the line to write in a chat of the tool, and Quadit
+    // offers to run it for a project (runs.spec.ts goes on from there).
     const step = card.getByRole("group", { name: "Next: have Claude Code listen" });
     await expect(step.locator("code")).toHaveText("listen to Quadit", { timeout: 20_000 });
-    await expect(card.getByText("Answers by itself while Quadit is open")).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Run Claude Code by Quadit for a project" })).toBeVisible();
     await screen(first, "07b-connected-by-itself.png");
 
     await first.getByRole("button", { name: "Continue" }).click();

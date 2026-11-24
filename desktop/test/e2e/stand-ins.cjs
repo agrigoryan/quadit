@@ -7,6 +7,8 @@
 //   Notification.prototype.show records the notification instead of showing it
 //   dialog.showMessageBox       records the message and answers with its cancel button, or with the
 //   dialog.showMessageBoxSync   button a test asked for (e2e.answers, first in first out)
+//   dialog.showOpenDialog       the folder picker: answers with the folder a test gave (e2e.folders,
+//                               first in first out), else as cancelled
 //   app.setBadgeCount           records the count (macOS shows a badge only once the app may
 //                               notify, which a test cannot wait for, so the system's own is unreliable)
 //
@@ -21,7 +23,7 @@ const { app, dialog, nativeTheme, Notification, shell } = require("electron");
 // The windows a run opens on the screen are dark, whatever the system's setting.
 nativeTheme.themeSource = "dark";
 
-const recorded = { opened: [], notes: [], dialogs: [], answers: [], badge: 0, errors: [] };
+const recorded = { opened: [], notes: [], dialogs: [], answers: [], folders: [], badge: 0, errors: [] };
 globalThis.e2e = recorded;
 process.on("uncaughtException", (err) => recorded.errors.push(String(err?.stack ?? err)));
 
@@ -42,4 +44,8 @@ dialog.showMessageBoxSync = (...args) => {
   const options = args.at(-1);
   recorded.dialogs.push(`${options.message} ${options.detail ?? ""}`.trim());
   return recorded.answers.shift() ?? options.cancelId ?? 0;
+};
+dialog.showOpenDialog = async () => {
+  const folder = recorded.folders.shift();
+  return folder ? { canceled: false, filePaths: [folder] } : { canceled: true, filePaths: [] };
 };
