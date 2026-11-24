@@ -96,3 +96,41 @@ describe.each([
     expect(screen.getByRole("link", { name: "Add an agent in Settings" })).toBeTruthy();
   });
 });
+
+describe("an agent whose computer is offline", () => {
+  it("says what runs it and since when it is offline, as Settings does, not that nothing listens", async () => {
+    const away = {
+      project_id: "p1",
+      project: "SVA",
+      by: "Quadit's runner",
+      live: false,
+      runner: {
+        machine: "Aram's Mac",
+        folder: "~/game",
+        program: "claude",
+        program_version: "2",
+        holding: false,
+        since: "2026-11-24 14:02",
+      },
+    };
+    const state = {
+      handle: "claude",
+      name: "Claude Code",
+      user_id: "a1",
+      state: "idle",
+      connected_at: "2026-11-24 10:00",
+      listening: false,
+      listeners: [away],
+      listening_projects: [],
+      listening_outside_projects: false,
+      open_tasks: 0,
+      waiting_on_it: 0,
+    };
+    vi.spyOn(api, "get").mockResolvedValue({ agents: [state], sessions: [] });
+    show([me, bot]);
+    expect(
+      await screen.findByText(/^Runs SVA on Aram's Mac: offline since .+\. Its requests wait for it\.$/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/listening/i)).toBeNull();
+  });
+});

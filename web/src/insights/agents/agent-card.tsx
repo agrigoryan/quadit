@@ -2,7 +2,7 @@
 // whether anything would wake it, and its recent runs.
 
 import { useState } from "react";
-import { CornerDownRight, Ear } from "lucide-react";
+import { CornerDownRight, Ear, EarOff } from "lucide-react";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
 import { ago, exact, parseWhen, timeOfDay } from "@/lib/time";
@@ -165,6 +165,14 @@ function Reach({ member, state, now }: { member: Member; state: AgentState; now:
           <Ear className="mt-0.5 size-3 shrink-0" aria-hidden />
           <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5">
             <ListenerLines reading={state} />
+          </span>
+        </span>
+      ) : state.listeners.some((l) => l.runner && !l.live) ? (
+        // Its computer is offline: what runs it there, and that its work waits for it, as Settings says it.
+        <span className="inline-flex min-w-0 items-start gap-1.5 text-ink-2">
+          <EarOff className="mt-0.5 size-3 shrink-0" aria-hidden />
+          <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5">
+            <ListenerLines reading={state} idle />
           </span>
         </span>
       ) : connection === "connected" ? (
