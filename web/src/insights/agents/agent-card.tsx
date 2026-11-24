@@ -8,7 +8,7 @@
 // can do.
 
 import { useState } from "react";
-import { CornerDownRight, MoreHorizontal, Settings2, Trash2 } from "lucide-react";
+import { CornerDownRight, MoreHorizontal, Settings2, Trash2, Unplug } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
 import { ago, exact, parseWhen, timeOfDay } from "@/lib/time";
@@ -21,7 +21,7 @@ import type { Claim } from "@/types/agents";
 import { AgentStateChip, isStranded, NotListening } from "@/insights/ui/agent-state";
 import { connectionOf } from "@/data/listening";
 import type { AgentWork } from "@/insights/agents/agent-data";
-import { ConnectionPill, Hearing, Offer } from "@/insights/agents/agent-reach";
+import { ConnectIt, ConnectionPill, Hearing } from "@/insights/agents/agent-reach";
 import { SessionRow, StopRun } from "@/insights/agents/session-row";
 import { useSettingsBase } from "@/settings/base";
 import { isFinishedHelper } from "@/settings/agents/helper-agents";
@@ -173,8 +173,8 @@ function whereItLives(state: AgentState | undefined, local: LocalAgent | undefin
   return computer ? t("agents.card.where", { program, computer }) : program;
 }
 
-/** The card's menu: the agent's settings, and removing it, for an admin. */
-function CardMenu({ member }: { member: Member }) {
+/** The card's menu: the agent's settings; in the app, disconnecting it from this computer; removing it, for an admin. */
+function CardMenu({ member, local }: { member: Member; local: LocalAgent | undefined }) {
   const can = useCan();
   const settings = useSettingsBase();
   const navigate = useNavigate();
@@ -191,6 +191,11 @@ function CardMenu({ member }: { member: Member }) {
           <MenuItem icon={<Settings2 />} onSelect={() => void navigate(`${settings}/agents/${member.handle}`)}>
             {t("agents.card.settings")}
           </MenuItem>
+          {local && (
+            <MenuItem icon={<Unplug />} onSelect={() => openConnect(member.user_id, "disconnect")}>
+              {t("agents.card.disconnect")}
+            </MenuItem>
+          )}
           {can.administer && (
             <MenuItem danger icon={<Trash2 />} onSelect={() => setRemoving(true)}>
               {t("agent.remove")}
@@ -266,50 +271,41 @@ export function AgentCard({ member, state, helpers, helperNote, work, sessions, 
       aria-label={member.name}
       className="flex min-w-0 flex-col gap-3 border-r border-b border-line bg-surface p-4"
     >
-      {/* Who it is, and whether it is connected: as the app's card has them. */}
-      <header className="flex min-w-0 flex-wrap items-start gap-x-3 gap-y-2">
-        <Avatar member={member} size="xl" />
-        <div className="min-w-0 flex-1 basis-40">
-          <h3 className="truncate text-base leading-6 font-semibold">
-            <Link to={`${settings}/agents/${member.handle}`} className="underline-offset-2 hover:underline">
-              {member.name}
-            </Link>
-          </h3>
+      {/* Who it is and where it lives; whether it is connected, as the app's card says it. */}
+      <header className="flex min-w-0 items-start gap-3">
+        <Avatar member={member} size="lg" className="mt-0.5" />
+        <div className="min-w-0 flex-1">
+          {/* The pill and the menu share the name's line, so the line under it has the card's whole width. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <h3 className="min-w-0 flex-1 truncate text-base leading-5 font-semibold">
+              <Link to={`${settings}/agents/${member.handle}`} className="underline-offset-2 hover:underline">
+                {member.name}
+              </Link>
+            </h3>
+            {isFinishedHelper(member) ? (
+              <Badge>{t("agents.helper.finished")}</Badge>
+            ) : (
+              <ConnectionPill connected={connected} />
+            )}
+            <CardMenu member={member} local={local} />
+          </div>
+          {/* The computer's name is never cut: it takes a line of its own when it does not fit beside the handle. */}
           <p className="flex min-w-0 flex-wrap gap-x-2 text-xs text-ink-3">
             <span>@{member.handle}</span>
-            {/* Whole, on a line of its own when it does not fit beside the handle. */}
-            {where && <span className="max-w-full truncate">{where}</span>}
+            {where && <span>{where}</span>}
           </p>
           {(helperNote || member.title) && (
             <p className="truncate text-xs text-ink-2">{[helperNote, member.title].filter(Boolean).join(" · ")}</p>
           )}
         </div>
-        <span className="ml-auto flex shrink-0 items-center gap-3">
-          {isFinishedHelper(member) ? (
-            <Badge>{t("agents.helper.finished")}</Badge>
-          ) : (
-            <ConnectionPill connected={connected} />
-          )}
-          {local && (
-            <button
-              type="button"
-              onClick={() => openConnect(member.user_id, "disconnect")}
-              aria-label={t("agents.card.disconnectLabel", { name: member.name })}
-              className="text-sm text-ink-3 underline underline-offset-2 hover:text-ink"
-            >
-              {t("agents.card.disconnect")}
-            </button>
-          )}
-          <CardMenu member={member} />
-        </span>
       </header>
 
-      {/* What hears it and what that means, then what can be done: the app's card's words. */}
-      {/* Under the name, as the app's card has it, where there is room. */}
-      <div className="flex flex-col gap-3 empty:hidden md:pl-14">
-        {connected && state && <Hearing member={member} state={state} local={local} busy={busy} />}
-        <Offer member={member} state={state} app={app} />
-      </div>
+      {/* What hears it, a line each, in the app's words; or the way to connect it. */}
+      {connected ? (
+        state && <Hearing member={member} state={state} local={local} busy={busy} />
+      ) : (
+        <ConnectIt member={member} app={app} />
+      )}
 
       {/* What it works on, below the line. */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line pt-3 text-xs text-ink-3">

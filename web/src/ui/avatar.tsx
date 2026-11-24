@@ -2,16 +2,15 @@ import { Bot } from "lucide-react";
 import { cx } from "@/lib/cx";
 import type { Member } from "@/types/core";
 
-type Size = "xs" | "sm" | "md" | "lg" | "xl";
+type Size = "xs" | "sm" | "md" | "lg";
 
 const boxes: Record<Size, string> = {
   xs: "size-4 text-[8px]",
   sm: "size-5 text-[9px]",
   md: "size-6 text-2xs",
   lg: "size-8 text-xs",
-  xl: "size-11 text-sm",
 };
-const badges: Record<Size, string> = { xs: "size-2", sm: "size-2.5", md: "size-3", lg: "size-3.5", xl: "size-4" };
+const badges: Record<Size, string> = { xs: "size-2", sm: "size-2.5", md: "size-3", lg: "size-3.5" };
 
 // The colours members' initials are drawn on, in the order the server
 // hands them out (a member's `tint` is its place here, from 1): eight hues

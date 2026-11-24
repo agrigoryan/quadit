@@ -1,25 +1,25 @@
 // The top of an agent's card on the Agents page: whether it is connected,
-// what hears it and what that means, and what can be done about it. It
-// reads as the desktop app's own card for the agent (desktop/src/pages/
-// tool-card.ts and run-by-quadit.ts) and says the same words for the same
-// state, so the two are one thing in two places; the app's card alone
-// changes files on the computer, so what does that opens it on the agent.
+// what hears it, and what can be done about it, a line each. It looks like
+// the desktop app's own card for the agent (desktop/src/pages/tool-card.ts
+// and run-by-quadit.ts) and says the same words for the same state; what
+// each state means is said in the app's sheet of the agent, which the card
+// opens. Only the app changes files on the computer, so what does that
+// opens it on the agent.
 
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { isKey, t, tMaybe } from "@/lib/i18n";
 import { exact, parseWhen } from "@/lib/time";
 import { useCan } from "@/data/access";
 import { copyText } from "@/data/files";
-import { connectionOf } from "@/data/listening";
-import { useLookup, useMe, useMember } from "@/data/selectors";
+import { useLookup } from "@/data/selectors";
 import { toast } from "@/lib/toast";
 import type { Member } from "@/types/core";
 import type { AgentState, ListenerShown, RunnerShown } from "@/types/dashboard";
 import { useSettingsBase } from "@/settings/base";
-import { Button, buttonLook } from "@/ui/button";
+import { Button, buttonLook, IconButton } from "@/ui/button";
 import { type LocalAgent, openConnect } from "@/ui/desktop-agents";
 
 /** The program's title: from the connection reading, else from the app on this computer. */
@@ -29,12 +29,12 @@ const programOf = (state: AgentState | undefined, local: LocalAgent | undefined)
 /** Whether it has proven it reaches Quadit: the big mark on the card's right, as on the app's card. */
 export function ConnectionPill({ connected }: { connected: boolean }) {
   return connected ? (
-    <span className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md bg-ok-soft px-2.5 text-sm font-medium text-ok">
-      <Check className="size-4" strokeWidth={2.4} aria-hidden />
+    <span className="inline-flex h-6 shrink-0 items-center gap-1 rounded-md bg-ok-soft px-2 text-xs font-medium text-ok">
+      <Check className="size-3.5" strokeWidth={2.4} aria-hidden />
       {t("agents.card.connected")}
     </span>
   ) : (
-    <span className="inline-flex h-7 shrink-0 items-center rounded-md border border-line px-2.5 text-sm text-ink-3">
+    <span className="inline-flex h-6 shrink-0 items-center rounded-md border border-line px-2 text-xs text-ink-3">
       {t("agents.card.notConnected")}
     </span>
   );
@@ -52,14 +52,17 @@ function Line({
 }) {
   const color = { ok: "text-ok", work: "text-accent-text", wait: "text-wait", quiet: "text-ink-3" }[tone];
   return (
-    <p className="flex min-w-0 items-baseline gap-2">
-      <span
-        className={cx("size-2 shrink-0 translate-y-[-1px] self-center rounded-full bg-current", color)}
-        aria-hidden
-      />
-      <span className="min-w-0 flex-1 text-sm">{children}</span>
+    // What ends the line (a button, a link) goes under it when the card is too narrow for both.
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+      <p className="flex min-w-0 flex-1 basis-56 items-baseline gap-2">
+        <span
+          className={cx("size-2 shrink-0 translate-y-[-1px] self-center rounded-full bg-current", color)}
+          aria-hidden
+        />
+        <span className="min-w-0 flex-1 text-sm">{children}</span>
+      </p>
       {after}
-    </p>
+    </div>
   );
 }
 
@@ -85,11 +88,12 @@ function runnerStatus(
 }
 
 /**
- * What hears a connected agent, a line for each, and under them one
- * sentence of what that means; with nothing hearing it, the next step,
- * set apart: the words to write in its chat, with Copy. A project Quadit
- * runs on this computer is said as the app says its own entries, with Stop
- * running (in the app, and not while a run is in hand: Stop is on the run).
+ * What hears a connected agent, a line for each; with nothing hearing it,
+ * the words that have it listen, with Copy. Where this computer can run it
+ * and Quadit runs nothing for it yet, Run by Quadit ends the first line.
+ * A project Quadit runs on this computer is said as the app says its own
+ * entries, with Stop running (not while a run is in hand: Stop is on the
+ * run).
  */
 export function Hearing({
   member,
@@ -105,10 +109,13 @@ export function Hearing({
   const projects = useLookup("projects");
   const program = programOf(state, local);
   const ownProjects = state.listeners.some((l) => l.project_id);
+  const offer = local?.canRun && local.runs.length === 0 && (
+    <Button size="sm" className="shrink-0 self-center" onClick={() => openConnect(member.user_id, "run")}>
+      {t("agents.card.runByQuadit")}
+    </Button>
+  );
   const lines: React.ReactNode[] = [];
-  const by: string[] = [];
   for (const l of state.listeners) {
-    const key = l.project ?? "";
     if (l.runner) {
       lines.push(
         <RunnerLine
@@ -125,49 +132,38 @@ export function Hearing({
     }
     if (!l.live) continue;
     const what = l.project_id
-      ? (projects[l.project_id]?.name ?? key)
+      ? (projects[l.project_id]?.name ?? l.project ?? "")
       : t(ownProjects ? "agents.listener.everythingElse" : "agents.listener.everything");
-    by.push(l.by ?? "");
     lines.push(
-      <Line key={`l${l.project_id ?? ""}`} tone="ok">
+      <Line key={`l${l.project_id ?? ""}`} tone="ok" after={lines.length === 0 && offer}>
         <span className="font-medium">
           {l.by ? t("agents.listener.toFrom", { what, by: l.by }) : t("agents.listener.to", { what })}
         </span>
       </Line>,
     );
   }
-  const pushed = state.listening_outside_projects && !state.listeners.some((l) => !l.project_id && l.live);
-  if (pushed)
+  if (state.listening_outside_projects && !state.listeners.some((l) => !l.project_id && l.live))
     lines.push(
-      <Line key="pushed" tone="ok">
+      <Line key="pushed" tone="ok" after={lines.length === 0 && offer}>
         <span className="font-medium">{t("agents.listener.webhook")}</span>
       </Line>,
     );
   if (lines.length === 0 && state.listening)
     lines.push(
-      <Line key="any" tone="ok">
+      <Line key="any" tone="ok" after={offer}>
         <span className="font-medium">{t("agents.card.listening")}</span>
       </Line>,
     );
-  if (lines.length === 0) return <NextStep member={member} program={program} />;
-
-  const chats = by.filter((b) => b === "a chat").length;
-  const said =
-    chats === 1
-      ? t("agents.card.chatSaid")
-      : chats > 1
-        ? t("agents.card.chatsSaid")
-        : by.includes("a companion")
-          ? t("agents.card.companionSaid")
-          : by.length > 0 || pushed
-            ? t("agents.card.listeningSaid")
-            : "";
-  return (
-    <div className="flex flex-col gap-1">
-      {lines}
-      {said && <p className="pl-4 text-sm text-ink-2">{said}</p>}
-    </div>
-  );
+  if (lines.length === 0)
+    lines.push(
+      <Line key="not" tone="wait" after={offer}>
+        <span className="inline-flex flex-wrap items-center gap-x-0.5">
+          <span className="text-ink">{t("agents.card.notListening")}</span>
+          <CopyListen />
+        </span>
+      </Line>,
+    );
+  return <div className="flex flex-col gap-1">{lines}</div>;
 }
 
 /**
@@ -232,78 +228,37 @@ function RunnerLine({
   );
 }
 
-/** Not listening yet: the next step, set apart, as the app's card sets it apart. */
-function NextStep({ member, program }: { member: Member; program: string }) {
+/** Copies the words that have it listen, and says so for a moment. */
+function CopyListen() {
   const [done, setDone] = useState(false);
-  const words = t("agents.card.listenWords");
   async function copy() {
-    if (!(await copyText(words))) return toast.error(t("common.copyFailed"));
+    if (!(await copyText(t("agents.card.listenWords")))) return toast.error(t("common.copyFailed"));
     setDone(true);
     setTimeout(() => setDone(false), 1500);
   }
   return (
-    <section
-      aria-label={t("agents.card.nextStep", { name: member.name })}
-      className="flex flex-col gap-2 rounded-lg border border-wait/40 bg-wait-soft/60 p-3"
-    >
-      <p className="text-sm font-medium text-ink">
-        {program ? t("agents.card.notListening", { program }) : t("agents.card.notListeningNoProgram")}
-      </p>
-      <p className="flex items-center gap-2">
-        <code className="rounded-md border border-line bg-surface px-2 py-1 font-mono text-sm font-semibold text-ink">
-          {words}
-        </code>
-        <Button size="sm" aria-label={t("agents.card.copyListen", { name: member.name })} onClick={() => void copy()}>
-          {done ? t("common.copied") : t("s.copy")}
-        </Button>
-      </p>
-    </section>
+    <IconButton label={done ? t("common.copied") : t("agents.card.copyListen")} size="sm" onClick={() => void copy()}>
+      {done ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />}
+    </IconButton>
   );
 }
 
 /**
- * What can be done to have the agent work, below the line: connect it (in
- * the app, its Connect window; in a browser, its page in Settings, where a
- * connect code is made), or, where this computer can, have Quadit run it,
- * with the sentence the app says of it. Nothing when there is nothing to do.
+ * Connecting an agent that has not proven it reaches Quadit, for whoever
+ * may make it a connect code: in the app, its Connect window on the agent;
+ * in a browser, the agent's page in Settings, where a connect code is made.
  */
-export function Offer({
-  member,
-  state,
-  app,
-}: {
-  member: Member;
-  state: AgentState | undefined;
-  app: Record<string, LocalAgent> | null;
-}) {
+export function ConnectIt({ member, app }: { member: Member; app: Record<string, LocalAgent> | null }) {
   const can = useCan();
-  const me = useMe();
   const settings = useSettingsBase();
-  const owner = useMember(member.responsible_id);
-  const local = app?.[member.user_id];
-  const connected = connectionOf(member, state) !== "not_connected";
-  if (!connected) {
-    if (!can.agentTokens(member)) return null;
-    // In a browser a connect code is made on the agent's page in Settings.
-    return app ? (
-      <Button variant="primary" className="self-start" onClick={() => openConnect(member.user_id, "connect")}>
-        {t("agents.card.connect")}
-      </Button>
-    ) : (
-      <Link to={`${settings}/agents/${member.handle}`} className={cx(buttonLook("primary"), "self-start")}>
-        {t("agents.card.connect")}
-      </Link>
-    );
-  }
-  if (!local?.canRun || local.runs.length > 0) return null;
-  const program = programOf(state, local);
-  const words = { program, handle: member.handle, owner: owner?.handle ?? "" };
-  return (
-    <div className="flex flex-col items-start gap-2 border-t border-line pt-3">
-      <p className="text-sm text-ink-2">
-        {owner && owner.user_id !== me.user_id ? t("agents.card.offerFor", words) : t("agents.card.offer", words)}
-      </p>
-      <Button onClick={() => openConnect(member.user_id, "run")}>{t("agents.card.runByQuadit")}</Button>
-    </div>
+  if (!can.agentTokens(member)) return null;
+  return app ? (
+    <Button variant="primary" size="sm" className="self-start" onClick={() => openConnect(member.user_id, "connect")}>
+      {t("agents.card.connect")}
+    </Button>
+  ) : (
+    <Link to={`${settings}/agents/${member.handle}`} className={cx(buttonLook("primary", "sm"), "self-start")}>
+      {t("agents.card.connect")}
+    </Link>
   );
 }

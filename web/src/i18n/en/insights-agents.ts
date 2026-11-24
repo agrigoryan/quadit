@@ -25,22 +25,11 @@ export const agentsStrings = {
   "agents.card.connected": "Connected",
   "agents.card.notConnected": "Not connected",
   "agents.card.connect": "Connect",
-  "agents.card.disconnect": "Disconnect",
-  "agents.card.disconnectLabel": "Disconnect {name} from this computer",
+  "agents.card.disconnect": "Disconnect from this computer",
   "agents.card.listening": "Listening",
-  "agents.card.listeningSaid": "It answers what you assign to it or ask it in Quadit.",
-  "agents.card.chatSaid":
-    "It answers what you assign to it or ask it in Quadit while that chat is open. One chat listens to a project at a time. To stop, tell that chat to stop listening.",
-  "agents.card.chatsSaid":
-    "It answers what you assign to it or ask it in Quadit while those chats are open. One chat listens to a project at a time. To stop one, tell its chat to stop listening.",
-  "agents.card.companionSaid": "A companion runs in a terminal, and stops with Ctrl-C or when that terminal closes.",
-  "agents.card.notListening":
-    "Not listening yet. To have it answer what you write in Quadit, open {program} in your project’s folder and write:",
-  "agents.card.notListeningNoProgram":
-    "Not listening yet. To have it answer what you write in Quadit, write this in its chat, in your project’s folder:",
-  "agents.card.nextStep": "Next: have {name} listen",
+  "agents.card.notListening": "Not listening. Say “listen to Quadit” to it in a chat.",
   "agents.card.listenWords": "listen to Quadit",
-  "agents.card.copyListen": "Copy “listen to Quadit” for {name}",
+  "agents.card.copyListen": "Copy “listen to Quadit”",
   "agents.card.runs": "Runs {project} in {folder}.",
   "agents.card.ready": "Ready.",
   "agents.card.working": "Working on {task}.",
@@ -54,10 +43,6 @@ export const agentsStrings = {
   "agents.card.paused.login_mismatch": "Paused: {program} is set to work as another agent. Connect it again.",
   "agents.card.paused.server_old": "Paused: this server needs an update to run agents.",
   "agents.card.paused.other": "Paused.",
-  "agents.card.offer":
-    "Quadit can start {program} for you when you assign @{handle} a task or comment on one, in the project’s folder on this computer.",
-  "agents.card.offerFor":
-    "Quadit can start {program} under your account when @{owner} assigns @{handle} a task or writes to it on one, in the project’s folder on this computer.",
   "agents.card.runByQuadit": "Run by Quadit…",
   "agents.card.stopRunning": "Stop running",
   "agents.card.stopRunningLabel": "Stop running {project} on this computer",

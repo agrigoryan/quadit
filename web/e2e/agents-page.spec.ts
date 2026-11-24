@@ -32,11 +32,7 @@ test("in a browser, a card says whether its agent is connected, connects one thr
   const talking = page.getByRole("article", { name: talker.name });
   await expect(talking.getByText("Claude Code", { exact: true })).toBeVisible();
   await expect(talking.getByText("Connected", { exact: true })).toBeVisible();
-  await expect(
-    talking.getByText(
-      "Not listening yet. To have it answer what you write in Quadit, open Claude Code in your project’s folder and write:",
-    ),
-  ).toBeVisible();
+  await expect(talking.getByText("Not listening. Say “listen to Quadit” to it in a chat.")).toBeVisible();
   await expect(talking.getByRole("button", { name: "Run by Quadit…" })).toHaveCount(0);
 
   // A browser connects an agent where a connect code is made: its page in Settings.
