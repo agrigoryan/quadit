@@ -51,7 +51,6 @@ const api: PagesApi = {
   newConnectCode: call("newConnectCode"),
   updateSkill: call("updateSkill"),
   toolSelf: call("toolSelf"),
-  setAnswering: call("setAnswering"),
   showToolLog: call("showToolLog"),
   copyText: call("copyText"),
   connectState: call("connectState"),

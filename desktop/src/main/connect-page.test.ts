@@ -44,7 +44,7 @@ function harness({ covered = "" }: { covered?: string } = {}) {
       summary: null,
     }),
     copy: async () => {},
-    selfRuns: { self: () => null, setAnswering: async () => {}, logOf: (id) => `/logs/${id}.log` },
+    selfRuns: { self: () => null, logOf: (id) => `/logs/${id}.log` },
     showLog: async () => {},
     showBackups: async () => {},
   });

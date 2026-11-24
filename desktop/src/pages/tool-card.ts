@@ -13,9 +13,8 @@
 //              line to write in a chat of the tool (`listen to Quadit`)
 //              with Copy, and how that chat listens (CardTool.chatListens);
 // and what the app does by itself (desktop contract §11, third amendment):
-// "Connecting…" while it gives the code back, the reason when it could not
-// (above the line to paste), and whether the tool answers by itself, with
-// Pause and Resume (the app never does now: main/self-runs.ts);
+// "Connecting…" while it gives the code back, and the reason when it could
+// not (above the line to paste);
 // and, set up but where it stands not known here (it works as another
 // server's login, or no answer came yet), a plain line saying so, never
 // "Connected". A set-up card asks the app where its tool stands every couple
@@ -90,7 +89,7 @@ export class ToolCard {
   private setUp = false;
   /** Where it stands with Quadit once set up; null until the app has said. */
   private handshake: Handshake | null = null;
-  /** What the app does by itself for it (giving its code back, answering); null until the app has said. */
+  /** What the app does by itself for it (giving its code back); null until the app has said. */
   private self: SelfRun | null = null;
   /** What the card's buttons and its standing lines were last drawn from: they are drawn anew only when it changes. */
   private drawn = "";
@@ -318,14 +317,8 @@ export class ToolCard {
 
     // Its nodes are replaced only when what they show changes: focus, a selection or a click in them survive the rest.
     const { self } = this;
-    // What is drawn from: of what the app does by itself, only what this state shows.
-    const shown =
-      stands === "waiting"
-        ? (self?.proving ?? null)
-        : stands === "found"
-          ? null
-          : [self?.answering ?? "none", self?.missed ?? null];
-    const drawn = JSON.stringify([stands, handshake, shown]);
+    // What is drawn from: of what the app does by itself, only what the waiting state shows.
+    const drawn = JSON.stringify([stands, handshake, stands === "waiting" ? (self?.proving ?? null) : null]);
     if (drawn === this.drawn) return;
     this.drawn = drawn;
     // The buttons beside its name follow where it stands only: what listens changing leaves focus on Disconnect.
@@ -347,7 +340,7 @@ export class ToolCard {
       return;
     }
     if (handshake?.state === "connected") {
-      this.stand.replaceChildren(this.listening(handshake), ...this.answering());
+      this.stand.replaceChildren(this.listening(handshake));
       return;
     }
     if (handshake?.state === "unknown")
@@ -360,57 +353,6 @@ export class ToolCard {
       connecting.append(make("span", "", "pulse"), document.createTextNode("Connecting…"));
       this.stand.replaceChildren(connecting);
     } else this.stand.replaceChildren(...this.waitingLines(handshake));
-  }
-
-  /**
-   * Whether it answers by itself while the app is open (desktop contract
-   * §11, third amendment), with Pause or Resume, and an item it could not
-   * answer; nothing where the app does not run it (another server's tool,
-   * one it could not prove, another on the same login).
-   */
-  private answering(): HTMLElement[] {
-    const { name } = this.tool;
-    const choose = (text: string, on: boolean, label: string) => {
-      const control = button(text, () => void this.setAnswering(control, on), "btn btn-line btn-sm", label);
-      return control;
-    };
-    const line = (text: string, control: HTMLButtonElement) => {
-      const row = make("p", "", "answers");
-      row.append(make("span", text), control);
-      return row;
-    };
-    const resume = () => choose("Resume", true, `Resume ${name} answering by itself`);
-    switch (this.self?.answering) {
-      case "on": {
-        const on = line(
-          "Answers by itself while Quadit is open",
-          choose("Pause", false, `Pause ${name} answering by itself`),
-        );
-        const missed = this.self.missed;
-        if (!missed) return [on];
-        // An item it could not answer: said quietly, until it answers the next.
-        const log = button(
-          "Show log",
-          () => void api.showToolLog(this.tool.id),
-          "link-blue",
-          `Show the log of what Quadit ran for ${name}`,
-        );
-        return [on, line(`It could not answer one item (${missed}).`, log)];
-      }
-      case "paused":
-        return [line(`Paused. It answers when you ask it in ${name}.`, resume())];
-      case "guarded":
-        return [line("Paused: it was started more than six times in a minute. Resume when you have looked.", resume())];
-      default:
-        return [];
-    }
-  }
-
-  /** The person's Pause or Resume; the card shows the result once the app says it. */
-  private async setAnswering(control: HTMLButtonElement, on: boolean) {
-    control.disabled = true;
-    await api.setAnswering(this.tool.id, on);
-    await this.ask();
   }
 
   /**

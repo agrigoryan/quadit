@@ -129,9 +129,7 @@ interface Connection {
    * again, even after the person takes it away. Absent in ledgers from before.
    */
   allowed?: boolean;
-  /** Whether the tool answers by itself (self-runs.ts), as the person chose; absent: not chosen. */
-  answering?: boolean;
-  /** The app ran the tool and saw it give its connect code back (self-runs.ts): only then does it answer by itself. */
+  /** The app ran the tool and saw it give its connect code back (self-runs.ts): it is not run for that again. */
   ran?: true;
   at: number;
 }
@@ -779,10 +777,9 @@ export class Connections {
   /**
    * The tools connected through the quadit command, as the app runs them
    * (self-runs.ts): the login file each uses (its own, or the computer's
-   * default one), whether the app ran it, and whether it answers by itself
-   * (off only when the person paused it).
+   * default one), and whether the app ran it.
    */
-  async selfRunTools(): Promise<{ id: string; login: string; ran: boolean; answering: boolean }[]> {
+  async selfRunTools(): Promise<{ id: string; login: string; ran: boolean }[]> {
     const connections = Object.entries(this.ledger().harnesses).filter(([, c]) => c.methods.includes("cli"));
     let defaultLogin: string | null = null;
     if (connections.some(([, c]) => !c.token)) {
@@ -792,7 +789,7 @@ export class Connections {
     }
     return connections.flatMap(([id, c]) => {
       const login = c.token?.config ?? defaultLogin;
-      return login ? [{ id, login, ran: c.ran === true, answering: c.answering !== false }] : [];
+      return login ? [{ id, login, ran: c.ran === true }] : [];
     });
   }
 
@@ -809,15 +806,6 @@ export class Connections {
     const connection = ledger.harnesses[harnessId];
     if (!connection) return;
     connection.ran = true;
-    this.saveLedger(ledger);
-  }
-
-  /** Remembers whether a tool answers by itself (its card's Pause and Resume). */
-  setAnswering(harnessId: string, on: boolean) {
-    const ledger = this.ledger();
-    const connection = ledger.harnesses[harnessId];
-    if (!connection) return;
-    connection.answering = on;
     this.saveLedger(ledger);
   }
 

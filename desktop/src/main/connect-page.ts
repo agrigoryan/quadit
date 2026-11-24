@@ -51,7 +51,7 @@ export interface ConnectPageParts {
   /** Puts text on the clipboard. */
   copy(text: string): Promise<void>;
   /** What the app runs by itself for the tools (self-runs.ts). */
-  selfRuns: Pick<SelfRuns, "self" | "setAnswering" | "logOf">;
+  selfRuns: Pick<SelfRuns, "self" | "logOf">;
   /** Opens a log file. */
   showLog(path: string): Promise<void>;
   /** Shows the folder of the backups Connect keeps. */
@@ -92,7 +92,6 @@ export class ConnectPage {
       newConnectCode: (_sender, harness) => connections.newCode(String(harness)),
       updateSkill: (_sender, harness) => connections.updateSkill(String(harness)),
       toolSelf: (_sender, harness) => parts.selfRuns.self(String(harness)),
-      setAnswering: (_sender, harness, on) => parts.selfRuns.setAnswering(String(harness), on === true),
       showToolLog: (_sender, harness) => parts.showLog(parts.selfRuns.logOf(String(harness))),
       copyText: (_sender, text) => parts.copy(String(text)),
     });

@@ -898,13 +898,13 @@ posixOnly("what the app runs by itself for a connected tool (desktop contract §
     expect(told).toEqual(["connected claude ABCDE2", "connected claude ABCDE3", "disconnected claude"]);
   });
 
-  it("knows each connected tool's login, whether the app ran it, whether it answers by itself, and the codes still waiting", async () => {
+  it("knows each connected tool's login, whether the app ran it, and the codes still waiting", async () => {
     const { connections, connect, choice, configDir } = setUp();
     await connect(choice("claude"));
     await connect(choice("pi"));
     expect(await connections.selfRunTools()).toEqual([
-      { id: "claude", login: join(configDir, "claude.json"), ran: false, answering: true },
-      { id: "pi", login: join(configDir, "config.json"), ran: false, answering: true },
+      { id: "claude", login: join(configDir, "claude.json"), ran: false },
+      { id: "pi", login: join(configDir, "config.json"), ran: false },
     ]);
     connections.markRan("pi");
     expect((await connections.selfRunTools())[1]?.ran).toBe(true);
@@ -912,8 +912,6 @@ posixOnly("what the app runs by itself for a connected tool (desktop contract §
       { id: "claude", code: "ABCDE2" },
       { id: "pi", code: "ABCDE3" },
     ]);
-    connections.setAnswering("claude", false);
-    expect((await connections.selfRunTools())[0]?.answering).toBe(false);
   });
 });
 

@@ -77,10 +77,7 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
             ],
           };
         },
-        toolSelf: async () => (state.connected ? (state.self ?? { proving: null, answering: "none" }) : null),
-        setAnswering: async (_id: string, on: boolean) => {
-          state.self = { proving: null, answering: on ? "on" : "paused" };
-        },
+        toolSelf: async () => (state.connected ? (state.self ?? { proving: null }) : null),
         toolHandshake: async () => {
           state.asks++;
           return state.connected ? state.handshake : null;
@@ -263,47 +260,26 @@ test("a connected card that is not listening makes the line to write its main st
   await expect(card.getByText("Listening to everything, from a companion")).toHaveCount(0);
 });
 
-// The app no longer answers by itself (main/self-runs.ts, answers: false), so it never says "on", "paused" or
-// "guarded" now; the card still shows them as it would were that switched back on.
-test("a card says what the app does by itself: Connecting, why it could not, and answering with Pause and Resume", async ({
-  page,
-}) => {
+test("a card says what the app does by itself: Connecting, and why it could not", async ({ page }) => {
   await open(page, {
     connected: true,
     handshake: { state: "waiting", code: "K7QX4M" },
-    self: { proving: { state: "running" }, answering: "on" },
+    self: { proving: { state: "running" } },
     slowMs: 0,
   });
   const card = page.getByRole("article", { name: "Claude Code" });
   await expect(card.getByText("Connecting…")).toBeVisible();
   await expect(card.getByText(/^Connect to Quadit/)).toHaveCount(0);
 
-  const set = (stand: Partial<Stand>) =>
-    page.evaluate((s) => Object.assign((window as unknown as { stand: Stand }).stand, s), stand);
-  await set({ self: { proving: { state: "failed", reason: "it took longer than two minutes" }, answering: "on" } });
+  await page.evaluate(() => {
+    (window as unknown as { stand: Stand }).stand.self = {
+      proving: { state: "failed", reason: "it took longer than two minutes" },
+    };
+  });
   await expect(
     card.getByText(
       "Quadit could not run Claude Code by itself (it took longer than two minutes). Say this in Claude Code instead:",
     ),
   ).toBeVisible({ timeout: 10_000 });
   await expect(card.getByText("Connect to Quadit K7QX4M")).toBeVisible();
-
-  await set({ handshake: { state: "connected", listening: true }, self: { proving: null, answering: "on" } });
-  await expect(card.getByText("Answers by itself while Quadit is open")).toBeVisible({ timeout: 10_000 });
-  await card.getByRole("button", { name: "Pause Claude Code answering by itself" }).click();
-  await expect(card.getByText("Paused. It answers when you ask it in Claude Code.")).toBeVisible();
-  await card.getByRole("button", { name: "Resume Claude Code answering by itself" }).click();
-  await expect(card.getByText("Answers by itself while Quadit is open")).toBeVisible();
-
-  await set({ self: { proving: null, answering: "on", missed: "it took too long" } });
-  await expect(card.getByText("It could not answer one item (it took too long).")).toBeVisible({ timeout: 10_000 });
-  await expect(card.getByRole("button", { name: "Show the log of what Quadit ran for Claude Code" })).toBeVisible();
-  await set({ self: { proving: null, answering: "guarded" } });
-  await expect(
-    card.getByText("Paused: it was started more than six times in a minute. Resume when you have looked."),
-  ).toBeVisible({ timeout: 10_000 });
-  // A tool the app does not run says nothing of answering by itself.
-  await set({ self: { proving: null, answering: "none" } });
-  await expect(card.getByText(/by itself|^Paused/)).toHaveCount(0, { timeout: 10_000 });
-  await expect(card.getByRole("button", { name: /answering by itself/ })).toHaveCount(0);
 });

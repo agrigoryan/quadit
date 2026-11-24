@@ -234,13 +234,13 @@ function start() {
     // The running app itself, which the quadit command starts: an AppImage by its own file, not where it is mounted.
     appFor: (id) => (id === list.localServer()?.id ? process.env.APPIMAGE || app.getPath("exe") : null),
     ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
-    // A code to give back first (one program at a time: the listener, when the app answers, follows it), else a sync.
+    // A code to give back, else a look at the tools.
     connected: (id, code) => void (code ? selfRuns.prove(id, code) : selfRuns.sync()),
     disconnected: (id) => selfRuns.disconnected(id),
   });
   // What the app runs by itself for the tools connected (desktop contract §11, third amendment): each tool's program
-  // on the login shell's PATH, else its desktop app's copy; the listeners' quadit the one on the PATH, else the app's.
-  // Looked at again at each Connect, Disconnect, Resume, change of the server here and start.
+  // on the login shell's PATH, else its desktop app's copy, run once to give its connect code back. Looked at again at
+  // each Connect, Disconnect, change of the server here and start.
   //
   // Whether a quadit login is the app's own server's: that server's address, and the app's mark (login --app). The
   // tool runs with that file, so it decides, never the ledger.
@@ -254,8 +254,6 @@ function start() {
     }
   };
   const selfRuns = new SelfRuns({
-    // Off for now: a tool answers from a chat told to listen. On brings back a listener per connected tool, Pause/Resume.
-    answers: false,
     look: async () => {
       const look = await cli.look();
       const where = {
@@ -277,18 +275,16 @@ function start() {
             ran: tool.ran,
             // Runs for the app's own server exist only while it runs as the app's child (never another program on its port).
             serverRuns: local.state().kind === "running",
-            answering: tool.answering,
           },
         ];
       });
-      return { tools, quadit: look.found?.path ?? cli.bundled, path: look.path.join(":") };
+      return { tools, path: look.path.join(":") };
     },
     start: (program, args, options) => startChild(program, args, options),
     codeGivenBack: async (id) => (await connections.handshake(id))?.state === "connected",
     openCode: (id) => connections.waitingCodes().find((open) => open.id === id)?.code ?? null,
     newCode: async (id) => void (await connections.newCode(id)),
     ran: (id) => connections.markRan(id),
-    remember: (id, on) => connections.setAnswering(id, on),
     dir: join(dataDir, "tools"),
     env: process.env,
     changed: () => pages.changed(),
@@ -423,7 +419,7 @@ function start() {
       quiet.say(() => void local.setupNeeded().then((needed) => needed && firstRun.show()));
     }
     // Whatever it became (running, stopped on purpose, failed, its port taken), the tools' runs follow it: those
-    // the app never ran give their codes back first.
+    // the app never ran give their codes back.
     void selfRuns.sync();
   });
   refreshMenu();
@@ -498,8 +494,8 @@ function start() {
   // The app may have been updated, and its quadit with it: the skills Connect wrote follow, and a tool connected
   // by a version from before is let use Quadit without asking, silently, in the background too. What is not done
   // now (no quadit answered) is at the next start.
-  // Then the tools are run by themselves (a background start too), once the app's own server runs (local.onChange);
-  // a tool of another server never is.
+  // Then a tool the app never ran gives its code back (a background start too), once the app's own server runs
+  // (local.onChange); a tool of another server never does.
   void connections
     .refresh()
     .catch(() => {})
