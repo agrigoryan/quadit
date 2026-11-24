@@ -252,8 +252,8 @@ interface Props {
   /** Name the task on the line (an agent's card does; the task panel does not). */
   showTask?: boolean;
   /**
-   * The open question its agent asked on the task, given for the newest run
-   * of that agent there: a run done then waits for its answer.
+   * The open question its agent asked on the task, given for the newest run Quadit
+   * started for that agent there: a run done then waits for its answer.
    */
   question?: Decision;
   /** It is the newest run Quadit's runner started for its agent on its task: once ended, it may be continued in a terminal. */

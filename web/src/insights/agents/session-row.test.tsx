@@ -136,7 +136,19 @@ describe("why a run waits, did not start or failed", () => {
       "run_open",
       "not_started",
       "Not started: a run of @claude on this task is still open on another computer.",
-      "Stop that run, then comment again.",
+      "Stop that run; then Ann can write to @claude here to start it again.",
+    ],
+    [
+      "run_cap",
+      "not_started",
+      "Not started: other agents started @claude too often in the last hour.",
+      "Ann can write to @claude here to start it again.",
+    ],
+    [
+      "no_progress",
+      "not_started",
+      "Not started: the last two runs changed nothing on this task.",
+      "Ann can write to @claude here to start it again.",
     ],
     [
       "start_failed",
@@ -293,6 +305,14 @@ describe("the task's sessions", () => {
       "/acme/task/SVA-12",
     );
     expect(within(rows[1] as HTMLElement).getByText("Done")).toBeInTheDocument();
+  });
+
+  it("keeps waiting for an answer on the newest run Quadit started, whatever session the agent recorded itself after", () => {
+    const manual = run("done", { id: "m1", title: "Notes", started_at: now, machine_id: undefined });
+    tasks([run("done"), manual], [question()]);
+    const rows = screen.getAllByRole("listitem");
+    expect(within(rows[0] as HTMLElement).getByText("Done")).toBeInTheDocument();
+    expect(within(rows[1] as HTMLElement).getByText("Waiting for an answer")).toBeInTheDocument();
   });
 
   it("shows it done once the question is answered, or when it is someone else's", () => {

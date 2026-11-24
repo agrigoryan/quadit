@@ -115,38 +115,32 @@ function CodeLink({ link, readOnly }: { link: TaskLink; readOnly: boolean }) {
   );
 }
 
-/**
- * Each agent's newest run on the task and its newest run Quadit's runner
- * started, by agent; `sessions` come newest first.
- */
-function newestByAgent(sessions: AgentSession[]) {
+/** Each agent's newest run on the task that Quadit's runner started, by agent; `sessions` come newest first. */
+function newestRuns(sessions: AgentSession[]) {
   const newest = new Map<string, string>();
-  const newestRun = new Map<string, string>();
-  for (const s of sessions) {
-    if (!newest.has(s.agent_id)) newest.set(s.agent_id, s.id);
-    if (s.machine_id && !newestRun.has(s.agent_id)) newestRun.set(s.agent_id, s.id);
-  }
-  return { newest, newestRun };
+  for (const s of sessions) if (s.machine_id && !newest.has(s.agent_id)) newest.set(s.agent_id, s.id);
+  return newest;
 }
 
 /**
  * The task's sessions, open ones first, each newest first. A run is shown
  * waiting for an answer (never stored: it is read from the task's questions
- * here) when it is its agent's newest on the task, it is done, and that
- * agent has asked a question on the task that is still open.
+ * here) when it is the newest run Quadit started for its agent on the
+ * task (a session the agent recorded itself does not count), it is done,
+ * and that agent has asked a question on the task that is still open.
  */
 function Sessions({ sessions, taskId }: { sessions: AgentSession[]; taskId: string }) {
   // The clock only has to run while a session is open.
   const ongoing = sessions.some(isOpenSession);
   const now = useNow(ongoing ? 15_000 : 600_000);
   const open = useOpenDecisions()[taskId];
-  const { newest, newestRun } = useMemo(() => newestByAgent(sessions), [sessions]);
+  const newestRun = useMemo(() => newestRuns(sessions), [sessions]);
   const ordered = useMemo(
     () => [...sessions.filter(isOpenSession), ...sessions.filter((s) => !isOpenSession(s))],
     [sessions],
   );
   const asked = (s: AgentSession) =>
-    newest.get(s.agent_id) === s.id && s.state === "done"
+    newestRun.get(s.agent_id) === s.id && s.state === "done"
       ? open
           ?.filter((d) => d.created_by === s.agent_id)
           .reduce<Decision | undefined>((last, d) => (last && last.created_at > d.created_at ? last : d), undefined)
