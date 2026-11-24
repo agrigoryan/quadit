@@ -265,6 +265,19 @@ type Listener struct {
 	// listener was handed: past its cursor, it is in hand, not yet
 	// acknowledged.
 	HandedSeq int64 `json:"-" db:"handed_seq"`
+
+	// What a runner says of itself when it holds this listener
+	// (agent-runs-contract.md §4.1); a listener whose MachineID is set is a
+	// runner listener. Set by a hold that names a machine, kept when another
+	// session holds the lease, cleared only by a release.
+	MachineID         string `json:"-" db:"machine_id,null"`
+	MachineName       string `json:"-" db:"machine_name"`
+	RunnerFolder      string `json:"-" db:"runner_folder"`
+	RunnerProgram     string `json:"-" db:"runner_program"`
+	RunnerVersion     string `json:"-" db:"runner_version"` // the program's version, "2.1.331"
+	RunnerPaused      string `json:"-" db:"runner_paused"`  // one of the core.Pause* reasons, "" when not paused
+	RunnerPausedUntil int64  `json:"-" db:"runner_paused_until,null"`
+	RunnerSeenAt      int64  `json:"-" db:"runner_seen_at,null"` // the runner's last hold (equals HeardAt while the runner holds)
 }
 
 // ListenerLabel is the form of what a listener says it is (by=, "the
@@ -438,6 +451,9 @@ type Comment struct {
 	// brings the marker back (an undo) puts it on its words again.
 	Quote      string `json:"quote,omitempty" db:"quote,null"`
 	DetachedAt int64  `json:"detached_at,omitempty" db:"detached_at,null"`
+	// SessionID is the run whose program's final message this comment is,
+	// posted by the runner when the agent wrote nothing on the task itself.
+	SessionID  string `json:"session_id,omitempty" db:"session_id,null"`
 	CreatedAt  int64  `json:"created_at" db:"created_at"`
 	EditedAt   int64  `json:"edited_at,omitempty" db:"edited_at,null"`
 	CreatedSeq int64  `json:"created_seq" db:"created_seq"`
@@ -538,7 +554,10 @@ type Event struct {
 // in the order of their keys, which is the order they have always been
 // written in.
 type EventData struct {
-	Attachments []Attachment `json:"attachments,omitempty"` // the files a new comment or decision came with
+	// Appended are items added to the end of a list field of the row, by
+	// field ("steps", "links"): a reader appends them to its copy.
+	Appended    map[string][]json.RawMessage `json:"appended,omitempty"`
+	Attachments []Attachment                 `json:"attachments,omitempty"` // the files a new comment or decision came with
 	// Blocks are the blocks a new page came with (set only when it has
 	// some), or those an edit wrote (set always: null when none).
 	Blocks  *[]Block               `json:"blocks,omitempty"`

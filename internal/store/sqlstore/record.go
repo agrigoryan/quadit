@@ -106,8 +106,12 @@ func metaOf(t reflect.Type) (*meta, error) {
 	return m, nil
 }
 
-// textIDs are the *_id columns that do not hold UUIDs.
-var textIDs = map[string]bool{"oauth_clients.id": true, "audit_log.target_id": true, "api_tokens.client_id": true}
+// textIDs are the *_id columns that do not hold UUIDs. A runner's machine
+// id is 16 hex digits it chose itself.
+var textIDs = map[string]bool{
+	"oauth_clients.id": true, "audit_log.target_id": true, "api_tokens.client_id": true,
+	"agent_sessions.machine_id": true, "listeners.machine_id": true,
+}
 
 // metaNamed returns the meta of a registered table, by its name.
 func metaNamed(table string) (*meta, error) {

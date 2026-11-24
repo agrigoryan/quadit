@@ -215,6 +215,8 @@ export type Comment = {
   quote?: string;
   /** When an edit took the thread's words out of the page: it is then on the page as a whole. */
   detached_at?: number;
+  /** The run whose program's last message this is, posted by Quadit's runner. */
+  session_id?: string;
   created_at: number;
   edited_at?: number;
   /** The feed position at which it was written, and at which it last changed. */
@@ -297,12 +299,15 @@ export type Attachment = {
   file?: FileRow;
 };
 
+/** A session's state (core.AgentSession*): waiting and running are open, every other ends it. */
+export type SessionState = "waiting" | "running" | "done" | "failed" | "stopped" | "not_started";
+
 export type AgentSession = {
   id: string;
   agent_id: string;
   task_id?: string;
   title?: string;
-  state: string;
+  state: SessionState;
   summary?: string;
   instructions?: string;
   /** What the run did, in order; each step is whatever the agent recorded. */
@@ -311,7 +316,31 @@ export type AgentSession = {
   started_at: number;
   ended_at?: number;
   updated_seq: number;
+  /** What a run Quadit's runner started adds; absent on a session an agent recorded itself. */
+  program?: string;
+  /** The program's own session id. */
+  program_session?: string;
+  machine_id?: string;
+  /** The machine's name, as the runner said it. */
+  machine?: string;
+  /** The folder's label ("~/devel/game"): the path stays on the machine. */
+  folder?: string;
+  /** Why it waits, did not start or failed (core.Run*). */
+  reason?: string;
+  /** For a usage limit: when the program said it resets. */
+  resets_at?: number;
+  /** The feed position of the item that started it, and of the last item of its task its prompt carried. */
+  item_seq?: number;
+  items_through?: number;
+  /** When the program took the prompt. */
+  accepted_at?: number;
+  stop_requested_at?: number;
+  stop_requested_by?: string;
+  /** How many of its oldest steps are no longer kept. */
+  steps_dropped?: number;
 };
+
+export const isOpenSession = (s: AgentSession) => s.state === "waiting" || s.state === "running";
 
 /** A key or password agents can use but never read. Its value is never sent to the browser. */
 export type Secret = {

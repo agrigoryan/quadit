@@ -234,3 +234,29 @@ func TestEitherSelectsTheRowsAnyOfItsConditionsDoes(t *testing.T) {
 		}
 	})
 }
+
+// TestARunnersMachineIDIsFoundByIt: a runner's machine id is 16 hex digits
+// of its own, not a UUID, and a session or a listener is found by it.
+func TestARunnersMachineIDIsFoundByIt(t *testing.T) {
+	eachDB(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		db := s.In(fillTasks(t, s, 1))
+		var task core.Task
+		if err := db.Get(ctx, &task); err != nil {
+			t.Fatal(err)
+		}
+		const machine = "0123456789abcdef"
+		if err := db.Insert(ctx, core.AgentSession{ID: id.New(), AgentID: task.CreatedBy, TaskID: task.ID, State: core.AgentSessionWaiting, MachineID: machine, StartedAt: 1, UpdatedSeq: 1}); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Insert(ctx, core.Listener{AgentID: task.CreatedBy, ProjectID: task.ProjectID, Lease: "KQ7MX4PA", LeaseUntil: 1, HeardAt: 1, MachineID: machine}); err != nil {
+			t.Fatal(err)
+		}
+		if there, err := store.Find(ctx, db, &core.AgentSession{}, store.Eq("machine_id", machine)); err != nil || !there {
+			t.Errorf("the session of machine %s: found %v, %v", machine, there, err)
+		}
+		if there, err := store.Find(ctx, db, &core.Listener{}, store.Eq("machine_id", machine)); err != nil || !there {
+			t.Errorf("the listener of machine %s: found %v, %v", machine, there, err)
+		}
+	})
+}

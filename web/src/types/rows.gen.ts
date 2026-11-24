@@ -36,6 +36,19 @@ export interface AgentSession {
   started_at: number;
   ended_at?: number;
   updated_seq: number;
+  program?: string;
+  program_session?: string;
+  machine_id?: string;
+  machine?: string;
+  folder?: string;
+  reason?: string;
+  resets_at?: number;
+  item_seq?: number;
+  items_through?: number;
+  accepted_at?: number;
+  stop_requested_at?: number;
+  stop_requested_by?: string;
+  steps_dropped?: number;
 }
 
 export interface AppliedChange {
@@ -122,6 +135,7 @@ export interface Comment {
   body: string;
   quote?: string;
   detached_at?: number;
+  session_id?: string;
   created_at: number;
   edited_at?: number;
   created_seq: number;

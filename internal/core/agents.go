@@ -19,12 +19,54 @@ const (
 	ClaimReleased = "released" // let go of it, or its lease ran out
 )
 
-// Agent session states. Any state but running ends the session.
+// Agent session states. waiting and running are open; every other ends the session.
 const (
-	AgentSessionRunning = "running"
-	AgentSessionDone    = "done"
-	AgentSessionFailed  = "failed"
-	AgentSessionStopped = "stopped"
+	AgentSessionWaiting    = "waiting" // a runner received it; the program has not taken the prompt yet
+	AgentSessionRunning    = "running" // working: the program took the prompt (shown "Working")
+	AgentSessionDone       = "done"
+	AgentSessionFailed     = "failed"      // Reason says why
+	AgentSessionStopped    = "stopped"     // a person asked it to stop (StopRequestedBy)
+	AgentSessionNotStarted = "not_started" // a runner received it and will not start the program for it; Reason says why
+)
+
+// Why a run waits, did not start, or failed (AgentSession.Reason).
+const (
+	// waiting
+	RunFolderBusy  = "folder_busy"  // another run works in the same folder on the machine
+	RunSessionOpen = "session_open" // its program session was written outside the runner in the last 5 minutes
+	// not_started
+	RunNotResponsible = "not_responsible" // the item's author is not the agent's owner, nor an agent of the owner
+	RunNoResponsible  = "no_responsible"  // the agent has no responsible person
+	RunCapped         = "run_cap"         // the automatic-run cap of the task was reached (G3)
+	RunNoProgress     = "no_progress"     // two runs in a row changed nothing on the task (G4)
+	// failed
+	RunStartFailed  = "start_failed"  // the program never took the prompt, after the retries (G6)
+	RunProgramError = "program_error" // it took the prompt and ended with an error
+	RunIdle         = "idle"          // no output for the idle limit, awake time (G2)
+	RunTimeLimit    = "time_limit"    // past the entry's optional wall-clock cap
+	RunInterrupted  = "interrupted"   // the runner stopped (quit, crash, update) while it worked
+	RunUsageLimit   = "usage_limit"   // the program's usage limit (G5); ResetsAt when known
+	RunNotSignedIn  = "not_signed_in" // the program is not signed in
+)
+
+// The programs a runner starts. A third is one more constant here, one
+// adapter in the runner and its words in the web app.
+const (
+	ProgramClaude = "claude"
+	ProgramCodex  = "codex"
+)
+
+// Programs is every program a runner can start.
+var Programs = []string{ProgramClaude, ProgramCodex}
+
+// Why a runner holds back every item of an entry (or every entry of an
+// agent, for usage_limit); the items wait. Listener.RunnerPaused.
+const (
+	PauseUsageLimit     = "usage_limit"
+	PauseNotSignedIn    = "not_signed_in"
+	PauseProgramMissing = "program_missing"
+	PauseFolderMissing  = "folder_missing"
+	PauseLoginMismatch  = "login_mismatch" // the program's own settings make it work as another login
 )
 
 // Rule action kinds.
@@ -139,6 +181,21 @@ type AgentSession struct {
 	StartedAt    int64           `json:"started_at" db:"started_at"`
 	EndedAt      int64           `json:"ended_at,omitempty" db:"ended_at,null"`
 	UpdatedSeq   int64           `json:"updated_seq" db:"updated_seq"`
+
+	// What a runner adds to a run it started (agent-runs-contract.md §2.1).
+	Program         string `json:"program,omitempty" db:"program"`                 // core.ProgramClaude, core.ProgramCodex; "" for a session an agent recorded itself
+	ProgramSession  string `json:"program_session,omitempty" db:"program_session"` // the program's own session id; Codex's is filled once the program reports it
+	MachineID       string `json:"machine_id,omitempty" db:"machine_id"`           // the runner's machine id (16 lower-case hex)
+	Machine         string `json:"machine,omitempty" db:"machine"`                 // the machine's name, as the runner said it
+	Folder          string `json:"folder,omitempty" db:"folder"`                   // the folder's display label ("~/devel/game")
+	Reason          string `json:"reason,omitempty" db:"reason"`                   // why it waits, did not start or failed: one of the core.Run* reasons
+	ResetsAt        int64  `json:"resets_at,omitempty" db:"resets_at,null"`        // usage_limit: when the program said its limit resets (ms)
+	ItemSeq         int64  `json:"item_seq,omitempty" db:"item_seq"`               // the feed position of the item that started it
+	ItemsThrough    int64  `json:"items_through,omitempty" db:"items_through"`     // the last item of its task its prompt carried
+	AcceptedAt      int64  `json:"accepted_at,omitempty" db:"accepted_at,null"`    // when the program took the prompt (set by the server when state becomes running)
+	StopRequestedAt int64  `json:"stop_requested_at,omitempty" db:"stop_requested_at,null"`
+	StopRequestedBy string `json:"stop_requested_by,omitempty" db:"stop_requested_by,null"`
+	StepsDropped    int    `json:"steps_dropped,omitempty" db:"steps_dropped"` // older steps not kept (the cap)
 }
 
 // Resource is something only one member may use at a time (a device, a
