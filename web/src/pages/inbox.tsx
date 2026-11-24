@@ -159,7 +159,8 @@ export function InboxPage() {
             ))}
           </Tabs.List>
           <p className="flex-1 pl-2 text-xs text-ink-2 tnum max-sm:hidden" aria-live="polite">
-            {unread > 0 ? t("nav.unread", { n: unread }) : t("inbox.allRead")}
+            {/* An empty tab says so below; "everything is read" there would read as the whole inbox. */}
+            {unread > 0 ? t("nav.unread", { n: unread }) : items.length > 0 && t("inbox.allRead")}
           </p>
           <Button
             variant="ghost"
