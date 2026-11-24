@@ -854,17 +854,30 @@ func runWaiting(ctx context.Context, fields map[string][]string, asJSON bool, st
 		fmt.Fprintln(stdout, strings.TrimSpace(string(raw)))
 		return exitOK
 	}
+	// What the server said is printed only in its form, a line each, as
+	// an item's line is (line).
+	agent, project := "the agent", "this project"
+	if handleForm.MatchString(answer.Agent) {
+		agent = answer.Agent
+	}
+	if keyForm.MatchString(answer.Project) {
+		project = answer.Project
+	}
 	switch answer.Runs {
 	case 0:
-		fmt.Fprintf(stdout, "Nothing waits on %s in %s: Quadit starts it with what comes next.\n", answer.Agent, answer.Project)
+		fmt.Fprintf(stdout, "Nothing waits on %s in %s: Quadit starts it with what comes next.\n", agent, project)
 		return exitOK
 	case 1:
-		fmt.Fprintf(stdout, "1 run starts when Quadit runs %s in %s:\n", answer.Agent, answer.Project)
+		fmt.Fprintf(stdout, "1 run starts when Quadit runs %s in %s:\n", agent, project)
 	default:
-		fmt.Fprintf(stdout, "%d runs start when Quadit runs %s in %s:\n", answer.Runs, answer.Agent, answer.Project)
+		fmt.Fprintf(stdout, "%d runs start when Quadit runs %s in %s:\n", answer.Runs, agent, project)
 	}
 	for _, t := range answer.Tasks {
-		fmt.Fprintf(stdout, "  %s  %s\n", t.Key, t.Title)
+		row := []string{}
+		if taskForm.MatchString(t.Key) {
+			row = append(row, t.Key)
+		}
+		fmt.Fprintf(stdout, "  %s\n", strings.Join(append(row, quotable(t.Title)), "  "))
 	}
 	if more := answer.Runs - len(answer.Tasks); more > 0 {
 		fmt.Fprintf(stdout, "  and %d more\n", more)

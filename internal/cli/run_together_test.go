@@ -346,3 +346,22 @@ func TestRunWaitingSaysWhatARunnerWouldStart(t *testing.T) {
 		}
 	})
 }
+
+// TestRunWaitingPrintsOnlyWhatIsOfItsForm: what quadit run waiting prints
+// of the server's answer is one line each: a title without control
+// characters or line breaks, a key, a handle and a project's key only when
+// they are of their form.
+func TestRunWaitingPrintsOnlyWhatIsOfItsForm(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"agent":"@claude\u001b[2J","project":"S\nVA","runs":2,"tasks":[{"key":"SVA-1","title":"Boss\nfight \u001b[31mred"},{"key":"SVA-2\n  SVA-9","title":"Sky"}]}`)
+	}))
+	t.Cleanup(srv.Close)
+	login := t.TempDir() + "/claude.json"
+	writeJSON(t, login, map[string]string{"url": srv.URL, "token": "qt_x"})
+	var out bytes.Buffer
+	code := runWaiting(context.Background(), map[string][]string{"login": {login}, "project": {"SVA"}}, false, &out, &out)
+	want := "2 runs start when Quadit runs the agent in this project:\n  SVA-1  Boss fight [31mred\n  Sky\n"
+	if code != 0 || out.String() != want {
+		t.Fatalf("%d\n%q\nwant\n%q", code, out.String(), want)
+	}
+}
