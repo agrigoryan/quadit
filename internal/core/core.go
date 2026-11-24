@@ -278,6 +278,10 @@ type Listener struct {
 	RunnerPaused      string `json:"-" db:"runner_paused"`  // one of the core.Pause* reasons, "" when not paused
 	RunnerPausedUntil int64  `json:"-" db:"runner_paused_until,null"`
 	RunnerSeenAt      int64  `json:"-" db:"runner_seen_at,null"` // the runner's last hold (equals HeardAt while the runner holds)
+	// RunnerHolds: the session holding the lease now is the runner (its
+	// last hold named the machine); false when a chat or a companion holds
+	// it.
+	RunnerHolds bool `json:"-" db:"runner_holds"`
 }
 
 // ListenerLabel is the form of what a listener says it is (by=, "the

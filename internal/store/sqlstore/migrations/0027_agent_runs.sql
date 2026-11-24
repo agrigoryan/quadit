@@ -31,6 +31,14 @@ ALTER TABLE listeners ADD COLUMN runner_version TEXT NOT NULL DEFAULT '';
 ALTER TABLE listeners ADD COLUMN runner_paused TEXT NOT NULL DEFAULT '';
 ALTER TABLE listeners ADD COLUMN runner_paused_until {{TS}};
 ALTER TABLE listeners ADD COLUMN runner_seen_at {{TS}};
+-- Whether the session that holds the lease now is the runner: its last
+-- hold named the machine.
+ALTER TABLE listeners ADD COLUMN runner_holds {{BOOL}} NOT NULL DEFAULT FALSE;
 -- The comment a run posted from its program's last message, when the agent
 -- wrote nothing on the task itself.
 ALTER TABLE comments ADD COLUMN session_id {{ID}};
+-- Whether the change that made an inbox item was for its member itself
+-- (assigned or handed to it, it was mentioned, asked or answered, or a
+-- person's comment on a task that is its own), not one it hears only as a
+-- follower.
+ALTER TABLE notifications ADD COLUMN addressed {{BOOL}} NOT NULL DEFAULT FALSE;

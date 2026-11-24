@@ -462,6 +462,7 @@ export interface Notification {
   created_at: number;
   read_at?: number;
   archived_at?: number;
+  addressed?: boolean;
 }
 
 export interface OAuthClient {

@@ -15,11 +15,12 @@ import (
 	"github.com/agrigoryan/quadit/internal/store/sqlstore"
 )
 
-// TestUpgradeKeepsSessionsListenersAndCommentsAsTheyWere: version 27 only
-// adds what a runner records, so the sessions, listeners and comments of
-// before read as they were, with nothing of a runner on them: a session
-// recorded by hand, a listener no runner holds, a comment no run posted.
-func TestUpgradeKeepsSessionsListenersAndCommentsAsTheyWere(t *testing.T) {
+// TestUpgradeKeepsSessionsListenersCommentsAndInboxItemsAsTheyWere:
+// version 27 only adds what a runner records and whether an item was
+// addressed, so the rows of before read as they were, with nothing of a
+// runner on them: a session recorded by hand, a listener no runner holds, a
+// comment no run posted, an inbox item not marked addressed.
+func TestUpgradeKeepsSessionsListenersCommentsAndInboxItemsAsTheyWere(t *testing.T) {
 	for _, d := range []sqlstore.Dialect{sqlstore.SQLite, sqlstore.Postgres} {
 		t.Run(d.Name, func(t *testing.T) {
 			ctx := context.Background()
@@ -43,6 +44,7 @@ func TestUpgradeKeepsSessionsListenersAndCommentsAsTheyWere(t *testing.T) {
 			task := do(owner.ID, "task.create", map[string]any{"project": "SVA", "title": "Boss fight"})
 			session := do(coder, "session.start", map[string]any{"task": task, "instructions": "Make the boss fight"})
 			do(coder, "session.update", map[string]any{"id": session, "state": core.AgentSessionDone, "summary": "The boss fights"})
+			do(owner.ID, "task.update", map[string]any{"id": task, "assignee": coder})
 			comment := do(coder, "comment.create", map[string]any{"task": task, "body": "Done: the boss fights back"})
 			until, heard := time.Now().Add(time.Minute).UnixMilli(), time.Now().UnixMilli()
 			if err := st.Exec(ctx, fmt.Sprintf(`INSERT INTO listeners (workspace_id, agent_id, project_id, lease, lease_until, heard_at, held_by, handed_seq)
@@ -57,6 +59,13 @@ func TestUpgradeKeepsSessionsListenersAndCommentsAsTheyWere(t *testing.T) {
 			}
 			if err := db.Get(ctx, &commentBefore, store.Eq("id", comment)); err != nil {
 				t.Fatal(err)
+			}
+			var notesBefore []core.Notification
+			if err := db.List(ctx, &notesBefore, store.Q{Order: "seq"}); err != nil {
+				t.Fatal(err)
+			}
+			if len(notesBefore) == 0 {
+				t.Fatal("the workspace has no inbox items to upgrade")
 			}
 
 			upgrade(t, st)
@@ -73,6 +82,13 @@ func TestUpgradeKeepsSessionsListenersAndCommentsAsTheyWere(t *testing.T) {
 			}
 			if !reflect.DeepEqual(commentAfter, commentBefore) {
 				t.Errorf("after the upgrade the comment is %+v, want %+v", commentAfter, commentBefore)
+			}
+			var notesAfter []core.Notification
+			if err := db.List(ctx, &notesAfter, store.Q{Order: "seq"}); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(notesAfter, notesBefore) {
+				t.Errorf("after the upgrade the inbox items are %+v, want %+v", notesAfter, notesBefore)
 			}
 			var listeners []core.Listener
 			if err := db.List(ctx, &listeners, store.Q{}); err != nil {

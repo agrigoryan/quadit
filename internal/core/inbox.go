@@ -75,4 +75,9 @@ type Notification struct {
 	CreatedAt   int64  `json:"created_at" db:"created_at"`
 	ReadAt      int64  `json:"read_at,omitempty" db:"read_at,null"`
 	ArchivedAt  int64  `json:"archived_at,omitempty" db:"archived_at,null"`
+	// Addressed: the change that made this item was for this member itself
+	// (assigned to it, handed to it, it was mentioned, asked or answered,
+	// or a person's comment on a task that is its own), as opposed to one
+	// it only hears as a follower.
+	Addressed bool `json:"addressed,omitempty" db:"addressed"`
 }

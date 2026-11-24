@@ -123,6 +123,8 @@ export type Notification = {
   created_at: number;
   read_at?: number;
   archived_at?: number;
+  /** The change that made it was for this member itself, not one it only hears as a follower. */
+  addressed?: boolean;
 };
 
 export type TaskLink = {
