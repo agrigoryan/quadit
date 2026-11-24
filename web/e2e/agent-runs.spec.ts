@@ -33,14 +33,30 @@ async function newAgent(page: Page, owner: Quadit): Promise<Agent> {
   return { handle, token, as: (...args) => quadit(currentRun(), token, args) };
 }
 
-/** One hold of the agent's listener of `project` as Quadit's runner, without waiting; gives the lease. */
+/**
+ * Holds the agent's listener of `project` as Quadit's runner, without
+ * waiting, and acknowledges what it is handed (a runner takes what already
+ * waits on its agent when it begins), so nothing waits in its queue; gives
+ * the lease.
+ */
 async function hold(agent: Agent, project: string): Promise<string> {
   const query = new URLSearchParams({ project, wait: "0", by: "Quadit's runner", ...RUNNER });
-  const answer = await fetch(`${currentRun().url}/api/v1/w/${WORKSPACE.slug}/listen?${query}`, {
-    headers: { Authorization: `Bearer ${agent.token}` },
-  });
-  expect(answer.ok, await answer.clone().text()).toBe(true);
-  return ((await answer.json()) as { lease: string }).lease;
+  const headers = { Authorization: `Bearer ${agent.token}` };
+  let lease = "";
+  for (;;) {
+    if (lease) query.set("lease", lease);
+    const answer = await fetch(`${currentRun().url}/api/v1/w/${WORKSPACE.slug}/listen?${query}`, { headers });
+    expect(answer.ok, await answer.clone().text()).toBe(true);
+    const held = (await answer.json()) as { lease: string; seq?: number; item?: unknown };
+    lease = held.lease;
+    if (!held.item) return lease;
+    const acked = await fetch(`${currentRun().url}/api/v1/w/${WORKSPACE.slug}/cursors/listen`, {
+      method: "PUT",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ seq: held.seq, lease }),
+    });
+    expect(acked.ok, await acked.clone().text()).toBe(true);
+  }
 }
 
 test("the comment box says a comment starts the agent now on its computer, and that another member's words do not", async ({
@@ -51,7 +67,7 @@ test("the comment box says a comment starts the agent now on its computer, and t
 }) => {
   const agent = await newAgent(page, owner);
   const key = await project.newTask("Make the boss harder", `assignee=@${agent.handle}`);
-  // Held after the assignment: a runner's first hold starts at the present, so nothing waits in its queue.
+  // Held after the assignment, which the pretend runner takes and acknowledges: nothing waits in its queue.
   await hold(agent, project.key);
 
   await page.goto(`/${WORKSPACE.slug}/task/${key}`);
