@@ -53,8 +53,8 @@ The command-line client is in the image too: `docker exec quadit quadit admin �
 Each release has `.deb` and `.rpm` packages for x86-64 and ARM64. They install `/usr/bin/quadit` and a systemd service, which they do not start:
 
 ```bash
-sudo apt install ./quadit_0.6.0_amd64.deb            # Debian, Ubuntu
-sudo dnf install ./quadit-0.6.0-1.x86_64.rpm         # Fedora, RHEL
+sudo apt install ./quadit_0.7.0_amd64.deb            # Debian, Ubuntu
+sudo dnf install ./quadit-0.7.0-1.x86_64.rpm         # Fedora, RHEL
 sudoedit /etc/quadit/quadit.env                      # QUADIT_BASE_URL and any other setting
 sudo systemctl enable --now quadit
 ```
@@ -152,7 +152,7 @@ Quadit follows [Semantic Versioning](https://semver.org): releases are tagged `v
 | Installed with | Upgrade |
 | --- | --- |
 | Homebrew | `brew upgrade quadit` |
-| The install script | Run it again: it replaces the binary in place and says which version it replaced. `curl … \| QUADIT_VERSION=v0.6.0 sh` installs that version instead of the newest, older or newer than the one there |
+| The install script | Run it again: it replaces the binary in place and says which version it replaced. `curl … \| QUADIT_VERSION=v0.7.0 sh` installs that version instead of the newest, older or newer than the one there |
 | Docker | `docker pull ghcr.io/agrigoryan/quadit:latest` and recreate the container; with Compose, `docker compose pull && docker compose up -d`. Tags: `X.Y.Z`, `X.Y` (newest patch), `X` (newest minor) and `latest`; pin one of the first three to upgrade only that far |
 | `.deb` / `.rpm` | Install the newer package: `sudo apt install ./quadit_X.Y.Z_amd64.deb` or `sudo dnf install ./quadit-X.Y.Z-1.x86_64.rpm`. A running `quadit` service is restarted on the new version |
 | An archive from Releases | Download the new one, replace the binary, restart the server |
