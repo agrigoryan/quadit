@@ -26,6 +26,9 @@ const (
 	NoteComment   = "comment"
 	NoteResult    = "result"
 	NoteStatus    = "status"
+	// NoteNotNeeded tells the asker that someone else closed their question
+	// as no longer needed (decision.close).
+	NoteNotNeeded = "not_needed"
 )
 
 // NoteHeadlines are what a notification outside the app (a push, a mail's
@@ -45,6 +48,7 @@ var NoteHeadlines = map[string]string{
 	NoteComment:   "{who} commented on {title}",
 	NoteResult:    "{who} posted a result in {title}",
 	NoteStatus:    "{who} changed the status of {title}",
+	NoteNotNeeded: "{who} closed your question in {title} as no longer needed",
 }
 
 // NoteHeadline is the headline of an inbox item of the type noteType that

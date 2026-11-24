@@ -396,6 +396,8 @@ func (c *cx) checkApproval() error {
 		need.Message = "that approval was asked for by someone else"
 	case approval.State == core.StateOpen:
 		need.Message = "that approval has not been answered yet"
+	case approval.State == core.StateNotNeeded:
+		need.Message = "that approval was closed as no longer needed; ask again for this change"
 	case approval.Outcome != core.OutcomeApproved:
 		need.Code, need.Message = CodeForbidden, "that approval was declined"
 	case approval.ActionUsedAt != 0:

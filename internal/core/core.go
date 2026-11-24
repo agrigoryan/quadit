@@ -490,6 +490,10 @@ const (
 	StateOpen     = "open"
 	StatePicked   = "picked"
 	StateSentBack = "sent_back"
+	// StateNotNeeded is a question settled without an answer: closed by
+	// someone (decision.close), by its task closing, or by its asker moving
+	// on from an answer sent back to them. It waits on nobody.
+	StateNotNeeded = "not_needed"
 
 	OutcomeAsIs        = "as_is"
 	OutcomeWithChanges = "with_changes"

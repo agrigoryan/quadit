@@ -80,6 +80,11 @@ func taskUpdate(c *cx, a taskUpdateArgs) error {
 	if u.p.empty() {
 		return nil
 	}
+	if u.moved != nil && !core.OpenCategory(u.moved.Category) {
+		if err := c.settleClosedTask(u.t); err != nil {
+			return err
+		}
+	}
 	return u.notifyConcerned()
 }
 

@@ -242,6 +242,12 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 	if err := c.readWrittenOn(t.ID, before); err != nil {
 		return err
 	}
+	// A result moves on from the author's answers sent back.
+	if cm.Kind == core.CommentResult {
+		if err := c.settleSentBack(t); err != nil {
+			return err
+		}
+	}
 	return c.index(taskCommentEntry(t, cm))
 }
 

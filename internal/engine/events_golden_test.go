@@ -228,6 +228,8 @@ func eventScenario(t *testing.T, st store.Store, quiet bool) (evs []core.Event, 
 	do("decision.unclear", M{"id": dec, "note": "which A?"})
 	do("decision.delete", M{"id": dec})
 	do("decision.restore", M{"id": dec})
+	moot := do("decision.open", M{"task": "SVA-1", "question": "Which sky?", "ask": "@artist", "options": []M{{"label": "Day"}, {"label": "Night"}}}).Ref
+	as(artist, "decision.close", M{"id": moot, "note": "settled in the comments"})
 	do("notify", M{"user": "@artist", "task": "SVA-1", "message": "have a look"})
 	as(artist, "notification.read", M{"all": true})
 	do("session.start", M{"task": "SVA-1", "title": "Drawing"})

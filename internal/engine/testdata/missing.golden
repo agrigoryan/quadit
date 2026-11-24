@@ -198,6 +198,10 @@ decision.delete -id others wrong: invalid [id] id is required
 decision.restore {}: invalid [id] id is required
 decision.restore -id: invalid [id] id is required
 decision.restore -id others wrong: invalid [id] id is required
+decision.close {}: invalid [id] id is required
+decision.close -id: invalid [id] id is required
+decision.close -id others wrong: invalid [id] id is required
+decision.close -note: ok
 notify {}: not_found [user] member "" does not exist in this workspace
 notify -message: invalid [message] say what the member should know
 notify -message others wrong: not_found [user] member "zz" does not exist in this workspace

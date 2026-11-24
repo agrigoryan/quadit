@@ -1,4 +1,4 @@
-// decision.*: open, update, pick, unclear, delete and restore.
+// decision.*: open, update, pick, unclear, close, delete and restore.
 
 package engine
 
@@ -17,6 +17,7 @@ func init() {
 	register("decision.update", core.RoleMember, decisionUpdate)
 	register("decision.pick", core.RoleMember, decisionPick)
 	register("decision.unclear", core.RoleMember, decisionUnclear)
+	register("decision.close", core.RoleMember, decisionClose)
 	register("decision.delete", core.RoleMember, decisionDelete)
 	register("decision.restore", core.RoleMember, decisionRestore)
 }
@@ -82,6 +83,10 @@ func decisionOpen(c *cx, a decisionOpenArgs) error {
 		return err
 	}
 	if err := c.insertDecision(&d, t, a); err != nil {
+		return err
+	}
+	// Asking again moves on from an answer sent back.
+	if err := c.settleSentBack(t); err != nil {
 		return err
 	}
 	if asked == "" {
@@ -255,15 +260,7 @@ func (c *cx) putQuestion(d core.Decision, t core.Task) error {
 	if err := c.notifyTask(asked, core.NoteAsked, t, about{entity: "decision", id: d.ID, text: d.Question}); err != nil {
 		return err
 	}
-	// A closed task waits on nobody; the question still reaches its inbox.
-	var st core.Status
-	ok, err := store.Find(c.ctx, c.tx, &st, store.Eq("id", t.StatusID))
-	if err != nil {
-		return err
-	}
-	if ok && !core.OpenCategory(st.Category) {
-		return nil
-	}
+	// On a closed task the question still reaches the inbox (setWaitingOn).
 	return c.setWaitingOn(t, asked, "answer: "+snippet(d.Question, 80))
 }
 
@@ -425,6 +422,9 @@ func decisionPick(c *cx, a decisionPickArgs) error {
 // mayAnswer says whether the actor may answer a decision.
 func (c *cx) mayAnswer(d core.Decision) error {
 	// The first answer stands. A second one is refused, not merged.
+	if d.State == core.StateNotNeeded {
+		return conflictErr("this question was closed as no longer needed; open a new one to ask again")
+	}
 	if d.State != core.StateOpen {
 		return conflictErr("this decision was already answered (%s); open a new one to ask again", d.State)
 	}
@@ -556,8 +556,8 @@ func decisionUnclear(c *cx, a decisionUnclearArgs) error {
 	if d.CreatedBy != c.actor.UserID {
 		return forbidden("only the one who asked can say the answer is unclear")
 	}
-	if d.State == core.StateOpen {
-		return conflictErr("this decision has no answer yet")
+	if d.State == core.StateOpen || d.State == core.StateNotNeeded {
+		return conflictErr("this decision has no answer to find unclear")
 	}
 	if strings.TrimSpace(a.Note) == "" {
 		return invalid("note", "say in one line what is unclear")
@@ -584,6 +584,139 @@ func decisionUnclear(c *cx, a decisionUnclearArgs) error {
 		return err
 	}
 	return c.setWaitingOn(t, answerer, "unclear: "+snippet(a.Note, 80))
+}
+
+type decisionCloseArgs struct {
+	ID   string `json:"id" quadit:"required"`
+	Note string `json:"note"` // why it is no longer needed, in a line or two
+}
+
+// decisionClose settles a question that is no longer needed, open or sent
+// back, and keeps it in the history: by the member who asked it, the
+// member it is asked of, the asking agent's responsible person, or an
+// admin. A question closed already is closed; an answered one is refused.
+// The asker is told when someone else closes it.
+func decisionClose(c *cx, a decisionCloseArgs) error {
+	before := c.tx.Seq()
+	d, t, err := c.decisionTask(a.ID)
+	if err != nil {
+		return err
+	}
+	if err := c.mayClose(d); err != nil {
+		return err
+	}
+	switch d.State {
+	case core.StateNotNeeded:
+		c.ref, c.key = d.ID, t.Key
+		return nil
+	case core.StatePicked:
+		return conflictErr("this decision was already answered; it stays as it was")
+	}
+	wasOpen := d.State == core.StateOpen
+	if err := c.closeQuestion(&d, t, strings.TrimSpace(a.Note)); err != nil {
+		return err
+	}
+	// The asker hears it from someone else. Only a note is words for
+	// them (the item is addressed); without one it is news, and starts no
+	// run of an agent's.
+	if d.CreatedBy != c.actor.UserID {
+		note := strings.TrimSpace(a.Note)
+		text := "no longer needed"
+		if note != "" {
+			text += ": " + note
+		}
+		if err := c.notify(d.CreatedBy, core.NoteNotNeeded, taskNote(t, about{entity: "decision", id: d.ID, text: text}, note != "")); err != nil {
+			return err
+		}
+	}
+	if err := c.readWrittenOn(t.ID, before); err != nil {
+		return err
+	}
+	// A task that waited on the one asked for this question alone waits on
+	// nobody now.
+	if !wasOpen || d.AskedID == "" || t.WaitingOnID != d.AskedID {
+		return nil
+	}
+	if n, err := c.tx.Count(c.ctx, "decisions", store.Eq("task_id", t.ID), store.Eq("state", core.StateOpen), store.Live,
+		store.Eq("asked_id", d.AskedID)); err != nil || n > 0 {
+		return err
+	}
+	return c.setWaitingOn(t, "", "")
+}
+
+// mayClose says whether the actor may close a question: the member who
+// asked it, the member it is asked of, an admin, or the person responsible
+// for the agent that asked it.
+func (c *cx) mayClose(d core.Decision) error {
+	if d.CreatedBy == c.actor.UserID || d.AskedID == c.actor.UserID || c.actor.Role.AtLeast(core.RoleAdmin) || c.system {
+		return nil
+	}
+	var asker core.User
+	if ok, err := store.Find(c.ctx, c.tx, &asker, store.Eq("id", d.CreatedBy)); err != nil || ok && asker.Kind == core.KindAgent && asker.ResponsibleID == c.actor.UserID {
+		return err
+	}
+	return forbidden("only the one who asked, the one asked, the asking agent's responsible person or an admin can close a question")
+}
+
+// closeQuestion settles the question d of task t as no longer needed, by
+// the actor, with note (may be empty): it stays in the history, says who
+// closed it and when (decided_by, decided_at), and the items that asked it
+// of someone are read. It has no answer (outcome). A note replaces what an
+// answer that sent it back said (outcome_note); with none, those words stay
+// as the reason.
+func (c *cx) closeQuestion(d *core.Decision, t core.Task, note string) error {
+	seq := c.tx.NextSeq()
+	if note != "" {
+		d.OutcomeNote = note
+	}
+	set := map[string]any{"state": core.StateNotNeeded, "outcome": "", "outcome_note": d.OutcomeNote, "decided_by": c.actor.UserID, "decided_at": c.at,
+		"unclear_note": "", "updated_at": c.at, "updated_seq": seq}
+	if _, err := c.tx.Update(c.ctx, "decisions", set, store.Eq("id", d.ID)); err != nil {
+		return err
+	}
+	d.State, d.Outcome, d.DecidedBy, d.DecidedAt, d.UnclearNote, d.UpdatedAt, d.UpdatedSeq = core.StateNotNeeded, "", c.actor.UserID, c.at, "", c.at, seq
+	if err := c.touchTask(t.ID, seq); err != nil {
+		return err
+	}
+	c.ref, c.key = d.ID, t.Key
+	if err := c.emit(event{seq: seq, typ: "decision.closed", entity: "decision", entityID: d.ID, place: inTask(t), data: core.EventData{Row: *d, Key: &t.Key}}); err != nil {
+		return err
+	}
+	return c.readQuestion(*d)
+}
+
+// settleQuestions closes as no longer needed the questions of task t in
+// the states given whose asker is askedBy ("" for any).
+func (c *cx) settleQuestions(t core.Task, states []string, askedBy string) error {
+	conds := []store.Cond{store.Eq("task_id", t.ID), store.In("state", states), store.Live}
+	if askedBy != "" {
+		conds = append(conds, store.Eq("created_by", askedBy))
+	}
+	var hanging []core.Decision
+	if err := c.tx.List(c.ctx, &hanging, store.Q{Where: conds, Order: "created_seq"}); err != nil {
+		return err
+	}
+	ref, key := c.ref, c.key
+	for i := range hanging {
+		if err := c.closeQuestion(&hanging[i], t, ""); err != nil {
+			return err
+		}
+	}
+	c.ref, c.key = ref, key
+	return nil
+}
+
+// settleClosedTask settles what hangs on a task that moved to a done or
+// canceled status: its open and sent-back questions are no longer needed.
+// (setStatus clears whom it waits on.)
+func (c *cx) settleClosedTask(t core.Task) error {
+	return c.settleQuestions(t, []string{core.StateOpen, core.StateSentBack}, "")
+}
+
+// settleSentBack settles the actor's questions on task t whose answer was
+// sent back to them, once they move on: they ask again, or post a result.
+func (c *cx) settleSentBack(t core.Task) error {
+	return c.settleQuestions(t, []string{core.StateSentBack}, c.actor.UserID)
 }
 
 func decisionDelete(c *cx, a idArgs) error {

@@ -92,9 +92,10 @@ func (c *cx) setStatus(p *patch, t *core.Task, st core.Status) {
 	if !core.OpenCategory(st.Category) {
 		p.put("waiting_on_id", t.WaitingOnID, "")
 		p.put("waiting_on_note", t.WaitingOnNote, "")
+		p.put("waiting_outside", t.WaitingOutside, false)
 		p.put("lease_holder_id", t.LeaseHolderID, "")
 		p.put("lease_until", t.LeaseUntil, int64(0))
-		t.WaitingOnID, t.WaitingOnNote, t.LeaseHolderID, t.LeaseUntil = "", "", "", 0
+		t.WaitingOnID, t.WaitingOnNote, t.WaitingOutside, t.LeaseHolderID, t.LeaseUntil = "", "", false, "", 0
 	}
 }
 
@@ -202,6 +203,15 @@ func (c *cx) setWaitingOutside(t core.Task, note string) error {
 // setWaitingOn hands a task to userID ("" = nobody) as part of another
 // change, and says so in the feed.
 func (c *cx) setWaitingOn(t core.Task, userID, note string) error {
+	// A closed task waits on nobody: a hand-off on one (an answer, a
+	// result handing it back) changes nothing.
+	if userID != "" {
+		var st core.Status
+		closed, err := store.Find(c.ctx, c.tx, &st, store.Eq("id", t.StatusID))
+		if err != nil || closed && !core.OpenCategory(st.Category) {
+			return err
+		}
+	}
 	p := newPatch()
 	p.put("waiting_on_id", t.WaitingOnID, userID)
 	p.put("waiting_on_note", t.WaitingOnNote, note)

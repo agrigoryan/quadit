@@ -9,6 +9,7 @@ export const push = {
   "push.comment": "{who} commented on {title}",
   "push.decision_asked": "{who} asked you a question in {title}",
   "push.mentioned": "{who} mentioned you in {title}",
+  "push.not_needed": "{who} closed your question in {title} as no longer needed",
   "push.picked": "{who} answered your question in {title}",
   "push.replied": "{who} replied to you in {title}",
   "push.result": "{who} posted a result in {title}",

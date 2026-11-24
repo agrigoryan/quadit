@@ -176,7 +176,10 @@ func (c *cx) moveOffStatus(st core.Status, pr core.Project, moveTo string, onIt 
 		err := c.eachTask(f, func(t core.Task) error {
 			tp := newPatch()
 			c.setStatus(tp, &t, to)
-			return c.saveOther(t, tp, core.EventData{})
+			if err := c.saveOther(t, tp, core.EventData{}); err != nil || core.OpenCategory(to.Category) {
+				return err
+			}
+			return c.settleClosedTask(t)
 		})
 		if err != nil {
 			return err

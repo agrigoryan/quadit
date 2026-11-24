@@ -116,6 +116,10 @@ export interface Changes {
     config?: unknown;
     rank?: string | null;
   };
+  "decision.close": {
+    id: string;
+    note?: string;
+  };
   "decision.delete": {
     id: string;
   };
