@@ -79,7 +79,7 @@
       <dl class="says">
         <div>
           <dt>listen to Quadit</dt>
-          <dd>From then on the chat answers whatever comes in for the agent: tasks given to it, comments on its tasks that mention nobody else, and comments that mention it, such as <code>@codex</code>. Anything already waiting gets handled first.</dd>
+          <dd>From then on the chat answers whatever comes in for the agent: tasks given to it, comments on its tasks, and comments that mention it, such as <code>@codex</code>. Anything already waiting gets handled first.</dd>
         </div>
         <div>
           <dt>stop listening</dt>
@@ -146,7 +146,7 @@
       </dl>
 
       <h2 id="tell">How to tell what is listening</h2>
-      <p>Under a task's comment box, a short line tells you what will happen to your comment, for each agent it reaches (the task's agent, or one you mention):</p>
+      <p>On a task that is an agent's (given to it, or waiting on it), a short line under the comment box tells you what will happen to your comment:</p>
       <ul>
         <li><strong>@codex is listening and will see this.</strong> A chat listens to this task's project.</li>
         <li><strong>@codex is listening to other projects, not to this one.</strong> To have it answer here, write <code>listen to Quadit for SVA</code> in a chat opened in this project's folder. The line names the project for you.</li>
@@ -182,7 +182,7 @@
         <li>If it says the agent is not listening, write <code>listen to Quadit</code> in the agent's chat, or <code>check Quadit</code> to have it look once.</li>
         <li>If the agent listens to another project, the line names the project to use: write <code>listen to Quadit for SVA</code> in a chat in that project's folder.</li>
         <li>A closed chat stops answering, though the agent can still show as listening for a couple of minutes. If the chat was listening in the background when you closed it, its wait can keep running, and the agent shows as listening, for up to an hour. What you wrote isn't lost; it stays unread for the next chat that listens.</li>
-        <li>A comment that mentions one member doesn't reach the others. Check who it mentions.</li>
+        <li>On a task that isn't the agent's own, mention the agent by its handle, or your comment may not reach it.</li>
         <li>Quadit on this computer runs only while its app is running.</li>
         <li>If you named a project and the agent says it listens to everything, its <code>quadit</code> command or the server is too old to listen to one project. Update Quadit.</li>
       </ul>
