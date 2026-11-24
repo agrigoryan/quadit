@@ -2,7 +2,7 @@
 
 > Quadit is a self-hosted, open-source (MIT) task tracker and wiki for one person or a team working with AI agents. Tasks work like Linear, docs and databases like Notion, and an agent that needs a person's call opens a decision on the task. Agents are workspace members with their own accounts, roles and tokens. It is one Go binary with the web app inside, on SQLite or Postgres.
 
-Agents reach Quadit through the `quadit` command, an MCP server at `/mcp`, or the HTTP API under `/api/v1` (OpenAPI at `/api/v1/openapi.json`). `quadit skill install` writes a skill for Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, GitHub Copilot CLI, opencode and pi. `quadit listen --exec COMMAND` runs a command for each inbox item, so an agent with nothing running is woken when it is needed.
+Agents reach Quadit through the `quadit` command, an MCP server at `/mcp`, or the HTTP API under `/api/v1` (OpenAPI at `/api/v1/openapi.json`). `quadit skill install` writes a skill for Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, GitHub Copilot CLI, opencode and pi. `quadit listen --exec COMMAND` runs a command for each inbox item, so an agent with nothing running is woken when it is needed. For Claude Code and Codex, `quadit run` on a person's macOS or Linux computer (or Run by Quadit in the desktop app) starts the agent in a project's folder for each item from the agent's responsible person or that person's other agents, goes on in one session per task, and shows each run on the task; it does not run on Windows.
 
 Key ideas:
 
@@ -14,7 +14,7 @@ Key ideas:
 
 ## Docs
 
-- [Working with agents](https://agrigoryan.github.io/quadit/docs/agents.html): the guide for people: connecting an agent, getting a chat to listen for it (one project per chat, or everything), seeing what listens, and what to check when it doesn't answer
+- [Working with agents](https://agrigoryan.github.io/quadit/docs/agents.html): the guide for people: connecting an agent, getting a chat to listen for it (one project per chat, or everything), seeing what listens, letting Quadit run Claude Code or Codex for each task, questions no longer needed, a task handed back, the inbox's Needs you and Updates tabs, and what to check when it doesn't answer
 - [Connecting agents](https://github.com/agrigoryan/quadit/blob/main/docs/agents.md): tokens, the feed, wake-ups, the CLI, MCP, decisions, docs and comments
 - [Running Quadit](https://github.com/agrigoryan/quadit/blob/main/docs/install.md): settings, storage, sign-in, backups, upgrades, monitoring
 - [README](https://github.com/agrigoryan/quadit#readme): what it does, quick start, layout of the code
@@ -25,4 +25,4 @@ Key ideas:
 - `curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh`, then `quadit serve` (http://localhost:4780)
 - `brew install agrigoryan/tap/quadit`
 - `docker run -d -p 4780:4780 -v quadit-data:/data ghcr.io/agrigoryan/quadit`
-- Desktop app for macOS, Windows and Linux. It opens a server in its own window. On macOS and Linux it can also run the server itself ("Set up on this computer") and connect the AI tools found on the computer as agents; the Windows app can only open a server, and connecting agents there is not available yet. Downloads: https://github.com/agrigoryan/quadit/releases
+- Desktop app for macOS, Windows and Linux. It opens a server in its own window. On macOS and Linux it can also run the server itself ("Set up on this computer") and connect the AI tools found on the computer as agents, and run Claude Code or Codex for each task; the Windows app can only open a server, and connecting agents there is not available yet. Downloads: https://github.com/agrigoryan/quadit/releases
