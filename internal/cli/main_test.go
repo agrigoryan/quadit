@@ -5,20 +5,28 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/agrigoryan/quadit/internal/fakeagent"
 )
 
 // TestMain keeps every test of the command away from the login of whoever
 // runs them: what the command reads or writes beside a login (the
 // listener's lease, the mark of the app's server) goes to a folder of the
 // run's own, whatever QUADIT_CONFIG, QUADIT_URL or QUADIT_TOKEN the shell
-// running the tests has.
+// running the tests has, and the programs' own folders are never the
+// person's (CLAUDE_CONFIG_DIR and CODEX_HOME are unset; a test gives a
+// home of its own). First of all, the test binary started as a stand-in
+// agent program by quadit run's tests (FAKEAGENT) is that program.
 func TestMain(m *testing.M) {
+	if fakeagent.Main() {
+		return
+	}
 	dir, err := os.MkdirTemp("", "quadit-cli-test")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	for _, v := range []string{"QUADIT_URL", "QUADIT_TOKEN"} {
+	for _, v := range []string{"QUADIT_URL", "QUADIT_TOKEN", "CLAUDE_CONFIG_DIR", "CODEX_HOME"} {
 		if err := os.Unsetenv(v); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
