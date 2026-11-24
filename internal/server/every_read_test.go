@@ -475,9 +475,11 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	do("resource staging", "resource.create", M{"name": "staging"})
 	do("resource gone", "resource.create", M{"name": "old-box"})
 	change(owner, "", "resource.delete", M{"id": rw.id("resource gone")})
-	as(rw.artist, "claim gpu artist", "resource.acquire", M{"resource": "gpu", "task": "SVA-1", "note": "rendering the boss"})
-	as(rw.ops, "claim staging ops", "resource.acquire", M{"resource": "staging", "task": "OPS-1"})
-	as(rw.ops, "claim gpu ops", "resource.acquire", M{"resource": "gpu", "task": "OPS-2", "note": "after the artist"})
+	// Every hold the recording takes lasts a day, so that none runs out
+	// while the reads are made, however slow the machine.
+	as(rw.artist, "claim gpu artist", "resource.acquire", M{"resource": "gpu", "task": "SVA-1", "note": "rendering the boss", "minutes": 24 * 60})
+	as(rw.ops, "claim staging ops", "resource.acquire", M{"resource": "staging", "task": "OPS-1", "minutes": 24 * 60})
+	as(rw.ops, "claim gpu ops", "resource.acquire", M{"resource": "gpu", "task": "OPS-2", "note": "after the artist", "minutes": 24 * 60})
 	as(rw.artist, "session artist", "session.start", M{"task": "SVA-1", "title": "Drawing the boss", "instructions": "four phases"})
 	change(nil, rw.artist, "session.update", M{"id": rw.id("session artist"), "summary": "two phases drawn",
 		"add_steps": []M{{"text": "sketched phase one"}}})
@@ -489,13 +491,23 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	runner := "machine_id=3f9c0a7d5e21b864&machine_name=Ops+box&folder=~/ops&program=codex&program_version=0.170.0"
 	var held struct{ Lease string }
 	s.call(t, nil, rw.ops, "GET", w+"/listen?project=OPS&by=Quadit%27s+runner&"+runner, nil, 200, &held)
-	// It holds the lease all through the reads, however slow the machine.
-	if _, err := st.Update(context.Background(), "listeners", map[string]any{"lease_until": time.Now().Add(time.Hour).UnixMilli()}, store.Eq("lease", held.Lease)); err != nil {
+	// It holds the lease all through the reads, however slow the machine:
+	// the lease, and when its member listens until, which the hold wrote
+	// ninety seconds ahead, are put a day ahead together.
+	ahead := time.Now().Add(24 * time.Hour).UnixMilli()
+	var ops core.Listener
+	if err := st.Get(context.Background(), &ops, store.Eq("lease", held.Lease)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Update(context.Background(), "listeners", map[string]any{"lease_until": ahead}, store.Eq("lease", held.Lease)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Update(context.Background(), "members", map[string]any{"listening_until": ahead}, store.Eq("user_id", ops.AgentID)); err != nil {
 		t.Fatal(err)
 	}
 	as(rw.ops, "run ops", "session.start", M{"task": "OPS-2", "state": "waiting", "program": "codex", "machine_id": "3f9c0a7d5e21b864", "machine_name": "Ops box",
 		"folder": "~/ops", "lease": held.Lease, "item_seq": 1, "instructions": "#1 assigned"})
-	change(nil, rw.artist, "task.take", M{"id": "SVA-1"})
+	change(nil, rw.artist, "task.take", M{"id": "SVA-1", "minutes": 24 * 60})
 	change(owner, "", "watch.set", M{"subject": "OPS-1"})
 	change(bea, "", "watch.set", M{"subject": "SVA-1"})
 	change(owner, "", "watch.set", M{"subject": "OPS-2", "user": "@cy"})
