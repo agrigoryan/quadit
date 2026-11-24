@@ -124,12 +124,22 @@ type about struct {
 	entity, id, text string
 }
 
-// notifyTask notifies about something in a task.
+// notifyTask notifies a member about something in a task that is for them
+// (Notification.Addressed): they were assigned, handed, mentioned, asked,
+// answered, or the task is theirs.
 func (c *cx) notifyTask(userID, typ string, t core.Task, what about) error {
-	return c.notify(userID, typ, core.Notification{TaskID: t.ID, EntityType: what.entity, EntityID: what.id, Title: t.Key + " " + t.Title, Snippet: what.text})
+	return c.notify(userID, typ, taskNote(t, what, true))
 }
 
-// notifyWatchers notifies everyone watching a task.
+// taskNote is the inbox item of something in a task.
+func taskNote(t core.Task, what about, addressed bool) core.Notification {
+	return core.Notification{TaskID: t.ID, EntityType: what.entity, EntityID: what.id, Title: t.Key + " " + t.Title, Snippet: what.text, Addressed: addressed}
+}
+
+// notifyWatchers notifies everyone watching a task, as followers: their
+// items are not addressed to them. Called after the members a change is
+// for, so that one who is both keeps the addressed item (notify keeps the
+// first per member and subject).
 func (c *cx) notifyWatchers(t core.Task, typ string, what about) error {
 	// Watching a task's epic or its project is watching the task.
 	subjects := []string{t.ID, t.ProjectID}
@@ -141,7 +151,7 @@ func (c *cx) notifyWatchers(t core.Task, typ string, what about) error {
 		return err
 	}
 	for _, w := range ws {
-		if err := c.notifyTask(w.UserID, typ, t, what); err != nil {
+		if err := c.notify(w.UserID, typ, taskNote(t, what, false)); err != nil {
 			return err
 		}
 	}

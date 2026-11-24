@@ -222,7 +222,7 @@ func (c *cx) afterDocText(d core.Doc, ed *editor) error {
 		if !CanSeeDoc(d, m.UserID) || d.Generated != "" {
 			continue
 		}
-		if err := c.notify(m.UserID, core.NoteMentioned, core.Notification{DocID: d.ID, EntityType: "doc", EntityID: d.ID, Title: d.Title, Snippet: snippet(text, 200)}); err != nil {
+		if err := c.notify(m.UserID, core.NoteMentioned, core.Notification{DocID: d.ID, EntityType: "doc", EntityID: d.ID, Title: d.Title, Snippet: snippet(text, 200), Addressed: true}); err != nil {
 			return err
 		}
 	}

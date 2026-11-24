@@ -153,7 +153,7 @@ func (c *cx) promote(r core.Resource, live []core.ResourceClaim) error {
 		return err
 	}
 	return c.notify(next.UserID, core.NoteWaitingOn, core.Notification{EntityType: "resource", EntityID: r.ID, TaskID: next.TaskID,
-		Title: r.Name + " is yours now", Snippet: next.Note})
+		Title: r.Name + " is yours now", Snippet: next.Note, Addressed: true})
 }
 
 // resourceAcquire asks for a shared resource. The answer says whether the

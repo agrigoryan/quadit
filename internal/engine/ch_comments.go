@@ -470,7 +470,7 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	if err != nil {
 		return err
 	}
-	n := core.Notification{DocID: doc.ID, EntityType: "comment", EntityID: cm.ID, Title: doc.Title, Snippet: cm.Body}
+	n := core.Notification{DocID: doc.ID, EntityType: "comment", EntityID: cm.ID, Title: doc.Title, Snippet: cm.Body, Addressed: true}
 	for _, m := range mentioned {
 		if err := c.notify(m.UserID, core.NoteMentioned, n); err != nil {
 			return err
@@ -489,6 +489,8 @@ func (c *cx) docComment(cm core.Comment, a commentCreateArgs) error {
 	if err := c.tx.List(c.ctx, &ws, store.Where(store.Eq("subject_id", doc.ID))); err != nil {
 		return err
 	}
+	// Followers last, and not addressed: one already told above keeps that.
+	n.Addressed = false
 	for _, w := range ws {
 		if err := c.notify(w.UserID, core.NoteComment, n); err != nil {
 			return err

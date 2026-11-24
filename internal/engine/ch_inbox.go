@@ -104,7 +104,7 @@ func notifyMember(c *cx, a notifyArgs) error {
 	if strings.TrimSpace(a.Message) == "" {
 		return invalid("message", "say what the member should know")
 	}
-	n := core.Notification{EntityType: "member", EntityID: m.UserID, Title: a.Message}
+	n := core.Notification{EntityType: "member", EntityID: m.UserID, Title: a.Message, Addressed: true}
 	if a.Task != "" {
 		t, err := c.task("task", a.Task)
 		if err != nil {
