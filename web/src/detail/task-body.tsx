@@ -14,6 +14,7 @@ import type { Task } from "@/types/core";
 import { Attachments } from "@/detail/attachments";
 import { useSubtasks, useTaskAttachments, useTaskLinks, useTaskRelations } from "@/detail/data";
 import { Links } from "@/detail/links";
+import { HandBack } from "@/detail/hand-back";
 import { MentionedIn } from "@/detail/mentions";
 import { Pages, useTaskPages } from "@/detail/pages";
 import { Properties } from "@/detail/properties";
@@ -119,6 +120,7 @@ export function TaskBody({ task, status, layout }: Props) {
         <div className={cx("px-4 pt-4 pb-3 md:px-6", page && "lg:px-10 lg:pt-7 lg:pb-5")}>
           <EditableTitle task={task} large={page} />
           <Description task={task} loading={loading} />
+          <HandBack key={task.id} task={task} />
           {failed && (
             <p role="alert" className="mt-2 text-sm text-danger">
               {t("detail.loadFailed")}: {status}
