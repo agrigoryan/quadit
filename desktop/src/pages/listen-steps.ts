@@ -32,7 +32,7 @@ export function listenSteps(): HTMLElement {
     make("b", "In its chat, in your project’s folder, write "),
     make("code", LISTEN_LINE),
     make("b", "."),
-    " This is the way we recommend: it then answers what you assign to it or ask it in Quadit as it comes in. It asks which project when you have several.",
+    " This is the way we recommend: it then answers what you assign to it or ask it in Quadit as it comes in. It asks which project when it cannot tell.",
   );
   steps.append(first, second);
   box.append(
