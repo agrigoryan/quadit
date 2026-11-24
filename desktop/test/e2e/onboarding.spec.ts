@@ -195,7 +195,7 @@ test("a tool the app can run gives its code back by itself in the first run, and
     await expect(page.getByText(/is for Claude Code/)).toBeVisible({ timeout: 20_000 });
     // Under its task's comment box: nothing listens for it, and the line that has it listen.
     await page.goto(`${origin}/personal/task/GS-3`);
-    await expect(page.getByText(/is not listening\..*“listen to Quadit”/)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/is not listening\..*“listen to Quadit for GS”/)).toBeVisible({ timeout: 20_000 });
     await screen(page, "08b-not-listening.png");
   } finally {
     await desktop.close();
