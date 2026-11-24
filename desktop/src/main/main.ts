@@ -214,7 +214,12 @@ function start() {
     whenReachable: (serverId) =>
       serverId === list.localServer()?.id ? local.whenRunning() : Promise.resolve({ ok: true as const }),
     openConnect: (serverId, focus) => connect.asked(serverId, focus),
-    localAgents: (serverId, workspaceId) => localAgents({ connections, runner }, serverId, workspaceId),
+    localAgents: (serverId, workspaceId) =>
+      localAgents(
+        { connections, runner, log: (line) => appendLog(join(dataDir, "tools", "logs", "local-agents.log"), line) },
+        serverId,
+        workspaceId,
+      ),
     signInWithoutForm: (serverId, fetch) =>
       serverId === list.localServer()?.id ? local.signInOwner(fetch) : Promise.resolve(false),
     letUnload: (contents) => quitting.letGo(contents),

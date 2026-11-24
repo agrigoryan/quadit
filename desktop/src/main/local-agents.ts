@@ -8,8 +8,30 @@ import type { Connections } from "@/main/connections";
 import type { Runner } from "@/main/runner";
 import type { LocalAgent } from "@/shared/bridge";
 
-/** The LocalAgent list of the workspace `workspaceId` of the server `serverId`. */
+/**
+ * The LocalAgent list of the workspace `workspaceId` of the server `serverId`;
+ * none when it cannot be told (a ledger that cannot be read), why kept in the
+ * app's own log (`log`): an error names a path on this computer, never the
+ * page's to know.
+ */
 export async function localAgents(
+  parts: {
+    connections: Pick<Connections, "agentsOf">;
+    runner: Pick<Runner, "available" | "projectsOf">;
+    log: (line: string) => void;
+  },
+  serverId: string,
+  workspaceId: string,
+): Promise<LocalAgent[]> {
+  try {
+    return await told(parts, serverId, workspaceId);
+  } catch (error) {
+    parts.log(`local agents: ${error instanceof Error ? error.message : String(error)}`);
+    return [];
+  }
+}
+
+async function told(
   parts: { connections: Pick<Connections, "agentsOf">; runner: Pick<Runner, "available" | "projectsOf"> },
   serverId: string,
   workspaceId: string,

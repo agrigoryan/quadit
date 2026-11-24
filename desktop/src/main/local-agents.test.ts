@@ -31,6 +31,7 @@ describe("localAgents", () => {
                 : [],
           }),
         },
+        log: () => {},
       },
       "s1",
       "w1",
@@ -60,10 +61,32 @@ describe("localAgents", () => {
           ],
         },
         runner: { available: false, projectsOf: async () => ({ machine: "", projects: [] }) },
+        log: () => {},
       },
       "s1",
       "w1",
     );
     expect(agents[0]).toMatchObject({ canRun: false, computer: "", runs: [] });
+  });
+
+  it("answers nothing when the ledger cannot be read, and keeps why in the app's own log, never telling the page", async () => {
+    const logged: string[] = [];
+    const agents = await localAgents(
+      {
+        connections: {
+          agentsOf: () => {
+            throw new Error("/Users/aram/Library/Application Support/Quadit/connections.json cannot be read");
+          },
+        },
+        runner: { available: true, projectsOf: async () => ({ machine: "", projects: [] }) },
+        log: (line) => void logged.push(line),
+      },
+      "s1",
+      "w1",
+    );
+    expect(agents).toEqual([]);
+    expect(logged).toEqual([
+      "local agents: /Users/aram/Library/Application Support/Quadit/connections.json cannot be read",
+    ]);
   });
 });
