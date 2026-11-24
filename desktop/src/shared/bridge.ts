@@ -158,11 +158,13 @@ export interface QuaditDesktop {
 /**
  * Where Connect agents opens when a page asks: at `agent` (a member's user
  * id); `intent`, what the person meant to do there: connect a tool as it,
- * run it by Quadit, or disconnect it.
+ * run it by Quadit, or disconnect it; `program`, the tool that works as it
+ * whose controls the page showed (a LocalAgent's), when two do here.
  */
 export interface ConnectFocus {
   agent?: string;
   intent?: "connect" | "run" | "disconnect";
+  program?: string;
 }
 
 /** A tool on this computer that works as an agent of a page's workspace, as the page is told of it. */
@@ -184,16 +186,21 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const INTENTS: readonly string[] = ["connect", "run", "disconnect"] satisfies ConnectFocus["intent"][];
 
 /**
- * What a page sent with openConnect, as a focus: an agent's id (a UUID) and
- * one of the intents; null for anything else, and Connect agents then opens
- * as it does without one.
+ * What a page sent with openConnect, as a focus: an agent's id (a UUID), one
+ * of the intents, and a program among `programs` (the app's tools; any other
+ * is left out); null for anything else, and Connect agents then opens as it
+ * does without one.
  */
-export function focusOf(raw: unknown): ConnectFocus | null {
+export function focusOf(raw: unknown, programs: readonly string[] = []): ConnectFocus | null {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return null;
-  const { agent, intent } = raw as Record<string, unknown>;
+  const { agent, intent, program } = raw as Record<string, unknown>;
   if (typeof agent !== "string" || !UUID.test(agent)) return null;
   if (intent !== undefined && (typeof intent !== "string" || !INTENTS.includes(intent))) return null;
-  return intent === undefined ? { agent } : { agent, intent: intent as ConnectFocus["intent"] };
+  return {
+    agent,
+    ...(intent === undefined ? {} : { intent: intent as ConnectFocus["intent"] }),
+    ...(typeof program === "string" && programs.includes(program) ? { program } : {}),
+  };
 }
 
 export const BRIDGE_NOTIFY = "bridge:notify";

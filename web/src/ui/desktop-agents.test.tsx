@@ -62,13 +62,18 @@ describe("useLocalAgents", () => {
 });
 
 describe("openConnect", () => {
-  it("opens the app's Connect window on an agent and what to do for it, or as it is without one", () => {
+  it("opens the app's Connect window on an agent, what to do for it and the program shown, or as it is without one", () => {
     const open = vi.fn();
     window.quaditDesktop = bridge({ openConnect: open });
     expect(canOpenConnect()).toBe(true);
     openConnect("a1", "run");
+    openConnect("a1", "run", "codex");
     openConnect();
-    expect(open.mock.calls).toEqual([[{ agent: "a1", intent: "run" }], [undefined]]);
+    expect(open.mock.calls).toEqual([
+      [{ agent: "a1", intent: "run" }],
+      [{ agent: "a1", intent: "run", program: "codex" }],
+      [undefined],
+    ]);
   });
 
   it("does nothing in a browser", () => {

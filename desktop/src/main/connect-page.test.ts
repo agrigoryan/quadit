@@ -57,7 +57,10 @@ function harness({
       runAs: (id: string) => logins[id] ?? null,
       agentsOf: (serverId: string, workspaceId: string) =>
         (serverId === "s1" || serverId === "local") && workspaceId === "w1"
-          ? [{ tool: "claude", name: "Claude Code", agent: CLAUDE, login: "/q/claude.json" }]
+          ? [
+              { tool: "claude", name: "Claude Code", agent: CLAUDE, login: "/q/claude.json" },
+              { tool: "codex", name: "Codex", agent: CLAUDE, login: "/q/codex.json" },
+            ]
           : [],
       skillForRuns: async (id: string) =>
         id === "codex" ? { ok: false, error: "The Quadit skill for Codex was changed by hand…" } : { ok: true },
@@ -272,6 +275,15 @@ describe("ConnectPage, asked by a page at one of its agents", () => {
       openedByPage: false,
       focus: { id: 1, intent: "run", tool: "claude", agent: { id: CLAUDE, handle: "claude" } },
     });
+  });
+
+  it("opens at the card of the program the page named, of two that work as that agent, else the first", async () => {
+    const { connect, call } = harness({ workspace: true });
+    connect.asked("local", { agent: CLAUDE, intent: "run", program: "codex" });
+    expect(await call(1, "connectTarget")).toMatchObject({ focus: { tool: "codex" } });
+    // Named, but not working as that agent here (disconnected since): the first that does.
+    connect.asked("local", { agent: CLAUDE, intent: "run", program: "gemini" });
+    expect(await call(1, "connectTarget")).toMatchObject({ focus: { id: 2, tool: "claude" } });
   });
 
   it("names the agent to connect a tool as when no tool works as it here", async () => {

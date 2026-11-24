@@ -107,7 +107,11 @@ export function Hearing({
   const program = programOf(state, local);
   const ownProjects = state.listeners.some((l) => l.project_id);
   const offer = local?.canRun && local.runs.length === 0 && (
-    <Button size="sm" className="shrink-0 self-center" onClick={() => openConnect(member.user_id, "run")}>
+    <Button
+      size="sm"
+      className="shrink-0 self-center"
+      onClick={() => openConnect(member.user_id, "run", local.program)}
+    >
       {t("agents.card.runByQuadit")}
     </Button>
   );
@@ -209,7 +213,7 @@ function RunnerLine({
         !busy && (
           <button
             type="button"
-            onClick={() => openConnect(member.user_id, "run")}
+            onClick={() => openConnect(member.user_id, "run", local?.program)}
             aria-label={t("agents.card.stopRunningLabel", { project })}
             className="shrink-0 text-sm text-ink-3 underline underline-offset-2 hover:text-ink"
           >

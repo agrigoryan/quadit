@@ -34,7 +34,7 @@ export type ConnectIntent = "connect" | "run" | "disconnect";
  * offers it; every member is missing in a browser or an older app.
  */
 interface AgentsBridge {
-  openConnect?(focus?: { agent?: string; intent?: ConnectIntent }): void;
+  openConnect?(focus?: { agent?: string; intent?: ConnectIntent; program?: string }): void;
   localAgents?(): Promise<LocalAgent[]>;
 }
 
@@ -43,9 +43,13 @@ const bridge = (): AgentsBridge | undefined => window.quaditDesktop;
 /** Whether this page is in an app that can open its Connect window. */
 export const canOpenConnect = () => !!bridge()?.openConnect;
 
-/** Opens the app's Connect window, on one agent and what to do for it when given. */
-export function openConnect(agent?: string, intent?: ConnectIntent) {
-  bridge()?.openConnect?.(agent ? { agent, intent } : undefined);
+/**
+ * Opens the app's Connect window, on one agent and what to do for it when
+ * given, at the program a LocalAgent the page shows names (of two that work
+ * as that agent here, the one whose state the page showed).
+ */
+export function openConnect(agent?: string, intent?: ConnectIntent, program?: string) {
+  bridge()?.openConnect?.(agent ? { agent, intent, ...(program ? { program } : {}) } : undefined);
 }
 
 /** How often the app is asked again while the page shows its answer. */

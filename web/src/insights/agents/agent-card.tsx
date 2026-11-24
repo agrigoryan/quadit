@@ -192,7 +192,7 @@ function CardMenu({ member, local }: { member: Member; local: LocalAgent | undef
             {t("agents.card.settings")}
           </MenuItem>
           {local && (
-            <MenuItem icon={<Unplug />} onSelect={() => openConnect(member.user_id, "disconnect")}>
+            <MenuItem icon={<Unplug />} onSelect={() => openConnect(member.user_id, "disconnect", local.program)}>
               {t("agents.card.disconnect")}
             </MenuItem>
           )}

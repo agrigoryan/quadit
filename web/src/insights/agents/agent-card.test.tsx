@@ -145,7 +145,8 @@ describe("the card in the app, in the app's card's words", () => {
     // What running it means is said in the app's sheet of the agent, not on the card.
     expect(within(card()).queryByText(/^Quadit can start/)).toBeNull();
     fireEvent.click(within(card()).getByRole("button", { name: "Run by Quadit…" }));
-    expect(open).toHaveBeenCalledWith({ agent: "a1", intent: "run" });
+    // The program the card speaks of, so the app opens its controls, not another's that works as the same agent.
+    expect(open).toHaveBeenCalledWith({ agent: "a1", intent: "run", program: "claude" });
     // Copying gives the words alone.
     const write = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText: write } });
@@ -161,7 +162,7 @@ describe("the card in the app, in the app's card's words", () => {
     expect(within(card()).getByText("Runs SVA in ~/game.")).toBeTruthy();
     expect(within(card()).getByText("Ready.")).toBeTruthy();
     fireEvent.click(within(card()).getByRole("button", { name: "Stop running SVA on this computer" }));
-    expect(open).toHaveBeenCalledWith({ agent: "a1", intent: "run" });
+    expect(open).toHaveBeenCalledWith({ agent: "a1", intent: "run", program: "claude" });
     show(listening({ ...runner, runner: { ...runner.runner!, task: "SVA-4" } }), { a1: here({ runs: ["p1"] }) });
     expect(within(card()).getByText("Working on SVA-4.")).toBeTruthy();
     show(listening({ ...runner, runner: { ...runner.runner!, paused: "not_signed_in" } }), {
@@ -280,7 +281,7 @@ describe("the card's menu", () => {
     show(reading(), { a1: here() });
     expect(items()).toEqual(["Settings", "Disconnect from this computer", "Remove agent"]);
     fireEvent.click(screen.getByRole("menuitem", { name: "Disconnect from this computer" }));
-    expect(open).toHaveBeenCalledWith({ agent: "a1", intent: "disconnect" });
+    expect(open).toHaveBeenCalledWith({ agent: "a1", intent: "disconnect", program: "claude" });
   });
 
   it("offers a member no Remove, and a browser no Disconnect", () => {

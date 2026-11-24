@@ -99,13 +99,19 @@ if (typeof origin === "string" && origin && window.location.origin === origin) {
       : {
           // The app checks what it is sent (focusOf); a page's object is never handed on as it is.
           openConnect(focus?: unknown) {
-            const { agent, intent } = (typeof focus === "object" && focus !== null ? focus : {}) as Record<
+            const { agent, intent, program } = (typeof focus === "object" && focus !== null ? focus : {}) as Record<
               string,
               unknown
             >;
             ipcRenderer.send(
               BRIDGE_OPEN_CONNECT,
-              typeof agent === "string" ? { agent, ...(typeof intent === "string" ? { intent } : {}) } : null,
+              typeof agent === "string"
+                ? {
+                    agent,
+                    ...(typeof intent === "string" ? { intent } : {}),
+                    ...(typeof program === "string" ? { program } : {}),
+                  }
+                : null,
             );
           },
           localAgents: () => ipcRenderer.invoke(BRIDGE_LOCAL_AGENTS) as Promise<LocalAgent[]>,

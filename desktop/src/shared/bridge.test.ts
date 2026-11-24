@@ -208,6 +208,18 @@ describe("focusOf", () => {
     expect(focusOf({ agent, intent: "run", folder: "/", token: "qd_x" })).toEqual({ agent, intent: "run" });
   });
 
+  it("takes the program a page names when it is one of the app's, and leaves out any other", () => {
+    const programs = ["claude", "codex"];
+    expect(focusOf({ agent, intent: "run", program: "codex" }, programs)).toEqual({
+      agent,
+      intent: "run",
+      program: "codex",
+    });
+    expect(focusOf({ agent, program: "claude" }, programs)).toEqual({ agent, program: "claude" });
+    for (const program of ["gemini", "../claude", 3, ""])
+      expect(focusOf({ agent, program }, programs)).toEqual({ agent });
+  });
+
   it("is none for an agent that is not a UUID, an intent it does not know, or no agent", () => {
     for (const raw of [
       null,

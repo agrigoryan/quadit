@@ -6,6 +6,7 @@
 // app answers at most once a second however often it is asked: a page
 // cannot keep the app busy.
 
+import { HARNESSES } from "@/main/harnesses";
 import { type ConnectFocus, focusOf } from "@/shared/bridge";
 
 const ASK_EVERY_MS = 1_000;
@@ -29,6 +30,12 @@ export class OpenConnect {
     const now = this.now();
     if (now - this.last < ASK_EVERY_MS) return;
     this.last = now;
-    this.open(serverId, focusOf(raw));
+    this.open(
+      serverId,
+      focusOf(
+        raw,
+        HARNESSES.map((h) => h.id),
+      ),
+    );
   }
 }

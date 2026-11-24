@@ -210,8 +210,13 @@ export class ConnectPage {
     const { focus } = shown;
     const workspace = target.summary?.workspace.id;
     if (!focus?.asked.agent || !workspace) return null;
-    const { agent, intent } = focus.asked;
-    const tool = this.parts.connections.agentsOf(shown.serverId, workspace).find((a) => a.agent === agent)?.tool;
+    const { agent, intent, program } = focus.asked;
+    // Of two tools that work as the agent, the one whose controls the page showed; else, or when it no longer does, the first.
+    const tools = this.parts.connections
+      .agentsOf(shown.serverId, workspace)
+      .filter((a) => a.agent === agent)
+      .map((a) => a.tool);
+    const tool = program && tools.includes(program) ? program : tools[0];
     const handle = target.summary?.agents.find((a) => a.id === agent)?.handle;
     if (!tool && !handle) return null;
     return {
