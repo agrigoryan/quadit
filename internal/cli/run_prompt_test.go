@@ -72,8 +72,8 @@ func TestEveryPromptNamesTheOwnerOfNow(t *testing.T) {
 			t.Fatal(err)
 		}
 		outside := got
-		if i := strings.Index(got, "QUADIT-ITEMS-"); i >= 0 {
-			outside = got[:i] + got[strings.LastIndex(got, "QUADIT-ITEMS-"):]
+		if before, _, ok := strings.Cut(got, "QUADIT-ITEMS-"); ok {
+			outside = before + got[strings.LastIndex(got, "QUADIT-ITEMS-"):]
 		}
 		if !strings.Contains(outside, "@bea") {
 			t.Fatalf("%s does not name the owner outside the items:\n%s", name, got)

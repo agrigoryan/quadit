@@ -381,8 +381,11 @@ func programVersionOf(ctx context.Context, path string, within time.Duration) (s
 		return "", fmt.Errorf("%s is not a program", path)
 	}
 	exit, out, err := probe(ctx, path, []string{"--version"}, os.Environ(), within)
-	if err != nil || exit != 0 {
-		return "", fmt.Errorf("%s --version did not answer: %v", path, err)
+	if err == nil && exit != 0 {
+		err = fmt.Errorf("it exited %d", exit)
+	}
+	if err != nil {
+		return "", fmt.Errorf("%s --version did not answer: %w", path, err)
 	}
 	v := programVersion(out)
 	if v == "" {
@@ -719,6 +722,7 @@ func (e *liveEntry) handle(ctx context.Context, ans held) error {
 	case err != nil:
 		// What the head's task covers could not be read: it is never taken
 		// as "nothing", the head comes again.
+		e.sayRun(head.Task, "waiting: what %s covers could not be read (%v)", head.Task, err)
 		e.srv.wait(ctx, e.srv.host.times.awayFirst)
 		return nil
 	case covered && !continuing:

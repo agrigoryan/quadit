@@ -201,7 +201,7 @@ func (r *agentRun) start(ctx context.Context) (int64, error) {
 			}
 		case errors.Is(err, errOutboxWaits):
 			if ctx.Err() != nil {
-				r.finish(ctx, runEnding{state: core.AgentSessionFailed, reason: core.RunInterrupted, summary: r.stoppedSummary(),
+				_ = r.finish(ctx, runEnding{state: core.AgentSessionFailed, reason: core.RunInterrupted, summary: r.stoppedSummary(), // an end not kept is held by the entry (keepEndLater)
 					line: "interrupted: Quadit stopped before this run started"}, nil)
 				return 0, ctx.Err() // the entry ends: whoever ended it does not wait on this
 			}
