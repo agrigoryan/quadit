@@ -63,6 +63,7 @@ type fakeQuadit struct {
 	// that ends a run; writeOnRunning is an event the agent emits (as its
 	// program would) when a run goes running.
 	changesAway    bool
+	runsAway       bool // GET /list/sessions answers 503
 	changesAwayFor string // the same, for one login's changes alone
 	staleStart     bool
 	stopOnStart    bool
@@ -72,6 +73,7 @@ type fakeQuadit struct {
 }
 
 type fakeItem struct {
+	Inner    int64  // the item's own seq as answered, when it is not Seq (a server that is wrong)
 	For      string // the agent's user id; none: @claude's
 	Seq      int64
 	ID       string
@@ -300,6 +302,13 @@ func (f *fakeQuadit) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && path == "/list/projects":
 		_, _ = io.WriteString(w, `{"projects":[{"id":"`+fakeProjectID+`","key":"SVA","name":"Samurai"}]}`)
 	case r.Method == http.MethodGet && path == "/list/sessions":
+		f.mu.Lock()
+		away := f.runsAway
+		f.mu.Unlock()
+		if away {
+			refuse(w, http.StatusServiceUnavailable, "unavailable", "", "the runs are away")
+			return
+		}
 		f.listRuns(w, r)
 	case r.Method == http.MethodGet && path == "/listen":
 		f.listen(w, r, who)
@@ -342,8 +351,12 @@ func (f *fakeQuadit) listRuns(w http.ResponseWriter, r *http.Request) {
 
 // itemJSON is an item as GET /listen answers it.
 func (it fakeItem) answer() map[string]any {
+	inner := it.Seq
+	if it.Inner != 0 {
+		inner = it.Inner
+	}
 	return map[string]any{"seq": it.Seq, "line": fmt.Sprintf("#%d %s %s", it.Seq, it.Type, it.Task),
-		"item": map[string]any{"id": it.ID, "seq": it.Seq, "type": it.Type, "by": it.By, "by_agent": it.ByAgent, "task": it.Task, "title": it.Task + " Boss fight",
+		"item": map[string]any{"id": it.ID, "seq": inner, "type": it.Type, "by": it.By, "by_agent": it.ByAgent, "task": it.Task, "title": it.Task + " Boss fight",
 			"snippet": "please do it", "decision": it.Decision},
 		"wake": map[string]any{"do": it.Do, "why": it.Why}}
 }

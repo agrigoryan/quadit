@@ -122,6 +122,7 @@ func TestAnOpenRunOfThisMachineWithNoJournalIsClosed(t *testing.T) {
 func TestCoverageIsWhatTheProgramTook(t *testing.T) {
 	t.Run("the head and the items its prompt carried are covered once it ran", func(t *testing.T) {
 		rt := newRunTest(t, core.ProgramClaude, claudeDone("done"), claudeDone("again"))
+		rt.seedState(func(s *entryState) { s.Tasks["SVA-12"] = &taskState{Through: 900} }) // what the task covers is known
 		rt.f.addItem(fakeItem{Task: "SVA-12"})
 		second := rt.f.addItem(fakeItem{Task: "SVA-12"})
 		rt.serve()
@@ -149,17 +150,23 @@ func TestCoverageIsWhatTheProgramTook(t *testing.T) {
 	})
 	t.Run("a run stopped before its program took the prompt covers nothing", func(t *testing.T) {
 		rt := newRunTest(t, core.ProgramClaude, []fakeagent.Step{claudeInit(), {UntilSignal: []string{"{}"}}}, claudeDone("done"))
+		rt.seedState(func(s *entryState) { s.Tasks["SVA-12"] = &taskState{Through: 900} })
 		rt.f.addItem(fakeItem{Task: "SVA-12"})
+		carried := rt.f.addItem(fakeItem{Task: "SVA-12"})
 		rt.serve()
+		// The barrier: the program has the prompt with both items, and has
+		// not taken it.
 		rt.eventually("the program started", func() bool { return len(rt.records()) == 1 })
-		later := rt.f.addItem(fakeItem{Task: "SVA-12"})
+		if !strings.Contains(rt.records()[0].Stdin, "#"+strconv.FormatInt(carried, 10)) {
+			t.Fatalf("the first prompt does not carry the second item:\n%s", rt.records()[0].Stdin)
+		}
 		rt.f.stopRun(rt.f.allRuns()[0]["id"].(string))
 		if row := rt.ended(0); row["state"] != core.AgentSessionStopped {
 			t.Fatalf("the run ended %v", row)
 		}
 		rt.ended(1)
-		if !strings.Contains(rt.records()[1].Stdin, "#"+strconv.FormatInt(later, 10)) {
-			t.Fatalf("the item the stopped run carried was not run:\n%s", rt.records()[1].Stdin)
+		if !strings.Contains(rt.records()[1].Stdin, "#"+strconv.FormatInt(carried, 10)) {
+			t.Fatalf("an item the stopped run carried was taken as covered:\n%s", rt.records()[1].Stdin)
 		}
 	})
 	t.Run("the server's record covers when the entry has none", func(t *testing.T) {
@@ -565,7 +572,9 @@ func TestTheProgramStartsOnlyWithTheLoginThatWasVerified(t *testing.T) {
 	rt.eventually("waiting for the folder", func() bool { return len(rt.f.allRuns()) > 0 && rt.f.allRuns()[0]["reason"] == core.RunFolderBusy })
 	writeJSON(t, rt.login, map[string]string{"url": rt.url, "token": codexToken}) // another login at the path
 	srv.releaseFolder(rt.folder, lock)
-	rt.eventually("the entry's error", func() bool { return readStatus(rt.files.status()).Entries[rt.entry.ID].Message == string(errLoginRefused) })
+	rt.eventually("the entry's error", func() bool {
+		return readStatus(rt.files.status()).Entries[rt.entry.ID].Message == string(errLoginRefused)
+	})
 	if len(rt.records()) != 0 {
 		t.Fatal("the program started with a login that was not the one verified")
 	}
@@ -623,4 +632,93 @@ func TestAPausedEntrySendsWhatWaitsInItsOutbox(t *testing.T) {
 	_, _ = out.add(w)
 	rt.serve()
 	rt.eventually("the waiting write sent", func() bool { return rt.f.sentCount(w.ChangeID) == 1 })
+}
+
+func TestAContinuationCarriesNoNewItems(t *testing.T) {
+	resets := time.Now().Add(time.Hour).Truncate(time.Second)
+	limited := []fakeagent.Step{claudeInit(), claudeSays("Working."),
+		{Out: `{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":` + strconv.FormatInt(resets.Unix(), 10) + `}}`}, exit(1)}
+	rt := newRunTest(t, core.ProgramClaude, limited, claudeDone("continued"), claudeDone("the later one"))
+	head := rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	rt.ended(0)
+	rt.eventually("paused", func() bool { return readStatus(rt.files.status()).Entries[rt.entry.ID].Pause == core.PauseUsageLimit })
+	later := rt.f.addItem(fakeItem{Task: "SVA-12"}) // came during the pause
+	rt.clock.jump(61 * time.Minute)
+	rt.acked(later)
+	recs := rt.records()
+	if len(recs) != 3 || strings.Contains(recs[1].Stdin, "QUADIT-ITEMS") || !strings.Contains(recs[2].Stdin, "#"+strconv.FormatInt(later, 10)) {
+		t.Fatalf("%d starts; the continuation's prompt:\n%s", len(recs), recs[len(recs)-1].Stdin)
+	}
+	if rt.f.allRuns()[1]["items_through"] != float64(head) {
+		t.Fatalf("the continuation covers %v, not the run it continues (%d)", rt.f.allRuns()[1]["items_through"], head)
+	}
+}
+
+func TestAFailedCoverageReadIsRetriedNeverTakenAsNothingCovered(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
+	head := rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.f.set(func(f *fakeQuadit) {
+		f.runsAway = true
+		f.runs = append(f.runs, map[string]any{"id": "0199dddd-0000-7000-8000-0000000000a1", "task": "SVA-12", "agent_id": fakeAgentID,
+			"state": "done", "accepted_at": 1, "items_through": head})
+	})
+	rt.serve()
+	rt.eventually("the head handed out a few times", func() bool { return len(rt.f.holdList()) >= 4 })
+	if len(rt.records()) != 0 || len(rt.f.allRuns()) != 1 {
+		t.Fatal("a head whose coverage could not be read was run")
+	}
+	rt.f.set(func(f *fakeQuadit) { f.runsAway = false })
+	rt.acked(head)
+	if len(rt.records()) != 0 {
+		t.Fatal("a head the server says a program took was run")
+	}
+}
+
+func TestWithCoverageUnknownTheHeadRunsAlone(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, claudeDone("one"), claudeDone("two"))
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	second := rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	rt.acked(second)
+	recs := rt.records()
+	if len(recs) != 2 || strings.Contains(recs[0].Stdin, "#"+strconv.FormatInt(second, 10)) {
+		t.Fatalf("%d starts; the first prompt:\n%s", len(recs), recs[0].Stdin)
+	}
+}
+
+func TestAnAnswerThatDoesNotHoldTogetherIsNotActedOn(t *testing.T) {
+	t.Run("a task of another project", func(t *testing.T) {
+		rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
+		rt.f.addItem(fakeItem{Task: "OPS-12"})
+		rt.serve()
+		rt.eventually("the entry's error", func() bool { return readStatus(rt.files.status()).Entries[rt.entry.ID].Message == string(errServerWrong) })
+		if len(rt.f.allRuns()) != 0 || len(rt.f.ackList()) != 0 || len(rt.records()) != 0 {
+			t.Fatal("an item of another project was acted on")
+		}
+	})
+	t.Run("an item whose own seq is not the answer's", func(t *testing.T) {
+		rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
+		rt.f.addItem(fakeItem{Task: "SVA-12", Inner: 99999})
+		rt.serve()
+		rt.eventually("the entry's error", func() bool { return readStatus(rt.files.status()).Entries[rt.entry.ID].Message == string(errServerWrong) })
+		if len(rt.f.allRuns()) != 0 || len(rt.f.ackList()) != 0 {
+			t.Fatal("an item whose seqs disagree was acted on")
+		}
+	})
+	item := func(seq int64) *listenItem { return &listenItem{Seq: seq, Task: "SVA-1", Type: "comment"} }
+	run := &wake{Do: wakeRun, Why: "for_you"}
+	for name, ans := range map[string]held{
+		"a seq of zero":                {Seq: 0, Item: item(0), Wake: run, Project: "SVA"},
+		"a batch item behind the head": {Seq: 5, Item: item(5), Wake: run, Project: "SVA", Batch: []heldItem{{Seq: 4, Item: item(4), Wake: run}}},
+		"a batch out of order":         {Seq: 5, Item: item(5), Wake: run, Project: "SVA", Batch: []heldItem{{Seq: 7, Item: item(7), Wake: run}, {Seq: 6, Item: item(6), Wake: run}}},
+		"a batch item's seqs disagree": {Seq: 5, Item: item(5), Wake: run, Project: "SVA", Batch: []heldItem{{Seq: 6, Item: item(60), Wake: run}}},
+		"a refusal of another project": {Seq: 5, Item: &listenItem{Seq: 5, Task: "OPS-1"}, Wake: &wake{Do: wakeRefuse, Why: "not_responsible"}, Project: "SVA"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if consistent(ans, "SVA") {
+				t.Fatalf("%+v taken as holding together", ans)
+			}
+		})
+	}
 }

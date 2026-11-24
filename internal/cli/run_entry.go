@@ -76,6 +76,7 @@ const (
 	errProjectGone  = entryError("project gone")
 	errServerOld    = entryError("this Quadit server cannot run agents yet: update it")
 	errNotInPlace   = entryError("this version of quadit runs a folder in place only")
+	errServerWrong  = entryError("the server sent an answer that does not hold together")
 )
 
 // errRemoving ends an entry that quadit run remove asked to let go.
@@ -564,6 +565,9 @@ func (e *liveEntry) listen(ctx context.Context) error {
 			e.pauseEntry(core.PauseServerOld)
 			return nil
 		}
+		if !consistent(ans, e.projectKey) {
+			return errServerWrong // nothing of it is recorded or acknowledged
+		}
 		if err := e.handle(ctx, ans); err != nil {
 			return err
 		}
@@ -574,16 +578,41 @@ func (e *liveEntry) listen(ctx context.Context) error {
 	return nil
 }
 
-// understood reports whether the runner can act on an answer with an
-// item: every item has a wake it knows, and an item to run is on a task.
+// understood reports whether the runner knows what an answer with an
+// item asks: every item has a wake it knows. (A server that does not is
+// older than the runner needs.)
 func understood(ans held) bool {
-	if !ans.Wake.understood() || ans.Item.Seq != ans.Seq || (ans.Wake.Do == wakeRun && !taskForm.MatchString(ans.Item.Task)) {
+	if !ans.Wake.understood() {
 		return false
 	}
 	for _, b := range ans.Batch {
-		if b.Item == nil || !b.Wake.understood() || b.Item.Task != ans.Item.Task || b.Seq <= ans.Seq {
+		if !b.Wake.understood() {
 			return false
 		}
+	}
+	return true
+}
+
+// consistent reports whether an answer holds together, before anything of
+// it is recorded or acknowledged: positive feed positions, each item's
+// own the same as its place's, the batch after the head and in order, on
+// the head's task; and an item to run or to refuse on a task of the
+// entry's project (an item to acknowledge may be of a task moved away).
+func consistent(ans held, project string) bool {
+	head := ans.Item
+	ofProject := func(task string) bool {
+		key, _, _ := strings.Cut(task, "-")
+		return taskForm.MatchString(task) && key == project
+	}
+	if ans.Seq <= 0 || head.Seq != ans.Seq || (ans.Wake.Do != wakeAck && !ofProject(head.Task)) {
+		return false
+	}
+	last := ans.Seq
+	for _, b := range ans.Batch {
+		if b.Item == nil || b.Item.Seq != b.Seq || b.Seq <= last || b.Item.Task != head.Task {
+			return false
+		}
+		last = b.Seq
 	}
 	return true
 }
@@ -609,7 +638,14 @@ func (e *liveEntry) handle(ctx context.Context, ans held) error {
 	}
 	task := e.state.task(head.Task)
 	continuing := task.Continue != nil && task.Continue.Seq == head.Seq
-	if !continuing && e.covered(ctx, head, task) {
+	covered, known, err := e.covered(ctx, head, task)
+	switch {
+	case err != nil:
+		// What the head's task covers could not be read: it is never taken
+		// as "nothing", the head comes again.
+		e.srv.wait(ctx, e.srv.host.times.awayFirst)
+		return nil
+	case covered && !continuing:
 		e.acknowledge(ctx, head, itemRunID(head.ID))
 		return nil
 	}
@@ -619,9 +655,12 @@ func (e *liveEntry) handle(ctx context.Context, ans held) error {
 			return nil
 		}
 	}
+	// The other items of the task go with the head only when what the task
+	// covers is known, and never with a continuation, which carries
+	// nothing new: what came during its pause comes as its own head.
 	items := []listenItem{head}
 	for _, b := range ans.Batch {
-		if b.Wake.Do == wakeRun {
+		if b.Wake.Do == wakeRun && known && !continuing {
 			items = append(items, *b.Item)
 		}
 	}
@@ -630,20 +669,25 @@ func (e *liveEntry) handle(ctx context.Context, ans held) error {
 
 // covered reports whether a program of this task already took the head:
 // by the entry's own record, or, when it has none, by a run of this agent
-// on the task that the server says its program took. When neither can
-// tell, nothing is covered.
-func (e *liveEntry) covered(ctx context.Context, head listenItem, task taskState) bool {
+// on the task that the server says its program took. known says whether
+// either told; when neither does, nothing is covered and the head runs
+// alone. A read of the server's runs that failed is an error, never
+// "nothing covered".
+func (e *liveEntry) covered(ctx context.Context, head listenItem, task taskState) (covered, known bool, err error) {
 	if task.Through > 0 {
-		return head.Seq <= task.Through
+		return head.Seq <= task.Through, true, nil
 	}
 	through := int64(0)
-	err := e.api.eachRun(ctx, head.Task, func(row runRow) bool {
+	err = e.api.eachRun(ctx, head.Task, func(row runRow) bool {
 		if row.AgentID == e.reg.AgentID && row.AcceptedAt > 0 {
 			through = max(through, row.ItemsThrough)
 		}
 		return false
 	})
-	return err == nil && through > 0 && head.Seq <= through
+	if err != nil {
+		return false, false, err
+	}
+	return through > 0 && head.Seq <= through, through > 0, nil
 }
 
 // The guards on automatic runs.
