@@ -22,7 +22,7 @@ import {
   type TaskProperty,
 } from "@/tasks/properties/property";
 import { memberOf, memberWord } from "@/tasks/properties/query-words";
-import { memberItems, noneItem, oneProject } from "@/tasks/property-picker";
+import { memberItems, noneItem, useListeningFor } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { ConnectionMark } from "@/ui/connection-mark";
 import { ListeningDot } from "@/ui/listening-dot";
@@ -148,7 +148,7 @@ export const assignee = {
       const members = useMembers().filter((m) => tasks.every((task) => mayBeGivenWork(m, task.project_id)));
       const me = useMe();
       // Asked of the server only while the list is open; of the tasks' project when they share one.
-      const listening = useListening(oneProject(tasks));
+      const listening = useListeningFor(tasks);
       return {
         items: [noneItem(t("task.unassigned")), ...memberItems(members, me.user_id, listening)],
         value: shared(tasks, (task) => task.assignee_id ?? NONE),

@@ -2,7 +2,7 @@
 // The property picker (tasks/property-picker.tsx), kind by kind: the rows it
 // offers for a task, the one it marks as picked, and the change a pick sends.
 
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { WithQuery } from "@/test/query";
@@ -228,5 +228,38 @@ describe("TaskPropertyPicker", () => {
     expect(rows()).toEqual(["Game · SVA ✓", "Ops · OPS"]);
     pick(/Ops/);
     expect(await lastSent()).toEqual({ type: "task.move", args: { id: "t1", project: "p2" } });
+  });
+});
+
+describe("whether an agent listens, beside it in a task's people pickers", () => {
+  /** @coder listens to OPS only. */
+  beforeEach(() => {
+    vi.spyOn(api, "get").mockResolvedValue({
+      agents: [
+        {
+          user_id: "u2",
+          handle: "@coder",
+          listening: true,
+          listeners: [{ project_id: "p2", project: "OPS", by: "a chat", live: true }],
+          listening_projects: ["p2"],
+          listening_outside_projects: false,
+        },
+      ],
+    });
+  });
+
+  const coder = () => within(list()).getByRole("option", { name: /Coder/ });
+
+  it("marks whether it listens to the task's project", async () => {
+    open("assignee");
+    expect(await within(coder()).findByRole("img", { name: "Nothing is listening" })).toBeInTheDocument();
+  });
+
+  it("marks nothing for tasks of several projects, where no one answer is true", async () => {
+    open("assignee", [theTask(), task({ id: "t2", project_id: "p2", key: "OPS-1" })]);
+    // The answer is in once the single-project picker would show it.
+    await waitFor(() => expect(vi.mocked(api.get)).toHaveBeenCalled());
+    await act(() => new Promise((done) => setTimeout(done, 0)));
+    expect(within(coder()).queryByRole("img")).toBeNull();
   });
 });

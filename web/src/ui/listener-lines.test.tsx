@@ -26,13 +26,17 @@ beforeEach(() => {
   });
 });
 
-function lines(listeners: ListenerShown[], more: { listening_outside_projects?: boolean; idle?: boolean } = {}) {
+function lines(
+  listeners: ListenerShown[],
+  more: { listening_outside_projects?: boolean; listening_projects?: string[]; idle?: boolean } = {},
+) {
   const { container } = render(
     <ListenerLines
       reading={{
         listening: listeners.some((l) => l.live) || !!more.listening_outside_projects,
         listeners,
         listening_outside_projects: more.listening_outside_projects ?? false,
+        listening_projects: more.listening_projects ?? [],
       }}
       idle={more.idle}
     />,
@@ -67,5 +71,12 @@ describe("what an agent listens to", () => {
       "GS: nothing listens now; its items wait. Say “listen to Quadit for GS” to it in a chat.",
     ]);
     expect(screen.queryByText(/Listening to/)).toBeNull();
+  });
+
+  it("says nothing of a project's items waiting while a webhook hears them", () => {
+    const stopped: ListenerShown = { project_id: "p2", project: "GS", by: "a chat", live: false };
+    expect(
+      lines([stopped], { idle: true, listening_outside_projects: true, listening_projects: ["p1", "p2"] }),
+    ).toEqual(["A webhook pushes to it"]);
   });
 });

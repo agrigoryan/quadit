@@ -9,7 +9,7 @@ import { t } from "@/lib/i18n";
 import { useLookup } from "@/data/selectors";
 import type { AgentState } from "@/types/dashboard";
 
-type Reading = Pick<AgentState, "listening" | "listeners" | "listening_outside_projects">;
+type Reading = Pick<AgentState, "listening" | "listeners" | "listening_projects" | "listening_outside_projects">;
 
 /** The lines, each its own element, for the caller to lay out (a row of spans, a list). */
 export function ListenerLines({ reading, idle, className }: { reading: Reading; idle?: boolean; className?: string }) {
@@ -30,7 +30,9 @@ export function ListenerLines({ reading, idle, className }: { reading: Reading; 
   if (lines.length === 0 && reading.listening) lines.push(t("agents.connection.listening"));
   if (idle)
     for (const l of reading.listeners)
-      if (l.project_id && !l.live && l.project) lines.push(t("agents.listener.idle", { project: l.project }));
+      // Its items wait only where nothing else hears them (a webhook does).
+      if (l.project_id && !l.live && l.project && !reading.listening_projects.includes(l.project_id))
+        lines.push(t("agents.listener.idle", { project: l.project }));
   return (
     <>
       {lines.map((line) => (

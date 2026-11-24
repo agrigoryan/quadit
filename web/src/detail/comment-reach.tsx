@@ -10,7 +10,7 @@
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
 import { useConnection } from "@/data/listening";
-import { useMember, useRow } from "@/data/selectors";
+import { useMember, useRowEvenIfGone } from "@/data/selectors";
 import type { Member, Task } from "@/types/core";
 import { useSettingsBase } from "@/settings/base";
 import { canConnectTools, ConnectToolsButton } from "@/ui/connect-tools";
@@ -26,7 +26,9 @@ export function CommentReach({ task }: { task: Task }) {
 
 function AgentReach({ agent, task }: { agent: Member; task: Task }) {
   const reach = useConnection()(agent, task.project_id);
-  const project = useRow("projects", task.project_id)?.key ?? "";
+  // An archived project still has its key, as the task's header shows it.
+  const project = useRowEvenIfGone("projects", task.project_id)?.key;
+  const line = project ? t("comment.reach.line", { project }) : t("comment.reach.lineAny");
   const settings = useSettingsBase();
   if (!reach) return null;
   const { connection, tool, elsewhere } = reach;
@@ -36,10 +38,10 @@ function AgentReach({ agent, task }: { agent: Member; task: Task }) {
       {connection === "listening" && t("comment.reach.listening", { handle })}
       {connection === "connected" &&
         (elsewhere
-          ? t("comment.reach.elsewhere", { handle, project })
+          ? t("comment.reach.elsewhere", { handle, line })
           : tool
-            ? t("comment.reach.connected", { handle, tool, project })
-            : t("comment.reach.connectedNoTool", { handle, project }))}
+            ? t("comment.reach.connected", { handle, tool, line })
+            : t("comment.reach.connectedNoTool", { handle, line }))}
       {connection === "not_connected" && (
         <>
           <span>{t("comment.reach.notConnected", { handle })}</span>

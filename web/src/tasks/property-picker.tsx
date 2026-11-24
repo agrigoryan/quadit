@@ -1,6 +1,7 @@
 import { type ReactNode, type RefObject, useState } from "react";
 import { CircleSlash } from "lucide-react";
 import { t } from "@/lib/i18n";
+import { useListening } from "@/data/listening";
 import type { Member, Project, Task } from "@/types/core";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { useManageLinks } from "@/tasks/manage";
@@ -27,13 +28,15 @@ export const noneChoice = (label: string, checked: boolean, apply: () => void): 
 });
 
 /**
- * The project the tasks share, for whether something listens there
- * (data/listening.ts Where); undefined when they are of several: the whole
- * agent.
+ * Whether something listens for a member's work in the tasks' project
+ * (data/listening.ts); no answer, so no mark, for tasks of several
+ * projects, where no one answer is true.
  */
-export function oneProject(tasks: Task[]): string | undefined {
+export function useListeningFor(tasks: Task[]): Listening {
   const first = tasks[0]?.project_id;
-  return first && tasks.every((task) => task.project_id === first) ? first : undefined;
+  const one = first && tasks.every((task) => task.project_id === first) ? first : undefined;
+  const listening = useListening(one);
+  return one ? listening : () => undefined;
 }
 
 /** Says whether something is listening for an agent; nothing for a person. From useListening (data/listening.ts). */

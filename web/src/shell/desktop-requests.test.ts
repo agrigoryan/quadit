@@ -289,6 +289,12 @@ describe("a tool's card in the app's Connect", () => {
     expect(reads).toEqual(["/api/v1/w/acme/agents/connection"]);
   });
 
+  it("names as unheard only the projects the agent itself may work in", async () => {
+    patchRow("members", "a1", { scope: { projects: ["p1"] } });
+    serve([{ user_id: "a1", listening: false, connected_at: "2026-11-21 14:02" }], false);
+    expect(await answer({ kind: "agent-state", agent: "a1" })).toMatchObject({ unheard: ["SVA"] });
+  });
+
   it("says a code replaced or cleared away since is gone, unused", async () => {
     vi.spyOn(api, "get").mockImplementation((path: string) =>
       path.endsWith("/agents/connection")

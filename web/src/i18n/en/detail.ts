@@ -186,11 +186,13 @@ export const detail = {
   "comment.placeholder": "Leave a comment… @ mentions someone",
   "comment.reach.listening": "@{handle} is listening and will see this.",
   "comment.reach.connected":
-    "@{handle} is not listening. To have it answer here, say “listen to Quadit for {project}” in {tool}. Until then it sees this when you next ask it, for example “check Quadit”.",
+    "@{handle} is not listening. To have it answer here, say {line} in {tool}. Until then it sees this when you next ask it, for example “check Quadit”.",
   "comment.reach.connectedNoTool":
-    "@{handle} is not listening. To have it answer here, say “listen to Quadit for {project}” to it in a chat. Until then it sees this when you next ask it to check Quadit.",
+    "@{handle} is not listening. To have it answer here, say {line} to it in a chat. Until then it sees this when you next ask it to check Quadit.",
   "comment.reach.elsewhere":
-    "@{handle} is listening to other projects, not to this one. To have it answer here, say “listen to Quadit for {project}” to it in a chat in this project’s folder. Until then it sees this when you next ask it, for example “check Quadit”.",
+    "@{handle} is listening to other projects, not to this one. To have it answer here, say {line} to it in a chat in this project’s folder. Until then it sees this when you next ask it, for example “check Quadit”.",
+  "comment.reach.line": "“listen to Quadit for {project}”",
+  "comment.reach.lineAny": "“listen to Quadit”",
   "comment.reach.notConnected": "@{handle} has not connected yet.",
   "comment.reach.connect": "Connect it",
   "comment.reach.connectInSettings": "Connect it in Settings",

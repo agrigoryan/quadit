@@ -5,7 +5,7 @@
 // that never has: the app's Connect in the desktop app, its page in
 // Settings in a browser.
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/data/api";
@@ -19,14 +19,14 @@ const ann = { user_id: "u1", handle: "ann", name: "Ann", kind: "person", role: "
 const codex = { user_id: "a1", handle: "codex", name: "Codex", kind: "agent", role: "member" } as Member;
 const base = { id: "t1", key: "SVA-1", project_id: "p1", status_id: "s1", title: "Boss" } as Task;
 
-function load(agent: Member) {
+function load(agent: Member, project: Record<string, unknown> = {}) {
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
     me: ann,
     user: { id: "u1" } as User,
     workspace: { id: "w", slug: "acme" } as Workspace,
-    projects: [{ id: "p1", key: "SVA", name: "Game", rank: "a" }],
+    projects: [{ id: "p1", key: "SVA", name: "Game", rank: "a", ...project }],
     members: [ann, agent],
   });
 }
@@ -96,6 +96,16 @@ describe("the line under the comment box", () => {
         "@codex is listening to other projects, not to this one. To have it answer here, say “listen to Quadit for SVA” to it in a chat in this project’s folder. Until then it sees this when you next ask it, for example “check Quadit”.",
       ),
     ).toBeTruthy();
+  });
+
+  it("names the project of a task in an archived project, and leaves it out when there is none to name", async () => {
+    load({ ...codex, connected_at: 1700000000000 }, { archived_at: 1 });
+    agents(false, "Codex");
+    show({ ...base, assignee_id: "a1" });
+    expect(await screen.findByText(/say “listen to Quadit for SVA” in Codex\./)).toBeTruthy();
+    cleanup();
+    show({ ...base, project_id: "gone", assignee_id: "a1" });
+    expect(await screen.findByText(/say “listen to Quadit” in Codex\./)).toBeTruthy();
   });
 
   it("names no tool for an agent whose tool is not known", async () => {

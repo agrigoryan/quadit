@@ -7,7 +7,6 @@ import { Globe } from "lucide-react";
 import { mayBeGivenWork, useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useListening } from "@/data/listening";
 import { useMe, useMember, useMembers } from "@/data/selectors";
 import type { Task } from "@/types/core";
 import { nameOf, who } from "@/detail/data";
@@ -23,7 +22,7 @@ import {
   type TaskProperty,
 } from "@/tasks/properties/property";
 import { memberOf, memberWord } from "@/tasks/properties/query-words";
-import { memberItems, noneItem, oneProject } from "@/tasks/property-picker";
+import { memberItems, noneItem, useListeningFor } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Input, Textarea } from "@/ui/input";
@@ -35,7 +34,7 @@ function useItems(tasks: Task[]) {
   const members = useMembers().filter((m) => tasks.every((task) => mayBeGivenWork(m, task.project_id)));
   const me = useMe();
   // Asked of the server only while the list is open; of the tasks' project when they share one.
-  const listening = useListening(oneProject(tasks));
+  const listening = useListeningFor(tasks);
   return {
     items: [
       noneItem(t("prop.nobody")),

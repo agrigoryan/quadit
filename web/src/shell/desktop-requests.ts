@@ -5,6 +5,7 @@
 // the answer.
 
 import { useEffect } from "react";
+import { mayBeGivenWork } from "@/data/access";
 import { api, errorMessage, workspacePath } from "@/data/api";
 import { mutate } from "@/data/mutate";
 import { getProjectByKey, getRow, getRows } from "@/data/selectors";
@@ -23,7 +24,7 @@ import { isNotFound } from "@/data/query";
 import { makeConnectCode, readConnectCode } from "@/settings/agents/data";
 import type { Changes } from "@/types/changes.gen";
 import type { AgentConnection } from "@/types/dashboard";
-import type { Decision, DecisionOption, Notification } from "@/types/core";
+import type { Decision, DecisionOption, Member, Notification } from "@/types/core";
 import type { DesktopAction, DesktopNotification, DesktopOutcome, DesktopRequest } from "@/types/desktop";
 
 // The buttons the page hands the app, and the reply box; act() reads their requests back.
@@ -134,17 +135,19 @@ async function agentState(agent: string, code: string | undefined): Promise<Desk
     listening: connection.connection === "listening",
     codeUsed: codeState.used,
     codeGone: codeState.gone,
-    ...heard(connection.reading),
+    ...heard(connection.reading, getRow("members", agent)),
   };
 }
 
 /**
  * What listens as an agent, for its card in the app: each live listener, by
  * its project's key and name (none: everything else) and what holds it;
- * whether a webhook pushes to it; and the projects nothing hears now.
+ * whether a webhook pushes to it; and the projects of its own (those it may
+ * work in) nothing hears now.
  */
 function heard(
   agent: AgentConnection | undefined,
+  member: Member | undefined,
 ): Pick<DesktopOutcome & { ok: true }, "listeners" | "pushed" | "unheard"> {
   if (!agent) return {};
   const live = agent.listeners.filter((l) => l.live);
@@ -160,7 +163,7 @@ function heard(
     listeners,
     pushed: agent.listening_outside_projects && !live.some((l) => !l.project_id),
     unheard: getRows("projects")
-      .filter((p) => !agent.listening_projects.includes(p.id))
+      .filter((p) => member && mayBeGivenWork(member, p.id) && !agent.listening_projects.includes(p.id))
       .map((p) => p.key),
   };
 }
