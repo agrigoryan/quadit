@@ -22,7 +22,7 @@ type fixtureHeader struct {
 	Final    string   `json:"final"`
 	ResetsAt string   `json:"resets_at"`
 	Session  string   `json:"session"`
-	Steps    []string `json:"steps"` // tool, or tool:text
+	Steps    []string `json:"steps"` // tool, tool:text, or :text for the agent's words
 	// Accepted is whether the provider took the turn (left out: not
 	// checked); Last is what Codex wrote to its -o file.
 	Accepted *bool  `json:"accepted"`
@@ -35,7 +35,7 @@ func readFixtures(t *testing.T, p program) {
 	const folder = "/home/p/devel/game"
 	now := time.Date(2026, 11, 24, 10, 0, 0, 0, time.UTC)
 	files, _ := filepath.Glob(filepath.Join("testdata", "programs", p.Name()+"-*.jsonl"))
-	for _, want := range []string{"fresh", "resume", "lost", "limit", "signedout", "error", "real-fresh", "real-resume", "real-lost"} {
+	for _, want := range []string{"fresh", "resume", "lost", "limit", "signedout", "error", "real-fresh", "real-resume", "real-lost", "real-tools"} {
 		if !slices.Contains(files, filepath.Join("testdata", "programs", p.Name()+"-"+want+".jsonl")) {
 			t.Fatalf("no fixture %s-%s", p.Name(), want)
 		}
@@ -272,5 +272,42 @@ func TestOnlyARejectedRateLimitIsAUsageLimit(t *testing.T) {
 	r.Line([]byte(`{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1795575600}}`))
 	if out := r.End(1, nil); out.Kind != outcomeUsageLimit || out.ResetsAt.Unix() != 1795575600 {
 		t.Fatalf("a rejected turn read as %d, resets %s", out.Kind, out.ResetsAt)
+	}
+}
+
+func TestTheAgentsWordsOnTheWayAreStepsAndItsLastAreNot(t *testing.T) {
+	steps := func(r streamReader, lines ...string) []step {
+		var out []step
+		for _, l := range lines {
+			for _, ev := range r.Line([]byte(l)) {
+				if ev.Kind == evStep {
+					out = append(out, ev.Step)
+				}
+			}
+		}
+		return out
+	}
+	message := func(text string) string {
+		raw, _ := json.Marshal(map[string]any{"type": "item.completed", "item": map[string]any{"id": "m", "type": "agent_message", "text": text}})
+		return string(raw)
+	}
+	spec := runSpec{Folder: "/f", Now: time.Now}
+	long := "First line\n\twith a tab\x07 and " + strings.Repeat("é", 400)
+	got := steps((codex{}).Reader(spec), message(long), message("Then this."), message("Done."), `{"type":"turn.completed"}`)
+	if len(got) != 2 || got[0].Tool != "" || got[1].Text != "Then this." {
+		t.Fatalf("the steps are %+v", got)
+	}
+	if first := []rune(got[0].Text); len(first) != maxStepText || !strings.HasPrefix(got[0].Text, "First line with a tab and é") || first[len(first)-1] != '…' {
+		t.Fatalf("a long message on several lines became %q", got[0].Text)
+	}
+	if got := steps((codex{}).Reader(spec), message("Done.")); len(got) != 0 {
+		t.Fatalf("the final answer alone made the steps %+v", got)
+	}
+	text := `{"type":"assistant","message":{"content":[{"type":"text","text":"Running the tests."}]}}`
+	bash := `{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"go test ./...","description":"Run the tests"}}]}}`
+	final := `{"type":"assistant","message":{"content":[{"type":"text","text":"All pass."}]}}`
+	if got := steps((claudeCode{}).Reader(spec), text, bash, final, `{"type":"result","subtype":"success","is_error":false,"result":"All pass."}`); len(got) != 2 ||
+		got[0] != (step{Text: "Running the tests."}) || got[1] != (step{Tool: "Bash", Text: "Run the tests"}) {
+		t.Fatalf("the steps are %+v", got)
 	}
 }

@@ -838,8 +838,8 @@ func (r *agentRun) sawEvents(events []programEvent, at time.Time) {
 			}
 			r.mu.Unlock()
 		case evStep:
-			if ev.Step.Tool == "" {
-				continue // the server keeps a step only with its tool's name
+			if ev.Step.Tool == "" && ev.Step.Text == "" {
+				continue // the server keeps a step only with a tool's name or the agent's words
 			}
 			r.mu.Lock()
 			s := ev.Step

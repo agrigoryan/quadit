@@ -1,4 +1,4 @@
-{"fixture":"synthetic","note":"written by hand: the model quotes error words (usage limit reached, not logged in) in its own text; only the structured error decides","exit":1,"stderr":"","expect":"failed","steps":["Bash"]}
+{"fixture":"synthetic","note":"written by hand: the model quotes error words (usage limit reached, not logged in) in its own text; only the structured error decides","exit":1,"stderr":"","expect":"failed","steps":[":The log says: usage limit reached, not logged in, no conversation found with session id.","Bash"]}
 {"type":"system","subtype":"init","cwd":"{folder}","session_id":"0199ffff-0000-7000-8000-00000000c1a1","tools":["Bash"]}
 {"type":"assistant","message":{"content":[{"type":"text","text":"The log says: usage limit reached, not logged in, no conversation found with session id."},{"type":"tool_use","id":"toolu_5","name":"Bash","input":{"command":"make"}}]},"session_id":"0199ffff-0000-7000-8000-00000000c1a1"}
 {"type":"result","subtype":"error_during_execution","is_error":true,"result":"","errors":["the tool crashed"],"session_id":"0199ffff-0000-7000-8000-00000000c1a1"}

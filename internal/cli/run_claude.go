@@ -18,7 +18,13 @@
 // resume of a session that does not exist prints one result
 // (error_during_execution, is_error true, num_turns 0, errors ["No
 // conversation found with session ID: …"]) and the same words on standard
-// error, exit 1.
+// error, exit 1. A run with tools (claude-real-tools.jsonl) prints each
+// block of a message as an assistant line of its own under the message's
+// id: a thinking block (empty, signed), a text with the agent's own
+// sentence of what it will do, then a tool_use (Bash with input.command
+// and input.description; Write with an absolute input.file_path); the
+// tool's result as a user line with a tool_result; system/thinking_tokens
+// lines between; and last a message of text alone, the result's text.
 //
 // UNVERIFIED, and read so that being wrong fails safe (a line or field not
 // known is passed over; an error not recognized is a plain failure, which
@@ -28,7 +34,8 @@
 //     authentication_failed, …), from the Agent SDK's message types;
 //   - a real sign-in failure, and the usage-limit and sign-in words of
 //     claudeWords with the reset time in them;
-//   - the tool events of a real run (tool_use, tool_result);
+//   - the tool_use of tools other than Bash and Write (Edit, Read,
+//     MultiEdit, NotebookEdit and the rest), and permission denials;
 //   - `claude auth status` exiting 0 when signed in and 1 when not;
 //   - where a session is kept: <config>/projects/<the folder, every
 //     character not a letter or digit made "-">/<id>.jsonl;
@@ -154,6 +161,7 @@ type claudeReader struct {
 	limited  bool
 	resetsAt time.Time
 	result   *claudeResult
+	words    agentWords
 }
 
 // claudeResult is the result line, the last of a turn.
@@ -215,8 +223,9 @@ func (r *claudeReader) Line(line []byte) []programEvent {
 		for _, block := range l.Message.Content {
 			switch block.Type {
 			case "text":
-				events = append(events, programEvent{Kind: evText, Text: block.Text})
+				events = append(events, r.words.said(block.Text)...)
 			case "tool_use":
+				events = append(events, r.words.acted()...)
 				events = append(events, programEvent{Kind: evTool}, programEvent{Kind: evStep, Step: r.step(block.Name, block.Input)})
 			}
 		}

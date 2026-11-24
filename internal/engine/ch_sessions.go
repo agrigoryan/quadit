@@ -52,7 +52,7 @@ var runMoves = map[string][]string{
 const (
 	runStepsKept      = 200
 	runStepsPerUpdate = 50
-	runStepText       = 200
+	runStepText       = 300
 )
 
 // openRun reports whether a run's state is open: it waits or runs.
@@ -424,16 +424,17 @@ func (c *cx) updateRun(p *patch, s core.AgentSession, a sessionUpdateArgs) error
 	return nil
 }
 
-// runStep is one step of a runner's run as it is kept: the tool, what the
-// program said the call does, cut to runStepText characters, and when.
+// runStep is one step of a runner's run as it is kept: the tool and what
+// the program said the call does, or with no tool the agent's own words
+// on the way; the text cut to runStepText characters; and when.
 func runStep(raw json.RawMessage) (json.RawMessage, *Error) {
 	var step struct {
-		Tool string `json:"tool"`
+		Tool string `json:"tool,omitempty"`
 		Text string `json:"text,omitempty"`
 		At   int64  `json:"at,omitempty"`
 	}
-	if err := json.Unmarshal(raw, &step); err != nil || strings.TrimSpace(step.Tool) == "" {
-		return nil, invalid("add_steps", "a step of a run is an object {tool, text, at}, with the tool's name")
+	if err := json.Unmarshal(raw, &step); err != nil || strings.TrimSpace(step.Tool+step.Text) == "" {
+		return nil, invalid("add_steps", "a step of a run is an object {tool, text, at}, with the tool's name, or with no tool the agent's words in text")
 	}
 	if utf8.RuneCountInString(step.Text) > runStepText {
 		step.Text = string([]rune(step.Text)[:runStepText-1]) + "…"

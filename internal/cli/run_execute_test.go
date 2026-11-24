@@ -583,6 +583,93 @@ func TestStepsCarryNoCommandLines(t *testing.T) {
 	if strings.Contains(rt.changeTypes(), "id_rsa") || strings.Contains(rt.changeTypes(), "passwd") {
 		t.Fatalf("a command line or a path outside the folder reached the server:%s", rt.changeTypes())
 	}
+
+	// The real runs with tools, played whole: the agent's words and the
+	// tools' steps reach the server, and nothing of a command.
+	for _, program := range []string{core.ProgramClaude, core.ProgramCodex} {
+		t.Run(program+" recorded", func(t *testing.T) {
+			rt := newRunTest(t, program)
+			script, head, commands := recordedRun(t, program+"-real-tools.jsonl", rt.folder)
+			rt.setScripts(script)
+			item := fakeItem{Task: "SVA-12"}
+			if program == core.ProgramCodex {
+				item.For = fakeCodexID
+			}
+			rt.f.addItem(item)
+			rt.serve()
+			row := rt.ended(0)
+			raw, _ := json.Marshal(row["steps"])
+			var steps []step
+			_ = json.Unmarshal(raw, &steps)
+			var got []string
+			for _, s := range steps {
+				got = append(got, s.Tool+":"+s.Text)
+			}
+			want := slices.Clone(head.Steps)
+			for i, s := range want {
+				if !strings.Contains(s, ":") {
+					want[i] = s + ":"
+				}
+			}
+			if !slices.Equal(got, want) {
+				t.Fatalf("steps %q, want %q%s", got, want, rt.changeTypes())
+			}
+			for _, command := range commands {
+				for line := range strings.Lines(command) {
+					if line = strings.TrimSpace(line); len(line) > 8 && strings.Contains(rt.changeTypes(), line) {
+						t.Fatalf("a line of a command reached the server: %q", line)
+					}
+				}
+			}
+		})
+	}
+}
+
+// recordedRun is a recorded fixture of a program's output as the fake
+// program's script, in folder, with its header and the command lines its
+// tools were given.
+func recordedRun(t *testing.T, file, folder string) ([]fakeagent.Step, fixtureHeader, []string) {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join("testdata", "programs", file))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(strings.ReplaceAll(string(raw), "{folder}", folder)), "\n")
+	var head fixtureHeader
+	if err := json.Unmarshal([]byte(lines[0]), &head); err != nil {
+		t.Fatal(err)
+	}
+	// The session the runner chose (Claude Code) or the thread a fresh one says (Codex).
+	session := "{session}"
+	if strings.HasPrefix(file, "codex") {
+		session = "{thread}"
+	}
+	var script []fakeagent.Step
+	var commands []string
+	for _, line := range lines[1:] {
+		var l struct {
+			Item struct {
+				Command string `json:"command"`
+			} `json:"item"`
+			Message struct {
+				Content []struct {
+					Input struct {
+						Command string `json:"command"`
+					} `json:"input"`
+				} `json:"content"`
+			} `json:"message"`
+		}
+		_ = json.Unmarshal([]byte(line), &l) // a line of another shape names no command
+		commands = append(commands, l.Item.Command)
+		for _, block := range l.Message.Content {
+			commands = append(commands, block.Input.Command)
+		}
+		if strings.Contains(line, `"turn.completed"`) {
+			script = append(script, fakeagent.Step{Last: head.Last})
+		}
+		script = append(script, fakeagent.Step{Out: strings.ReplaceAll(line, head.Session, session)})
+	}
+	return script, head, slices.DeleteFunc(commands, func(c string) bool { return c == "" })
 }
 
 func TestARunAfterTheOwnerChangedNamesTheNewOne(t *testing.T) {

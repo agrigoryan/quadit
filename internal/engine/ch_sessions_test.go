@@ -424,7 +424,7 @@ func TestStepsAreAppendedNotResent(t *testing.T) {
 		r := newRuns(t, st)
 		run := r.running()
 		r.do(r.claude, "session.update", M{"id": run, "add_steps": []M{{"tool": "Read", "text": "src/boss.go"}}})
-		long := strings.Repeat("é", 250)
+		long := strings.Repeat("é", 350)
 		data := updated(t, r.changes(r.claude, "session.update", M{"id": run, "add_steps": []M{{"tool": "Bash", "text": long, "at": 5}}, "add_links": []string{"https://example.com"}}))
 		if _, whole := data.Changes["steps"]; whole || len(data.Appended["steps"]) != 1 || len(data.Appended["links"]) != 1 {
 			t.Fatalf("the event carries %+v", data)
@@ -436,14 +436,21 @@ func TestStepsAreAppendedNotResent(t *testing.T) {
 		if err := json.Unmarshal(data.Appended["steps"][0], &step); err != nil {
 			t.Fatal(err)
 		}
-		if step.Tool != "Bash" || step.At != 5 || len([]rune(step.Text)) != 200 || !strings.HasSuffix(step.Text, "…") {
+		if step.Tool != "Bash" || step.At != 5 || len([]rune(step.Text)) != 300 || !strings.HasSuffix(step.Text, "…") {
 			t.Fatalf("the step kept is %+v (%d characters)", step, len([]rune(step.Text)))
 		}
+		// The agent's words on the way are a step with no tool.
+		words := updated(t, r.changes(r.claude, "session.update", M{"id": run, "add_steps": []M{{"text": "I'll run the tests.", "at": 6}}}))
+		if got := string(words.Appended["steps"][0]); got != `{"text":"I'll run the tests.","at":6}` {
+			t.Fatalf("the agent's words were kept as %s", got)
+		}
 		var steps []json.RawMessage
-		if err := json.Unmarshal(r.session(run).Steps, &steps); err != nil || len(steps) != 2 {
+		if err := json.Unmarshal(r.session(run).Steps, &steps); err != nil || len(steps) != 3 {
 			t.Fatalf("the row keeps %d steps: %v", len(steps), err)
 		}
 		_, err := r.try(r.claude, "session.update", M{"id": run, "add_steps": []string{"a string"}})
+		refusedFor(t, err, engine.CodeInvalid, "add_steps", "")
+		_, err = r.try(r.claude, "session.update", M{"id": run, "add_steps": []M{{"text": " ", "at": 6}}})
 		refusedFor(t, err, engine.CodeInvalid, "add_steps", "")
 		var many []M
 		for i := range 51 {

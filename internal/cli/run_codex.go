@@ -16,7 +16,12 @@
 // break; a resume of a thread that does not exist prints nothing on
 // standard output, exit 1, and ends its standard error with "Error:
 // thread/resume: thread/resume failed: no rollout found for thread id …
-// (code -32600)".
+// (code -32600)". A run with commands (codex-real-tools.jsonl) prints,
+// before each command, an item.completed agent_message with the agent's
+// own sentence of what it will do; then item.started and item.completed
+// of a command_execution under one id, with the raw command line (a
+// shell's -lc, heredocs and all) and its output; its last agent_message
+// is the final answer, the one the -o file holds.
 //
 // UNVERIFIED, and read so that being wrong fails safe (a line or field not
 // known is passed over; an error not recognized is a plain failure, which
@@ -25,8 +30,8 @@
 //     a local time with an optional "(Zone/Name)") in codexWords;
 //   - a real sign-in failure while running: the sign-in words are known to
 //     be incomplete;
-//   - the tool events of a real run (command_execution, file_change,
-//     mcp_tool_call, web_search);
+//   - the tool events of a real run other than command_execution
+//     (file_change, mcp_tool_call, web_search);
 //   - `codex login status` exiting 0 when signed in, and exiting 1 both
 //     when signed out and when the check itself failed, told apart only by
 //     its words ("not logged in");
@@ -188,6 +193,7 @@ type codexReader struct {
 	completed bool            // turn.completed was seen
 	errors    tail            // the messages of turn.failed and error lines, their last keptStderr bytes
 	tools     map[string]bool // the tool items seen, by id: each makes its step once, on either edge
+	words     agentWords
 	lastText  string
 }
 
@@ -244,8 +250,8 @@ func (r *codexReader) Line(line []byte) []programEvent {
 	return events
 }
 
-// item is what an item says: a tool's activity with its step, or the
-// agent's message.
+// item is what an item says: a tool's activity with its step, after the
+// agent's message held before it (agentWords); or the agent's message.
 func (r *codexReader) item(started bool, kind string, l codexLine) []programEvent {
 	// A tool's activity counts on whichever edge of its item is seen
 	// first; its step is made once.
@@ -258,10 +264,11 @@ func (r *codexReader) item(started bool, kind string, l codexLine) []programEven
 		return !seen || l.Item.ID == ""
 	}
 	tool := func(s step) []programEvent {
+		events := append(r.words.acted(), programEvent{Kind: evTool})
 		if !first() {
-			return []programEvent{{Kind: evTool}}
+			return events
 		}
-		return []programEvent{{Kind: evTool}, {Kind: evStep, Step: s}}
+		return append(events, programEvent{Kind: evStep, Step: s})
 	}
 	switch kind {
 	case "command_execution":
@@ -271,7 +278,7 @@ func (r *codexReader) item(started bool, kind string, l codexLine) []programEven
 	case "web_search":
 		return tool(step{Tool: "web search"})
 	case "file_change":
-		events := []programEvent{{Kind: evTool}}
+		events := append(r.words.acted(), programEvent{Kind: evTool})
 		if !first() {
 			return events
 		}
@@ -288,7 +295,7 @@ func (r *codexReader) item(started bool, kind string, l codexLine) []programEven
 			return nil
 		}
 		r.lastText = l.Item.Text
-		return []programEvent{{Kind: evText, Text: l.Item.Text}}
+		return r.words.said(l.Item.Text)
 	}
 	return nil
 }

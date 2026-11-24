@@ -93,7 +93,6 @@ type programEvent struct {
 	Kind    eventKind
 	Session string // evSession
 	Step    step   // evStep
-	Text    string // evText: an assistant message (only ever used as the final message)
 }
 
 type eventKind int
@@ -103,17 +102,42 @@ const (
 	evAccepted                    // the provider took the turn
 	evTool                        // tool activity began (the work may have had effects); comes with evStep
 	evStep                        // a step for the record
-	evText                        // an assistant message
 	evUnreadable                  // a line on the protocol's output that could not be read: it may have been a tool's
 )
 
-// step is one step of a run as the server keeps it: a tool's name and,
-// when the program gives one, a short description or a path relative to
-// the folder; never a command line or a tool's input.
+// step is one step of a run as the server keeps it: either a tool's name
+// with, when the program gives one, a short description or a path
+// relative to the folder; or, with no tool, a message the agent wrote on
+// the way (agentWords). Never a command line or a tool's input.
 type step struct {
-	Tool string `json:"tool"`
+	Tool string `json:"tool,omitempty"`
 	Text string `json:"text,omitempty"`
 	At   int64  `json:"at"`
+}
+
+// agentWords holds the agent's last message until it shows whether it was
+// said on the way or is the final answer. Both programs print a short
+// sentence of the agent's before it acts ("I'll list the files under
+// src."): a message the agent follows with a tool's use or with another
+// message becomes a step with no tool; the last one is the final answer,
+// which the run's outcome carries, and is never a step.
+type agentWords struct{ held string }
+
+// said takes a message, and gives the one held before it as a step.
+func (w *agentWords) said(text string) []programEvent {
+	events := w.acted()
+	w.held = stepText(text)
+	return events
+}
+
+// acted is the agent going on: the message held, if any, as a step.
+func (w *agentWords) acted() []programEvent {
+	if w.held == "" {
+		return nil
+	}
+	s := step{Text: w.held}
+	w.held = ""
+	return []programEvent{{Kind: evStep, Step: s}}
 }
 
 // outcome is how an attempt ended, decided once the program exited: from
@@ -164,7 +188,7 @@ func readAtMost(path string, n int64) []byte {
 }
 
 // maxStepText is the most of a step's text kept; the server cuts longer.
-const maxStepText = 200
+const maxStepText = 300
 
 // stepText is a tool's name or text as a step carries it: on one line,
 // no control characters, at most maxStepText characters.

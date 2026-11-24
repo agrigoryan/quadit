@@ -649,8 +649,8 @@ func (f *fakeQuadit) applyLocked(ch fakeChange, who fakeMember) (int, string) {
 		}
 		if steps, ok := a["add_steps"].([]any); ok {
 			for _, st := range steps {
-				if m, ok := st.(map[string]any); !ok || m["tool"] == "" || m["tool"] == nil {
-					return bad(http.StatusBadRequest, "invalid", "", "a step is an object with its tool")
+				if m, ok := st.(map[string]any); !ok || (m["tool"] == nil || m["tool"] == "") && (m["text"] == nil || m["text"] == "") {
+					return bad(http.StatusBadRequest, "invalid", "", "a step is an object with its tool, or the agent's words")
 				}
 			}
 		}
