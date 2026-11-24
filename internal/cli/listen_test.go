@@ -422,7 +422,7 @@ func TestOneListenPerLogin(t *testing.T) {
 	asked := false
 	srv := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { asked = true })
 	c := testClient(t, srv)
-	first, err := openLeaseFile(c, "")
+	first, err := openLeaseFile(filepath.Dir(configPath()), c, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -435,17 +435,17 @@ func TestOneListenPerLogin(t *testing.T) {
 	// Another agent's login beside it, given by QUADIT_URL and QUADIT_TOKEN, has a lease file of its own.
 	other := *c
 	other.Token = "another agent's token"
-	second, err := openLeaseFile(&other, "")
+	second, err := openLeaseFile(filepath.Dir(configPath()), &other, "")
 	if err != nil {
 		t.Fatalf("a second agent's listen is refused: %v", err)
 	}
 	second.close()
-	project, err := openLeaseFile(c, "SVA")
+	project, err := openLeaseFile(filepath.Dir(configPath()), c, "SVA")
 	if err != nil {
 		t.Fatalf("a listen of a project beside one of everything is refused: %v", err)
 	}
 	defer project.close()
-	if _, err := openLeaseFile(c, "SVA"); !errors.Is(err, errAnotherListen) {
+	if _, err := openLeaseFile(filepath.Dir(configPath()), c, "SVA"); !errors.Is(err, errAnotherListen) {
 		t.Fatalf("a second listen of the same project ended with %v", err)
 	}
 }
@@ -800,12 +800,12 @@ func TestAProjectsLeaseFileDoesNotHangOnTheKeysCase(t *testing.T) {
 	t.Setenv("QUADIT_CONFIG", filepath.Join(t.TempDir(), "codex.json"))
 	c := testClient(t, http.NotFoundHandler())
 	lower, upper := listenArgs([]string{"project=sva"}), listenArgs([]string{"project=SVA"})
-	first, err := openLeaseFile(c, lower.project)
+	first, err := openLeaseFile(filepath.Dir(configPath()), c, lower.project)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer first.close()
-	if _, err := openLeaseFile(c, upper.project); !errors.Is(err, errAnotherListen) {
+	if _, err := openLeaseFile(filepath.Dir(configPath()), c, upper.project); !errors.Is(err, errAnotherListen) {
 		t.Fatalf("project=SVA beside project=sva opened its own lease file: %v", err)
 	}
 }
@@ -899,5 +899,25 @@ func TestAProjectsCompanionWaitsOutAServerAwayAtItsStart(t *testing.T) {
 	<-done
 	if srv.checks() != 2 || !strings.Contains(out.String(), "retrying:") {
 		t.Fatalf("the companion checked %d times and said:\n%s", srv.checks(), out)
+	}
+}
+
+func TestListeningPrintsARunnerWithItsMachine(t *testing.T) {
+	answer := `{"listening":false,"listeners":[
+	  {"project":"SVA","by":"Quadit's runner","last_heard":"2026-11-24 14:02","live":true,"runner":{"machine":"Aram's MacBook Pro","holding":true,"since":"2026-11-24 14:02","program_version":"2.1.331"}},
+	  {"project":"GS","by":"a chat","last_heard":"2026-11-24 14:03","live":true,"runner":{"machine":"Aram's MacBook Pro","holding":false,"since":"2026-11-24 13:00","program_version":""}},
+	  {"project":"OPS","by":"Quadit's runner","last_heard":"2026-11-24 09:00","live":false,"runner":{"machine":"Mini\u001b[2J","holding":false,"since":"2026-11-24 09:00","program_version":""}},
+	  {"project":"WEB","by":"Quadit's runner","last_heard":"2026-11-24 14:04","live":true,"runner":{"machine":"Aram's MacBook Pro","holding":true,"since":"2026-11-24 14:04","program_version":"","paused":"usage_limit","paused_until":"2026-11-24 18:00"}}]}`
+	var who listener
+	if err := json.Unmarshal([]byte(answer), &who); err != nil {
+		t.Fatal(err)
+	}
+	want := "SVA: Quadit's runner on Aram's MacBook Pro listens (last heard 2026-11-24 14:02 UTC).\n" +
+		"GS: a chat listens (last heard 2026-11-24 14:03 UTC).\n" +
+		"OPS: Quadit's runner on a computer is away (last heard 2026-11-24 09:00 UTC); its items wait for it.\n" +
+		"WEB: Quadit's runner on Aram's MacBook Pro listens, holding every item back (usage_limit) (last heard 2026-11-24 14:04 UTC).\n" +
+		"Everything else: nothing listens now, and those items wait in the inbox; it leaves out SVA, GS, OPS, WEB, which have listeners of their own.\n"
+	if got := who.lines(); got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 }

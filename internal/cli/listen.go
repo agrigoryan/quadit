@@ -9,19 +9,19 @@ package cli
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/agrigoryan/quadit/internal/core"
 )
@@ -84,7 +84,7 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 		maxItemPause = 5 * time.Minute  // an item's command keeps failing
 	)
 	readPause, itemPause := firstPause, firstPause
-	kept, err := openLeaseFile(r.c, opts.project)
+	kept, err := openLeaseFile(filepath.Dir(configPath()), r.c, opts.project)
 	if err != nil {
 		return err
 	}
@@ -372,6 +372,9 @@ type listenItem struct {
 	Snippet string `json:"snippet"`
 	Page    string `json:"page"`
 	Thread  string `json:"thread"`
+	// Decision is the decision's id for an item about one (a question
+	// asked, answered or found unclear), else empty.
+	Decision string `json:"decision"`
 }
 
 // listenAsk is one ask for the next item: of the listener of which
@@ -554,8 +557,8 @@ func (item listenItem) line() string {
 
 // record is what wait prints of the item for an agent to act on, without
 // the commands to acknowledge it and wait again (a companion does those):
-// its line, the command that reads it, and the one that answers it once.
-// Nothing for no item.
+// its line, the command that reads it, the one that answers it once, and
+// for an item about a decision the decision's id. Nothing for no item.
 func (item *listenItem) record() string {
 	if item == nil {
 		return ""
@@ -566,6 +569,9 @@ func (item *listenItem) record() string {
 	}
 	if answering := item.answering(); answering != "" {
 		lines = append(lines, answering+"   # answer with this line, your words in the quotes")
+	}
+	if pageForm.MatchString(item.Decision) {
+		lines = append(lines, "decision "+item.Decision)
 	}
 	return strings.Join(lines, "\n")
 }
@@ -580,10 +586,7 @@ func (item listenItem) answering() string {
 	if !pageForm.MatchString(item.ID) {
 		return ""
 	}
-	sum := sha256.Sum256([]byte("quadit answer " + item.ID))
-	h := hex.EncodeToString(sum[:16])
-	// A UUID's form: version 8 (made by its maker's own rule), the usual variant.
-	answerID := h[0:8] + "-" + h[8:12] + "-8" + h[13:16] + "-" + string("89ab"[sum[8]&3]) + h[17:20] + "-" + h[20:32]
+	answerID := madeChangeID("quadit answer " + item.ID)
 	switch {
 	case pageForm.MatchString(item.Thread):
 		return fmt.Sprintf(`quadit reply %s "…" --id=%s`, item.Thread, answerID)
@@ -652,13 +655,55 @@ type listener struct {
 }
 
 // listenerShown is one listener as GET /listening tells it: its project's
-// key (none: everything), what holds it, when it was last heard, and
-// whether its lease lives.
+// key (none: everything), what holds it, when it was last heard, whether
+// its lease lives, and the mark of Quadit's runner when one runs the
+// project's agent on a computer (quadit run).
 type listenerShown struct {
 	Project   string
 	By        string
 	LastHeard string `json:"last_heard"`
 	Live      bool
+	Runner    *runnerShown
+}
+
+// runnerShown is the runner's mark on a listener: the computer it runs
+// on, whether it holds the lease now (a chat may hold it instead), and
+// why it holds every item back, when it does.
+type runnerShown struct {
+	Machine string
+	Holding bool
+	Since   string
+	Paused  string
+}
+
+// line says what listens to a project, in one sentence.
+func (l listenerShown) line() string {
+	if r := l.Runner; r != nil && (!l.Live || r.Holding) {
+		who := "Quadit's runner on " + machineLabel(r.Machine)
+		if !l.Live {
+			return fmt.Sprintf("%s: %s is away%s; its items wait for it.", l.Project, who, heard(r.Since))
+		}
+		paused := ""
+		if kindForm.MatchString(r.Paused) {
+			paused = ", holding every item back (" + r.Paused + ")"
+		}
+		return fmt.Sprintf("%s: %s listens%s%s.", l.Project, who, paused, heard(l.LastHeard))
+	}
+	if l.Live {
+		return fmt.Sprintf("%s: %s listens%s.", l.Project, label(l.By), heard(l.LastHeard))
+	}
+	return fmt.Sprintf("%s: nothing listens now; its items wait for the next %s (or, to hand them to everything instead: quadit listening forget project=%s).",
+		l.Project, waitCommand(l.Project, ""), l.Project)
+}
+
+// machineLabel is a computer's name as a runner said it, when it reads as
+// a name: at most 64 characters, none of them control characters.
+func machineLabel(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" || utf8.RuneCountInString(name) > 64 || strings.ContainsFunc(name, unicode.IsControl) {
+		return "a computer"
+	}
+	return name
 }
 
 // lines say it, in the command's own words: with no project listening by
@@ -674,12 +719,7 @@ func (who listener) lines() string {
 			continue
 		}
 		own = append(own, l.Project)
-		if l.Live {
-			fmt.Fprintf(&out, "%s: %s listens%s.\n", l.Project, label(l.By), heard(l.LastHeard))
-		} else {
-			fmt.Fprintf(&out, "%s: nothing listens now; its items wait for the next %s (or, to hand them to everything instead: quadit listening forget project=%s).\n",
-				l.Project, waitCommand(l.Project, ""), l.Project)
-		}
+		out.WriteString(l.line() + "\n")
 	}
 	if len(own) == 0 {
 		if !who.Listening {

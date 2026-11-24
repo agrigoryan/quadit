@@ -89,6 +89,34 @@ func NewClient() (*Client, error) {
 	return c, nil
 }
 
+// loginClient is a client of one login file alone, as `quadit run` uses
+// for each entry: QUADIT_URL, QUADIT_TOKEN and QUADIT_CONFIG are not read,
+// and a server that is not running is waited for, never started (the
+// desktop app supervises the runner, not the other way round).
+func loginClient(path string) (*Client, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("the login file: %w", err)
+	}
+	var sc savedConfig
+	if err := json.Unmarshal(raw, &sc); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	if sc.URL == "" || sc.Token == "" {
+		return nil, fmt.Errorf("%s holds no server and token: connect the agent again", path)
+	}
+	return &Client{URL: strings.TrimRight(sc.URL, "/"), Token: sc.Token, HTTP: &http.Client{Timeout: requestTimeout}}, nil
+}
+
+// madeChangeID is the change id made from text: a UUID's form, the same
+// for the same text every time, so a change sent again under it is applied
+// once. Version 8 (made by its maker's own rule), the usual variant.
+func madeChangeID(text string) string {
+	sum := sha256.Sum256([]byte(text))
+	h := hex.EncodeToString(sum[:16])
+	return h[0:8] + "-" + h[8:12] + "-8" + h[13:16] + "-" + string("89ab"[sum[8]&3]) + h[17:20] + "-" + h[20:32]
+}
+
 // APIError is a refusal from the server.
 type APIError struct {
 	Status  int      `json:"-"`
