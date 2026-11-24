@@ -7,23 +7,35 @@
 // prompt argument reads it). --disallowedTools takes every word after it,
 // so it is always the last argument.
 //
+// Verified against real output of Claude Code 2.1.331 (2026-11-24, kept
+// sanitized in testdata/programs/claude-real-*.jsonl): a fresh run with
+// --session-id and a resume of it print system/session_title_changed,
+// system/init (the session id chosen), assistant, rate_limit_event and a
+// result (success, is_error false, the final text), exit 0; every run
+// carries a rate_limit_event, here with status "allowed_warning", resetsAt
+// in seconds, and "rejected" in other fields (overageStatus, the nested
+// windows), so only rate_limit_info.status "rejected" is a usage limit; a
+// resume of a session that does not exist prints one result
+// (error_during_execution, is_error true, num_turns 0, errors ["No
+// conversation found with session ID: …"]) and the same words on standard
+// error, exit 1.
+//
 // UNVERIFIED, and read so that being wrong fails safe (a line or field not
 // known is passed over; an error not recognized is a plain failure, which
 // is retried only before any work):
-//   - the fields of the rate-limit event ({"type":"rate_limit_event",
-//     "rate_limit_info":{"status":"rejected","resetsAt":SECONDS}}), taken
-//     from the Agent SDK's message types;
-//   - the kinds an assistant message's "error" field takes (rate_limit,
-//     billing_error, authentication_failed, …), from the same types;
-//   - the error words of a lost session, a usage limit and a sign-in
-//     (claudeWords), and the reset time in them;
+//   - a real usage limit: a rejected rate_limit_event, and the kinds an
+//     assistant message's "error" field takes (rate_limit, billing_error,
+//     authentication_failed, …), from the Agent SDK's message types;
+//   - a real sign-in failure, and the usage-limit and sign-in words of
+//     claudeWords with the reset time in them;
+//   - the tool events of a real run (tool_use, tool_result);
 //   - `claude auth status` exiting 0 when signed in and 1 when not;
 //   - where a session is kept: <config>/projects/<the folder, every
 //     character not a letter or digit made "-">/<id>.jsonl;
-//   - that settings' env.QUADIT_CONFIG reaches the program's Bash tool.
-// The fixtures in testdata/programs/claude-*.jsonl are written by hand in
-// the documented form until the hand check (scripts/agent-run-check.sh)
-// records real ones.
+//   - that a settings env.QUADIT_* reaches the program's Bash tool (the
+//     runner pauses on any, whichever wins).
+// testdata/programs/claude-{fresh,resume,lost,limit,signedout,error}.jsonl
+// are written by hand in the documented form.
 
 package cli
 

@@ -1,0 +1,2 @@
+{"fixture":"recorded from Claude Code 2.1.331 on 2026-11-24, sanitized","exit":1,"stderr":"No conversation found with session ID: 0199ffff-0000-7000-8000-00000000dead","expect":"lost_session","accepted":false}
+{"type":"result","subtype":"error_during_execution","is_error":true,"num_turns":0,"stop_reason":null,"session_id":"0199ffff-0000-7000-8000-00000000dead","permission_denials":[],"errors":["No conversation found with session ID: 0199ffff-0000-7000-8000-00000000dead"]}

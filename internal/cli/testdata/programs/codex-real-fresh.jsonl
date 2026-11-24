@@ -1,0 +1,5 @@
+{"fixture":"recorded from Codex 0.170.0 on 2026-11-24, sanitized","exit":0,"stderr":"","expect":"ok","accepted":true,"session":"01a20ce7-0000-7000-8000-00000000c0d1","final":"ok","last":"ok"}
+{"type":"thread.started","thread_id":"01a20ce7-0000-7000-8000-00000000c0d1"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"ok"}}
+{"type":"turn.completed","usage":{"input_tokens":0,"cached_input_tokens":0,"output_tokens":0}}

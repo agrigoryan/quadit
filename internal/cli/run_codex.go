@@ -8,13 +8,25 @@
 // login status` exists. Codex exec refuses the program's own interactive
 // question requests: nothing to pass.
 //
+// Verified against real output of Codex 0.170.0 (2026-11-24, kept
+// sanitized in testdata/programs/codex-real-*.jsonl): a fresh run and a
+// resume of it print thread.started (thread_id, a version-7 UUID),
+// turn.started, item.completed (agent_message) and turn.completed (with
+// usage), exit 0, and the -o file holds the last message with no line
+// break; a resume of a thread that does not exist prints nothing on
+// standard output, exit 1, and ends its standard error with "Error:
+// thread/resume: thread/resume failed: no rollout found for thread id …
+// (code -32600)".
+//
 // UNVERIFIED, and read so that being wrong fails safe (a line or field not
 // known is passed over; an error not recognized is a plain failure, which
 // is retried only before any work):
-//   - the error words of a usage limit, of its reset time ("try again at
-//     …", a local time with an optional "(Zone/Name)"), of a lost session
-//     and of a sign-in (codexWords): the sign-in words are known to be
-//     incomplete for failures met while running;
+//   - a real usage limit: its words and its reset time ("try again at …",
+//     a local time with an optional "(Zone/Name)") in codexWords;
+//   - a real sign-in failure while running: the sign-in words are known to
+//     be incomplete;
+//   - the tool events of a real run (command_execution, file_change,
+//     mcp_tool_call, web_search);
 //   - `codex login status` exiting 0 when signed in, and exiting 1 both
 //     when signed out and when the check itself failed, told apart only by
 //     its words ("not logged in");
@@ -24,9 +36,8 @@
 //   - that shell_environment_policy.set.QUADIT_CONFIG in config.toml makes
 //     the commands it runs work as another login (read in the three forms
 //     TOML writes it).
-// The fixtures in testdata/programs/codex-*.jsonl are written by hand in
-// the documented form until the hand check (scripts/agent-run-check.sh)
-// records real ones.
+// testdata/programs/codex-{fresh,resume,lost,limit,signedout,error}.jsonl
+// are written by hand in the documented form.
 
 package cli
 

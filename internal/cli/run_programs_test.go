@@ -21,6 +21,10 @@ type fixtureHeader struct {
 	ResetsAt string   `json:"resets_at"`
 	Session  string   `json:"session"`
 	Steps    []string `json:"steps"` // tool, or tool:text
+	// Accepted is whether the provider took the turn (left out: not
+	// checked); Last is what Codex wrote to its -o file.
+	Accepted *bool  `json:"accepted"`
+	Last     string `json:"last"`
 }
 
 // readFixture reads every fixture of a program through its reader.
@@ -29,7 +33,7 @@ func readFixtures(t *testing.T, p program) {
 	const folder = "/home/p/devel/game"
 	now := time.Date(2026, 11, 24, 10, 0, 0, 0, time.UTC)
 	files, _ := filepath.Glob(filepath.Join("testdata", "programs", p.Name()+"-*.jsonl"))
-	for _, want := range []string{"fresh", "resume", "lost", "limit", "signedout", "error"} {
+	for _, want := range []string{"fresh", "resume", "lost", "limit", "signedout", "error", "real-fresh", "real-resume", "real-lost"} {
 		if !slices.Contains(files, filepath.Join("testdata", "programs", p.Name()+"-"+want+".jsonl")) {
 			t.Fatalf("no fixture %s-%s", p.Name(), want)
 		}
@@ -46,12 +50,24 @@ func readFixtures(t *testing.T, p program) {
 			if err := json.Unmarshal([]byte(lines[0]), &head); err != nil || head.Fixture == "" {
 				t.Fatalf("the first line is not a fixture's header: %s", lines[0])
 			}
-			reader := p.Reader(runSpec{Folder: folder, Now: func() time.Time { return now }, LastMessageFile: filepath.Join(t.TempDir(), "none")})
+			last := filepath.Join(t.TempDir(), "last.txt")
+			if head.Last != "" {
+				_ = os.WriteFile(last, []byte(head.Last), 0o600) // as Codex 0.170.0 wrote it: no line break at the end
+			}
+			reader := p.Reader(runSpec{Folder: folder, Now: func() time.Time { return now }, LastMessageFile: last})
 			var session string
 			var steps []string
+			accepted := false
 			for _, line := range lines[1:] {
+				if line == "" {
+					continue
+				}
 				for _, ev := range reader.Line([]byte(line)) {
 					switch ev.Kind {
+					case evUnreadable:
+						t.Fatalf("a line of the program's own output read as unreadable: %s", line)
+					case evAccepted:
+						accepted = true
 					case evSession:
 						session = ev.Session
 					case evStep:
@@ -81,6 +97,9 @@ func readFixtures(t *testing.T, p program) {
 			}
 			if head.Steps != nil && !slices.Equal(steps, head.Steps) {
 				t.Fatalf("steps %q, want %q", steps, head.Steps)
+			}
+			if head.Accepted != nil && accepted != *head.Accepted {
+				t.Fatalf("accepted %v, want %v", accepted, *head.Accepted)
 			}
 		})
 	}
@@ -202,5 +221,24 @@ func TestToolEvidenceIsReadOnEitherEdge(t *testing.T) {
 	}
 	if got := kinds((claudeCode{}).Reader(spec), `{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t","content":"x"}]}}`); !slices.Contains(got, evTool) {
 		t.Fatalf("a tool's result read as %v", got)
+	}
+}
+
+func TestOnlyARejectedRateLimitIsAUsageLimit(t *testing.T) {
+	// As Claude Code 2.1.331 prints it on every run, with rejected statuses
+	// nested where they do not mean the turn was refused.
+	warning := `{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","resetsAt":1795575600,"overageStatus":"rejected",` +
+		`"unifiedWindows":{"seven_day":{"status":"rejected","resetsAt":1795575600}}}}`
+	r := (claudeCode{}).Reader(runSpec{Now: time.Now})
+	for _, line := range []string{warning, `{"type":"assistant","message":{"content":[{"type":"text","text":"ok"}]}}`, `{"type":"result","subtype":"success","is_error":false,"result":"ok"}`} {
+		r.Line([]byte(line))
+	}
+	if out := r.End(0, nil); out.Kind != outcomeOK {
+		t.Fatalf("a warning read as %d", out.Kind)
+	}
+	r = (claudeCode{}).Reader(runSpec{Now: time.Now})
+	r.Line([]byte(`{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":1795575600}}`))
+	if out := r.End(1, nil); out.Kind != outcomeUsageLimit || out.ResetsAt.Unix() != 1795575600 {
+		t.Fatalf("a rejected turn read as %d, resets %s", out.Kind, out.ResetsAt)
 	}
 }

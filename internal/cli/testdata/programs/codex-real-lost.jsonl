@@ -1,0 +1,1 @@
+{"fixture":"recorded from Codex 0.170.0 on 2026-11-24, sanitized","exit":1,"stderr":"Error: thread/resume: thread/resume failed: no rollout found for thread id 0199ffff-0000-7000-8000-00000000beef (code -32600)","expect":"lost_session","accepted":false}
