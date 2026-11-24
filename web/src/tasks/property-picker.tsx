@@ -64,22 +64,24 @@ function assignWords(o: RunOutlook, members: Member[]): string | undefined {
 
 /**
  * What assigning one task would do, for each agent a computer runs (the
- * run outlook), asked once for all of them while the picker is open.
- * Nothing for several tasks at once.
+ * run outlook), asked while the picker is open. Nothing for the agent that
+ * has the task already (assigning it again makes no item), and nothing for
+ * several tasks at once.
  */
 export function useAssignOutlook(tasks: Task[]): Outlook {
   const one = tasks.length === 1 ? tasks[0] : undefined;
   const members = useMembers();
   const connection = useConnection();
-  const run = one ? members.filter((m) => connection(m, one.project_id)?.runner) : [];
+  const other = (m: Member) => m.user_id !== one?.assignee_id;
+  const run = one ? members.filter((m) => other(m) && connection(m, one.project_id)?.runner) : [];
   const { outlooks } = useRunOutlook(
     one?.key,
     run.map((m) => m.handle),
     "assign",
   );
   return (member) => {
-    const o = outlooks?.[`@${member.handle}`];
-    return o && assignWords(o, members);
+    const o = outlooks[`@${member.handle}`];
+    return o && other(member) ? assignWords(o, members) : undefined;
   };
 }
 

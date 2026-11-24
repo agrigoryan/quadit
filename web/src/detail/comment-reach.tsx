@@ -72,9 +72,9 @@ function Reach({ agents, members, task }: { agents: Member[]; members: Member[];
   );
   // An agent a computer runs is spoken of only from the server's present answer: not as listening, which would promise
   // an answer, while it is asked or while asking fails.
-  const told = outlook.outlooks ? agents : agents.filter((agent) => !run.includes(agent));
+  const told = agents.filter((agent) => !run.includes(agent) || outlook.outlooks[`@${agent.handle}`]);
   const runs = (agent: Member) => {
-    const o = outlook.outlooks?.[`@${agent.handle}`];
+    const o = outlook.outlooks[`@${agent.handle}`];
     return o && o.outcome !== "none" && o.outcome !== "in_chat" ? o : undefined;
   };
   // The run the computer works on may be another agent's: only a run of this agent's own on this task takes the comment next.

@@ -42,31 +42,7 @@ export function useLive<T>(
     enabled: path !== null,
     refetchInterval: opts.everyMs,
   });
-  const throttle = opts.throttleMs ?? 2000;
-  const only = opts.only?.join(",") ?? "";
-
-  useEffect(() => {
-    if (path === null) return;
-    const key = liveKey(slug, path);
-    const kinds = only ? new Set(only.split(",")) : null;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const off = onEvents((events) => {
-      if (timer || (kinds && !events.some((ev) => kinds.has(ev.entity_type)))) return;
-      // Not sooner than `throttle` after the answer on screen was read.
-      const read = queryClient.getQueryState(key)?.dataUpdatedAt ?? 0;
-      timer = setTimeout(
-        () => {
-          timer = undefined;
-          void queryClient.invalidateQueries({ queryKey: key });
-        },
-        Math.max(0, read + throttle - Date.now()),
-      );
-    });
-    return () => {
-      clearTimeout(timer);
-      off();
-    };
-  }, [slug, path, throttle, only]);
+  useFollowFeed(path === null ? [] : [path], opts);
 
   return {
     data: query.data,
@@ -75,6 +51,42 @@ export function useLive<T>(
     refreshing: query.isFetching && !query.isPending,
     refetch: () => void query.refetch(),
   };
+}
+
+/**
+ * Asks again for the live reads of `paths` (cached under liveKey) whenever
+ * the feed moves, at most once every `throttleMs` after the oldest of them
+ * was read: what useLive does for its one path, for a read made of several.
+ */
+export function useFollowFeed(paths: string[], opts: { throttleMs?: number; only?: string[] } = {}) {
+  const slug = useStore((s) => s.slug);
+  const throttle = opts.throttleMs ?? 2000;
+  const only = opts.only?.join(",") ?? "";
+  // One string, so the effect starts over only when the set of paths does.
+  const joined = paths.join("\n");
+
+  useEffect(() => {
+    if (!joined) return;
+    const keys = joined.split("\n").map((path) => liveKey(slug, path));
+    const kinds = only ? new Set(only.split(",")) : null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const off = onEvents((events) => {
+      if (timer || (kinds && !events.some((ev) => kinds.has(ev.entity_type)))) return;
+      // Not sooner than `throttle` after the answers on screen were read.
+      const read = Math.min(...keys.map((key) => queryClient.getQueryState(key)?.dataUpdatedAt ?? 0));
+      timer = setTimeout(
+        () => {
+          timer = undefined;
+          for (const key of keys) void queryClient.invalidateQueries({ queryKey: key });
+        },
+        Math.max(0, read + throttle - Date.now()),
+      );
+    });
+    return () => {
+      clearTimeout(timer);
+      off();
+    };
+  }, [slug, joined, throttle, only]);
 }
 
 /** The time now, updated on a slow tick, for "elapsed" and "until" readouts. */

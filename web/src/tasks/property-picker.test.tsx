@@ -8,7 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { WithQuery } from "@/test/query";
 import { api } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
-import { clearStore, getState, loadBootstrap } from "@/data/store";
+import { applyEvents, clearStore, getState, loadBootstrap } from "@/data/store";
 import type { Member, Task, User, Workspace } from "@/types/core";
 import { PROPERTIES, type PropertyName } from "@/tasks/properties";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
@@ -336,12 +336,50 @@ describe("what assigning a task does, for an agent a computer runs", () => {
     );
   });
 
-  it("says nothing when assigning would start nothing, as for the agent that has the task already", async () => {
+  it("says nothing when assigning would start nothing", async () => {
     const asked = serve({ outcome: "none" });
-    open("assignee", [task({ assignee_id: "u2" })]);
+    open("assignee");
     await waitFor(() => expect(asked.some((path) => path.includes("/run-outlook"))).toBe(true));
     await act(() => new Promise((done) => setTimeout(done, 0)));
     expect(within(coder()).queryByText(/^(Starts|Busy|Paused|Will not|Not run)/)).toBeNull();
+  });
+
+  it("says nothing for the agent that has the task already, without asking", async () => {
+    const asked = serve({ outcome: "starts_now" });
+    open("assignee", [task({ assignee_id: "u2" })]);
+    await waitFor(() => expect(asked.length).toBeGreaterThan(0));
+    await act(() => new Promise((done) => setTimeout(done, 0)));
+    expect(asked.some((path) => path.includes("/run-outlook"))).toBe(false);
+    expect(within(coder()).queryByText(/Starts now/)).toBeNull();
+  });
+
+  it("asks again when the task changes, as when someone else assigns it", async () => {
+    const asked = serve({ outcome: "starts_now" });
+    open("assignee");
+    expect(await within(coder()).findByText("Starts now on Aram's MacBook Pro")).toBeInTheDocument();
+    const before = asked.filter((path) => path.includes("/run-outlook")).length;
+    act(() =>
+      applyEvents(
+        [
+          {
+            seq: 2,
+            at: 2,
+            actor_id: "u3",
+            change_id: "c2",
+            type: "task.updated",
+            entity_type: "task",
+            entity_id: "t1",
+            scope_type: "",
+            scope_id: "",
+            data: { changes: { assignee_id: { from: null, to: "u3" } } },
+          },
+        ],
+        true,
+      ),
+    );
+    await waitFor(() => expect(asked.filter((path) => path.includes("/run-outlook")).length).toBeGreaterThan(before), {
+      timeout: 4000,
+    });
   });
 
   it("asks nothing for several tasks at once", async () => {
