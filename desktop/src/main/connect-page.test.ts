@@ -22,7 +22,11 @@ const entry = (id: string, project: string): RunEntryView => ({
  * Code as @claude (its login /q/claude.json) for SVA, and Codex as @codex
  * for GS; `available`: the app carries a quadit.
  */
-function harness({ covered = "", available = true }: { covered?: string; available?: boolean } = {}) {
+function harness({
+  covered = "",
+  available = true,
+  unreadable = false,
+}: { covered?: string; available?: boolean; unreadable?: boolean } = {}) {
   let handlers: Partial<PageHandlers> = {};
   const said: string[] = [];
   const logins: Record<string, { login: string; agent: string; program: "claude" | "codex" }> = {
@@ -44,6 +48,8 @@ function harness({ covered = "", available = true }: { covered?: string; availab
     connections: {
       dropPlans: () => void said.push("drop plans"),
       runAs: (id: string) => logins[id] ?? null,
+      skillForRuns: async (id: string) =>
+        id === "codex" ? { ok: false, error: "The Quadit skill for Codex was changed by hand…" } : { ok: true },
     } as unknown as ConstructorParameters<typeof ConnectPage>[0]["connections"],
     windows: {
       cover: (view, serverId, closed) => {
@@ -70,7 +76,7 @@ function harness({ covered = "", available = true }: { covered?: string; availab
     showBackups: async () => {},
     runner: {
       available,
-      entries: async (login) => entries[login] ?? [],
+      entries: async (login) => (unreadable ? null : (entries[login] ?? [])),
       projects: async (login) => ({ ok: true, projects: [{ key: login, name: "as asked" }] }),
       add: async (a) => {
         said.push(`add ${JSON.stringify(a)}`);
@@ -151,6 +157,29 @@ describe("ConnectPage, Run by Quadit", () => {
     expect(await harness({ available: false }).call(1, "runEntries", "claude")).toBeNull();
   });
 
+  it("says when what Quadit runs could not be read, rather than that it runs nothing", async () => {
+    expect(await harness({ unreadable: true }).call(1, "runEntries", "claude")).toEqual({
+      agent: "@claude",
+      entries: [],
+      unreadable: true,
+    });
+  });
+
+  it("hands quadit run add only a project key and a whole folder path, refusing anything else in plain words", async () => {
+    const { call, said } = harness();
+    for (const project of ["sva", "SVA\nrm -rf ~", "", 7])
+      expect(await call(1, "startRunning", "claude", project, "/h/devel/game")).toEqual({
+        ok: false,
+        error: "That is not a project of this workspace.",
+      });
+    for (const folder of ["devel/game", "/h/devel\0/game", "", null])
+      expect(await call(1, "startRunning", "claude", "SVA", folder)).toEqual({
+        ok: false,
+        error: "Choose the folder again.",
+      });
+    expect(said).toEqual([]);
+  });
+
   it("asks the projects as the tool's own login", async () => {
     const { call } = harness();
     expect(await call(1, "agentProjects", "codex")).toEqual({
@@ -163,11 +192,18 @@ describe("ConnectPage, Run by Quadit", () => {
   it("starts running a project with the tool's login, program and the program the app finds", async () => {
     const { call, said } = harness();
     expect(await call(1, "startRunning", "claude", "SVA", "/h/devel/game")).toEqual({ ok: true });
-    await call(1, "startRunning", "codex", "GS", "/h/devel/site");
     expect(said).toEqual([
       `add ${JSON.stringify({ login: "/q/claude.json", project: "SVA", folder: "/h/devel/game", program: "claude", programPath: "/h/.local/bin/claude" })}`,
-      `add ${JSON.stringify({ login: "/q/codex.json", project: "GS", folder: "/h/devel/site", program: "codex" })}`,
     ]);
+  });
+
+  it("starts no run of an agent whose skill lacks the section for runs, saying why", async () => {
+    const { call, said } = harness();
+    expect(await call(1, "startRunning", "codex", "GS", "/h/devel/site")).toEqual({
+      ok: false,
+      error: "The Quadit skill for Codex was changed by hand…",
+    });
+    expect(said).toEqual([]);
   });
 
   it("stops running only an entry of the tool's own agent", async () => {

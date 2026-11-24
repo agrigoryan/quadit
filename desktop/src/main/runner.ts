@@ -24,6 +24,7 @@ import { dirname, join } from "node:path";
 import type { RunningChild, startChild } from "@/main/child-guard";
 import { withoutQuadit } from "@/main/child-guard";
 import { homely } from "@/main/connections";
+import { isProjectKey } from "@/shared/bridge";
 import type { Refused, RunEntryView, RunPause, RunProgram } from "@/shared/pages-api";
 
 export interface RunnerParts {
@@ -74,6 +75,8 @@ const LAST_WAIT_MS = 5 * 60_000;
 const STEADY_MS = 60_000;
 /** How often the app tries again while another quadit run serves this computer. */
 const ANOTHER_WAIT_MS = 5 * 60_000;
+/** How often the registry is read again while an entry is still being removed (quadit run remove gave up waiting). */
+const RECHECK_MS = 30_000;
 /** How long a command may take: add checks the server and the program (10 s each); remove waits up to 60 s for a serving runner. */
 const COMMAND_MS = 20_000;
 const ADD_MS = 60_000;
@@ -97,14 +100,21 @@ export const NOT_SERVED = {
 
 const NO_QUADIT: Refused = { ok: false, error: "This Quadit app has no quadit command of its own to run agents with." };
 
+/** A removal not done: `pending`, the runner is still telling the server how a run ended, and lets the entry go once it has. */
+export type RemoveRefused = Refused & { pending?: true };
+
 export class Runner {
   private child: RunningChild | null = null;
   /** When the runner running now was started. */
   private since = 0;
   /** How many times in a row it ended by itself soon after its start. */
   private waits = 0;
-  /** The next start: after it ended by itself, or while another serves this computer. */
+  /** The next start: after it ended by itself, while another serves this computer, or after the list could not be read. */
   private next: ReturnType<typeof setTimeout> | undefined;
+  /** How many times in a row the list could not be read at a start. */
+  private unread = 0;
+  /** The next look at the registry while an entry is still being removed. */
+  private recheck: ReturnType<typeof setTimeout> | undefined;
   /** Its last end said another quadit run serves this computer. */
   private another = false;
   private beginning = false;
@@ -144,10 +154,11 @@ export class Runner {
   }
 
   /**
-   * The entries of the login `login` (an agent's own login file) and what
-   * each does now, as its card says them; none when the list cannot be read.
+   * The entries of the login `login` (an agent's own login file, matched by
+   * real path) and what each does now, as its card says them; null when the
+   * list cannot be read.
    */
-  async entries(login: string): Promise<RunEntryView[]> {
+  async entries(login: string): Promise<RunEntryView[] | null> {
     let list: RunList;
     try {
       list = await this.list();
@@ -156,7 +167,7 @@ export class Runner {
       const words = (err as Error).message;
       if (words !== this.listFailed) this.parts.log(`quadit run list: ${words}`);
       this.listFailed = words;
-      return [];
+      return null;
     }
     const home = this.parts.env.HOME ?? "";
     return list.entries.flatMap((e) =>
@@ -234,22 +245,57 @@ export class Runner {
   }
 
   /**
-   * `quadit run remove …`, which stops the entry's run, tells the server how
-   * it ended and lets the project go, waiting for that; then the runner is
-   * stopped when no entry is left. With no quadit of the app's, the app
-   * added none: nothing to remove.
+   * `quadit run remove ID` for the entry `entry`, or for each entry of the
+   * login `login` (matched by real path, as the card shows them), which
+   * stops its run, tells the server how it ended and lets the project go,
+   * waiting for that. Done only when a fresh read of the registry has none
+   * of them: one still there and marked removing is `pending` (the runner
+   * lets it go once the server has heard), any other keeps what quadit run
+   * said. Then the runner is stopped if no entry is left. With no quadit of
+   * the app's, the app added none: nothing to remove.
    */
-  async remove(by: { entry: string } | { login: string }): Promise<{ ok: true } | Refused> {
+  async remove(by: { entry: string } | { login: string }): Promise<{ ok: true } | RemoveRefused> {
     if (!this.available) return { ok: true };
-    const said = await this.run(["run", "remove", "entry" in by ? by.entry : `login=${by.login}`], REMOVE_MS);
-    if (said.code !== 0) return { ok: false, error: said.words };
-    this.parts.log(said.out.trim());
-    const left = await this.list().catch(() => null);
-    if (left?.entries.length === 0) this.stop();
-    // With no runner serving, remove holds the runner's lock while it works: a start meanwhile found it held (exit 3).
-    else if (left) await this.begin();
+    let ids: string[];
+    try {
+      ids =
+        "entry" in by
+          ? [by.entry]
+          : (await this.readList()).entries.filter((e) => sameFile(e.login, by.login)).map((e) => e.id);
+    } catch (err) {
+      return { ok: false, error: `Quadit could not read what it runs on this computer: ${(err as Error).message}` };
+    }
+    let words = "";
+    for (const id of ids) {
+      const said = await this.run(["run", "remove", id], REMOVE_MS);
+      if (said.code === 0) this.parts.log(said.out.trim());
+      else words ||= said.words;
+    }
+    const left = await this.reconcile();
     this.parts.changed();
-    return { ok: true };
+    const still = left ? left.entries.filter((e) => ids.includes(e.id)) : [];
+    if (left && still.length === 0) return { ok: true };
+    if (still.length > 0 && still.every((e) => e.removing)) return { ok: false, error: words, pending: true };
+    return { ok: false, error: words || "Quadit could not stop running it: try again." };
+  }
+
+  /**
+   * After a removal, from a fresh read of the registry (never one begun
+   * before it): the runner stops when no entry is left, and is started when
+   * some are (remove holds the runner's lock while it works, so a start
+   * meanwhile found it held, exit 3); while an entry is still being removed,
+   * or the registry cannot be read, it looks again in 30 s. Gives what it read.
+   */
+  private async reconcile(): Promise<RunList | null> {
+    clearTimeout(this.recheck);
+    this.recheck = undefined;
+    const left = await this.readList().catch(() => null);
+    if (this.quitting) return left;
+    if (left?.entries.length === 0) this.stop();
+    else if (left) await this.begin();
+    if (!left || left.entries.some((e) => e.removing))
+      this.recheck = setTimeout(() => void this.reconcile().then(() => this.parts.changed()), RECHECK_MS);
+    return left;
   }
 
   /** The projects the agent of the login `login` may work in: `quadit me`, as that login. */
@@ -259,10 +305,11 @@ export class Runner {
     if (said.code !== 0) return { ok: false, error: said.words };
     const me = JSON.parse(said.out) as { projects?: unknown; project_names?: unknown };
     const names = (typeof me.project_names === "object" && me.project_names) || {};
-    const keys = Array.isArray(me.projects) ? me.projects.filter((key) => typeof key === "string") : [];
+    // Shown and handed back to quadit run add: only what has a project key's form.
+    const keys: string[] = Array.isArray(me.projects) ? me.projects.filter(isProjectKey) : [];
     return {
       ok: true,
-      projects: keys.map((key: string) => {
+      projects: keys.map((key) => {
         const name = (names as Record<string, unknown>)[key];
         return { key, name: typeof name === "string" ? name : key };
       }),
@@ -276,19 +323,36 @@ export class Runner {
     return said.code === 0 ? join(dirname(said.out.trim()), "runner", "runner.log") : null;
   }
 
-  /** At the app's start: starts the runner when the registry has an entry. */
+  /**
+   * At the app's start, and at each start again: starts the runner when the
+   * registry has an entry. A list that cannot be read is read again after
+   * 2 s, doubling, at most 5 minutes.
+   */
   async sync() {
     if (this.quitting || !this.available) return;
     const list = await this.list().catch((err: Error) => {
       this.parts.log(`quadit run list: ${err.message}`);
       return null;
     });
-    if (list && list.entries.length > 0) await this.begin();
+    if (this.quitting) return;
+    if (!list) {
+      const wait = Math.min(FIRST_WAIT_MS * 2 ** this.unread, LAST_WAIT_MS);
+      this.unread++;
+      clearTimeout(this.next);
+      this.next = setTimeout(() => {
+        this.next = undefined;
+        void this.sync();
+      }, wait);
+      return;
+    }
+    this.unread = 0;
+    if (list.entries.length > 0) await this.begin();
   }
 
   /** At quit: the guard's stop (SIGTERM to its group, killed 5 s later), never waited for; nothing starts again. */
   quit() {
     this.quitting = true;
+    clearTimeout(this.recheck);
     this.stop();
   }
 

@@ -24,10 +24,12 @@
 // Run by Quadit (runner.ts): the projects Quadit runs a connected Claude
 // Code's or Codex's agent for, starting and stopping one, the folder picker.
 
+import { isAbsolute } from "node:path";
 import type { WebContents, WebContentsView } from "electron";
 import type { AppPages } from "@/main/app-pages";
 import { type Connections, homely } from "@/main/connections";
 import type { Runner } from "@/main/runner";
+import { isProjectKey } from "@/shared/bridge";
 import type { SelfRuns } from "@/main/self-runs";
 import type { ServerWindows } from "@/main/server-windows";
 import type { ConnectChoice, ConnectTarget, Refused } from "@/shared/pages-api";
@@ -46,6 +48,7 @@ export interface ConnectPageParts {
     | "newCode"
     | "updateSkill"
     | "runAs"
+    | "skillForRuns"
   >;
   windows: Pick<ServerWindows, "cover" | "uncover" | "isCovered">;
   /** Whether `serverId` is the server the app runs on this computer. */
@@ -110,7 +113,9 @@ export class ConnectPage {
       copyText: (_sender, text) => parts.copy(String(text)),
       runEntries: async (_sender, harness) => {
         const tool = this.runAs(String(harness));
-        return tool ? { agent: tool.agent, entries: await parts.runner.entries(tool.login) } : null;
+        if (!tool) return null;
+        const entries = await parts.runner.entries(tool.login);
+        return { agent: tool.agent, entries: entries ?? [], ...(entries ? {} : { unreadable: true as const }) };
       },
       agentProjects: (_sender, harness) => {
         const tool = this.runAs(String(harness));
@@ -123,20 +128,21 @@ export class ConnectPage {
       startRunning: async (_sender, harness, project, folder) => {
         const tool = this.runAs(String(harness));
         if (!tool) return NOT_RUN;
+        // What the page sends goes to quadit run add as arguments: a project key's form, a whole path.
+        if (!isProjectKey(project)) return { ok: false, error: "That is not a project of this workspace." };
+        if (typeof folder !== "string" || !isAbsolute(folder) || folder.includes("\0"))
+          return { ok: false, error: "Choose the folder again." };
+        // The agent's skill must tell it how a run Quadit starts goes: brought up to date, else no run.
+        const skill = await connections.skillForRuns(tool.program);
+        if (!skill.ok) return skill;
         const programPath = (await parts.programOf(tool.program)) ?? undefined;
-        return parts.runner.add({
-          login: tool.login,
-          project: String(project),
-          folder: String(folder),
-          program: tool.program,
-          programPath,
-        });
+        return parts.runner.add({ login: tool.login, project, folder, program: tool.program, programPath });
       },
       stopRunning: async (_sender, harness, entry) => {
         const tool = this.runAs(String(harness));
         if (!tool) return NOT_RUN;
         // Only an entry of this tool's agent: the page names it by its id.
-        if (!(await parts.runner.entries(tool.login)).some((e) => e.id === entry))
+        if (!(await parts.runner.entries(tool.login))?.some((e) => e.id === entry))
           return { ok: false, error: `Quadit does not run that project for ${tool.agent}.` };
         return parts.runner.remove({ entry: String(entry) });
       },

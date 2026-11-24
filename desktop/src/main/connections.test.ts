@@ -76,11 +76,7 @@ function setUp({
   tokensWait = Promise.resolve(),
   revokeRefused = "",
   ownServer = false,
-  runs = { refused: false, removed: [] as string[] } as {
-    refused: boolean;
-    removed: string[];
-    during?: () => void;
-  },
+  runs = { refused: false, removed: [] },
 }: {
   quaditOnPath?: boolean;
   bundled?: boolean;
@@ -99,7 +95,8 @@ function setUp({
   /** Whether the server "s1" is the one the app runs on this computer. */
   ownServer?: boolean;
   /** What quadit run remove does: the logins it was asked to stop running, whether it refuses, and what happens meanwhile. */
-  runs?: { refused: boolean; removed: string[]; during?: () => void };
+  /** `failed`: what a refusal says when it is not "still telling the server". */
+  runs?: { refused: boolean; removed: string[]; during?: () => void; failed?: string };
 } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
   const home = join(root, "home");
@@ -110,6 +107,10 @@ function setUp({
   const script = join(root, "quadit-bundled");
   standIn(script, join(configDir, "config.json"));
   if (quaditOnPath) copyFileSync(script, join(bin, "quadit"));
+  // The quadit the app carries, when a test gives it one (`carry`): its skill is in quadit-own.skill.
+  const own = join(root, "quadit-own");
+  standIn(own, join(configDir, "config.json"));
+  let carried = false;
   const asked: DesktopRequest[] = [];
   /** What the app was told of tools connected (with their open code) and disconnected. */
   const told: string[] = [];
@@ -133,6 +134,7 @@ function setUp({
     dataDir: join(root, "data"),
     platform,
     hostName: "mac",
+    ownQuadit: () => (carried ? own : null),
     cli: new QuaditCli(
       quaditOnPath || !bundled ? null : script,
       async () =>
@@ -173,7 +175,8 @@ function setUp({
     removeRuns: async (login) => {
       runs.removed.push(login);
       runs.during?.();
-      return runs.refused ? { ok: false, error: "Quadit is still telling the server…" } : { ok: true };
+      if (!runs.refused) return { ok: true };
+      return runs.failed ? { ok: false, error: runs.failed } : { ok: false, error: "still telling…", pending: true };
     },
     appFor: (id) => (ownServer && id === "s1" ? "/Applications/Quadit.app/Contents/MacOS/Quadit" : null),
     ask: async (_server, _workspace, request) => {
@@ -234,6 +237,11 @@ function setUp({
     root,
     home,
     bin,
+    /** Gives the app a quadit of its own, whose skill is `skill`. */
+    carry: (skill: string) => {
+      writeFileSync(`${own}.skill`, skill);
+      carried = true;
+    },
     configDir,
     connections,
     asked,
@@ -977,6 +985,19 @@ posixOnly("Quadit running a connected tool's agent (agent-runs-contract.md §8.2
     expect(existsSync(login)).toBe(false);
   });
 
+  it("says what went wrong when Quadit could not stop running the agent for another reason, and goes no further", async () => {
+    const runs = { refused: true, removed: [] as string[], failed: "runner.json: permission denied" };
+    const { connections, connect, choice, configDir } = setUp({ runs });
+    await connect(choice("claude"));
+    const planned = connections.planDisconnect("claude");
+    if (!planned.ok) throw new Error(planned.error);
+    expect(await connections.applyDisconnect(planned.plan.id)).toEqual({
+      ok: false,
+      error: "runner.json: permission denied",
+    });
+    expect(existsSync(join(configDir, "claude.json"))).toBe(true);
+  });
+
   it("looks at the files again once Quadit stopped running the agent, and writes nothing over a file changed meanwhile", async () => {
     const runs = { refused: false, removed: [] as string[], during: () => {} };
     const { connections, connect, choice, home, asked } = setUp({ runs });
@@ -1005,6 +1026,45 @@ posixOnly("Quadit running a connected tool's agent (agent-runs-contract.md §8.2
     await connect(choice("copilot"));
     await disconnect("pi");
     expect(runs.removed).toEqual([]);
+  });
+});
+
+posixOnly("the skill for runs Quadit starts (review M3)", () => {
+  const NEW = "# Quadit skill\n\n## Started by Quadit\n\nWhat to do.\n";
+
+  it("is the skill of the app's own quadit when it carries one, over an older one on the PATH", async () => {
+    const { connect, choice, read, carry } = setUp();
+    carry(NEW);
+    await connect(choice("claude"));
+    expect(read(".claude/skills/quadit/SKILL.md")).toBe(NEW);
+  });
+
+  it("is brought up to date before a run when the app wrote an older one, and refused when it was changed by hand", async () => {
+    const { connections, connect, choice, read, carry, home } = setUp();
+    await connect(choice("claude"));
+    await connect(choice("codex"));
+    expect(read(".claude/skills/quadit/SKILL.md")).toBe("# Quadit skill\n");
+    carry(NEW);
+    expect(await connections.skillForRuns("claude")).toEqual({ ok: true });
+    expect(read(".claude/skills/quadit/SKILL.md")).toBe(NEW);
+
+    writeFileSync(join(home, ".agents/skills/quadit/SKILL.md"), "# Quadit skill, mine\n");
+    expect(await connections.skillForRuns("codex")).toEqual({
+      ok: false,
+      error:
+        "The Quadit skill for Codex was changed by hand and has no section for runs Quadit starts: update it first.",
+    });
+    expect(read(".agents/skills/quadit/SKILL.md")).toBe("# Quadit skill, mine\n");
+  });
+
+  it("refuses a run when no quadit carries the section", async () => {
+    const { connections, connect, choice } = setUp();
+    await connect(choice("claude"));
+    expect(await connections.skillForRuns("claude")).toEqual({
+      ok: false,
+      error:
+        "The Quadit skill for Claude Code has no section for runs Quadit starts: update the Quadit app, or connect Claude Code again.",
+    });
   });
 });
 

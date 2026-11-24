@@ -86,6 +86,9 @@ const onPath = (name) =>
     .map((d) => path.join(d, name))
     .find((p) => existsSync(p) && statSync(p).isFile());
 
+// A registry that cannot be read or written is said in one line, exit 1, as quadit says its errors.
+process.on("uncaughtException", (err) => refuse(err.message));
+
 const args = process.argv.slice(2);
 const [first, second] = args;
 

@@ -32,8 +32,10 @@
 // an agent of its own: a tool that works as a login of another server (the
 // computer's default one) has no code and is never asked about.
 //
-// The skill Connect wrote is kept up to date with the quadit the tools run
-// (the app's own, updated with the app): at every start, a skill file that
+// The skill Connect writes is the one the app's own quadit carries (the one
+// that runs agents for Run by Quadit, updated with the app), else the one on
+// the PATH: a run Quadit starts needs the skill's section for it, which an
+// older quadit on the PATH may not carry. At every start, a skill file that
 // still says what Connect wrote is rewritten through the same plan, backup
 // and ledger, so Disconnect still takes back exactly what is there; one the
 // person changed since is left, and its tool says so (refresh).
@@ -90,6 +92,8 @@ export interface ConnectionsParts {
   /** This computer's name, in the names of the tokens Connect makes. */
   hostName: string;
   cli: QuaditCli;
+  /** The quadit the app carries (runner.ts runs it), whose skill Connect writes; null in a build without one. */
+  ownQuadit(): string | null;
   /** The workspaces the server windows show now. */
   summaries(): { serverId: string; summary: DesktopSummary; listening: boolean }[];
   server(serverId: string): { name: string; origin: string } | undefined;
@@ -107,8 +111,9 @@ export interface ConnectionsParts {
    * Stops Quadit running the agent of the login file `login` for any
    * project on this computer (`quadit run remove`, agent-runs-contract.md
    * §8.2): its run ends and the server is told, while the login still works.
+   * `pending`: the runner is still telling the server how a run ended.
    */
-  removeRuns(login: string): Promise<{ ok: true } | Refused>;
+  removeRuns(login: string): Promise<{ ok: true } | (Refused & { pending?: true })>;
   /** Asks the page that speaks for a workspace (Requests.toWorkspace). */
   ask(serverId: string, workspaceId: string, request: DesktopRequest): Promise<DesktopOutcome>;
 }
@@ -185,6 +190,9 @@ type Plan =
 
 const MASKED_TOKEN = "qd_…";
 
+/** The heading of the skill's section for a run Quadit starts (integrations/skills/quadit/SKILL.md). */
+const RUN_SECTION = "## Started by Quadit";
+
 export class Connections {
   private plans = new Map<string, Plan>();
   /** Where each tool stood at the server's last answer, which no answer leaves as it is (handshake.ts). */
@@ -216,7 +224,7 @@ export class Connections {
     const binary = look.found?.path ?? cli.bundled;
     const defaultConfig = supported && binary ? await cli.defaultConfig(binary).catch(() => null) : null;
     const ledger = this.ledger();
-    const skill = supported && binary && Object.keys(ledger.harnesses).length > 0 ? await this.skillOf(binary) : null;
+    const skill = supported && Object.keys(ledger.harnesses).length > 0 ? await this.currentSkill() : null;
     const defaultLogin =
       defaultConfig && binary && existsSync(defaultConfig)
         ? {
@@ -324,8 +332,7 @@ export class Connections {
 
   /**
    * Brings the skill of every tool Connect set up up to date with the skill
-   * the quadit it uses carries now (the one on the PATH, else the app's
-   * own). A skill file that still says what Connect wrote is rewritten,
+   * Connect writes now (currentSkill). A skill file that still says what Connect wrote is rewritten,
    * backed up first, and the ledger records the new text, so Disconnect
    * takes back exactly what is there; one changed by hand since is left as
    * it is (its tool's card offers updateSkill); a skill the app did not
@@ -368,11 +375,49 @@ export class Connections {
     });
   }
 
-  /** The skill the quadit the tools run carries: the one on the login shell's PATH, else the app's own; null when none says. */
+  /**
+   * The skill Connect writes: the one the app's own quadit carries, else the
+   * one of the quadit on the login shell's PATH; null when none says.
+   */
   private async currentSkill(): Promise<string | null> {
+    const own = this.parts.ownQuadit();
+    const skill = own ? await this.skillOf(own) : null;
+    if (skill !== null) return skill;
     const look = await this.parts.cli.look();
     const binary = look.found?.path ?? this.parts.cli.bundled;
     return binary ? this.skillOf(binary) : null;
+  }
+
+  /**
+   * Before Quadit runs a tool's agent for a project: its Quadit skill has
+   * the section for runs Quadit starts (RUN_SECTION). One the app wrote and
+   * nobody changed since is brought up to date first; one changed by hand,
+   * or not the app's, is left as it is, and the run is refused, saying so.
+   */
+  skillForRuns(harnessId: string): Promise<{ ok: true } | Refused> {
+    return this.inTurn(async () => {
+      const harness = HARNESSES.find((h) => h.id === harnessId);
+      if (!harness) return { ok: false, error: "There is no such tool." };
+      const installed = realPath(join(this.parts.home, harness.skills, "quadit", "SKILL.md"));
+      if (readText(installed)?.includes(RUN_SECTION)) return { ok: true };
+      const ledger = this.ledger();
+      const path = this.skillPath(ledger, harness);
+      const skill = await this.currentSkill();
+      const state = path && skill !== null ? this.skillState(ledger, harness, skill) : null;
+      if (state === "by hand")
+        return {
+          ok: false,
+          error: `The Quadit skill for ${harness.name} was changed by hand and has no section for runs Quadit starts: update it first.`,
+        };
+      if (path && state === "outdated" && skill?.includes(RUN_SECTION) && this.rewriteSkill(ledger, path, skill)) {
+        this.saveLedger(ledger);
+        return { ok: true };
+      }
+      return {
+        ok: false,
+        error: `The Quadit skill for ${harness.name} has no section for runs Quadit starts: update the Quadit app, or connect ${harness.name} again.`,
+      };
+    });
   }
 
   private skillOf(binary: string): Promise<string | null> {
@@ -499,7 +544,7 @@ export class Connections {
       changes.push({
         kind: "file",
         path: join(home, harness.skills, "quadit", "SKILL.md"),
-        content: await cli.skill(binary).catch(tooOld),
+        content: (await this.currentSkill()) ?? (await cli.skill(binary).catch(tooOld)),
       });
       // The command as an agent may call it by its path: the one on the PATH, or the app's copy linked there now.
       const command = look.found?.path ?? (look.linkInto && cli.bundled ? join(look.linkInto.folder, "quadit") : null);
@@ -924,11 +969,14 @@ export class Connections {
       if (before) return before;
       // Quadit stops running the agent before its login is revoked, so that how its last run ended reaches the server
       // (agent-runs-contract.md §8.2). Not done yet: nothing else is, and the same plan may be carried out again.
-      if (plan.revoke && !(await this.parts.removeRuns(plan.revoke.config)).ok) {
+      const removed = plan.revoke ? await this.parts.removeRuns(plan.revoke.config) : { ok: true as const };
+      if (!removed.ok) {
         this.plans.set(plan.id, plan);
         return {
           ok: false,
-          error: `Quadit is still telling the server how @${plan.agent}'s last run ended. Disconnect again in a moment.`,
+          error: removed.pending
+            ? `Quadit is still telling the server how @${plan.agent}'s last run ended. Disconnect again in a moment.`
+            : removed.error,
         };
       }
       // That can take a minute, in which the tool or the person may have changed a file of the plan.
