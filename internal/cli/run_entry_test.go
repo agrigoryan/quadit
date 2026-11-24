@@ -805,3 +805,20 @@ func TestAKeptHeadIsAcknowledgedWhenTheServerNoLongerRunsIt(t *testing.T) {
 		t.Fatalf("%d starts, %d runs: the withdrawn head went on", len(rt.records()), len(rt.f.allRuns()))
 	}
 }
+
+// TestAServerNotUpYetIsWaitedForAsAServerAway: a runner that starts before
+// its server listens (the app starts both at once) tries again as for a
+// server away, from a second doubling to thirty, not after five minutes,
+// and says the server is not answering meanwhile.
+func TestAServerNotUpYetIsWaitedForAsAServerAway(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	rt.times.recheck = time.Hour // what a check that failed otherwise waits
+	rt.f.set(func(f *fakeQuadit) { f.unreachable = true })
+	rt.serve()
+	rt.eventually("the entry saying the server is not answering", func() bool {
+		st := readStatus(rt.files.status()).Entries[rt.entry.ID]
+		return st.State == statusError && st.Message == "the server is not answering; trying again"
+	})
+	rt.f.set(func(f *fakeQuadit) { f.unreachable = false })
+	rt.eventually("the entry listening", func() bool { return readStatus(rt.files.status()).Entries[rt.entry.ID].State == statusReady })
+}

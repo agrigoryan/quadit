@@ -81,6 +81,7 @@ const (
 	errServerOld    = entryError("this Quadit server cannot run agents yet: update it")
 	errNotInPlace   = entryError("this version of quadit runs a folder in place only")
 	errServerWrong  = entryError("the server sent an answer that does not hold together")
+	errServerAway   = entryError("the server is not answering; trying again")
 )
 
 // errRemoving ends an entry that quadit run remove asked to let go.
@@ -166,6 +167,20 @@ func (e *liveEntry) serve(runner context.Context) {
 	if e.reg.Removing {
 		cancel(errRemoving)
 	}
+	// failed waits after an entry error: a server away (one starting with
+	// the runner, as the app starts both) is tried again soon, doubling,
+	// anything else at the recheck.
+	away := e.srv.host.times.awayFirst
+	failed := func(err error) {
+		if !serverAway(err) {
+			e.setStatus(entryStatus{State: statusError, Message: err.Error()})
+			e.srv.wait(ctx, e.srv.host.times.recheck)
+			return
+		}
+		e.setStatus(entryStatus{State: statusError, Message: string(errServerAway)})
+		e.srv.wait(ctx, away)
+		away = min(away*2, e.srv.host.times.awayMax)
+	}
 	for ctx.Err() == nil {
 		if err := e.keepUnkept(); err != nil {
 			e.setStatus(entryStatus{State: statusError, Message: string(errEndNotKept)})
@@ -178,6 +193,9 @@ func (e *liveEntry) serve(runner context.Context) {
 			break
 		}
 		pause, err := e.check(ctx)
+		if err == nil {
+			away = e.srv.host.times.awayFirst // the server answered
+		}
 		if e.verified && !e.out.empty() {
 			_ = e.flush(ctx) // what is not sent now is sent with the next round
 		}
@@ -185,8 +203,7 @@ func (e *liveEntry) serve(runner context.Context) {
 		switch {
 		case ctx.Err() != nil:
 		case err != nil:
-			e.setStatus(entryStatus{State: statusError, Message: err.Error()})
-			e.srv.wait(ctx, e.srv.host.times.recheck)
+			failed(err)
 		case pause != "":
 			if current == nil || current.Reason != pause {
 				e.pauseEntry(pause)
@@ -200,8 +217,7 @@ func (e *liveEntry) serve(runner context.Context) {
 			e.whilePaused(ctx)
 		default:
 			if err := e.listen(ctx); err != nil && ctx.Err() == nil {
-				e.setStatus(entryStatus{State: statusError, Message: err.Error()})
-				e.srv.wait(ctx, e.srv.host.times.recheck)
+				failed(err)
 			}
 		}
 	}

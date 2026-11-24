@@ -357,6 +357,18 @@ func temporary(err error) bool {
 	return ae.Status == http.StatusRequestTimeout || ae.Status == http.StatusTooManyRequests || ae.Status >= 500
 }
 
+// serverAway reports whether err says the server is away: not reached at
+// all (refused, timed out, no route: the client's transport error), or an
+// answer that it is busy or failing (408, 429, 5xx); not a refusal it gave,
+// nor a fault of this computer's.
+func serverAway(err error) bool {
+	if _, answered := refusalOf(err); answered {
+		return temporary(err)
+	}
+	var transport *url.Error
+	return errors.As(err, &transport)
+}
+
 // refusalReason is the reason of the server's refusal in err, or "".
 func refusalReason(err error) string {
 	if ae, ok := refusalOf(err); ok {
