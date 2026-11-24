@@ -92,7 +92,9 @@ func TestARunIsRecordedOnlyByTheAgentsOwnLogin(t *testing.T) {
 		_, err = r.try(r.claude, "session.start", start("SVA-1", M{"lease": ""}))
 		refusedFor(t, err, engine.CodeInvalid, "machine_id", "")
 		_, err = r.try(r.claude, "session.start", start("", nil))
-		refusedFor(t, err, engine.CodeInvalid, "machine_id", "")
+		refusedFor(t, err, engine.CodeInvalid, "task", "")
+		_, err = r.try(r.claude, "session.start", M{"task": "SVA-1", "state": "waiting"})
+		refusedFor(t, err, engine.CodeInvalid, "state", "")
 	})
 }
 

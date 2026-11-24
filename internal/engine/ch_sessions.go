@@ -114,11 +114,13 @@ func sessionStart(c *cx, a sessionStartArgs) error {
 }
 
 // startByHand refuses what only a runner's run has on a session an agent
-// records itself.
+// records itself, and a runner's run with no task.
 func startByHand(a sessionStartArgs) error {
-	if field := firstGiven([]given{{"machine_id", a.Program != "" || a.MachineID != "" || a.MachineName != "" || a.Folder != "" || a.Lease != ""},
-		{"state", a.State != ""}, {"reason", a.Reason != ""}, {"program_session", a.ProgramSession != ""}, {"item_seq", a.ItemSeq != 0}}); field != "" {
-		return invalid(field, "%s is said only of a run Quadit's runner starts, which is on a task", field)
+	if a.Program != "" || a.MachineID != "" || a.MachineName != "" || a.Folder != "" || a.Lease != "" {
+		return invalid("task", "a run Quadit's runner starts is on a task: give task")
+	}
+	if field := firstGiven([]given{{"state", a.State != ""}, {"reason", a.Reason != ""}, {"program_session", a.ProgramSession != ""}, {"item_seq", a.ItemSeq != 0}}); field != "" {
+		return invalid(field, "%s is said only of a run Quadit's runner starts", field)
 	}
 	return nil
 }
