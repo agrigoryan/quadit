@@ -90,11 +90,13 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 	}
 	defer kept.close()
 	lease := kept.kept()
+	if err := r.checkListensByProject(opts.project, lease); err != nil {
+		return err
+	}
 	var failedSeq int64 // the item whose runs failed, failed times in a row
 	failed := 0
-	scoped := false // the server said it listens to the project asked for
 	for {
-		page, err := r.nextItem(r.ctx, listenAsk{project: opts.project, lease: lease, take: take, by: opts.by}, firstHold(opts.project, scoped))
+		page, err := r.nextItem(r.ctx, listenAsk{project: opts.project, lease: lease, take: take, by: opts.by}, waitHold)
 		if err != nil {
 			if r.ctx.Err() != nil {
 				return r.ctx.Err()
@@ -116,7 +118,6 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 		if _, err := page.scope(opts.project); err != nil {
 			return err
 		}
-		scoped = true
 		if page.Lease != lease {
 			kept.keep(page.Lease)
 		}
@@ -315,14 +316,28 @@ func (page listened) scope(project string) (string, error) {
 	return page.Project, nil
 }
 
-// firstHold is how long to ask the server to hold a wait: a second until
-// it has said it listens to the project asked for, so that a server too
-// old to listen by project is found out at once, and waitHold after.
-func firstHold(project string, scoped bool) time.Duration {
-	if project != "" && !scoped {
-		return time.Second
+// checkListensByProject stops a listener of a project that starts with no
+// lease when the server is too old to listen by project, before it asks
+// for one: GET /listening takes no lease, and an older server's answer
+// lists no listeners. One that goes on with a lease was answered already.
+func (r *runner) checkListensByProject(project, lease string) error {
+	if project == "" || lease != "" {
+		return nil
 	}
-	return waitHold
+	raw, err := r.c.JSON(r.ctx, "/listening", url.Values{})
+	if err != nil {
+		return err
+	}
+	var answer struct {
+		Listeners *[]listenerShown `json:"listeners"`
+	}
+	if err := json.Unmarshal(raw, &answer); err != nil {
+		return err
+	}
+	if answer.Listeners == nil {
+		return errOlderServer
+	}
+	return nil
 }
 
 // projectArg checks a project= given: a project's key (in any case) or
@@ -433,10 +448,12 @@ type waitSpan struct{ total, hold time.Duration }
 // project or task key, a page id, a handle. The item's words are shown in
 // quotes, without what could end them or start a line.
 func (r *runner) waitFor(span waitSpan, ask listenAsk, forArg string) error {
+	if err := r.checkListensByProject(ask.project, ask.lease); err != nil {
+		return err
+	}
 	deadline := time.Now().Add(span.total)
-	scoped := false
 	for {
-		page, err := r.nextItem(r.ctx, ask, min(span.hold, firstHold(ask.project, scoped), time.Until(deadline)))
+		page, err := r.nextItem(r.ctx, ask, min(span.hold, time.Until(deadline)))
 		if err != nil {
 			var ae *APIError
 			if errors.As(err, &ae) && ae.Reason == "listening_elsewhere" {
@@ -451,7 +468,7 @@ func (r *runner) waitFor(span waitSpan, ask listenAsk, forArg string) error {
 		if err != nil {
 			return err
 		}
-		scoped, ask.lease, ask.take = true, page.Lease, false
+		ask.lease, ask.take = page.Lease, false
 		next := fmt.Sprintf("%s lease=%s", waitCommand(project, forArg), ask.lease)
 		if item := page.Item; item != nil {
 			if _, err := item.reading(); err != nil {
@@ -717,6 +734,6 @@ func (r *runner) forgetListener(project string) error {
 		fmt.Fprintf(r.out, "%s has no listener of its own: its items go to whatever listens to everything.\n", project)
 		return nil
 	}
-	fmt.Fprintf(r.out, "Forgot the listener of %s: its items go to whatever listens to everything again.\n", project)
+	fmt.Fprintf(r.out, "Forgot the listener of %s: from now on its items go to whatever listens to everything; what was waiting stays unread in the inbox.\n", project)
 	return nil
 }

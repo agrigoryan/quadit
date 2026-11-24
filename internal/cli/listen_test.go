@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -174,9 +175,14 @@ func TestListenAcknowledgesOnlyWhatItsCommandHandled(t *testing.T) {
 }
 
 // refusingListener refuses every read of the listener's cursor, as the
-// server does while another session holds its lease.
-func refusingListener(w http.ResponseWriter, _ *http.Request) {
+// server does while another session holds its lease; GET /listening it
+// answers as a server that listens by project.
+func refusingListener(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	if strings.HasSuffix(r.URL.Path, "/listening") {
+		_, _ = io.WriteString(w, `{"listening":true,"listeners":[]}`)
+		return
+	}
 	w.WriteHeader(http.StatusConflict)
 	_, _ = io.WriteString(w, `{"error":{"code":"conflict","reason":"listening_elsewhere","field":"lease","message":"@coder is already listening from another session (last heard 14:02 UTC)"}}`)
 }
@@ -195,17 +201,45 @@ func TestListenStopsWhenAnotherSessionListens(t *testing.T) {
 // its wait= seconds unless an item is there, answers the lease (testLease
 // unless told another) and, unless it is older than listening by project,
 // the project asked for, in upper case; and it keeps what each request
-// asked.
+// asked. GET /listening it answers with nothing listening, and, unless it
+// is older, no listeners; it counts those.
 type listenServer struct {
-	mu    sync.Mutex
-	item  string // the item's JSON, or "" for none
-	lease string
-	older bool // from before listening by project: project= is not answered
-	asked []url.Values
+	mu      sync.Mutex
+	item    string // the item's JSON, or "" for none
+	lease   string
+	older   bool // from before listening by project: project= is not answered
+	asked   []url.Values
+	checked int // the asks of GET /listening
+}
+
+// requests are what the asks of GET /listen asked, so far.
+func (s *listenServer) requests() []url.Values {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.asked)
+}
+
+// checks is how many times GET /listening was asked, so far.
+func (s *listenServer) checks() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.checked
 }
 
 func (s *listenServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	w.Header().Set("Content-Type", "application/json")
+	if strings.HasSuffix(r.URL.Path, "/listening") {
+		s.mu.Lock()
+		s.checked++
+		s.mu.Unlock()
+		if s.older {
+			_, _ = io.WriteString(w, `{"listening":false}`)
+		} else {
+			_, _ = io.WriteString(w, `{"listening":false,"listeners":[]}`)
+		}
+		return
+	}
 	s.mu.Lock()
 	s.asked = append(s.asked, q)
 	item := s.item
@@ -219,7 +253,6 @@ func (s *listenServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if lease == "" {
 		lease = testLease
 	}
-	w.Header().Set("Content-Type", "application/json")
 	raw, _ := json.Marshal(lease)
 	project, _ := json.Marshal(strings.ToUpper(q.Get("project")))
 	if s.older {
@@ -244,7 +277,7 @@ quadit wait for=30 lease=KQ7MX4PA   # then go on listening
 		if out.String() != want {
 			t.Fatalf("wait printed:\n%s\nwant:\n%s", out, want)
 		}
-		if q := srv.asked[0]; q.Get("wait") != "30" || q.Has("lease") || q.Has("take") {
+		if q := srv.requests()[0]; q.Get("wait") != "30" || q.Has("lease") || q.Has("take") {
 			t.Fatalf("the first wait asked %v", q)
 		}
 	})
@@ -263,13 +296,13 @@ quadit wait for=30 lease=KQ7MX4PA   # then go on listening
 		if want := "IDLE\nquadit wait for=3 lease=" + testLease + "   # go on listening\n"; out.String() != want {
 			t.Fatalf("wait printed:\n%s\nwant:\n%s", out, want)
 		}
-		if len(srv.asked) != 3 {
-			t.Fatalf("wait asked %d times, want 3 holds of a second: %v", len(srv.asked), srv.asked)
+		if len(srv.requests()) != 3 {
+			t.Fatalf("wait asked %d times, want 3 holds of a second: %v", len(srv.requests()), srv.requests())
 		}
-		if first := srv.asked[0]; first.Get("take") != "1" || first.Has("lease") {
+		if first := srv.requests()[0]; first.Get("take") != "1" || first.Has("lease") {
 			t.Fatalf("the first hold asked %v, want take=1 and no lease", first)
 		}
-		for _, q := range srv.asked[1:] {
+		for _, q := range srv.requests()[1:] {
 			if q.Get("lease") != testLease || q.Has("take") || q.Get("wait") != "1" {
 				t.Fatalf("a later hold asked %v, want the lease it was given", q)
 			}
@@ -469,6 +502,13 @@ type lateServer struct {
 	asked   []url.Values
 }
 
+// requests are what the asks of GET /listen asked, so far.
+func (s *lateServer) requests() []url.Values {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.asked)
+}
+
 func (s *lateServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	s.mu.Lock()
@@ -499,10 +539,10 @@ func TestALongWaitRenewsItsHoldsAndTakesWhatComesLate(t *testing.T) {
 	if !strings.HasPrefix(out.String(), "ITEM #7 comment SVA-1 from @ann: ") || !strings.Contains(out.String(), "quadit wait for=3600 lease="+testLease) {
 		t.Fatalf("the long wait printed:\n%s", out)
 	}
-	if len(srv.asked) < 3 {
-		t.Fatalf("the long wait asked %d times, want a hold renewed each second", len(srv.asked))
+	if len(srv.requests()) < 3 {
+		t.Fatalf("the long wait asked %d times, want a hold renewed each second", len(srv.requests()))
 	}
-	for _, q := range srv.asked[1:] {
+	for _, q := range srv.requests()[1:] {
 		if q.Get("lease") != testLease {
 			t.Fatalf("a later hold asked %v, without the lease it was given", q)
 		}
@@ -556,7 +596,7 @@ func TestAListenerSaysWhatItIs(t *testing.T) {
 	if err := r.wait(input{}); err != nil {
 		t.Fatal(err)
 	}
-	if by := srv.asked[0].Get("by"); by != "a chat" {
+	if by := srv.requests()[0].Get("by"); by != "a chat" {
 		t.Fatalf("a wait said it is %q", by)
 	}
 	if err := r.listen(input{rest: []string{"by=the Quadit app; rm", "--exec", "true"}}); err == nil || !strings.Contains(err.Error(), "by= says what listens") {
@@ -565,7 +605,7 @@ func TestAListenerSaysWhatItIs(t *testing.T) {
 	refusing := &listenServer{lease: "not a lease", item: `{"seq":1,"type":"assigned","task":"SVA-1"}`}
 	r = &runner{ctx: context.Background(), c: testClient(t, refusing), out: &bytes.Buffer{}}
 	_ = r.listen(input{rest: []string{"by=the Quadit app", "--exec", "true"}}) // ends at the lease it does not recognize, after asking once
-	if by := refusing.asked[0].Get("by"); by != "the Quadit app" {
+	if by := refusing.requests()[0].Get("by"); by != "the Quadit app" {
 		t.Fatalf("a listen with by= said it is %q", by)
 	}
 }
@@ -669,8 +709,8 @@ quadit wait project=SVA for=30 lease=KQ7MX4PA   # then go on listening
 		if out.String() != want {
 			t.Fatalf("wait printed:\n%s\nwant:\n%s", out, want)
 		}
-		if q := srv.asked[0]; q.Get("project") != "SVA" || q.Get("wait") != "1" {
-			t.Fatalf("the first ask was %v, want project=SVA held a second", q)
+		if q := srv.requests()[0]; q.Get("project") != "SVA" || q.Get("wait") != "30" || srv.checks() != 1 {
+			t.Fatalf("the first ask was %v after %d checks, want project=SVA held thirty seconds after one", q, srv.checks())
 		}
 	})
 
@@ -684,7 +724,7 @@ quadit wait project=SVA for=30 lease=KQ7MX4PA   # then go on listening
 		if want := "IDLE\nquadit wait project=SVA lease=" + testLease + "   # go on listening\n"; out.String() != want {
 			t.Fatalf("wait printed:\n%s\nwant:\n%s", out, want)
 		}
-		for _, q := range srv.asked {
+		for _, q := range srv.requests() {
 			if q.Get("project") != "SVA" {
 				t.Fatalf("a hold asked %v, without the project", q)
 			}
@@ -702,36 +742,62 @@ quadit wait project=SVA for=30 lease=KQ7MX4PA   # then go on listening
 	t.Run("a project not of a key's or an id's form", func(t *testing.T) {
 		srv := &listenServer{}
 		r := &runner{ctx: context.Background(), c: testClient(t, srv), out: &bytes.Buffer{}}
-		if err := r.wait(input{f: map[string][]string{"project": {"SVA; rm -rf ~"}}}); err == nil || !strings.Contains(err.Error(), "project= is a project's key") || len(srv.asked) != 0 {
-			t.Fatalf("wait with a strange project ended with %v, having asked %v", err, srv.asked)
+		if err := r.wait(input{f: map[string][]string{"project": {"SVA; rm -rf ~"}}}); err == nil || !strings.Contains(err.Error(), "project= is a project's key") || len(srv.requests()) != 0 {
+			t.Fatalf("wait with a strange project ended with %v, having asked %v", err, srv.requests())
 		}
 	})
 }
 
 // TestAServerTooOldToListenByProjectIsFoundOutAtOnce: a server from before
 // listening by project ignores project= and would hand over every item; a
-// wait or a listen asked for a project stops at its first answer, a hold
-// of a second, saying so, and prints nothing to run.
+// wait or a listen asked for a project with no lease yet first reads
+// GET /listening, which takes no lease, and stops there when the answer
+// lists no listeners, saying so, without asking GET /listen (so take=1
+// never takes a lease there); a wait that goes on with a lease does not
+// ask again.
 func TestAServerTooOldToListenByProjectIsFoundOutAtOnce(t *testing.T) {
 	t.Setenv("QUADIT_CONFIG", filepath.Join(t.TempDir(), "codex.json"))
 	srv := &listenServer{older: true, item: `{"seq":42,"type":"assigned","by":"@ann","task":"GS-3"}`}
 	out := &bytes.Buffer{}
 	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: out}
-	if err := r.wait(input{f: map[string][]string{"project": {"SVA"}}}); !errors.Is(err, errOlderServer) || out.Len() != 0 {
+	if err := r.wait(input{f: map[string][]string{"project": {"SVA"}, "take": {"1"}}}); !errors.Is(err, errOlderServer) || out.Len() != 0 {
 		t.Fatalf("wait printed %q and ended with %v", out, err)
 	}
 	if err := r.listen(input{rest: []string{"project=SVA", "--exec", "true"}}); !errors.Is(err, errOlderServer) {
 		t.Fatalf("listen ended with %v", err)
 	}
-	if len(srv.asked) != 2 || srv.asked[0].Get("wait") != "1" || srv.asked[1].Get("wait") != "1" {
-		t.Fatalf("they asked %v, want one hold of a second each", srv.asked)
+	if asked := srv.requests(); len(asked) != 0 || srv.checks() != 2 {
+		t.Fatalf("they asked GET /listen %v and GET /listening %d times, want only the two checks", asked, srv.checks())
 	}
 	if !strings.Contains(errOlderServer.Error(), "older and cannot listen to one project") {
 		t.Fatalf("the message is %q", errOlderServer)
 	}
-	// Without project=, an older server is as good as ever.
-	if err := r.wait(input{}); err != nil {
+	// Without project=, an older server is as good as ever, and is not asked.
+	if err := r.wait(input{}); err != nil || srv.checks() != 2 {
+		t.Fatalf("a wait of everything ended with %v after %d checks", err, srv.checks())
+	}
+
+	current := &listenServer{item: `{"seq":42,"type":"assigned","by":"@ann","task":"SVA-3"}`}
+	r = &runner{ctx: context.Background(), c: testClient(t, current), out: &bytes.Buffer{}}
+	if err := r.wait(input{f: map[string][]string{"project": {"SVA"}, "lease": {testLease}}}); err != nil || current.checks() != 0 {
+		t.Fatalf("a wait going on with its lease ended with %v after %d checks, want none", err, current.checks())
+	}
+}
+
+// TestAProjectsLeaseFileDoesNotHangOnTheKeysCase: a companion started with
+// project=sva and one with project=SVA share one lease file, so the second
+// is refused and a restart keeps the lease.
+func TestAProjectsLeaseFileDoesNotHangOnTheKeysCase(t *testing.T) {
+	t.Setenv("QUADIT_CONFIG", filepath.Join(t.TempDir(), "codex.json"))
+	c := testClient(t, http.NotFoundHandler())
+	lower, upper := listenArgs([]string{"project=sva"}), listenArgs([]string{"project=SVA"})
+	first, err := openLeaseFile(c, lower.project)
+	if err != nil {
 		t.Fatal(err)
+	}
+	defer first.close()
+	if _, err := openLeaseFile(c, upper.project); !errors.Is(err, errAnotherListen) {
+		t.Fatalf("project=SVA beside project=sva opened its own lease file: %v", err)
 	}
 }
 
@@ -768,11 +834,15 @@ Everything else: a companion listens (last heard 2026-11-23 14:05 UTC); it leave
 // project=KEY asks the server to forget that project's listener, and says
 // what became of its items.
 func TestListeningForgetsAProjectsListener(t *testing.T) {
+	var mu sync.Mutex
 	var asked []string
 	srv := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
 		asked = append(asked, r.Method+" "+r.URL.Path+"?"+r.URL.RawQuery)
+		first := len(asked) == 1
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = io.WriteString(w, `{"project":"SVA","forgotten":`+strconv.FormatBool(len(asked) == 1)+`}`)
+		_, _ = io.WriteString(w, `{"project":"SVA","forgotten":`+strconv.FormatBool(first)+`}`)
 	})
 	out := &bytes.Buffer{}
 	r := &runner{ctx: context.Background(), c: testClient(t, srv), out: out}
@@ -781,7 +851,10 @@ func TestListeningForgetsAProjectsListener(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	want := "Forgot the listener of SVA: its items go to whatever listens to everything again.\nSVA has no listener of its own: its items go to whatever listens to everything.\n"
+	want := "Forgot the listener of SVA: from now on its items go to whatever listens to everything; what was waiting stays unread in the inbox.\n" +
+		"SVA has no listener of its own: its items go to whatever listens to everything.\n"
+	mu.Lock()
+	defer mu.Unlock()
 	if out.String() != want || len(asked) != 2 || !strings.HasPrefix(asked[0], "DELETE ") || !strings.Contains(asked[0], "/listening/SVA?") {
 		t.Fatalf("forget asked %v and printed:\n%s", asked, out)
 	}

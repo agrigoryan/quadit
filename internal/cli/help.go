@@ -77,8 +77,9 @@ var helpTopics = map[string]string{
   listening                    what already listens as you, to which project, and what, without
                                taking a lease
                                quadit listening  ->  Something already listens as you: a companion (last heard 2026-11-21 14:05 UTC).
-  listening forget project=KEY hand a project's items to whatever listens to everything again,
-                               once nothing listens to it
+  listening forget project=KEY from now on, hand a project's items to whatever listens to
+                               everything, once nothing listens to it; what was waiting stays
+                               unread in the inbox
   wait [project=KEY] [for=SECONDS] [lease=ID] [take=1]
                                wait for the next inbox item (50 seconds unless for= says, up to
                                3600), then print ITEM or IDLE and the exact commands to go on:
