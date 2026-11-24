@@ -12,6 +12,10 @@ UPDATE decisions SET state = 'not_needed', outcome = NULL, decided_by = NULL, de
     updated_at = (EXTRACT(EPOCH FROM now()) * 1000)::BIGINT
 WHERE state IN ('open', 'sent_back')
     AND task_id IN (SELECT t.id FROM tasks t JOIN statuses s ON s.id = t.status_id WHERE s.category IN ('done', 'canceled'));
+-- The items that asked them of someone are read, as closing reads them.
+UPDATE notifications SET read_at = (EXTRACT(EPOCH FROM now()) * 1000)::BIGINT
+WHERE read_at IS NULL AND entity_type = 'decision' AND type IN ('decision_asked', 'unclear')
+    AND entity_id IN (SELECT id FROM decisions WHERE state = 'not_needed');
 UPDATE tasks SET waiting_on_id = NULL, waiting_on_note = '', waiting_outside = FALSE
 WHERE (waiting_on_id IS NOT NULL OR waiting_outside OR waiting_on_note <> '')
     AND status_id IN (SELECT id FROM statuses WHERE category IN ('done', 'canceled'));

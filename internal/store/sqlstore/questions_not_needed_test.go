@@ -51,6 +51,11 @@ func TestUpgradeSettlesWhatHangsOnClosedTasks(t *testing.T) {
 			sentBack := ask(done)
 			do(owner.ID, "decision.pick", map[string]any{"id": sentBack, "outcome": "none", "note": "talk it through"})
 			onOpenTask := ask(open)
+			// The engine of now reads what a send-back or an answer settles;
+			// the database of before read nothing.
+			if err := st.Exec(ctx, "UPDATE notifications SET read_at = NULL"); err != nil {
+				t.Fatal(err)
+			}
 			// The database of before: the task went done and still waits on
 			// the owner, as a hand-off on a done task left it.
 			db := st.In(ws.ID)
@@ -99,6 +104,18 @@ func TestUpgradeSettlesWhatHangsOnClosedTasks(t *testing.T) {
 			}
 			if err := db.Get(ctx, &task, store.Eq("id", open)); err != nil || task.WaitingOnID != owner.ID {
 				t.Errorf("the open task's waiting changed: %+v (%v)", task, err)
+			}
+			// The items that asked the settled questions are read; that of the
+			// question on the open task is not.
+			var items []core.Notification
+			if err := db.List(ctx, &items, store.Where(store.Eq("type", core.NoteAsked))); err != nil {
+				t.Fatal(err)
+			}
+			for _, n := range items {
+				settled := n.EntityID == stillOpen || n.EntityID == sentBack
+				if settled != (n.ReadAt != 0) {
+					t.Errorf("the item of question %s reads at %d", n.EntityID, n.ReadAt)
+				}
 			}
 			// The new state is one the table takes.
 			do(owner.ID, "decision.close", map[string]any{"id": onOpenTask})
