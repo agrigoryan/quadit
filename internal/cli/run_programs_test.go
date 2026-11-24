@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/agrigoryan/quadit/internal/core"
 )
 
 // fixtureHeader is the first line of a fixture of a program's output: how
@@ -145,26 +147,56 @@ func TestTheCommandsAreArgumentLists(t *testing.T) {
 	}
 }
 
-func TestTheLoginSettingIsReadInEachFormTOMLHas(t *testing.T) {
-	for _, text := range []string{
-		"[shell_environment_policy.set]\nQUADIT_CONFIG = \"/x/a.json\"\n",
-		"[shell_environment_policy]\ninherit = \"all\"\nset = { QUADIT_CONFIG = \"/x/a.json\", OTHER = \"1\" }\n",
-		"shell_environment_policy.set.QUADIT_CONFIG = '/x/a.json'\n",
-		"shell_environment_policy = { set = { QUADIT_CONFIG = \"/x/a.json\" } }\n",
-	} {
-		home := t.TempDir()
-		_ = os.MkdirAll(filepath.Join(home, ".codex"), 0o700)
-		_ = os.WriteFile(filepath.Join(home, ".codex", "config.toml"), []byte(text), 0o600)
-		if got, ok := (codex{}).LoginSetting(home); !ok || got != "/x/a.json" {
-			t.Fatalf("%q read as %q %v", text, got, ok)
+func TestEverySettingThatCouldChangeTheLoginPauses(t *testing.T) {
+	const login = "/logins/claude.json"
+	type file struct{ path, text string }
+	cases := []struct {
+		name  string
+		p     program
+		files []file
+		pause bool
+	}{
+		{"no settings at all", claudeCode{}, nil, false},
+		{"Claude Code's settings without Quadit's", claudeCode{}, []file{{"home/.claude/settings.json", `{"env":{"FOO":"1"}}`}}, false},
+		{"the entry's own login", claudeCode{}, []file{{"home/.claude/settings.json", `{"env":{"QUADIT_CONFIG":"` + login + `"}}`}}, false},
+		{"another login in the user settings", claudeCode{}, []file{{"home/.claude/settings.json", `{"env":{"QUADIT_CONFIG":"/other.json"}}`}}, true},
+		{"QUADIT_URL in the user settings", claudeCode{}, []file{{"home/.claude/settings.json", `{"env":{"QUADIT_URL":"http://x"}}`}}, true},
+		{"QUADIT_TOKEN in the project settings", claudeCode{}, []file{{"folder/.claude/settings.json", `{"env":{"QUADIT_TOKEN":"t"}}`}}, true},
+		{"another login in the project's local settings", claudeCode{}, []file{{"folder/.claude/settings.local.json", `{"env":{"QUADIT_CONFIG":"/other.json"}}`}}, true},
+		{"QUADIT_URL in the project's local settings", claudeCode{}, []file{{"folder/.claude/settings.local.json", `{"env":{"QUADIT_URL":"http://x"}}`}}, true},
+		{"project settings that do not parse", claudeCode{}, []file{{"folder/.claude/settings.json", `{"env":`}}, true},
+		{"Codex without Quadit's", codex{}, []file{{"home/.codex/config.toml", "[shell_environment_policy]\ninherit = \"all\"\n"}}, false},
+		{"Codex with the entry's login", codex{}, []file{{"home/.codex/config.toml", "[shell_environment_policy.set]\nQUADIT_CONFIG = \"" + login + "\"\n"}}, false},
+		{"Codex with another login", codex{}, []file{{"home/.codex/config.toml", "[shell_environment_policy.set]\nQUADIT_CONFIG = \"/other.json\"\n"}}, true},
+		{"Codex with a quoted key", codex{}, []file{{"home/.codex/config.toml", "[shell_environment_policy.set]\n'QUADIT_CONFIG' = '/other.json'\n"}}, true},
+		{"Codex with QUADIT_URL inline", codex{}, []file{{"home/.codex/config.toml", "[shell_environment_policy]\nset = { OTHER = \"1\", QUADIT_URL = \"http://x\" }\n"}}, true},
+		{"Codex with QUADIT_TOKEN dotted", codex{}, []file{{"home/.codex/config.toml", "shell_environment_policy.set.QUADIT_TOKEN = \"t\"\n"}}, true},
+		{"Codex with a line too long to read", codex{}, []file{{"home/.codex/config.toml", "# " + strings.Repeat("x", 2<<20) + "\n"}}, true},
+		{"Codex naming it elsewhere", codex{}, []file{{"home/.codex/config.toml", "[shell_environment_policy]\nexclude = [\"QUADIT_CONFIG\"]\n# QUADIT_URL = \"x\"\n[other]\nQUADIT_TOKEN = \"t\"\n"}}, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			home, folder := filepath.Join(dir, "home"), filepath.Join(dir, "folder")
+			for _, f := range c.files {
+				path := filepath.Join(dir, f.path)
+				_ = os.MkdirAll(filepath.Dir(path), 0o700)
+				_ = os.WriteFile(path, []byte(f.text), 0o600)
+			}
+			if got := settingsPause(c.p, home, folder, login); (got == core.PauseLoginMismatch) != c.pause {
+				t.Fatalf("paused %q, want a pause: %v", got, c.pause)
+			}
+		})
+	}
+	t.Run("a settings file that cannot be read", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "home", ".claude", "settings.json")
+		_ = os.MkdirAll(filepath.Dir(path), 0o700)
+		_ = os.WriteFile(path, []byte(`{}`), 0o000)
+		if got := settingsPause(claudeCode{}, filepath.Join(dir, "home"), filepath.Join(dir, "folder"), login); got != core.PauseLoginMismatch {
+			t.Fatalf("an unreadable settings file read as %q", got)
 		}
-	}
-	home := t.TempDir()
-	_ = os.MkdirAll(filepath.Join(home, ".codex"), 0o700)
-	_ = os.WriteFile(filepath.Join(home, ".codex", "config.toml"), []byte("[shell_environment_policy]\nexclude = [\"QUADIT_CONFIG\"]\n# QUADIT_CONFIG = \"/x\"\n[other]\nQUADIT_CONFIG = \"/y\"\n"), 0o600)
-	if got, ok := (codex{}).LoginSetting(home); ok {
-		t.Fatalf("read %q where nothing sets it", got)
-	}
+	})
 }
 
 func TestAResetTimeIsTheNextSuchTime(t *testing.T) {

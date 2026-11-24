@@ -45,6 +45,8 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -101,28 +103,45 @@ func (codex) ResumeLine(folderLabel, session string) string {
 	return "cd " + folderForShell(folderLabel) + " && codex resume " + session
 }
 
-func (codex) LoginSetting(home string) (string, bool) {
-	f, err := os.Open(filepath.Join(codexHome(home), "config.toml"))
+// QuaditSettings reads config.toml's shell_environment_policy.set.
+func (codex) QuaditSettings(home, _ string) ([]quaditSetting, error) {
+	path := filepath.Join(codexHome(home), "config.toml")
+	f, err := os.Open(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
 	if err != nil {
-		return "", false
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	defer f.Close()
-	return quaditConfigInTOML(f)
+	settings, err := quaditSettingsInTOML(f)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	for i := range settings {
+		settings[i].File = path
+	}
+	return settings, nil
 }
 
-// tomlQuaditConfig finds QUADIT_CONFIG = "…" on a line, and tomlTable a
-// table's header.
+// tomlQuaditVariable finds a QUADIT_CONFIG, QUADIT_URL or QUADIT_TOKEN
+// key on a line, and tomlQuaditValue one with its value; tomlTable finds
+// a table's header.
 var (
-	tomlQuaditConfig = regexp.MustCompile(`(?:^|[{,\s.])"?QUADIT_CONFIG"?\s*=\s*(?:"([^"]*)"|'([^']*)')`)
-	tomlTable        = regexp.MustCompile(`^\[\s*([A-Za-z0-9_."-]+)\s*\]`)
+	tomlQuaditVariable = regexp.MustCompile(`(?:^|[{,\s.])["']?(QUADIT_(?:CONFIG|URL|TOKEN))["']?\s*=`)
+	tomlQuaditValue    = regexp.MustCompile(`(?:^|[{,\s.])["']?(QUADIT_(?:CONFIG|URL|TOKEN))["']?\s*=\s*(?:"([^"]*)"|'([^']*)')`)
+	tomlTable          = regexp.MustCompile(`^\[\s*([A-Za-z0-9_."'-]+)\s*\]`)
 )
 
-// quaditConfigInTOML is shell_environment_policy.set.QUADIT_CONFIG in a
-// Codex config, written in any of the forms TOML has for it: the key in
-// the table [shell_environment_policy.set], set.QUADIT_CONFIG or an inline
-// set = { QUADIT_CONFIG = … } in [shell_environment_policy], the whole
-// dotted key at the top, or the policy as one inline table.
-func quaditConfigInTOML(f *os.File) (string, bool) {
+// quaditSettingsInTOML are the QUADIT_ variables of
+// shell_environment_policy.set in a Codex config, in any of the forms
+// TOML writes them: keys of the table [shell_environment_policy.set];
+// set.KEY or an inline set = { … } in [shell_environment_policy]; the
+// whole dotted key at the top; the policy as one inline table. A key it
+// finds there with a value it cannot read, or a file it cannot read to
+// its end, is an error: what is set is not known.
+func quaditSettingsInTOML(f *os.File) ([]quaditSetting, error) {
+	var out []quaditSetting
 	table := ""
 	scan := bufio.NewScanner(f)
 	for scan.Scan() {
@@ -131,21 +150,27 @@ func quaditConfigInTOML(f *os.File) (string, bool) {
 			continue
 		}
 		if m := tomlTable.FindStringSubmatch(line); m != nil {
-			table = strings.ReplaceAll(m[1], `"`, "")
+			table = strings.NewReplacer(`"`, "", "'", "").Replace(m[1])
 			continue
 		}
-		m := tomlQuaditConfig.FindStringSubmatch(line)
-		if m == nil {
+		if !tomlQuaditVariable.MatchString(line) {
 			continue
 		}
 		key, _, _ := strings.Cut(line, "=")
-		full := strings.Trim(strings.Join([]string{table, strings.ReplaceAll(strings.TrimSpace(key), `"`, "")}, "."), ".")
-		// set.QUADIT_CONFIG, set = { … }, or the whole policy inline.
-		if strings.HasPrefix(full, "shell_environment_policy.set") || (full == "shell_environment_policy" && strings.Contains(line, "set")) {
-			return m[1] + m[2], true
+		full := strings.Trim(strings.Join([]string{table, strings.NewReplacer(`"`, "", "'", "").Replace(strings.TrimSpace(key))}, "."), ".")
+		// set.KEY, set = { … }, or the whole policy inline.
+		if !strings.HasPrefix(full, "shell_environment_policy.set") && (full != "shell_environment_policy" || !strings.Contains(line, "set")) {
+			continue
+		}
+		values := tomlQuaditValue.FindAllStringSubmatch(line, -1)
+		if len(values) != len(tomlQuaditVariable.FindAllString(line, -1)) {
+			return nil, errors.New("a QUADIT_ setting whose value could not be read")
+		}
+		for _, m := range values {
+			out = append(out, quaditSetting{Name: m[1], Value: m[2] + m[3]})
 		}
 	}
-	return "", false
+	return out, scan.Err()
 }
 
 // codexWords are Codex's error words.

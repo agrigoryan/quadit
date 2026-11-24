@@ -295,7 +295,11 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 		if end, ok := r.endedYet(ctx); !ok {
 			return end // the runner stopping, or the lease lost, between two attempts
 		}
-		if pause := e.checkFolderAndProgram(ctx); pause != "" {
+		pause := e.checkFolderAndProgram(ctx)
+		if pause == "" {
+			pause = settingsPause(e.prog, e.srv.host.home, e.reg.Folder, e.reg.Login)
+		}
+		if pause != "" {
 			e.pauseEntry(pause)
 			return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, line: "failed: " + pauseWords(pause, e.prog.Title(), time.Time{})}
 		}

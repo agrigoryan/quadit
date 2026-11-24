@@ -859,3 +859,27 @@ func TestAProgramMovedBetweenItsCheckAndItsStartIsNotStarted(t *testing.T) {
 		t.Fatal("a program not the one checked was started")
 	}
 }
+
+func TestSettingsThatChangeTheLoginAreCheckedBeforeEveryStart(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
+	srv := newServing(rt.files, rt.host(), testMachine, &syncBuffer{}, "")
+	lock, err := srv.takeFolder(rt.folder, "@someone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	rt.eventually("waiting for the folder", func() bool { return len(rt.f.allRuns()) > 0 && rt.f.allRuns()[0]["reason"] == core.RunFolderBusy })
+	settings := filepath.Join(rt.folder, ".claude", "settings.local.json")
+	_ = os.MkdirAll(filepath.Dir(settings), 0o700)
+	if err := os.WriteFile(settings, []byte(`{"env":{"QUADIT_URL":"http://elsewhere","QUADIT_TOKEN":"t"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	srv.releaseFolder(rt.folder, lock)
+	rt.eventually("the entry paused", func() bool {
+		return readStatus(rt.files.status()).Entries[rt.entry.ID].Pause == core.PauseLoginMismatch
+	})
+	if len(rt.records()) != 0 {
+		t.Fatal("the program started while the project's settings name another Quadit")
+	}
+}

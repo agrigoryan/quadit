@@ -41,6 +41,8 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -102,19 +104,36 @@ func (claudeCode) ResumeLine(folderLabel, session string) string {
 	return "cd " + folderForShell(folderLabel) + " && claude --resume " + session
 }
 
-func (claudeCode) LoginSetting(home string) (string, bool) {
-	raw, err := os.ReadFile(filepath.Join(claudeHome(home), "settings.json"))
-	if err != nil {
-		return "", false
+// QuaditSettings reads the env of the user's settings and of both of the
+// folder's own (.claude/settings.json and .claude/settings.local.json).
+func (claudeCode) QuaditSettings(home, folder string) ([]quaditSetting, error) {
+	var out []quaditSetting
+	for _, path := range []string{filepath.Join(claudeHome(home), "settings.json"), filepath.Join(folder, ".claude", "settings.json"),
+		filepath.Join(folder, ".claude", "settings.local.json")} {
+		raw, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		var settings struct {
+			Env map[string]json.RawMessage `json:"env"`
+		}
+		if err := json.Unmarshal(raw, &settings); err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		for _, name := range quaditVariables {
+			if v, ok := settings.Env[name]; ok {
+				var s string
+				if json.Unmarshal(v, &s) != nil {
+					s = string(v) // not a string: set all the same
+				}
+				out = append(out, quaditSetting{File: path, Name: name, Value: s})
+			}
+		}
 	}
-	var settings struct {
-		Env map[string]any `json:"env"`
-	}
-	if json.Unmarshal(raw, &settings) != nil {
-		return "", false
-	}
-	v, ok := settings.Env["QUADIT_CONFIG"].(string)
-	return v, ok && v != ""
+	return out, nil
 }
 
 // claudeWords are Claude Code's error words.

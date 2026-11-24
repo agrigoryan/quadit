@@ -237,8 +237,8 @@ func (e *liveEntry) check(ctx context.Context) (pause string, err error) {
 	if pause := e.checkFolderAndProgram(ctx); pause != "" {
 		return pause, nil
 	}
-	if setting, ok := e.prog.LoginSetting(e.srv.host.home); ok && resolved(expandHome(setting, e.srv.host.home)) != resolved(e.reg.Login) {
-		return core.PauseLoginMismatch, nil
+	if pause := settingsPause(e.prog, e.srv.host.home, e.reg.Folder, e.reg.Login); pause != "" {
+		return pause, nil
 	}
 	signedIn, err := e.signedIn(ctx)
 	if err != nil {
@@ -248,6 +248,24 @@ func (e *liveEntry) check(ctx context.Context) (pause string, err error) {
 		return core.PauseNotSignedIn, nil
 	}
 	return "", nil
+}
+
+// settingsPause is login_mismatch when the program's own settings could
+// make a run work as another login than the entry's, whichever of its
+// settings files wins: QUADIT_CONFIG naming another file, QUADIT_URL or
+// QUADIT_TOKEN set at all, or a settings file that cannot be read. "" when
+// none.
+func settingsPause(p program, home, folder, login string) string {
+	settings, err := p.QuaditSettings(home, folder)
+	if err != nil {
+		return core.PauseLoginMismatch
+	}
+	for _, s := range settings {
+		if s.Name != "QUADIT_CONFIG" || resolved(expandHome(s.Value, home)) != resolved(login) {
+			return core.PauseLoginMismatch
+		}
+	}
+	return ""
 }
 
 // verifyLogin reads the entry's login file and makes sure it is the
