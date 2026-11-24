@@ -829,7 +829,7 @@ func (e *liveEntry) ackWrite(run string, head listenItem, lease string) outboxWr
 // item's id: one row per item however often it comes.
 func (e *liveEntry) notStarted(ctx context.Context, head listenItem, why string) {
 	run := itemRunID(head.ID)
-	args := e.startArgs(run, head, core.AgentSessionNotStarted)
+	args := e.startArgs(run, []listenItem{head}, core.AgentSessionNotStarted)
 	args["reason"] = why
 	// The row and the acknowledgment are one write: decided together, so a
 	// crash between them never sends the row again with other bytes.
@@ -842,10 +842,69 @@ func (e *liveEntry) notStarted(ctx context.Context, head listenItem, why string)
 	_ = e.flush(ctx) // not sent: the head comes again, and waits for it (endWaits)
 }
 
-// startArgs are a run's session.start arguments, in a state.
-func (e *liveEntry) startArgs(run string, head listenItem, state string) map[string]any {
+// startArgs are a run's session.start arguments, in a state, for its
+// items (the head first).
+func (e *liveEntry) startArgs(run string, items []listenItem, state string) map[string]any {
+	head := items[0]
 	return map[string]any{"id": run, "task": head.Task, "state": state, "program": e.reg.Program, "machine_id": e.srv.machineNow().ID,
-		"machine_name": e.srv.machineNow().Name, "folder": e.label, "lease": e.lease, "item_seq": head.Seq, "instructions": head.line()}
+		"machine_name": e.srv.machineNow().Name, "folder": e.label, "lease": e.lease, "item_seq": head.Seq, "instructions": runInstructions(items)}
+}
+
+// runInstructions is what started a run, as its row shows it to people
+// under "Started by": the head item said as a person would, and how many
+// more items the prompt carries ("@ann commented: "…" and 2 more."). The
+// agent reads the items' own lines in its prompt, not this.
+func runInstructions(items []listenItem) string {
+	said := items[0].sentence()
+	if n := len(items) - 1; n > 0 {
+		said = strings.TrimSuffix(said, ".") + fmt.Sprintf(" and %d more.", n)
+	}
+	return said
+}
+
+// sentence is the item as a person says it, the agent being "it": who did
+// what, with their words in quotes ("@ann commented: "…""). It keeps the
+// care of the item's line: a handle and a task key only of their form,
+// the words as quotable gives them.
+func (item listenItem) sentence() string {
+	who := "Someone"
+	if handleForm.MatchString(item.By) {
+		who = item.By
+	}
+	words := quotable(item.Snippet)
+	did := func(what string) string {
+		if words == "" {
+			return who + " " + what + "."
+		}
+		return who + " " + what + `: "` + words + `"`
+	}
+	switch item.Type {
+	case core.NoteComment:
+		return did("commented")
+	case core.NoteReplied:
+		return did("replied")
+	case core.NoteMentioned:
+		return did("mentioned it")
+	case core.NoteResult:
+		return did("posted a result")
+	case core.NoteWaitingOn:
+		return did("is waiting on it")
+	case core.NoteAsked:
+		return did("asked it a question")
+	case core.NotePicked:
+		return did("answered its question")
+	case core.NoteUnclear:
+		return did("found its answer unclear")
+	case core.NoteAssigned:
+		if taskForm.MatchString(item.Task) {
+			return who + " assigned " + item.Task + "."
+		}
+		return who + " assigned a task to it."
+	}
+	if words == "" {
+		return who + "."
+	}
+	return who + `: "` + words + `"`
 }
 
 // flush sends the outbox, and says whether everything was sent.

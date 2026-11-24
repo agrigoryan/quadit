@@ -140,10 +140,7 @@ func (e *liveEntry) run(ctx context.Context, items []listenItem, continuing bool
 // or an error when the server refused it for good.
 func (r *agentRun) start(ctx context.Context) (int64, error) {
 	e, head := r.e, r.items[0]
-	args := e.startArgs(r.id, head, core.AgentSessionWaiting)
-	if n := len(r.items) - 1; n > 0 {
-		args["instructions"] = fmt.Sprintf("%s and %d more items", head.line(), n)
-	}
+	args := e.startArgs(r.id, r.items, core.AgentSessionWaiting)
 	if r.session != "" {
 		args["program_session"] = r.session
 		r.sentSession = r.session

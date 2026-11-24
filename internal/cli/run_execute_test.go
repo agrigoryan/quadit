@@ -42,10 +42,14 @@ func TestThePromptGoesOnStandardInputNeverAsAnArgument(t *testing.T) {
 	rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
 	rt.f.addItem(fakeItem{Task: "SVA-12"})
 	rt.serve()
-	rt.ended(0)
+	row := rt.ended(0)
 	r := rt.records()[0]
 	if !strings.HasPrefix(r.Stdin, "Quadit started you, @claude, on Test Mac in ~/devel/game, for task SVA-12.") || !strings.Contains(r.Stdin, `ITEM #1001 comment SVA-12 from @aram: "please do it"`) {
 		t.Fatalf("the prompt on standard input:\n%s", r.Stdin)
+	}
+	// The agent reads the item's line; people read on the run what started it.
+	if row["instructions"] != `@aram commented: "please do it"` {
+		t.Fatalf("the run says it was started by %q", row["instructions"])
 	}
 	for _, a := range r.Argv {
 		if strings.Contains(a, "Quadit") || strings.Contains(a, "please") {

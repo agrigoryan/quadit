@@ -542,6 +542,13 @@ func (item listenItem) line() string {
 	if text == "" {
 		text = item.Title
 	}
+	return strings.Join(parts, " ") + `: "` + quotable(text) + `"`
+}
+
+// quotable is an item's words as they are put between double quotes: on
+// one line, without control characters, their own double quotes made
+// single, at most 200 characters.
+func quotable(text string) string {
 	text = strings.Map(func(r rune) rune {
 		switch {
 		case r == '"':
@@ -552,7 +559,7 @@ func (item listenItem) line() string {
 		return r
 	}, text)
 	runes := []rune(strings.Join(strings.Fields(text), " "))
-	return strings.Join(parts, " ") + `: "` + string(runes[:min(len(runes), 200)]) + `"`
+	return string(runes[:min(len(runes), 200)])
 }
 
 // record is what wait prints of the item for an agent to act on, without

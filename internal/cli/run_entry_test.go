@@ -739,3 +739,40 @@ func TestAnAnswerThatDoesNotHoldTogetherIsNotActedOn(t *testing.T) {
 		})
 	}
 }
+
+func TestARunSaysWhatStartedItAsAPersonWould(t *testing.T) {
+	item := func(typ, snippet string) listenItem {
+		return listenItem{Seq: 2343, Type: typ, By: "@aram-grigoryan", Task: "SVA-53", Title: "SVA-53 Boss fight", Snippet: snippet}
+	}
+	for _, c := range []struct {
+		item listenItem
+		want string
+	}{
+		{item(core.NoteComment, "check this out"), `@aram-grigoryan commented: "check this out"`},
+		{item(core.NoteReplied, "yes"), `@aram-grigoryan replied: "yes"`},
+		{item(core.NoteMentioned, "@codex look"), `@aram-grigoryan mentioned it: "@codex look"`},
+		{item(core.NoteResult, "Shipped"), `@aram-grigoryan posted a result: "Shipped"`},
+		{item(core.NoteAssigned, ""), `@aram-grigoryan assigned SVA-53.`},
+		{item(core.NoteWaitingOn, "the numbers"), `@aram-grigoryan is waiting on it: "the numbers"`},
+		{item(core.NoteWaitingOn, ""), `@aram-grigoryan is waiting on it.`},
+		{item(core.NoteAsked, "Which one?"), `@aram-grigoryan asked it a question: "Which one?"`},
+		{item(core.NotePicked, "The second"), `@aram-grigoryan answered its question: "The second"`},
+		{item(core.NoteUnclear, "Say more"), `@aram-grigoryan found its answer unclear: "Say more"`},
+		{item("something_new", "hi"), `@aram-grigoryan: "hi"`},
+		// The same care as the line an agent reads: no handle or key not of its form, one line, its quotes made single, 200 characters.
+		{listenItem{Type: core.NoteComment, By: "@Not A Handle\n", Snippet: "two\nlines \"quoted\"\x07"}, `Someone commented: "two lines 'quoted'"`},
+		{listenItem{Type: core.NoteAssigned, By: "@ann", Task: "SVA-53; rm -rf"}, `@ann assigned a task to it.`},
+		{listenItem{Type: core.NoteComment, By: "@ann", Snippet: strings.Repeat("é", 300)}, `@ann commented: "` + strings.Repeat("é", 200) + `"`},
+	} {
+		if got := runInstructions([]listenItem{c.item}); got != c.want {
+			t.Errorf("%s: %q, want %q", c.item.Type, got, c.want)
+		}
+	}
+	more := []listenItem{item(core.NoteComment, "check this out"), item(core.NoteComment, "and this"), item(core.NoteAssigned, "")}
+	if got, want := runInstructions(more), `@aram-grigoryan commented: "check this out" and 2 more.`; got != want {
+		t.Errorf("with more items: %q, want %q", got, want)
+	}
+	if got, want := runInstructions(more[2:]), `@aram-grigoryan assigned SVA-53.`; got != want {
+		t.Errorf("%q, want %q", got, want)
+	}
+}
