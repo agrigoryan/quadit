@@ -472,3 +472,68 @@ func TestAResourcesTurnOnATaskStaysOutOfItsBatch(t *testing.T) {
 		})
 	}
 }
+
+// TestAHeadThatStartsNothingComesAlone: "gpu is yours now" for a task,
+// then the owner's comment on it: the resource's turn, which names the
+// resource as its task and starts nothing, is handed without a batch, and
+// the comment comes next, as a head of its own.
+func TestAHeadThatStartsNothingComesAlone(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		key := r.task(t, M{"assignee": "@claude"})
+		r.drain(t)
+		r.change(t, r.owner, "", "resource.create", M{"name": "gpu"})
+		r.change(t, r.owner, "", "resource.acquire", M{"resource": "gpu"})
+		r.change(t, nil, r.claude, "resource.acquire", M{"resource": "gpu", "task": key})
+		r.change(t, r.owner, "", "resource.release", M{"resource": "gpu"})
+		r.change(t, r.owner, "", "comment.create", M{"task": key, "body": "Render it now."})
+		got := r.hold(t, "&batch=1")
+		if got.Wake.Do+" "+got.Wake.Why != "ack resource" || got.Batch == nil || len(got.Batch) != 0 {
+			t.Fatalf("the resource's turn came as %+v", got)
+		}
+		r.ack(t, got.Seq)
+		if next := r.hold(t, "&batch=1"); next.Item.Task != key || next.Wake.Do != "run" {
+			t.Fatalf("the comment came as %+v", next)
+		}
+	})
+}
+
+// TestAKeptItemWithdrawnDuringAPauseIsFromBefore: a run that took an item
+// from before the runner stops at a usage limit; while it is paused the
+// owner gives the task to someone else: the kept item is acknowledged as
+// from before, and the runner, which follows the server, does not go on.
+func TestAKeptItemWithdrawnDuringAPauseIsFromBefore(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := beforeTheRunner(t, st)
+		key := r.task(t, M{"assignee": "@claude"})
+		head := r.hold(t, "")
+		r.runOn(t, key, head.Seq, head.Seq, M{"state": "failed", "reason": core.RunUsageLimit})
+		r.change(t, r.owner, "", "task.update", M{"id": key, "assignee": "@codex"})
+		if again := r.hold(t, ""); again.Seq != head.Seq || again.Wake.Do+" "+again.Wake.Why != "ack before" {
+			t.Fatalf("the withdrawn kept item is told %+v", again)
+		}
+	})
+}
+
+// TestABatchLooksAtAHundredItemsAtMost: a hold reads at most a hundred
+// of the task's items after the head for its batch; a run item past them
+// is not in this batch, and comes with a later head.
+func TestABatchLooksAtAHundredItemsAtMost(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		key := r.task(t, nil)
+		r.change(t, nil, r.claude, "watch.set", M{"subject": key})
+		r.change(t, r.owner, "", "comment.create", M{"task": key, "body": "@claude look at this"})
+		for i := range 100 {
+			r.change(t, r.owner, "", "comment.create", M{"task": key, "body": fmt.Sprint("note ", i)})
+		}
+		r.change(t, r.owner, "", "comment.create", M{"task": key, "body": "@claude and this"})
+		got := r.hold(t, "&batch=1")
+		if got.Wake.Do != "run" || len(got.Batch) != 0 {
+			t.Fatalf("the head %+v came with %d more", got.Item, len(got.Batch))
+		}
+	})
+}

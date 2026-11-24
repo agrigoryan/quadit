@@ -57,14 +57,19 @@ const (
 )
 
 // A runner's hold (GET /listen with machine_id=) is answered, besides its
-// head item, with at most batchLength other items of the head's task.
-const batchLength = 20
+// head item, with at most batchLength other items of the head's task, of
+// the first batchLooks after it: a task with many items that start nothing
+// is not read through again for every head.
+const (
+	batchLength = 20
+	batchLooks  = 100
+)
 
 // listenerRoutes are the routes of the listener.
 func (s *Server) listenerRoutes() []route {
 	return []route{
 		{"GET /api/v1/w/{ws}/listening", s.workspaceMember(s.handleShowListeners), "What listens as the caller, without taking a lease: {listening, by, last_heard} of the listener of everything (by is what holds the lease, as the holder said: \"a chat\", \"a companion\", \"the Quadit app\"), and listeners, every listener of the caller's: [{project_id, project, by, last_heard, live, runner}], the listener of everything with no project; runner, on a listener Quadit's runner marked: {machine, folder, program, program_version, holding (the runner holds the lease now), since (its last hold), paused, paused_until, task (the task of this project its open run is on)}. A project's listener stays when its session stops (live false): its items wait for its next listener, and the listener of everything leaves them out.", "", "follow"},
-		{"GET /api/v1/w/{ws}/listen", s.workspaceMember(s.handleNextInboxItem), "The listener's read: the next item of the caller's inbox after the listener's cursor, waiting for one up to wait seconds (at most 55). With project=, the listener of that project: its items only, from the cursor listen:<project id>. Without, the listener of everything: the items of no project and of every project that never had a listener of its own, from the cursor listen. It holds that listener's lease: the first call takes it, and each call after gives its id as lease=; while it lives (90 seconds past the end of the hold its holder last asked for) another session is refused (reason listening_elsewhere) unless it asks with take=1, and the agent counts as listening. Answers {lease} when the wait ended with nothing, or {lease, seq, item, line, wake} (line: the item as the feed writes it; wake: what Quadit's runner does with it, {do: run, ack or refuse, why}), with project: the project's key, for a project's listener. A runner's hold (machine_id=) marks the listener as its own; the first on a listener with no runner begins the runner there: the cursor is set just before the oldest item that still waits on the agent (GET listening/{key}/waiting tells what would start), or at the present when none does, and an item from before then that no longer waits is answered with wake {do: ack, why: before}; with batch=1 and a head item of a task, batch is the other items of that task after it that this listener would be handed and that start a run (wake run), oldest first, at most 20, each {seq, item, line, wake}, not handed by being told; a runner hold with a lease that a release let go is refused (lease_stale), and a release puts the cursor back to where the runner began, at least. Nothing moves the cursor but an acknowledgment with the lease: PUT cursors/listen {seq, lease}. An agent's login only.", "wait: seconds, up to 55; project: a project's key or id, to listen to that project only; lease: the id the last call answered with; take: true to take the lease from the session that holds it; by: what listens, in a few plain words, said to whoever asks (\"a chat\", \"a companion\"); machine_id: Quadit's runner's machine (16 lower-case hex), which makes the hold a runner's, of a project's listener only; machine_name, folder (its label, from / or ~), program (claude, codex), program_version: what the runner says of itself; paused: why it holds every item back (usage_limit, not_signed_in, program_missing, folder_missing, login_mismatch, server_old), empty for nothing; paused_until: with paused=usage_limit, when it tries again (Unix ms); batch: true to be answered also the other items of the head's task", "follow"},
+		{"GET /api/v1/w/{ws}/listen", s.workspaceMember(s.handleNextInboxItem), "The listener's read: the next item of the caller's inbox after the listener's cursor, waiting for one up to wait seconds (at most 55). With project=, the listener of that project: its items only, from the cursor listen:<project id>. Without, the listener of everything: the items of no project and of every project that never had a listener of its own, from the cursor listen. It holds that listener's lease: the first call takes it, and each call after gives its id as lease=; while it lives (90 seconds past the end of the hold its holder last asked for) another session is refused (reason listening_elsewhere) unless it asks with take=1, and the agent counts as listening. Answers {lease} when the wait ended with nothing, or {lease, seq, item, line, wake} (line: the item as the feed writes it; wake: what Quadit's runner does with it, {do: run, ack or refuse, why}), with project: the project's key, for a project's listener. A runner's hold (machine_id=) marks the listener as its own; the first on a listener with no runner begins the runner there: the cursor is set just before the oldest item that still waits on the agent (GET listening/{key}/waiting tells what would start), or at the present when none does, and an item from before then that no longer waits is answered with wake {do: ack, why: before}; with batch=1 and a head item of a task, batch is the other items of that task after it that this listener would be handed and that start a run (wake run), among the first 100 after it, oldest first, at most 20, each {seq, item, line, wake}, not handed by being told; a head that starts no run comes with an empty batch; a runner hold with a lease that a release let go is refused (lease_stale), and a release puts the cursor back to where the runner began, at least. Nothing moves the cursor but an acknowledgment with the lease: PUT cursors/listen {seq, lease}. An agent's login only.", "wait: seconds, up to 55; project: a project's key or id, to listen to that project only; lease: the id the last call answered with; take: true to take the lease from the session that holds it; by: what listens, in a few plain words, said to whoever asks (\"a chat\", \"a companion\"); machine_id: Quadit's runner's machine (16 lower-case hex), which makes the hold a runner's, of a project's listener only; machine_name, folder (its label, from / or ~), program (claude, codex), program_version: what the runner says of itself; paused: why it holds every item back (usage_limit, not_signed_in, program_missing, folder_missing, login_mismatch, server_old), empty for nothing; paused_until: with paused=usage_limit, when it tries again (Unix ms); batch: true to be answered also the other items of the head's task", "follow"},
 		{"DELETE /api/v1/w/{ws}/listening/{key}/runner", s.workspaceMember(s.handleReleaseRunner), "Let Quadit's runner on a machine go from the caller's listener of a project (its key, or its id): when machine_id is the machine that marked it, the mark goes (the next runner begins anew), and so does the runner's lease, live or run out: a chat can listen at once, and nothing made with that lease is accepted again; the listener and its cursor stay. Answers {project, released}: released false when there was no mark, or another machine's. dry_run=1 checks without doing. An agent's login only.", "machine_id: the runner's machine; dry_run: true to check only", "follow"},
 		{"DELETE /api/v1/w/{ws}/listening/{key}", s.workspaceMember(s.handleForgetListener), "Forget the caller's listener of a project (its key, or its id), and its cursor, so that from now on the project's items go to the listener of everything, whose cursor moves to the present: nothing acknowledged comes again, and what was pending for either stays unread in the inbox. Refused (conflict, reason listening_elsewhere) while its lease lives. Answers {project, forgotten}: forgotten false when the project had no listener of its own. dry_run=1 checks without forgetting.", "", "follow"},
 	}
@@ -243,8 +248,11 @@ func (s *Server) handleNextInboxItem(x *c) error {
 		return err
 	}
 	batch = batch && ev.ScopeType == "task"
-	var more []handedItem
-	if batch {
+	// A head that starts no run comes alone: what it would carry is the
+	// next head's (and an item that starts nothing may name its task
+	// otherwise, as a resource's turn does).
+	more := []handedItem{}
+	if batch && head.Wake.Do == wakeRun {
 		if more, err = x.taskBatch(x.ctx(), ev, project.ID, own, names, hold.began); err != nil {
 			return err
 		}
@@ -313,8 +321,10 @@ func (who *viewer) handed(ctx context.Context, ev core.Event, names *nameLookup,
 
 // taskBatch is what a runner's hold answers with its head ev beside it: the
 // viewer's items after it, of the same task, that the listener of scope
-// would be handed (listenFilter) and that start a run (wake run), up to the
-// present, oldest first, at most batchLength. They are what a runner gives
+// would be handed (listenFilter) and that start a run (wake run), among
+// the first batchLooks after it, oldest first, at most batchLength; past
+// those the batch is smaller, and the rest come with a later head. They are
+// what a runner gives
 // its program with the head; any other comes as a head of its own, and so
 // does an item that names its task otherwise (a resource's turn, titled
 // with the resource). They are not recorded as handed: each comes again as
@@ -323,7 +333,7 @@ func (who *viewer) taskBatch(ctx context.Context, ev core.Event, scope string, o
 	f := listenFilter(who.feed(), scope, own)
 	f.After, f.OnlyAudience, f.Types, f.ScopeType, f.ScopeID, f.Limit = ev.Seq, who.member.UserID, []string{"notification.created"}, ev.ScopeType, ev.ScopeID, batchLength
 	out := []handedItem{}
-	for len(out) < batchLength {
+	for looked := 0; len(out) < batchLength && looked < batchLooks; looked += f.Limit {
 		evs, err := who.readFeed(ctx, f)
 		if err != nil {
 			return nil, err
