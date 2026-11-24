@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -43,6 +44,7 @@ type runTest struct {
 	clock   *testClock
 	entry   regEntry
 	times   runTimings
+	poll    time.Duration // how often eventually looks
 
 	cancel context.CancelFunc
 	done   chan int
@@ -128,7 +130,7 @@ func newRunTest(t *testing.T, program string, scripts ...[]fakeagent.Step) *runT
 	if err != nil {
 		t.Fatal(err)
 	}
-	rt := &runTest{t: t, f: newFakeQuadit(), dir: dir, home: filepath.Join(dir, "home"), out: &syncBuffer{}, clock: newTestClock(), times: testTimings()}
+	rt := &runTest{t: t, f: newFakeQuadit(), dir: dir, home: filepath.Join(dir, "home"), out: &syncBuffer{}, clock: newTestClock(), times: testTimings(), poll: 3 * time.Millisecond}
 	rt.folder = filepath.Join(rt.home, "devel", "game")
 	for _, d := range []string{rt.folder, filepath.Join(dir, "config")} {
 		if err := os.MkdirAll(d, 0o700); err != nil {
@@ -259,9 +261,10 @@ func (rt *runTest) eventually(what string, cond func() bool) {
 	deadline := time.Now().Add(20 * time.Second)
 	for !cond() {
 		if time.Now().After(deadline) {
-			rt.t.Fatalf("waited for %s; quadit run said:\n%s\nchanges: %s", what, rt.out, rt.changeTypes())
+			status, _ := os.ReadFile(rt.files.status())
+			rt.t.Fatalf("waited for %s; quadit run said:\n%s\nstatus.json: %s\nchanges (fake server): %s", what, rt.out, status, rt.changeTypes())
 		}
-		time.Sleep(3 * time.Millisecond)
+		time.Sleep(rt.poll)
 	}
 }
 
@@ -564,4 +567,48 @@ func TestQuaditRunListSaysWhatEachEntryDoes(t *testing.T) {
 	if strings.Contains(out.String(), `"status"`) || !strings.Contains(out.String(), `"serving": false`) {
 		t.Fatalf("list --json with no runner printed %s", out.String())
 	}
+}
+
+// testServe is how a test starts the test binary as quadit run in a
+// process of its own (QUADIT_TEST_SERVE, read by TestMain): the registry,
+// the home folder, the program it fakes.
+type testServe struct {
+	Registry  string `json:"registry"`
+	Home      string `json:"home"`
+	FakeAgent string `json:"fake_agent"`
+}
+
+// serveForTest serves as quadit run does, on the test's computer, until
+// SIGINT or SIGTERM (or SIGKILL, which is what such a test sends). The
+// programs it starts are the fake agent.
+func serveForTest(spec string) int {
+	var s testServe
+	if err := json.Unmarshal([]byte(spec), &s); err != nil {
+		return 2
+	}
+	_ = os.Setenv("FAKEAGENT", s.FakeAgent) // for its children: this process is past fakeagent.Main
+	files, err := runFilesFor(s.Registry)
+	if err != nil {
+		return 2
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	host := runHost{home: s.Home, roots: testRoots(), clock: systemClock{start: time.Now()}, times: testTimings()}
+	return serve(ctx, files, host, os.Stdout, os.Stderr)
+}
+
+// serveApart starts quadit run in a process of its own, its output in
+// out, and gives the process.
+func (rt *runTest) serveApart(out io.Writer) *exec.Cmd {
+	rt.t.Helper()
+	exe, _ := os.Executable()
+	spec, _ := json.Marshal(testServe{Registry: rt.files.registry, Home: rt.home, FakeAgent: os.Getenv("FAKEAGENT")})
+	cmd := exec.Command(exe, "-test.run=^$")
+	cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "FAKEAGENT=") }), "QUADIT_TEST_SERVE="+string(spec))
+	cmd.Stdout, cmd.Stderr = out, out
+	if err := cmd.Start(); err != nil {
+		rt.t.Fatal(err)
+	}
+	rt.t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+	return cmd
 }

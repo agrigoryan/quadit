@@ -15,3 +15,6 @@ func TestRunRefusesToServeWithoutLocksAndGroups(t *testing.T) {
 		t.Fatalf("exit %d, said %q", code, errs.String())
 	}
 }
+
+// serveForTest is never asked for where quadit run cannot serve.
+func serveForTest(string) int { return 1 }
