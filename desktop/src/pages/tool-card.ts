@@ -460,7 +460,7 @@ export class ToolCard {
     const { name, chatListens, mcpOnly } = this.tool;
     const { listening, heard } = handshake;
     if (listening === null) return make("p", "Cannot tell right now whether it is listening.", "listen");
-    if (listening) return heardLines(heard);
+    if (listening) return heardLines(heard, !mcpOnly);
     const step = make("div", "", "next-step");
     step.setAttribute("role", "group");
     step.setAttribute("aria-label", `Next: have ${name} listen`);
@@ -502,11 +502,12 @@ export class ToolCard {
  * should know of each kind, in the skill's words: a chat answers while it is
  * open and stops when told to stop listening; a companion runs in a
  * terminal; a webhook pushes. One chat listens to a project at a time, and,
- * listening to projects only, another is added from a chat in its folder.
+ * listening to projects only, another is added from a chat in its folder
+ * (`mayAdd`: not for a tool connected by MCP alone, which cannot listen).
  * A page of an older server says nothing of what listens: then only that
  * it listens.
  */
-function heardLines(heard: Heard | undefined): HTMLElement {
+function heardLines(heard: Heard | undefined, mayAdd: boolean): HTMLElement {
   const box = make("div", "", "listening");
   const on = (text: string) => {
     const line = make("p", "", "listen on");
@@ -519,7 +520,8 @@ function heardLines(heard: Heard | undefined): HTMLElement {
     return box;
   }
   const { listeners, pushed, unheard } = heard;
-  const own = listeners.some((l) => l.project);
+  // Everything leaves out a project that listens by itself, and one whose own listener stopped (nothing hears it).
+  const own = listeners.some((l) => l.project) || unheard.length > 0;
   for (const l of listeners) {
     const what = l.project ? l.project.name : own ? "everything else" : "everything";
     box.append(on(`Listening to ${what}${l.by ? `, from ${l.by}` : ""}`));
@@ -544,7 +546,7 @@ function heardLines(heard: Heard | undefined): HTMLElement {
     box.append(said("A companion runs in a terminal, and stops with Ctrl-C or when that terminal closes."));
   // Listening to projects only: how to add another, named when it is the one left.
   const onlyProjects = !pushed && listeners.length > 0 && listeners.every((l) => l.project);
-  if (onlyProjects && unheard.length > 0)
+  if (mayAdd && onlyProjects && unheard.length > 0)
     box.append(
       said(
         unheard.length === 1

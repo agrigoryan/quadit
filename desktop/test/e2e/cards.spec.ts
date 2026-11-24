@@ -245,6 +245,17 @@ test("a connected card that is not listening makes the line to write its main st
     card.getByText("A companion runs in a terminal, and stops with Ctrl-C or when that terminal closes."),
   ).toBeVisible();
   await expect(card.getByText(/^To have it listen to/)).toHaveCount(0);
+
+  // A companion of everything while GS keeps its items for its own listener, stopped: everything else, not everything.
+  await page.evaluate(() => {
+    (window as unknown as { stand: Stand }).stand.handshake = {
+      state: "connected",
+      listening: true,
+      heard: { listeners: [{ by: "a companion" }], pushed: false, unheard: ["GS"] },
+    };
+  });
+  await expect(card.getByText("Listening to everything else, from a companion")).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByText("Listening to everything, from a companion")).toHaveCount(0);
 });
 
 // The app no longer answers by itself (main/self-runs.ts, answers: false), so it never says "on", "paused" or
