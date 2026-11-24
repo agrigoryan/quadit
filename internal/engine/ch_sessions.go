@@ -8,6 +8,7 @@
 package engine
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -170,14 +171,25 @@ func (c *cx) startRun(s *core.AgentSession, a sessionStartArgs, t core.Task) err
 	if a.ProgramSession != "" && !id.Valid(a.ProgramSession) {
 		return invalid("program_session", "program_session is the program's own session id: a lower-case UUID")
 	}
+	if err := c.mayWriteIn(t.ProjectID); err != nil {
+		return err
+	}
+	var same core.AgentSession
+	if there, err := store.Find(c.ctx, c.tx, &same, store.Eq("id", s.ID)); err != nil || there {
+		return cmp.Or(err, alreadyInUse(store.ErrConflict, "id", s.ID))
+	}
+	// The lease of the listener the runner on this machine holds: not a
+	// chat's that took the project over, nor another machine's. One that
+	// only ran out, which nobody took, is still its own.
 	var l core.Listener
-	held, err := store.Find(c.ctx, c.tx, &l, store.Eq("agent_id", c.actor.UserID), store.Eq("project_id", t.ProjectID), store.Eq("lease", a.Lease))
+	held, err := store.Find(c.ctx, c.tx, &l, store.Eq("agent_id", c.actor.UserID), store.Eq("project_id", t.ProjectID), store.Eq("lease", a.Lease),
+		store.Eq("machine_id", r.MachineID), store.Eq("runner_holds", true))
 	if err != nil {
 		return err
 	}
 	if !held {
 		return &Error{Code: CodeConflict, Field: "lease", Reason: ReasonLeaseStale,
-			Message: fmt.Sprintf("lease %s is no longer @%s's listener of %s's project: another session took the project over, and the item is that one's now", a.Lease, c.actor.Handle, t.Key)}
+			Message: fmt.Sprintf("lease %s is not the lease @%s's runner on this machine holds for the task's project: another session took the project over, and the item is that one's now", a.Lease, c.actor.Handle)}
 	}
 	if a.State == core.AgentSessionWaiting {
 		var open []core.AgentSession
@@ -327,6 +339,9 @@ func (c *cx) updateRun(p *patch, s core.AgentSession, a sessionUpdateArgs) error
 		if !slices.Contains(runMoves[s.State], to) {
 			return invalid("state", "a run that is %s cannot become %s: it runs only after it waited, and is done only after it ran", s.State, to)
 		}
+		if to == core.AgentSessionStopped && s.StopRequestedAt == 0 {
+			return invalid("state", "a run is stopped only when a member asked it to stop (session.stop); a run that ended otherwise failed, with its reason")
+		}
 	}
 
 	// A new state starts with no reason unless one is given with it.
@@ -350,7 +365,11 @@ func (c *cx) updateRun(p *patch, s core.AgentSession, a sessionUpdateArgs) error
 		p.put("ended_at", int64(0), c.at)
 	}
 
-	// Coverage is known only once the program took the prompt.
+	// Coverage is known only once the program took the prompt; not said, it
+	// is the run's own item alone.
+	if accepted && !a.ItemsThrough.Set {
+		p.put("items_through", s.ItemsThrough, s.ItemSeq)
+	}
 	if a.ItemsThrough.Set {
 		if !accepted || a.ItemsThrough.Null {
 			return invalid("items_through", "items_through is written with the move to running, when the program took the prompt")
@@ -458,19 +477,38 @@ type sessionStopArgs struct {
 // once, since nothing would ever act on the request. A run that ended, or
 // was asked already, is left as it is.
 func sessionStop(c *cx, a sessionStopArgs) error {
-	s, err := loadLive[core.AgentSession](c, "session", "id", a.ID)
-	if err != nil {
-		return err
+	// By its id alone: a name would be looked for among the sessions'
+	// titles, which are their tasks' titles.
+	var s core.AgentSession
+	there := false
+	if id.Valid(a.ID) {
+		var err error
+		if there, err = store.Find(c.ctx, c.tx, &s, store.Eq("id", a.ID)); err != nil {
+			return err
+		}
+	}
+	if !there {
+		e := notFound("session", a.ID)
+		e.Field = "id"
+		return e
 	}
 	if s.MachineID == "" || s.TaskID == "" {
 		return invalid("id", "this session was not started by Quadit, so Quadit cannot stop it")
+	}
+	// What the actor may reach is asked before anything names the task.
+	var t core.Task
+	if err := c.tx.Get(c.ctx, &t, store.Eq("id", s.TaskID)); err != nil {
+		return err
+	}
+	if err := c.mayWriteIn(t.ProjectID); err != nil {
+		return err
 	}
 	t, err := c.task("id", s.TaskID)
 	if err != nil {
 		return err
 	}
-	if !c.system && len(c.scope.Projects) > 0 && !slices.Contains(c.scope.Projects, t.ProjectID) {
-		return forbidden("your access does not include this project")
+	if err := c.checkAsker(t.ID); err != nil {
+		return err
 	}
 	c.ref = s.ID
 	if !openRun(s.State) || s.StopRequestedAt != 0 {
@@ -480,8 +518,7 @@ func sessionStop(c *cx, a sessionStopArgs) error {
 	p.put("stop_requested_at", int64(0), c.at)
 	p.put("stop_requested_by", "", c.actor.UserID)
 	var l core.Listener
-	there, err := store.Find(c.ctx, c.tx, &l, store.Eq("agent_id", s.AgentID), store.Eq("project_id", t.ProjectID))
-	if err != nil {
+	if there, err = store.Find(c.ctx, c.tx, &l, store.Eq("agent_id", s.AgentID), store.Eq("project_id", t.ProjectID)); err != nil {
 		return err
 	}
 	if !there || l.MachineID != s.MachineID || !l.HeldByRunner(c.at) {

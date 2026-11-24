@@ -129,11 +129,21 @@ func (c *cx) eachTask(f store.TaskFilter, fn func(t core.Task) error) error {
 	}
 }
 
+// mayWriteIn refuses a write in a project the change's credential does not
+// reach: what emit checks, for a handler that must know before it says
+// anything of what is there.
+func (c *cx) mayWriteIn(projectID string) error {
+	if projectID != "" && !c.system && len(c.scope.Projects) > 0 && !slices.Contains(c.scope.Projects, projectID) {
+		return forbidden("your access does not include this project")
+	}
+	return nil
+}
+
 // emit records an event, after checking that the actor may write where it
 // belongs.
 func (c *cx) emit(e event) error {
-	if e.place.projectID != "" && !c.system && len(c.scope.Projects) > 0 && !slices.Contains(c.scope.Projects, e.place.projectID) {
-		return forbidden("your access does not include this project")
+	if err := c.mayWriteIn(e.place.projectID); err != nil {
+		return err
 	}
 	if e.place.scopeType == "task" {
 		if err := c.checkAsker(e.place.scopeID); err != nil {

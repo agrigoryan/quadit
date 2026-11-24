@@ -116,6 +116,64 @@ func TestARunStartsOnlyWithTheCurrentLease(t *testing.T) {
 	})
 }
 
+// TestARunStartsOnlyWithTheRunnersOwnLease: the lease must be the one the
+// runner on the machine named holds, not a chat's that took the project
+// over, nor one another machine's runner marked.
+func TestARunStartsOnlyWithTheRunnersOwnLease(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		for _, held := range []struct {
+			name string
+			set  map[string]any
+		}{
+			{"a chat's lease", map[string]any{"runner_holds": false}},
+			{"another machine's", map[string]any{"machine_id": "0000000000000000"}},
+			{"a lease no runner marked", map[string]any{"machine_id": "", "runner_holds": false}},
+		} {
+			t.Run(held.name, func(t *testing.T) {
+				r := newRuns(t, st)
+				if _, err := st.Update(context.Background(), "listeners", held.set, store.Eq("lease", runnerLease)); err != nil {
+					t.Fatal(err)
+				}
+				_, err := r.try(r.claude, "session.start", start("SVA-1", nil))
+				refusedFor(t, err, engine.CodeConflict, "lease", engine.ReasonLeaseStale)
+			})
+		}
+	})
+}
+
+// TestARunsRefusalsNameNoTaskTheCallerMayNotReach: a start or a stop made
+// with a credential kept to other projects is refused for that, before
+// anything that would name the task; a stop finds its run by id only.
+func TestARunsRefusalsNameNoTaskTheCallerMayNotReach(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRuns(t, st)
+		mia := r.person("mia")
+		other := r.do(r.owner.ID, "project.create", M{"key": "ART", "name": "Art"}).Ref
+		run := r.running()
+		apply := func(actor engine.Actor, typ string, args M) error {
+			raw, _ := json.Marshal(args)
+			_, err := r.e.Apply(context.Background(), r.ws.ID, actor, engine.Change{ID: id.New(), Type: typ, Args: raw})
+			return err
+		}
+		kept := engine.Actor{UserID: r.claude, Projects: []string{other}}
+		err := apply(kept, "session.start", start("SVA-1", M{"lease": "ZZZZZZZZ"}))
+		refusedFor(t, err, engine.CodeForbidden, "", "")
+		r.do(r.owner.ID, "task.delete", M{"id": "SVA-1"})
+		err = apply(engine.Actor{UserID: mia, Projects: []string{other}}, "session.stop", M{"id": run})
+		refusedFor(t, err, engine.CodeForbidden, "", "")
+		if strings.Contains(err.Error(), "SVA") {
+			t.Errorf("the refusal names the task: %v", err)
+		}
+		var e *engine.Error
+		err = apply(engine.Actor{UserID: mia}, "session.stop", M{"id": "Boss fight"})
+		if !errors.As(err, &e) || e.Code != engine.CodeNotFound || e.Field != "id" || len(e.Allowed) != 0 {
+			t.Errorf("a stop by name was refused %v (allowed %v)", err, e)
+		}
+	})
+}
+
 func TestASecondOpenRunOfAnAgentOnATaskIsRefused(t *testing.T) {
 	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
@@ -193,6 +251,40 @@ func TestTheServerStampsWhenTheProgramTookThePrompt(t *testing.T) {
 		if s := r.session(run); s.State != core.AgentSessionRunning || s.AcceptedAt == 0 || s.AcceptedAt < s.StartedAt {
 			t.Fatalf("a run its program took is stored as %+v", s)
 		}
+	})
+}
+
+func TestCoverageIsTheRunsOwnItemWhenNotSaid(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRuns(t, st)
+		run := r.do(r.claude, "session.start", start("SVA-1", M{"item_seq": 40})).Ref
+		r.do(r.claude, "session.update", M{"id": run, "state": "running"})
+		if s := r.session(run); s.ItemsThrough != 40 {
+			t.Fatalf("coverage is %d", s.ItemsThrough)
+		}
+	})
+}
+
+func TestARunIsStoppedOnlyWhenAStopWasAsked(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRuns(t, st)
+		run := r.running()
+		_, err := r.try(r.claude, "session.update", M{"id": run, "state": "stopped"})
+		refusedFor(t, err, engine.CodeInvalid, "state", "")
+		r.do(r.owner.ID, "session.stop", M{"id": run})
+		r.do(r.claude, "session.update", M{"id": run, "state": "stopped"})
+	})
+}
+
+func TestARunIDInUseIsRefusedAsInUse(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRuns(t, st)
+		run := r.do(r.claude, "session.start", start("SVA-1", nil)).Ref
+		_, err := r.try(r.claude, "session.start", start("SVA-1", M{"id": run}))
+		refusedFor(t, err, engine.CodeConflict, "", engine.ReasonInUse)
 	})
 }
 
@@ -458,6 +550,23 @@ func TestAStopIsAskedNotByAMemberWhoMayOnlyRead(t *testing.T) {
 	})
 }
 
+// TestAStopThatChangesNothingIsCheckedAsOneThatDoes: an agent's stop on a
+// task given to agents by someone who lost their access is refused, even
+// when the run ended already.
+func TestAStopThatChangesNothingIsCheckedAsOneThatDoes(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRuns(t, st)
+		mia := r.person("mia")
+		codex := r.agent("codex")
+		key := r.do(mia, "task.create", M{"project": "SVA", "title": "Menu", "assignee": "@claude"}).Key
+		run := r.do(r.claude, "session.start", start(key, nil)).Ref
+		r.do(r.claude, "session.update", M{"id": run, "state": "failed", "reason": "interrupted"})
+		r.do(r.owner.ID, "member.update", M{"id": mia, "suspended": true})
+		r.refused(engine.CodeForbidden, codex, "session.stop", M{"id": run})
+	})
+}
+
 func TestAStopAskedTwiceIsOnce(t *testing.T) {
 	t.Parallel()
 	testdb.Each(t, func(t *testing.T, st store.Store) {
@@ -588,6 +697,7 @@ func TestACommentFromARunIsMarkedOnlyByTheAgentOfThatSession(t *testing.T) {
 			{"on a page", r.claude, M{"doc": page}},
 			{"a run that is not there", r.claude, M{"task": "SVA-1", "session": id.New()}},
 			{"not an id", r.claude, M{"task": "SVA-1", "session": "run-1"}},
+			{"a session recorded by hand", r.claude, M{"task": "SVA-1", "session": r.do(r.claude, "session.start", M{"task": "SVA-1"}).Ref}},
 		} {
 			t.Run(refused.name, func(t *testing.T) {
 				args := M{"body": "Done.", "session": run}

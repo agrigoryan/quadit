@@ -83,7 +83,7 @@ func commentCreate(c *cx, a commentCreateArgs) error {
 }
 
 // fromRun marks a comment as the last message of the run named, which must
-// be the actor's own on the comment's task t.
+// be a run Quadit's runner started for the actor on the comment's task t.
 func (c *cx) fromRun(cm *core.Comment, run string, t core.Task) error {
 	if run == "" {
 		return nil
@@ -93,7 +93,7 @@ func (c *cx) fromRun(cm *core.Comment, run string, t core.Task) error {
 		return refused
 	}
 	var s core.AgentSession
-	ok, err := store.Find(c.ctx, c.tx, &s, store.Eq("id", run), store.Eq("agent_id", c.actor.UserID), store.Eq("task_id", t.ID))
+	ok, err := store.Find(c.ctx, c.tx, &s, store.Eq("id", run), store.Eq("agent_id", c.actor.UserID), store.Eq("task_id", t.ID), store.Ne("machine_id", ""))
 	if err != nil {
 		return err
 	}
