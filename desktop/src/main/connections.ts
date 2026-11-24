@@ -914,13 +914,14 @@ export class Connections {
     return this.inTurn(async () => {
       if (plan?.kind !== "disconnect")
         return { ok: false, error: "That plan is gone: review the changes again.", stale: true };
-      const changed = changedSince(plan.edits);
-      if (changed)
-        return {
-          ok: false,
-          error: `${changed.path} changed since you reviewed the plan: review it again.`,
-          stale: true,
-        };
+      const stale = (): Refused | null => {
+        const changed = changedSince(plan.edits);
+        return changed
+          ? { ok: false, error: `${changed.path} changed since you reviewed the plan: review it again.`, stale: true }
+          : null;
+      };
+      const before = stale();
+      if (before) return before;
       // Quadit stops running the agent before its login is revoked, so that how its last run ended reaches the server
       // (agent-runs-contract.md §8.2). Not done yet: nothing else is, and the same plan may be carried out again.
       if (plan.revoke && !(await this.parts.removeRuns(plan.revoke.config)).ok) {
@@ -930,6 +931,9 @@ export class Connections {
           error: `Quadit is still telling the server how @${plan.agent}'s last run ended. Disconnect again in a moment.`,
         };
       }
+      // That can take a minute, in which the tool or the person may have changed a file of the plan.
+      const after = plan.revoke && stale();
+      if (after) return after;
       backUp(plan.edits, plan.backupDir);
       writeEdits(plan.edits);
       const ledger = this.ledger();

@@ -76,7 +76,11 @@ function setUp({
   tokensWait = Promise.resolve(),
   revokeRefused = "",
   ownServer = false,
-  runs = { refused: false, removed: [] as string[] },
+  runs = { refused: false, removed: [] as string[] } as {
+    refused: boolean;
+    removed: string[];
+    during?: () => void;
+  },
 }: {
   quaditOnPath?: boolean;
   bundled?: boolean;
@@ -94,8 +98,8 @@ function setUp({
   revokeRefused?: string;
   /** Whether the server "s1" is the one the app runs on this computer. */
   ownServer?: boolean;
-  /** What quadit run remove does: the logins it was asked to stop running, and whether it refuses. */
-  runs?: { refused: boolean; removed: string[] };
+  /** What quadit run remove does: the logins it was asked to stop running, whether it refuses, and what happens meanwhile. */
+  runs?: { refused: boolean; removed: string[]; during?: () => void };
 } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-connect-")));
   const home = join(root, "home");
@@ -168,6 +172,7 @@ function setUp({
     disconnected: (id) => void told.push(`disconnected ${id}`),
     removeRuns: async (login) => {
       runs.removed.push(login);
+      runs.during?.();
       return runs.refused ? { ok: false, error: "Quadit is still telling the server…" } : { ok: true };
     },
     appFor: (id) => (ownServer && id === "s1" ? "/Applications/Quadit.app/Contents/MacOS/Quadit" : null),
@@ -970,6 +975,27 @@ posixOnly("Quadit running a connected tool's agent (agent-runs-contract.md §8.2
     expect(runs.removed).toEqual([login, login]);
     expect(asked.at(-1)).toEqual({ kind: "revoke-token", token: "t1" });
     expect(existsSync(login)).toBe(false);
+  });
+
+  it("looks at the files again once Quadit stopped running the agent, and writes nothing over a file changed meanwhile", async () => {
+    const runs = { refused: false, removed: [] as string[], during: () => {} };
+    const { connections, connect, choice, home, asked } = setUp({ runs });
+    mkdirSync(join(home, ".claude"));
+    writeFileSync(join(home, ".claude", "settings.json"), "{}");
+    await connect(choice("claude"));
+    const planned = connections.planDisconnect("claude");
+    if (!planned.ok) throw new Error(planned.error);
+    const settings = join(home, ".claude", "settings.json");
+    const changed = '{"env":{"QUADIT_CONFIG":"/elsewhere.json"},"mine":true}';
+    runs.during = () => writeFileSync(settings, changed);
+    expect(await connections.applyDisconnect(planned.plan.id)).toEqual({
+      ok: false,
+      error: `${settings} changed since you reviewed the plan: review it again.`,
+      stale: true,
+    });
+    expect(readFileSync(settings, "utf8")).toBe(changed);
+    expect(asked.some((request) => request.kind === "revoke-token")).toBe(false);
+    expect(connections.runAs("claude")).not.toBeNull();
   });
 
   it("asks nothing of quadit run for a tool whose login stays (shared with another tool)", async () => {
