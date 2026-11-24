@@ -2,7 +2,7 @@
 // (test/fake-quadit-run.cjs), in a home folder of the test's own: the
 // supervisor over a spawner that can be faked, and once over the real guard.
 
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -409,6 +409,32 @@ posixOnly("Runner, its commands", () => {
     const me = { handle: "@odd", kind: "agent", projects: ["SVA", "sva", "GS\nrm -rf ~", 7] };
     writeFileSync(odd, JSON.stringify({ url: "https://q.example", token: "qd_z", me }));
     expect(await runner.projects(odd)).toEqual({ ok: true, projects: [{ key: "SVA", name: "SVA" }] });
+  });
+
+  it("says what adding a project would start at once, and nothing it cannot tell", async () => {
+    const { runner, login, configDir, quadit } = setUp();
+    const saved = JSON.parse(readFileSync(login, "utf8")) as Record<string, unknown>;
+    const tasks = [
+      { key: "SVA-1", title: "Line 0" },
+      { key: "bad key", title: "dropped" },
+      { key: "SVA-3", title: "Line 2" },
+    ];
+    writeFileSync(login, JSON.stringify({ ...saved, waiting: { SVA: { runs: 7, tasks } } }));
+    expect(await runner.waiting(login, "SVA")).toEqual({
+      agent: "@claude",
+      runs: 7,
+      tasks: [
+        { key: "SVA-1", title: "Line 0" },
+        { key: "SVA-3", title: "Line 2" },
+      ],
+    });
+    expect(await runner.waiting(login, "GS")).toEqual({ agent: "@claude", runs: 0, tasks: [] });
+    // Refused, or not reached: nothing said.
+    expect(await runner.waiting(login, "XYZ")).toBeNull();
+    expect(await runner.waiting(join(configDir, "nobody.json"), "SVA")).toBeNull();
+    // A quadit from before the form: it refuses the form, and nothing is said either.
+    writeFileSync(quadit, "#!/bin/sh\necho 'usage: quadit run …' >&2\nexit 1\n");
+    expect(await runner.waiting(login, "SVA")).toBeNull();
   });
 
   it("gives this computer's name and the ids of the projects it runs a login's agent for", async () => {

@@ -18,7 +18,7 @@
 // Styled by tools.css.
 
 import { button, make } from "@/pages/dom";
-import type { Owner, PagesApi, RunEntryView, RunsView } from "@/shared/pages-api";
+import type { Owner, PagesApi, RunEntryView, RunsView, RunWaiting } from "@/shared/pages-api";
 
 /** The app's pages API, asked only once the card is on its page. */
 const api = () => window.quaditPages as PagesApi;
@@ -46,6 +46,31 @@ export function choosingNote({ program, here }: RunWords, agent: string, project
   return owner.me
     ? `${program} runs there with full access, as you, whenever you assign ${agent} a task in ${where} or comment on one. Only your words, or those of your other agents, start it.`
     : `${program} runs there with full access, under your account on ${here}, whenever @${owner.handle} assigns ${agent} a task in ${where} or writes to it on one. Only @${owner.handle}’s words, or those of @${owner.handle}’s other agents, start it.`;
+}
+
+/**
+ * What Start running starts at once, said before it is pressed: the task
+ * that waits on the agent, or how many do and the first few of them, one
+ * run after another; nothing when none waits.
+ */
+export function waitingWords(waiting: RunWaiting): { lead: string; tasks: string[]; more: string | null } | null {
+  const tasks = waiting.tasks.map((t) => `${t.key} ${oneLine(t.title)}`);
+  const [first] = tasks;
+  if (waiting.runs === 0 || !first) return null;
+  if (waiting.runs === 1)
+    return { lead: `Starts now on ${/[.!?…]$/.test(first) ? first : `${first}.`}`, tasks: [], more: null };
+  const rest = waiting.runs - tasks.length;
+  return {
+    lead: `Starts now on ${waiting.runs} tasks that wait on ${waiting.agent}, one after another:`,
+    tasks,
+    more: rest > 0 ? `and ${rest} more` : null,
+  };
+}
+
+/** A title on one line: its first line, cut short. */
+function oneLine(title: string): string {
+  const line = title.split("\n", 1)[0]?.trim() ?? "";
+  return line.length > 80 ? `${line.slice(0, 79).trimEnd()}…` : line;
 }
 
 /** Why Quadit offers no run of the agent: it cannot tell whose words would start one. */
@@ -383,18 +408,44 @@ export class RunByQuadit {
     refused.setAttribute("role", "alert");
 
     const note = make("p", "", "run-note");
+    // What Start running starts at once, for the project chosen: said once known, nothing meanwhile.
+    const waits = make("div", "", "run-waits");
+    waits.setAttribute("aria-live", "polite");
+    let askedFor = "";
+    const askWaiting = () => {
+      const project = select.value;
+      if (project === askedFor) return;
+      askedFor = project;
+      waits.replaceChildren();
+      if (!project) return;
+      void api()
+        .runWaiting(this.tool.id, project)
+        .then((waiting) => {
+          if (askedFor !== project || this.choosing?.form !== form) return;
+          const words = waiting && waitingWords(waiting);
+          if (!words) return;
+          const list = make("ul", "", "run-waiting");
+          list.append(...words.tasks.map((t) => make("li", t)));
+          waits.replaceChildren(
+            make("p", words.lead, "run-starts"),
+            ...(words.tasks.length > 0 ? [list] : []),
+            ...(words.more ? [make("p", words.more, "run-more-tasks")] : []),
+          );
+        });
+    };
     let busy = false;
     const start = button("Start running", () => void go(), "btn btn-move btn-sm");
     const cancel = button("Cancel", () => this.close(true), "btn-text");
     const buttons = make("div", "", "run-buttons");
     buttons.append(start, cancel);
-    form.append(projectLabel, select, projectError, folderLabel, folderRow, refused, note, buttons);
+    form.append(projectLabel, select, projectError, folderLabel, folderRow, refused, note, waits, buttons);
     form.addEventListener("submit", (e) => e.preventDefault());
 
     const update = () => {
       start.disabled = !mayStart({ project: select.value, folder, busy });
       if (this.owner)
         setText(note, choosingNote(this.words, this.runs?.agent ?? agent, select.value || null, this.owner));
+      askWaiting();
     };
     select.addEventListener("change", update);
     const go = async () => {

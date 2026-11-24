@@ -69,6 +69,9 @@ test("Run by Quadit runs a connected Claude Code for a project in a folder, the 
     // Choosing, in the card: the project, the folder from the picker, then Start running.
     await offer.click();
     await card.getByLabel("Which project?").selectOption("GS");
+    // The first run handed GS-3 to Claude Code's agent: it waits on it, so Start running starts it at once, and the
+    // form says so first (quadit run waiting).
+    await expect(card.getByText(/^Starts now on GS-3 /)).toBeVisible({ timeout: 20_000 });
     await desktop.chooseNextFolder(folder);
     await card.getByRole("button", { name: "Choose folder…" }).click();
     await expect(card.getByText(/runs there with full access, as you/)).toBeVisible();
@@ -84,7 +87,8 @@ test("Run by Quadit runs a connected Claude Code for a project in a folder, the 
       .poll(entries, { timeout: 30_000 })
       .toEqual([expect.objectContaining({ project: "GS", folder: realpathSync(folder), program: "claude" })]);
     await expect(card.getByText(/^Runs GS in /)).toBeVisible({ timeout: 20_000 });
-    await expect(card.getByText("Ready.", { exact: true })).toBeVisible({ timeout: 60_000 });
+    // Ready, or at work on GS-3, which waited (the stand-in Claude Code fails to do it, and the runner tries again).
+    await expect(card.getByText(/^(Ready\.|Working on GS-3\.)$/)).toBeVisible({ timeout: 60_000 });
     await screen(connect, "11-run-by-quadit-ready.png");
 
     // Stop running: the runner lets the project go and the entry is gone; the offer is back.

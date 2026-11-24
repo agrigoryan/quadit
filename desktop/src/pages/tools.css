@@ -605,6 +605,36 @@ button.link-blue:hover {
   text-wrap: pretty;
 }
 
+/* What Start running starts at once: said plainly, above the button. */
+.run-waits:empty {
+  display: none;
+}
+
+.run-starts {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.run-waiting {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.run-waiting li {
+  overflow-wrap: anywhere;
+}
+
+.run-more-tasks {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
 .run-buttons {
   display: flex;
   align-items: center;

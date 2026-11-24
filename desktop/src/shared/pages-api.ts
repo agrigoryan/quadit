@@ -250,6 +250,17 @@ export interface RunEntryView {
 }
 
 /**
+ * What Starting running would start at once: the tasks that wait on the
+ * agent in the project (`runs`, one run each; `tasks`, the first few, by key
+ * and title, at most 5).
+ */
+export interface RunWaiting {
+  agent: string;
+  runs: number;
+  tasks: { key: string; title: string }[];
+}
+
+/**
  * "Run by Quadit" on a tool's card (agent-runs-contract.md §8.2): the agent
  * Quadit runs the tool as ("@claude"), and the projects it runs it for on
  * this computer.
@@ -464,6 +475,8 @@ export interface PagesApi {
   runEntries(toolId: string): Promise<RunsView | null>;
   /** The projects the tool's agent may work in. */
   agentProjects(toolId: string): Promise<{ ok: true; projects: { key: string; name: string }[] } | Refused>;
+  /** What Start running would start at once in `project`; null when it cannot be told (the card then says nothing). */
+  runWaiting(toolId: string, project: string): Promise<RunWaiting | null>;
   /** The native folder picker over the page's window: the folder chosen, and as a person writes it (~); null when cancelled. */
   pickFolder(): Promise<{ path: string; shown: string } | null>;
   /** Has Quadit run the tool's agent for `project` in `folder` (quadit run add); the runner is started if it was not running. */

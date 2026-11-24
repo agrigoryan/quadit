@@ -9,6 +9,7 @@ import {
   statusLine,
   unreadableLine,
   untilWords,
+  waitingWords,
 } from "@/pages/run-by-quadit";
 import type { RunEntryView } from "@/shared/pages-api";
 
@@ -104,6 +105,30 @@ describe("Run by Quadit's words", () => {
       `${tomorrow.toLocaleDateString(undefined, { weekday: "short" })} ${tomorrow.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`,
     );
     expect(untilWords("soon", now)).toBe("soon");
+  });
+
+  it("says what Start running starts at once: nothing, one task, or how many and the first five", () => {
+    const tasks = (n: number) => Array.from({ length: n }, (_, i) => ({ key: `SVA-${50 + i}`, title: `Level ${i}` }));
+    expect(waitingWords({ agent: "@claude", runs: 0, tasks: [] })).toBeNull();
+    expect(
+      waitingWords({ agent: "@claude", runs: 1, tasks: [{ key: "SVA-53", title: "Check the new level graphics" }] }),
+    ).toEqual({ lead: "Starts now on SVA-53 Check the new level graphics.", tasks: [], more: null });
+    expect(
+      waitingWords({ agent: "@claude", runs: 1, tasks: [{ key: "SVA-53", title: "Why so slow?\nDetails" }] })?.lead,
+    ).toBe("Starts now on SVA-53 Why so slow?");
+    expect(waitingWords({ agent: "@claude", runs: 3, tasks: tasks(3) })).toEqual({
+      lead: "Starts now on 3 tasks that wait on @claude, one after another:",
+      tasks: ["SVA-50 Level 0", "SVA-51 Level 1", "SVA-52 Level 2"],
+      more: null,
+    });
+    expect(waitingWords({ agent: "@claude", runs: 7, tasks: tasks(5) })).toMatchObject({
+      tasks: ["SVA-50 Level 0", "SVA-51 Level 1", "SVA-52 Level 2", "SVA-53 Level 3", "SVA-54 Level 4"],
+      more: "and 2 more",
+    });
+    const long = "x".repeat(200);
+    expect(waitingWords({ agent: "@a", runs: 1, tasks: [{ key: "SVA-1", title: long }] })?.lead).toBe(
+      `Starts now on SVA-1 ${"x".repeat(79)}…`,
+    );
   });
 
   it("says a write about a run the server refused for good", () => {

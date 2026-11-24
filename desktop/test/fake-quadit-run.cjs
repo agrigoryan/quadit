@@ -14,6 +14,7 @@
 //   run add login= project= folder= program= [program_path=]
 //   run remove ID | login=PATH   with a runner serving: marks the entries removing and waits (2 s, the real one 60)
 //   run list [--json]
+//   run waiting login= project= --json   what the login file's "waiting" says of the project (read only)
 //   run machine name=
 //   --json me              the login file's "me" (QUADIT_CONFIG), as the server answers /me
 //   login --path
@@ -215,6 +216,21 @@ if (first === "login" && second === "--path") {
           : "not served: no quadit run is running";
       say(`${e.id}  ${e.agent}  ${e.project}  ${tilde(e.folder)}  ${TITLES[e.program] ?? e.program}  ${words}`);
     }
+} else if (first === "run" && second === "waiting") {
+  const a = keyed(args.slice(2));
+  if (!a.login || !a.project) refuse("usage: quadit run waiting login=PATH project=KEY [--json]");
+  const saved = existsSync(a.login) ? JSON.parse(readFileSync(a.login, "utf8")) : undefined;
+  if (!saved?.me) refuse("cannot reach https://q.example: connection refused");
+  const key = (saved.me.projects ?? []).find((k) => k.toLowerCase() === a.project.toLowerCase());
+  if (!key) refuse(`${saved.me.handle} may not work in ${a.project}: quadit me lists its projects`);
+  const waiting = saved.waiting?.[key] ?? { runs: 0, tasks: [] };
+  say(
+    JSON.stringify(
+      { agent: saved.me.handle, project: key, runs: waiting.runs, tasks: waiting.tasks.slice(0, 5) },
+      null,
+      2,
+    ),
+  );
 } else if (first === "run" && second === "machine") {
   const name = keyed(args.slice(2)).name ?? "";
   if (name.length < 1 || name.length > 64) refuse("name= is this computer's name: 1 to 64 characters");

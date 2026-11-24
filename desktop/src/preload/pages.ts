@@ -54,6 +54,7 @@ const api: PagesApi = {
   showToolLog: call("showToolLog"),
   runEntries: call("runEntries"),
   agentProjects: call("agentProjects"),
+  runWaiting: call("runWaiting"),
   pickFolder: call("pickFolder"),
   startRunning: call("startRunning"),
   stopRunning: call("stopRunning"),

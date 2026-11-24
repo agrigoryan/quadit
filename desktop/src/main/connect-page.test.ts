@@ -100,6 +100,10 @@ function harness({
       available,
       entries: async (login) => (unreadable ? null : (entries[login] ?? [])),
       projects: async (login) => ({ ok: true, projects: [{ key: login, name: "as asked" }] }),
+      waiting: async (login, project) => {
+        said.push(`waiting ${login} ${project}`);
+        return { agent: "@claude", runs: 1, tasks: [{ key: `${project}-1`, title: "First" }] };
+      },
       add: async (a) => {
         said.push(`add ${JSON.stringify(a)}`);
         return { ok: true };
@@ -200,6 +204,18 @@ describe("ConnectPage, Run by Quadit", () => {
         error: "Choose the folder again.",
       });
     expect(said).toEqual([]);
+  });
+
+  it("tells what running a project would start, asked as the tool's own login, for a project key only", async () => {
+    const { call, said } = harness();
+    expect(await call(1, "runWaiting", "claude", "SVA")).toEqual({
+      agent: "@claude",
+      runs: 1,
+      tasks: [{ key: "SVA-1", title: "First" }],
+    });
+    expect(await call(1, "runWaiting", "claude", "sva; rm")).toBeNull();
+    expect(await call(1, "runWaiting", "gemini", "SVA")).toBeNull();
+    expect(said).toEqual(["waiting /q/claude.json SVA"]);
   });
 
   it("asks the projects as the tool's own login", async () => {

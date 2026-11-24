@@ -25,7 +25,7 @@ import type { RunningChild, startChild } from "@/main/child-guard";
 import { withoutQuadit } from "@/main/child-guard";
 import { homely } from "@/main/connections";
 import { isProjectKey } from "@/shared/bridge";
-import type { Refused, RunEntryView, RunPause, RunProgram } from "@/shared/pages-api";
+import type { Refused, RunEntryView, RunPause, RunProgram, RunWaiting } from "@/shared/pages-api";
 
 export interface RunnerParts {
   /** The quadit the app carries (its version is the app's); null in a build without one. */
@@ -103,6 +103,9 @@ export const NOT_SERVED = {
 };
 
 const NO_QUADIT: Refused = { ok: false, error: "This Quadit app has no quadit command of its own to run agents with." };
+
+/** A task's key, as the server makes them ("SVA-12"): only such keys are shown. */
+const TASK_KEY = /^[A-Z][A-Z0-9]{1,9}-[0-9]{1,9}$/;
 
 /** A removal not done: `pending`, the runner is still telling the server how a run ended, and lets the entry go once it has. */
 export type RemoveRefused = Refused & { pending?: true };
@@ -313,6 +316,34 @@ export class Runner {
     if (!left || left.entries.some((e) => e.removing))
       this.recheck = setTimeout(() => void this.reconcile().then(() => this.parts.changed()), RECHECK_MS);
     return left;
+  }
+
+  /**
+   * What `quadit run add` for `project` would start at once (`quadit run
+   * waiting`, which only reads): the tasks that wait on the agent of the
+   * login `login` there. Null when it cannot be told: a refusal, a server
+   * not reached, a quadit without that form, an answer not of its form.
+   */
+  async waiting(login: string, project: string): Promise<RunWaiting | null> {
+    if (!this.available) return null;
+    const said = await this.run(["run", "waiting", `login=${login}`, `project=${project}`, "--json"], COMMAND_MS);
+    if (said.code !== 0) return null;
+    try {
+      const raw = JSON.parse(said.out) as { agent?: unknown; runs?: unknown; tasks?: unknown };
+      const tasks = Array.isArray(raw.tasks) ? (raw.tasks as { key?: unknown; title?: unknown }[]) : null;
+      if (typeof raw.agent !== "string" || !Number.isSafeInteger(raw.runs) || (raw.runs as number) < 0 || !tasks)
+        return null;
+      const kept = tasks
+        .slice(0, 5)
+        .flatMap((t) =>
+          typeof t?.key === "string" && TASK_KEY.test(t.key) && typeof t.title === "string"
+            ? [{ key: t.key, title: t.title }]
+            : [],
+        );
+      return { agent: raw.agent, runs: raw.runs as number, tasks: kept };
+    } catch {
+      return null;
+    }
   }
 
   /** The projects the agent of the login `login` may work in: `quadit me`, as that login. */

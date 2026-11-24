@@ -65,7 +65,7 @@ export interface ConnectPageParts {
   /** Shows the folder of the backups Connect keeps. */
   showBackups(): Promise<void>;
   /** Quadit running agents for projects of this computer (runner.ts). */
-  runner: Pick<Runner, "available" | "entries" | "projects" | "add" | "remove" | "logFile">;
+  runner: Pick<Runner, "available" | "entries" | "projects" | "waiting" | "add" | "remove" | "logFile">;
   /** Where a tool's program is, as the app finds it (tool-program.ts); null when it is not found. */
   programOf(toolId: string): Promise<string | null>;
   /** The native folder picker over the window of the page `sender`; null when cancelled. */
@@ -126,6 +126,10 @@ export class ConnectPage {
         if (!tool) return null;
         const entries = await parts.runner.entries(tool.login);
         return { agent: tool.agent, entries: entries ?? [], ...(entries ? {} : { unreadable: true as const }) };
+      },
+      runWaiting: async (_sender, harness, project) => {
+        const tool = this.runAs(String(harness));
+        return tool && isProjectKey(project) ? parts.runner.waiting(tool.login, project) : null;
       },
       agentProjects: (_sender, harness) => {
         const tool = this.runAs(String(harness));
