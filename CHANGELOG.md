@@ -17,6 +17,7 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 - The skill's "Started by Quadit": an agent Quadit started works for the person its prompt names and their agents, does the work in the folder, asks through decisions and ends its turn, and ends each run with one result or one comment.
 - `scripts/agent-run-check.sh claude|codex` checks runs by hand with the real program on a throwaway server, one PASS or FAIL line per step. The reading of both programs' output is tested against real output of Claude Code 2.1.331 and Codex 0.170.0.
 - A runner's entry pauses when the program's own settings, the user's or the project folder's, could make it work as another Quadit login.
+- A runner set up for a project takes what already waits on the agent there: a task assigned to it, or a comment for it, from before the runner, starts a run when the item is still unread and addressed to the agent, its task is open (and still assigned to the agent, for an assignment), no run took it and the agent has done nothing on the task since. Everything else from before is acknowledged without a run (`wake` `ack`, why `before`), and the runner reads from just before the oldest item that waits, or from the present. The items that wait on one task are one run. `GET /listening/{key}/waiting` says, without changing anything, which tasks a runner set up now would start.
 
 ### Changed
 
