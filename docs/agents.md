@@ -8,7 +8,7 @@ An agent is a member of the workspace with its own account, role and token. Peop
 2. Issue it a token (an admin, or the person responsible for the agent). It is shown once.
 3. Give the agent `QUADIT_URL` and `QUADIT_TOKEN`, or run `quadit login URL TOKEN` (`-` for the token reads it from standard input). Or let the desktop app do steps 2 to 4: see [Connect from the desktop app](#connect-from-the-desktop-app).
 4. Teach the agent Quadit: `quadit skill install` (see [Your agent](#your-agent)).
-5. Prove it reaches Quadit from inside its tool: on the agent's page in Settings, make a connect code and say the line it gives in the tool (`Connect to Quadit K7PQ2M`). See [Connected, and listening](#connected-and-listening).
+5. Prove it reaches Quadit from where it runs: on the agent's page in Settings, make a connect code and say the line it gives in the agent's chat (`Connect to Quadit K7PQ2M`). See [Connected, and listening](#connected-and-listening).
 
 ## Your agent
 
@@ -114,16 +114,16 @@ Tokens are kept only in `quadit`'s own login files, readable by the user alone, 
 
 **Disconnect** puts back what Connect changed, except where a file has been changed since (it is left as it is, and said), and revokes the token. An MCP sign-in is ended in the agent itself.
 
-Connect is a page of the app laid over the workspace window (File → Connect Agents…, the Agents page, the button under a task's comment box). A tool it set up shows the line to say in it, `Connect to Quadit K7PQ2M`, until the agent gives the code back; then whether it listens, and, while it does not, the line that has it listen, `listen to Quadit`, with Copy. Above the cards, the page says the two steps: connect a tool here, then write `listen to Quadit` in it.
+Connect is a page of the app laid over the workspace window (File → Connect Agents…, the Agents page, the button under a task's comment box). An agent it set up shows the line to say in its chat, `Connect to Quadit K7PQ2M`, until it gives the code back; then whether it listens, and, while it does not, the line that has it listen, `listen to Quadit`, with Copy. Above the cards, the page says the two steps: connect an agent here, then write `listen to Quadit` in its chat.
 
-**For the server on this computer, the app gives the code back itself.** Right after Connect writes a tool's files, the app runs the tool once, without a window, with its one-prompt command and "Connect to Quadit CODE", as that tool's own login, and the card turns "Connected" when the server says the code was used. If the tool cannot be run, is not signed in, or the code does not come back within two minutes, the card shows the line to say in the tool instead, with a word on why. That one run is all the app does with the tool: it does not answer for it. Connected is not listening; to have the agent answer what is written in Quadit, write `listen to Quadit` in a chat of the tool, in your project's folder (below).
+**For the server on this computer, the app gives the code back itself.** Right after Connect writes an agent's files, the app runs its program (Claude Code, Codex…) once, without a window, with its one-prompt command and "Connect to Quadit CODE", as its own login, and the card turns "Connected" when the server says the code was used. If it cannot be run, is not signed in, or the code does not come back within two minutes, the card shows the line to say in its chat instead, with a word on why. That one run is all the app does: it does not answer for the agent. Connected is not listening; to have the agent answer what is written in Quadit, write `listen to Quadit` in its chat, in your project's folder (below).
 
 ### Connected, and listening
 
 Files written are not proof that an agent reaches Quadit, and an agent that does reach it sees what is written to it only when it looks. So an agent is in one of three states, shown on a task given to it, under the comment box, on the Agents page and in Settings → Agents:
 
-- **Not connected yet**: it has never proven it reached Quadit from inside its tool.
-- **Connected, not listening**: it works when the person asks it in its tool ("check Quadit"); what is written in Quadit waits until then. To have it answer as things come in, write `listen to Quadit` in a chat of the tool: that is the recommended way.
+- **Not connected yet**: it has never proven it reached Quadit from where it runs.
+- **Connected, not listening**: it works when the person asks it in a chat ("check Quadit"); what is written in Quadit waits until then. To have it answer as things come in, write `listen to Quadit` in its chat: that is the recommended way.
 - **Listening**: a session of it is waiting for its inbox right now (or a webhook pushes to it), and answers what comes in.
 
 An agent is connected by the first of: a connect code given back, a change made with its own token, its listener's first wait. Reading proves nothing: `quadit login` and `quadit me` do not connect it. The member row and `GET /agents` carry `connected_at`; `GET /agents/connection` is the cheap read of all three, with the tool of the last code the agent gave back, which pages read again while they show it.
@@ -139,7 +139,7 @@ quadit connect           # with no code: who this login is
 
 A wrong, used or expired code is refused saying which (`reason`: `wrong`, `used`, `expired`), ten tries a minute per agent; a person's login is refused, since an agent connects with its own. The code is taken in any case and with spaces or a dash in it, and a code for a tool replaces the open one of the same tool however its name is written. Connecting starts no wait.
 
-**Listening.** Only when the person in the tool asks ("listen to Quadit"), the agent runs `quadit wait` again and again: in the background where its tool wakes it for a background command, in the foreground otherwise, and not at all from a chat when `quadit listening` says something already listens as it. The skill (`quadit skill`) says how it tells which, and `quadit help listen` says all of it. Listening needs the `quadit` command and the skill: an agent connected by MCP alone cannot listen. For an agent that should answer with no chat open, run a companion (`quadit listen --exec …`, [Following changes](#following-changes)), or push its inbox to a webhook.
+**Listening.** Only when the person asks it in a chat ("listen to Quadit"), the agent runs `quadit wait` again and again: in the background where its tool wakes it for a background command, in the foreground otherwise, and not at all from a chat when `quadit listening` says something already listens as it. The skill (`quadit skill`) says how it tells which, and `quadit help listen` says all of it. Listening needs the `quadit` command and the skill: an agent connected by MCP alone cannot listen. For an agent that should answer with no chat open, run a companion (`quadit listen --exec …`, [Following changes](#following-changes)), or push its inbox to a webhook.
 
 ```bash
 quadit wait for=3600     # in the background: up to an hour, renewing the server's holds and the lease inside itself

@@ -6,10 +6,11 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ### Changed
 
-- The desktop app no longer starts connected tools by itself to answer what comes in: a tool answers what is written in Quadit from a chat told to listen ("listen to Quadit"). Connect still proves the connection by itself, running the tool once to give its connect code back for the server on this computer; the plan says so for a tool whose checks are off for that run.
-- Connect agents and the first run's tools step say the two steps above the cards: connect a tool here, then write `listen to Quadit` in it, in your project's folder, the recommended way; without listening it sees what waits when asked in a chat ("check Quadit"). Connect agents also names the other ways: MCP (under More options), which cannot listen, a companion command, and a webhook.
-- A connected card that is not listening shows the line to write, `listen to Quadit`, with Copy, as its main step, and how a chat of the tool listens: in the background for Claude Code and Antigravity CLI, keeping the chat busy for Codex. Listening, it says what the agent answers, that one chat listens at a time, and how to stop it. A tool connected by MCP alone says it cannot listen.
+- The desktop app no longer starts connected agents by itself to answer what comes in: an agent answers what is written in Quadit from a chat told to listen ("listen to Quadit"). Connect still proves the connection by itself, running the agent's program once to give its connect code back for the server on this computer; the plan says so where that run has its checks off.
+- Connect agents and the first run's tools step say the two steps above the cards: connect an agent here, then write `listen to Quadit` in its chat, in your project's folder, the recommended way; without listening it sees what waits when asked in a chat ("check Quadit"). Connect agents also names the other ways: MCP (under More options), which cannot listen, a companion command, and a webhook.
+- A connected card that is not listening shows the line to write, `listen to Quadit`, with Copy, as its main step, and how its chat listens: in the background for Claude Code and Antigravity CLI, keeping the chat busy for Codex. Listening, it says what the agent answers, that one chat listens at a time, and how to stop it. An agent connected by MCP alone says it cannot listen.
 - Under a task's comment box, in the Agents page and in Settings → Agents, an agent that is connected and not listening names the line that has it listen.
+- What people read says the agent's name, or "agent", instead of "a tool"; "AI tools" is kept for the programs found on the computer. A connect code's field is "Runs in".
 - The folded sidebar takes the page's colour and has no line between it and the page; the colour and the line fade with the width as it folds and opens.
 
 ## [0.5.0] - 2026-11-23
