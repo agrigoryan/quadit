@@ -213,6 +213,36 @@ export interface SelfRun {
   proving: { state: "running" } | { state: "failed"; reason: string } | null;
 }
 
+/** A program Quadit runs for an agent (agent-runs-contract.md §1): Claude Code or Codex. */
+export type RunProgram = "claude" | "codex";
+
+/** Why the runner holds back an entry's items (agent-runs-contract.md §2.2). */
+export type RunPause =
+  "usage_limit" | "not_signed_in" | "program_missing" | "folder_missing" | "login_mismatch" | "server_old";
+
+/**
+ * One project Quadit runs an agent for on this computer (an entry of
+ * `quadit run`'s registry, agent-runs-contract.md §5.1) and what it does
+ * now, as `quadit run list --json` says (§5.12). `not_served`: no runner
+ * of the app's serves the registry now; its message is the card's line.
+ * `blocked`: writes the server refused for good, by the run's task.
+ */
+export interface RunEntryView {
+  id: string;
+  /** The project's key. */
+  project: string;
+  /** The folder, with ~ for the home folder. */
+  folder: string;
+  program: RunProgram;
+  status:
+    | { state: "starting" | "ready" | "aside" | "removing" }
+    | { state: "working"; task: string }
+    | { state: "paused"; pause: RunPause; until?: string }
+    | { state: "error"; message: string }
+    | { state: "not_served"; message: string };
+  blocked: { task: string; error: string }[];
+}
+
 /**
  * The window Connect agents is laid over: its server, the workspace its page
  * shows (null: none yet, or signed out), and whether that server's page

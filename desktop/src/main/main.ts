@@ -42,11 +42,13 @@ import { SignInFlows } from "@/main/handoff";
 import { HARNESSES } from "@/main/harnesses";
 import { ActivateAfterStart, coldStart, Quiet, secondStart } from "@/main/launch";
 import { LocalServer, loopbackPorts } from "@/main/local-server";
+import { appendLog } from "@/main/log-file";
 import { menuTemplate } from "@/main/menu";
 import { Panel } from "@/main/panel";
 import { loginShellPath, QuaditCli } from "@/main/quadit-cli";
 import { QuitGuard } from "@/main/quit";
 import { Requests } from "@/main/requests";
+import { Runner } from "@/main/runner";
 import { SelfRuns } from "@/main/self-runs";
 import { ServerChecks } from "@/main/server-checks";
 import { ServerList } from "@/main/server-list";
@@ -289,6 +291,16 @@ function start() {
     env: process.env,
     changed: () => pages.changed(),
   });
+  // Quadit runs the agent for a task (agent-runs-contract.md §8.3): quadit run, as the quadit the app carries (the
+  // one it runs as its server: run from source, QUADIT_DESKTOP_QUADIT's), supervised while the app runs.
+  const runner = new Runner({
+    quadit: localServerBinary,
+    path: loginShellPath,
+    env: process.env,
+    start: startChild,
+    log: (line) => appendLog(join(dataDir, "tools", "logs", "quadit-run.log"), line),
+    changed: () => pages.changed(),
+  });
   const connect = new ConnectPage({
     pages,
     connections,
@@ -461,8 +473,10 @@ function start() {
   // have closed: one may still keep the app (a page's beforeunload, during
   // an upload) after before-quit, and the server must not go under it.
   app.on("will-quit", () => {
-    // Every program the app started for its tools stops with it (child-guard.ts), as its server does.
+    // Every program the app started for its tools stops with it (child-guard.ts), as its server does; quadit run ends
+    // the runs it started (Interrupted on their tasks: a comment continues them).
     selfRuns.quit();
+    runner.quit();
     local.stopWithoutWaiting();
   });
   // Server windows hide rather than close, so this only runs when quitting
@@ -500,6 +514,8 @@ function start() {
     .refresh()
     .catch(() => {})
     .then(() => selfRuns.sync());
+  // quadit run serves the projects registered on this computer for the agents' tasks, a background start too.
+  void runner.sync();
   if (watchingUpdates) updates.start();
   // Only now that the windows are made: making one can run the system's
   // event loop, which may hand in a link, and handled then it would make

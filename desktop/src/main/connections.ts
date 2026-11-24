@@ -1112,7 +1112,7 @@ function manualInstall(bundled: string | null): string {
 }
 
 /** `path` as a person writes it: ~ for the home folder. */
-function homely(home: string, path: string): string {
+export function homely(home: string, path: string): string {
   return path === home || path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
 }
 
