@@ -281,8 +281,9 @@ func (o *outbox) failed() []blockedWrite {
 }
 
 // startRefused is a run's start the server refused because the lease is
-// no longer the runner's (lease_stale) or another run of the agent on the
-// task is open (run_open). Its file stays for the run to decide.
+// no longer the runner's (lease_stale), another run of the agent on the
+// task is open (run_open), or the run exists already (in_use: made under
+// another change id). Its file stays for the run to decide.
 type startRefused struct {
 	file   string
 	reason string
@@ -346,7 +347,7 @@ func (o *outbox) flush(ctx context.Context, srv outboxServer, until string) (Res
 		switch {
 		case w.Write == writeAck && leaseLost(err):
 			o.drop(name)
-		case w.Write == writeStart && (ae.Reason == "lease_stale" || ae.Reason == "run_open"):
+		case w.Write == writeStart && (ae.Reason == "lease_stale" || ae.Reason == "run_open" || ae.Reason == "in_use"):
 			if name == until {
 				return Result{}, &startRefused{file: name, reason: ae.Reason, err: err}
 			}

@@ -499,3 +499,14 @@ func TestTheProgramsSettingsNamingAnotherLoginPauseTheEntry(t *testing.T) {
 		})
 	}
 }
+
+func TestAnAcknowledgmentOfAnyWhyIsPlain(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
+	rt.f.addItem(fakeItem{Task: "SVA-12", Do: wakeAck, Why: "background"})
+	last := rt.f.addItem(fakeItem{Task: "SVA-13", Do: wakeAck, Why: "a why from a newer server"})
+	rt.serve()
+	rt.acked(last)
+	if len(rt.f.allRuns()) != 0 || len(rt.records()) != 0 || readStatus(rt.files.status()).Entries[rt.entry.ID].Pause != "" {
+		t.Fatal("an acknowledgment started something or paused the entry")
+	}
+}

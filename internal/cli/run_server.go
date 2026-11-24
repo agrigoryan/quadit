@@ -86,9 +86,18 @@ const (
 	wakeRefuse = "refuse"
 )
 
-// understood reports whether the runner can act on w.
+// understood reports whether the runner can act on w: a do it knows. Why
+// an item is acknowledged does not matter (any why, known or not, is a
+// plain acknowledgment); a refusal's why goes on the row, so it must have
+// a reason's form.
 func (w *wake) understood() bool {
-	return w != nil && (w.Do == wakeRun || w.Do == wakeAck || w.Do == wakeRefuse) && kindForm.MatchString(w.Why)
+	switch {
+	case w == nil:
+		return false
+	case w.Do == wakeRefuse:
+		return kindForm.MatchString(w.Why)
+	}
+	return w.Do == wakeRun || w.Do == wakeAck
 }
 
 // hold holds the listener as ask says.

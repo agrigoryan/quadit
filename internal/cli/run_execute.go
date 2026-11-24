@@ -164,6 +164,14 @@ func (r *agentRun) start(ctx context.Context) (int64, error) {
 			e.out.drop(refused.file)
 			_ = clearJournal(e.dir) // no row was made: the head goes to whoever holds the lease
 			return 0, nil
+		case errors.As(err, &refused) && refused.reason == "in_use":
+			// The run exists already: go on from its row, never close it.
+			e.out.drop(refused.file)
+			if seq, ok := r.existing(ctx); ok {
+				return seq, nil
+			}
+			_ = clearJournal(e.dir) // the run is not open: its head comes again and is decided again
+			return 0, nil
 		case errors.As(err, &refused):
 			if !retried && r.closeOrphans(ctx) {
 				retried = true
@@ -183,9 +191,24 @@ func (r *agentRun) start(ctx context.Context) (int64, error) {
 			away = min(away*2, e.srv.host.times.awayMax)
 		default:
 			_ = clearJournal(e.dir) // the write is kept in the outbox's failed folder and shown
+			if ae, ok := refusalOf(err); ok && ae.Code == "forbidden" {
+				return 0, errLoginRefused
+			}
 			return 0, fmt.Errorf("%w: %w", errStartBlocked, err)
 		}
 	}
+}
+
+// existing is where the feed stands now, for a run the server already
+// holds that is still open: the run goes on from there (a stop asked
+// earlier is found on its row before the program starts).
+func (r *agentRun) existing(ctx context.Context) (int64, bool) {
+	row, ok, err := r.e.api.runRowOf(ctx, r.key, r.id)
+	if err != nil || !ok || ended(row.State) {
+		return 0, false
+	}
+	seq, err := r.e.api.seqNow(ctx)
+	return seq, err == nil && seq > 0
 }
 
 // closeOrphans ends the open runs of this agent on the task that this
@@ -247,9 +270,6 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 	for attempt := 1; ; attempt++ {
 		if row, ok, err := e.api.runRowOf(ctx, r.key, r.id); err == nil && ok && (row.StopRequestedAt > 0 || ended(row.State)) {
 			r.askStop()
-		}
-		if r.stopped() {
-			return r.stoppedEnd("")
 		}
 		if end, ok := r.endedYet(ctx); !ok {
 			return end // the runner stopping, or the lease lost, between two attempts

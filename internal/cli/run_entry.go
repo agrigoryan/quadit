@@ -423,7 +423,13 @@ func (e *liveEntry) listen(ctx context.Context) error {
 		if !e.out.empty() {
 			_ = e.flush(ctx) // what is not sent now is sent before the next run, which waits for it
 		}
-		ans, err := e.api.hold(ctx, e.holdAsk(t.hold, true))
+		// The first hold is short: it takes the lease and says so at once,
+		// rather than when the first item comes.
+		wait := t.hold
+		if !ready {
+			wait = time.Second
+		}
+		ans, err := e.api.hold(ctx, e.holdAsk(wait, true))
 		if ctx.Err() != nil {
 			return ctx.Err() // the entry ends: whoever ended it does not wait on this
 		}
