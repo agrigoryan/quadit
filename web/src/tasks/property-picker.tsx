@@ -1,8 +1,11 @@
 import { type ReactNode, type RefObject, useState } from "react";
 import { CircleSlash } from "lucide-react";
-import { t } from "@/lib/i18n";
-import { useListening } from "@/data/listening";
+import { isKey, t, tMaybe } from "@/lib/i18n";
+import { useConnection, useListening } from "@/data/listening";
+import { useRunOutlook } from "@/data/run-outlook";
+import { useMembers } from "@/data/selectors";
 import type { Member, Project, Task } from "@/types/core";
+import type { RunOutlook } from "@/types/dashboard";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { useManageLinks } from "@/tasks/manage";
 import { type Choice, NONE, type PickerListProps, type PickerProperty } from "@/tasks/properties/property";
@@ -42,8 +45,55 @@ export function useListeningFor(tasks: Task[]): Listening {
 /** Says whether something is listening for an agent; nothing for a person. From useListening (data/listening.ts). */
 export type Listening = (member: Member | undefined) => boolean | undefined;
 
-/** People and agents as picker rows, "me" first. With `listening`, each agent shows whether anything waits for its work. */
-export function memberItems(members: Member[], meId: string | undefined, listening?: Listening): PickerItem[] {
+/** Says in a few words what picking a member would do; nothing when there is nothing to say. */
+export type Outlook = (member: Member) => string | undefined;
+
+/** The few words of an outlook for assigning a task; none when Quadit would not start the agent for it, or a chat holds it. */
+function assignWords(o: RunOutlook, members: Member[]): string | undefined {
+  if (o.outcome === "none" || o.outcome === "in_chat") return undefined;
+  const key = `assign.run.${o.outcome === "will_not_start" ? o.reason : o.outcome}`;
+  if (!isKey(key)) return undefined;
+  const owner = members.find((m) => `@${m.handle}` === o.owner);
+  return t(key, {
+    machine: o.machine,
+    owner: owner?.name ?? o.owner,
+    project: o.project,
+    program: tMaybe(`run.program.${o.program}`, o.program),
+  });
+}
+
+/**
+ * What assigning one task would do, for each agent a computer runs (the
+ * run outlook), asked once for all of them while the picker is open.
+ * Nothing for several tasks at once.
+ */
+export function useAssignOutlook(tasks: Task[]): Outlook {
+  const one = tasks.length === 1 ? tasks[0] : undefined;
+  const members = useMembers();
+  const connection = useConnection();
+  const run = one ? members.filter((m) => connection(m, one.project_id)?.runner) : [];
+  const { outlooks } = useRunOutlook(
+    one?.key,
+    run.map((m) => m.handle),
+    "assign",
+  );
+  return (member) => {
+    const o = outlooks?.[`@${member.handle}`];
+    return o && assignWords(o, members);
+  };
+}
+
+/**
+ * People and agents as picker rows, "me" first. With `listening`, each
+ * agent shows whether anything waits for its work; with `outlook`, what
+ * picking it would do.
+ */
+export function memberItems(
+  members: Member[],
+  meId: string | undefined,
+  listening?: Listening,
+  outlook?: Outlook,
+): PickerItem[] {
   return [...members]
     .sort((a, b) => Number(b.user_id === meId) - Number(a.user_id === meId))
     .map((m) => {
@@ -51,6 +101,7 @@ export function memberItems(members: Member[], meId: string | undefined, listeni
       return {
         id: m.user_id,
         label: m.name,
+        detail: outlook?.(m),
         icon: <Avatar member={m} size="xs" />,
         hint:
           m.kind === "agent" ? (

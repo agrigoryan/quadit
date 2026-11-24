@@ -17,6 +17,8 @@ export interface PickerItem {
   icon?: ReactNode;
   /** Shown faintly at the right: a count, a key, a kind. */
   hint?: ReactNode;
+  /** A short second line under the label: what picking it would do. */
+  detail?: string;
   /** More words the search should match. */
   keywords?: string;
 }
@@ -103,7 +105,14 @@ export function PickerList({
             ) : (
               <>
                 {item.icon && <span className="flex size-4 shrink-0 items-center justify-center">{item.icon}</span>}
-                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                {item.detail ? (
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate">{item.label}</span>
+                    <span className="text-xs leading-4 text-ink-3">{item.detail}</span>
+                  </span>
+                ) : (
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                )}
                 {item.hint && <span className="shrink-0 text-xs text-ink-3">{item.hint}</span>}
               </>
             )}

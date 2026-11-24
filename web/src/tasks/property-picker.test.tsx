@@ -263,3 +263,93 @@ describe("whether an agent listens, beside it in a task's people pickers", () =>
     expect(within(coder()).queryByRole("img")).toBeNull();
   });
 });
+
+describe("what assigning a task does, for an agent a computer runs", () => {
+  /** Quadit runs @coder for SVA; the run outlook answers `outcome` for it, and asks are counted. */
+  function serve(outlook: Record<string, string>) {
+    const asked: string[] = [];
+    vi.spyOn(api, "get").mockImplementation((path: string) => {
+      asked.push(path);
+      if (path.includes("/run-outlook"))
+        return Promise.resolve({
+          outlooks: [
+            {
+              agent: "@coder",
+              machine: "Aram's MacBook Pro",
+              folder: "~/devel/game",
+              program: "claude",
+              project: "SVA",
+              owner: "@ann",
+              since: "",
+              until: "",
+              running: "",
+              reason: "",
+              ...outlook,
+            },
+          ],
+        });
+      return Promise.resolve({
+        agents: [
+          {
+            user_id: "u2",
+            handle: "@coder",
+            listening: true,
+            listening_projects: ["p1"],
+            listening_outside_projects: false,
+            listeners: [
+              {
+                project_id: "p1",
+                project: "SVA",
+                live: true,
+                runner: {
+                  machine: "Aram's MacBook Pro",
+                  folder: "~/devel/game",
+                  program: "claude",
+                  program_version: "2",
+                  holding: true,
+                  since: "",
+                },
+              },
+            ],
+          },
+        ],
+      });
+    });
+    return asked;
+  }
+
+  const coder = () => within(list()).getByRole("option", { name: /Coder/ });
+
+  it.each([
+    [{ outcome: "starts_now" }, "Starts now on Aram's MacBook Pro"],
+    [{ outcome: "when_back" }, "Starts when Aram's MacBook Pro is back"],
+    [{ outcome: "queued", running: "SVA-9" }, "Busy on Aram's MacBook Pro: queued"],
+    [{ outcome: "paused", reason: "not_signed_in" }, "Paused on Aram's MacBook Pro"],
+    [{ outcome: "will_not_start", reason: "not_responsible" }, "Will not start: only Ann's words start it"],
+    [{ outcome: "will_not_start", reason: "no_runner_here" }, "Not run by Quadit for SVA"],
+  ])("%o: says it under the agent", async (outlook, words) => {
+    const asked = serve(outlook);
+    open("assignee");
+    expect(await within(coder()).findByText(words)).toBeInTheDocument();
+    expect(asked).toContain(
+      `/api/v1/w/acme/tasks/SVA-1/run-outlook?agents=${encodeURIComponent("@coder")}&cause=assign`,
+    );
+  });
+
+  it("says nothing when assigning would start nothing, as for the agent that has the task already", async () => {
+    const asked = serve({ outcome: "none" });
+    open("assignee", [task({ assignee_id: "u2" })]);
+    await waitFor(() => expect(asked.some((path) => path.includes("/run-outlook"))).toBe(true));
+    await act(() => new Promise((done) => setTimeout(done, 0)));
+    expect(within(coder()).queryByText(/^(Starts|Busy|Paused|Will not|Not run)/)).toBeNull();
+  });
+
+  it("asks nothing for several tasks at once", async () => {
+    const asked = serve({ outcome: "starts_now" });
+    open("assignee", [theTask(), task({ id: "t2", key: "SVA-2" })]);
+    await waitFor(() => expect(asked.length).toBeGreaterThan(0));
+    await act(() => new Promise((done) => setTimeout(done, 0)));
+    expect(asked.some((path) => path.includes("/run-outlook"))).toBe(false);
+    expect(within(coder()).queryByText(/Starts now/)).toBeNull();
+  });
+});

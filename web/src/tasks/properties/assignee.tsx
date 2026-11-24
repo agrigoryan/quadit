@@ -22,7 +22,7 @@ import {
   type TaskProperty,
 } from "@/tasks/properties/property";
 import { memberOf, memberWord } from "@/tasks/properties/query-words";
-import { memberItems, noneItem, useListeningFor } from "@/tasks/property-picker";
+import { memberItems, noneItem, useAssignOutlook, useListeningFor } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { ConnectionMark } from "@/ui/connection-mark";
 import { ListeningDot } from "@/ui/listening-dot";
@@ -149,8 +149,10 @@ export const assignee = {
       const me = useMe();
       // Asked of the server only while the list is open; of the tasks' project when they share one.
       const listening = useListeningFor(tasks);
+      // And what assigning one task would do for each agent a computer runs.
+      const outlook = useAssignOutlook(tasks);
       return {
-        items: [noneItem(t("task.unassigned")), ...memberItems(members, me.user_id, listening)],
+        items: [noneItem(t("task.unassigned")), ...memberItems(members, me.user_id, listening, outlook)],
         value: shared(tasks, (task) => task.assignee_id ?? NONE),
       };
     },
