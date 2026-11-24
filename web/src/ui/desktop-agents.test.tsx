@@ -61,6 +61,22 @@ describe("useLocalAgents", () => {
   });
 });
 
+describe("useLocalAgents, read again", () => {
+  it("asks the app again when the window gets focus back or is shown again, as after a Disconnect in its Connect window", async () => {
+    const ask = vi.fn().mockResolvedValue([claude]);
+    window.quaditDesktop = bridge({ localAgents: ask });
+    const result = read();
+    await waitFor(() => expect(result.current).toEqual({ a1: claude }));
+    expect(ask).toHaveBeenCalledTimes(1);
+    ask.mockResolvedValue([]);
+    window.dispatchEvent(new Event("focus"));
+    await waitFor(() => expect(result.current).toEqual({}));
+    expect(ask).toHaveBeenCalledTimes(2);
+    document.dispatchEvent(new Event("visibilitychange"));
+    await waitFor(() => expect(ask).toHaveBeenCalledTimes(3));
+  });
+});
+
 describe("openConnect", () => {
   it("opens the app's Connect window on an agent, what to do for it and the program shown, or as it is without one", () => {
     const open = vi.fn();

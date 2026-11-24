@@ -6,6 +6,7 @@
 // use of the app's bridge for agents goes through here.
 
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useFollowFeed } from "@/data/live";
 import { inWorkspace } from "@/data/query";
 import { useSlug } from "@/data/selectors";
@@ -59,7 +60,9 @@ const REREAD_MS = 20_000;
  * The agents the app on this computer connects, by agent id; null when the
  * page is not in an app that answers (a browser, an older app, or a call
  * that failed): the page then shows what a browser shows. Asked when the
- * page opens, again on member and session events, and every 20 seconds.
+ * page opens, again on member and session events, when the window gets
+ * focus back or is shown again (the app's Connect window, just closed, may
+ * have changed them: no event says so), and every 20 seconds.
  */
 export function useLocalAgents(): Record<string, LocalAgent> | null {
   const slug = useSlug();
@@ -74,6 +77,19 @@ export function useLocalAgents(): Record<string, LocalAgent> | null {
     enabled: answers,
     refetchInterval: REREAD_MS,
   });
+  const { refetch } = answer;
+  useEffect(() => {
+    if (!answers) return;
+    const again = () => {
+      if (document.visibilityState === "visible") void refetch();
+    };
+    window.addEventListener("focus", again);
+    document.addEventListener("visibilitychange", again);
+    return () => {
+      window.removeEventListener("focus", again);
+      document.removeEventListener("visibilitychange", again);
+    };
+  }, [answers, refetch]);
   useFollowFeed(answers ? [key] : [], { only: ["member", "session"] });
   return answers && answer.isSuccess ? answer.data : null;
 }
