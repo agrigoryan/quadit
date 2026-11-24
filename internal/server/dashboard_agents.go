@@ -5,8 +5,10 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -84,13 +86,22 @@ type agentWork struct {
 // the whole workspace).
 func (who *viewer) agentWork(ctx context.Context, tasks []core.Task, names *nameLookup, projects []string) (*agentWork, error) {
 	w := &agentWork{who: who, ctx: ctx, names: names, now: time.Now(), tasks: tasks, keyOf: map[string]core.Task{}}
-	// A run Quadit's runner received and has not started yet (waiting) is
-	// the agent's work as much as one that runs.
-	if err := who.db.List(ctx, &w.sessions, store.Q{Where: []store.Cond{store.In("state", []string{core.AgentSessionWaiting, core.AgentSessionRunning}),
-		store.Gte("started_at", w.now.Add(-12*time.Hour).UnixMilli())},
-		Order: "-started_at,id"}); err != nil {
+	// A session an agent recorded by hand counts as work for twelve hours at
+	// most: it may never say it ended. A run Quadit's runner has open
+	// (waiting or running) counts while it is open: the runner ends it.
+	var byHand, runs []core.AgentSession
+	if err := who.db.List(ctx, &byHand, store.Q{Where: []store.Cond{store.Eq("state", core.AgentSessionRunning), store.Eq("machine_id", ""),
+		store.Gte("started_at", w.now.Add(-12*time.Hour).UnixMilli())}}); err != nil {
 		return nil, err
 	}
+	if err := who.db.List(ctx, &runs, store.Q{Where: []store.Cond{store.In("state", []string{core.AgentSessionWaiting, core.AgentSessionRunning}),
+		store.Ne("machine_id", "")}}); err != nil {
+		return nil, err
+	}
+	w.sessions = append(byHand, runs...)
+	slices.SortFunc(w.sessions, func(a, b core.AgentSession) int {
+		return cmp.Or(cmp.Compare(b.StartedAt, a.StartedAt), cmp.Compare(a.ID, b.ID))
+	})
 	w.sessions = onTask(func(session core.AgentSession) string { return session.TaskID })(ctx, who, w.sessions)
 	if len(projects) > 0 {
 		w.keys = map[string]bool{}

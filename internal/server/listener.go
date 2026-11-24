@@ -65,7 +65,7 @@ func (s *Server) listenerRoutes() []route {
 	return []route{
 		{"GET /api/v1/w/{ws}/listening", s.workspaceMember(s.handleShowListeners), "What listens as the caller, without taking a lease: {listening, by, last_heard} of the listener of everything (by is what holds the lease, as the holder said: \"a chat\", \"a companion\", \"the Quadit app\"), and listeners, every listener of the caller's: [{project_id, project, by, last_heard, live, runner}], the listener of everything with no project; runner, on a listener Quadit's runner marked: {machine, folder, program, program_version, holding (the runner holds the lease now), since (its last hold), paused, paused_until, task (the task of this project its open run is on)}. A project's listener stays when its session stops (live false): its items wait for its next listener, and the listener of everything leaves them out.", "", "follow"},
 		{"GET /api/v1/w/{ws}/listen", s.workspaceMember(s.handleNextInboxItem), "The listener's read: the next item of the caller's inbox after the listener's cursor, waiting for one up to wait seconds (at most 55). With project=, the listener of that project: its items only, from the cursor listen:<project id>. Without, the listener of everything: the items of no project and of every project that never had a listener of its own, from the cursor listen. It holds that listener's lease: the first call takes it, and each call after gives its id as lease=; while it lives (90 seconds past the end of the hold its holder last asked for) another session is refused (reason listening_elsewhere) unless it asks with take=1, and the agent counts as listening. Answers {lease} when the wait ended with nothing, or {lease, seq, item, line, wake} (line: the item as the feed writes it; wake: what Quadit's runner does with it, {do: run, ack or refuse, why}), with project: the project's key, for a project's listener. A runner's hold (machine_id=) marks the listener as its own; with batch=1 and a head item of a task, batch is the other items of that task after it that this listener would be handed, oldest first, at most 20, each {seq, item, line, wake}, not handed by being told. Nothing moves the cursor but an acknowledgment with the lease: PUT cursors/listen {seq, lease}. An agent's login only.", "wait: seconds, up to 55; project: a project's key or id, to listen to that project only; lease: the id the last call answered with; take: true to take the lease from the session that holds it; by: what listens, in a few plain words, said to whoever asks (\"a chat\", \"a companion\"); machine_id: Quadit's runner's machine (16 lower-case hex), which makes the hold a runner's, of a project's listener only; machine_name, folder (its label, from / or ~), program (claude, codex), program_version: what the runner says of itself; paused: why it holds every item back (usage_limit, not_signed_in, program_missing, folder_missing, login_mismatch, server_old), empty for nothing; paused_until: with paused=usage_limit, when it tries again (Unix ms); batch: true to be answered also the other items of the head's task", "follow"},
-		{"DELETE /api/v1/w/{ws}/listening/{key}/runner", s.workspaceMember(s.handleReleaseRunner), "Let Quadit's runner on a machine go from the caller's listener of a project (its key, or its id): when machine_id is the machine that marked it, the mark goes, and the lease ends if the runner holds it, so a chat can listen at once; the listener and its cursor stay. Answers {project, released}: released false when there was no mark, or another machine's. dry_run=1 checks without doing. An agent's login only.", "machine_id: the runner's machine; dry_run: true to check only", "follow"},
+		{"DELETE /api/v1/w/{ws}/listening/{key}/runner", s.workspaceMember(s.handleReleaseRunner), "Let Quadit's runner on a machine go from the caller's listener of a project (its key, or its id): when machine_id is the machine that marked it, the mark goes, and so does the runner's lease, live or run out: a chat can listen at once, and nothing made with that lease is accepted again; the listener and its cursor stay. Answers {project, released}: released false when there was no mark, or another machine's. dry_run=1 checks without doing. An agent's login only.", "machine_id: the runner's machine; dry_run: true to check only", "follow"},
 		{"DELETE /api/v1/w/{ws}/listening/{key}", s.workspaceMember(s.handleForgetListener), "Forget the caller's listener of a project (its key, or its id), and its cursor, so that from now on the project's items go to the listener of everything, whose cursor moves to the present: nothing acknowledged comes again, and what was pending for either stays unread in the inbox. Refused (conflict, reason listening_elsewhere) while its lease lives. Answers {project, forgotten}: forgotten false when the project had no listener of its own. dry_run=1 checks without forgetting.", "", "follow"},
 	}
 }
@@ -734,8 +734,8 @@ func (s *Server) handleShowListeners(x *c) error {
 // handleReleaseRunner lets a machine's runner go from the caller's
 // listener of a project: what a runner does when the person removes the
 // project from it. Only the machine that marked the listener can clear its
-// mark, and the lease is ended only when that runner holds it: a chat that
-// holds it keeps it.
+// mark, and the lease goes only when it is the runner's: a chat that holds
+// it keeps it.
 func (s *Server) handleReleaseRunner(x *c) error {
 	if x.member.Kind != core.KindAgent {
 		return errForbidden("this login is @%s's, a person's, not an agent's: a runner listens with the agent's own login", x.member.Handle)
@@ -769,9 +769,11 @@ func (s *Server) handleReleaseRunner(x *c) error {
 		now := time.Now().UnixMilli()
 		set := map[string]any{"machine_id": "", "machine_name": "", "runner_folder": "", "runner_program": "", "runner_version": "", "runner_paused": "",
 			"runner_paused_until": int64(0), "runner_seen_at": int64(0), "runner_holds": false}
-		ends := held.HeldByRunner(now)
+		// The runner's lease, live or run out, is let go with it: a hold, an
+		// acknowledgment or a start made with it later is refused.
+		ends := held.RunnerHolds
 		if ends {
-			set["lease_until"] = now
+			set["lease"], set["lease_until"] = "", min(held.LeaseUntil, now)
 		}
 		if _, err := tx.Update(x.ctx(), "listeners", set, listenerOf(x.member.UserID, project.ID)...); err != nil || !ends {
 			return err

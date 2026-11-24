@@ -1534,3 +1534,37 @@ func TestTheConnectionReadsTellARunnerAndItsState(t *testing.T) {
 		})
 	})
 }
+
+// TestAReleasedLeaseIsDead: once the runner is let go, its lease hands
+// nothing, moves no cursor and starts no run, even when it had run out
+// before the release.
+func TestAReleasedLeaseIsDead(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		key := r.task(t, M{"assignee": "@claude"})
+		for _, before := range []string{"after it ran out", "while it lives"} {
+			t.Run(before, func(t *testing.T) {
+				r.hold(t, "")
+				old := r.lease
+				if before == "after it ran out" {
+					runOut(t, st, old)
+				}
+				r.call(t, nil, r.claude, "DELETE", w+"/listening/SVA/runner?machine_id=3f9c0a7d5e21b864", nil, 200, nil)
+				if l := r.listenerRow(t); l.Lease != "" {
+					t.Fatalf("the released listener keeps the lease %q", l.Lease)
+				}
+				var refused struct{ Error struct{ Reason string } }
+				r.call(t, nil, r.claude, "PUT", w+"/cursors/listen:"+r.sva.ID, M{"seq": 1, "lease": old}, 409, &refused)
+				if refused.Error.Reason != "lease_stale" {
+					t.Errorf("an acknowledgment with the released lease: %+v", refused)
+				}
+				r.call(t, nil, r.claude, "POST", w+"/changes", M{"id": id.New(), "type": "session.start", "args": M{"task": key, "state": "waiting", "program": "claude",
+					"machine_id": "3f9c0a7d5e21b864", "machine_name": "Aram's MacBook Pro", "folder": "~/devel/game", "lease": old, "item_seq": 1}}, 409, &refused)
+				if refused.Error.Reason != "lease_stale" {
+					t.Errorf("a start with the released lease: %+v", refused)
+				}
+			})
+		}
+	})
+}
