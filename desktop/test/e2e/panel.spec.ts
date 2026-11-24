@@ -123,12 +123,14 @@ test("the panel lists a run open now, and Stop asks it to stop through the works
   const row = panel.getByRole("listitem").filter({ hasText: `@${AGENT.handle} ${key} Make the boss harder` });
   await expect(row.getByText(/^Waiting, for \d+m$/)).toBeVisible();
   await row.getByRole("button", { name: `Stop @${AGENT.handle} on ${key}` }).click();
+  // The task's runs, as the server lists them (quadit show gives the task, not its runs).
   await expect
     .poll(async () => {
-      const shown = JSON.parse(await quadit(run, ["--json", "show", key])) as {
-        sessions?: { id: string; stop_requested_at?: string }[];
-      };
-      return !!shown.sessions?.find((s) => s.id === id)?.stop_requested_at;
+      const listed = await fetch(`${run.direct}/api/v1/w/e2e/list/sessions?task=${key}`, {
+        headers: { Authorization: `Bearer ${run.token}` },
+      });
+      const { sessions } = (await listed.json()) as { sessions?: { id: string; stop_requested_at?: number }[] };
+      return !!sessions?.find((s) => s.id === id)?.stop_requested_at;
     })
     .toBe(true);
 });
