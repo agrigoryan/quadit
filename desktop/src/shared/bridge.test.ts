@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { focusOf, isConnectCode, notificationOf, outcomeOf, summaryOf } from "@/shared/bridge";
+import { focusOf, isConnectCode, notificationOf, outcomeOf, summaryOf, waitsOnYou } from "@/shared/bridge";
 
 const action = (extra: Record<string, unknown> = {}) => ({ label: "Ship it", request: "pick:d1:o1", ...extra });
 
@@ -49,6 +49,70 @@ describe("notificationOf with actions and a reply", () => {
 describe("summaryOf", () => {
   it("keeps a well-formed summary as plain data", () => {
     expect(summaryOf(summary({ extra: "dropped" }))).toEqual(summary());
+  });
+
+  it("keeps what waits on the person, what runs, and each agent's line, each list short, and says how many wait", () => {
+    const task = { key: "SVA-53", title: "Check the new level graphics", who: "@codex", path: "/acme/task/SVA-53" };
+    const run = { key: "GS-4", title: "Docs", line: "Not started: …", path: "/acme/task/GS-4" };
+    const open = {
+      agent: "@claude",
+      key: "SVA-61",
+      title: "Boss",
+      state: "Working",
+      since: 1_732_460_400_000,
+      path: "/acme/task/SVA-61",
+      stop: { label: "Stop", request: "stop:r1" },
+    };
+    const parts = {
+      waitingMore: 2,
+      tasks: { items: Array.from({ length: 14 }, () => task), more: 1 },
+      runs: { items: [run], more: 0 },
+      working: { items: [open], more: 0 },
+      agents: [
+        {
+          id: "a1",
+          handle: "claude",
+          name: "Claude",
+          state: "idle",
+          detail: "",
+          path: "/acme/agents",
+          usable: true,
+          line: { text: "Ready.", tone: "ok" },
+          reach: "heard",
+        },
+      ],
+    };
+    const kept = summaryOf(summary(parts));
+    expect(kept?.tasks?.items).toHaveLength(10);
+    expect(kept?.working).toEqual(parts.working);
+    expect(kept?.agents[0]).toEqual(parts.agents[0]);
+    // Its questions (one), the two more, ten tasks kept and one more, one run.
+    expect(kept && waitsOnYou(kept)).toBe(1 + 2 + 11 + 1);
+    // A page from before them: only its questions count.
+    expect(waitsOnYou(summary() as never)).toBe(1);
+  });
+
+  it("refuses a summary whose new parts are not of their form", () => {
+    expect(summaryOf(summary({ tasks: { items: [{ key: 1 }], more: 0 } }))).toBeNull();
+    expect(summaryOf(summary({ working: { items: [], more: "lots" } }))).toBeNull();
+    expect(
+      summaryOf(
+        summary({
+          agents: [
+            {
+              id: "a",
+              handle: "a",
+              name: "A",
+              state: "idle",
+              detail: "",
+              path: "/",
+              usable: true,
+              line: { text: "x", tone: "red" },
+            },
+          ],
+        }),
+      ),
+    ).toBeNull();
   });
 
   it("cuts text short and keeps the first items of a long list", () => {

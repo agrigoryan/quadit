@@ -1,47 +1,40 @@
-// Unread counts: each window of a server reports the count of the workspace
-// it shows, through the bridge, and the app shows the sum on the dock icon
-// (the taskbar where the system has a badge) and beside the menu-bar icon,
-// whose menu opens a server. A server's count is the sum of the workspaces
-// its windows show, each counted once however many windows show it. A
-// workspace's count is its newest report, 0 included, whichever window made
-// it: a window that leaves takes nothing back while another window still
-// shows that workspace, since an older report it held may be out of date. A
-// window shows one workspace at a time, so it leaves one when it reports
-// another, reports none, or its page goes away.
+// The menu-bar icon and its number: what waits on the person in the
+// workspaces the app's windows show (the questions asked of them, the tasks
+// that wait on them, the runs that need them: waitsOnYou), read from what
+// each window's page publishes (requests.ts). The number stands beside the
+// icon and on the Dock (the taskbar where the system has a badge); nothing
+// waits, no number. Unread inbox items are not counted: they stay in the
+// web app. Each workspace counts once, at its newest summary.
 //
-// Clicking the menu-bar icon opens the panel (panel.ts); its menu of servers
-// is on the right click. Linux trays only have a menu, so there the panel is
-// the menu's first item.
+// Clicking the icon opens the panel (panel.ts); its menu of servers, each
+// with its own number, is on the right click. Linux trays only have a menu,
+// so there the panel is the menu's first item.
 
 import { app, Menu, nativeImage, type Rectangle, Tray } from "electron";
 import { PANEL_LABEL } from "@/main/menu";
 import type { ServerStore } from "@/main/servers";
+import { type DesktopSummary, waitsOnYou } from "@/shared/bridge";
 
-export interface UnreadSetup {
+export interface MenuBarSetup {
   /** The menu-bar icon: a template image file (black on transparent). */
   trayIcon: string;
   openServer(serverId: string): void;
   showServerList(): void;
   /** Opens or closes the panel, under the icon at `tray` when its place is known. */
   togglePanel(tray: Rectangle | null): void;
+  /** The workspaces the windows show, each once, as their pages published them (Requests.summaries). */
+  summaries(): { serverId: string; summary: DesktopSummary }[];
 }
 
-export class Unread {
-  /** The workspace each reporter (a web contents, by id) shows. */
-  private shown = new Map<number, Workspace>();
-  /** The newest count of each shown workspace, by server and workspace. */
-  private counts = new Map<string, Map<string, number>>();
+export class MenuBar {
   private tray: Tray | undefined;
   private menu: Menu | undefined;
 
   constructor(
     private store: ServerStore,
-    private setup: UnreadSetup,
+    private setup: MenuBarSetup,
   ) {
-    store.onChange(() => {
-      for (const [reporter, { serverId }] of this.shown) if (!store.get(serverId)) this.leave(reporter);
-      this.render();
-    });
+    store.onChange(() => this.changed());
   }
 
   /** Puts the menu-bar icon up; call once the app is ready. */
@@ -53,7 +46,7 @@ export class Unread {
     tray.on("click", (_event, bounds) => this.setup.togglePanel(bounds));
     tray.on("right-click", () => this.menu && tray.popUpContextMenu(this.menu));
     this.tray = tray;
-    this.render();
+    this.changed();
   }
 
   /** Where the menu-bar icon is on screen, when the system says. */
@@ -61,58 +54,27 @@ export class Unread {
     return this.tray?.getBounds() ?? null;
   }
 
-  /**
-   * `reporter` shows `workspace` of the server, which has `count` unread now
-   * (0 is a count like any other). An empty `workspace` is none.
-   */
-  report(serverId: string, reporter: number, workspace: string, count: number) {
-    this.leave(reporter);
-    if (workspace) {
-      this.shown.set(reporter, { serverId, workspace });
-      const counts = this.counts.get(serverId) ?? new Map<string, number>();
-      this.counts.set(serverId, counts.set(workspace, count));
-    }
-    this.render();
-  }
-
-  /** `reporter`'s page went away. */
-  forget(reporter: number) {
-    if (this.shown.has(reporter)) {
-      this.leave(reporter);
-      this.render();
-    }
-  }
-
-  /** A server's count: the newest count of each workspace its windows show, added up. */
+  /** How many things wait on the person in the server's workspaces that windows show. */
   of(serverId: string): number {
     let sum = 0;
-    for (const count of this.counts.get(serverId)?.values() ?? []) sum += count;
+    for (const shown of this.setup.summaries()) if (shown.serverId === serverId) sum += waitsOnYou(shown.summary);
     return sum;
   }
 
+  /** How many things wait on the person, in every server the app has. */
   get total(): number {
     let sum = 0;
     for (const server of this.store.list()) sum += this.of(server.id);
     return sum;
   }
 
-  /** `reporter` no longer shows its workspace, whose count goes once no other window shows it. */
-  private leave(reporter: number) {
-    const left = this.shown.get(reporter);
-    if (!left) return;
-    this.shown.delete(reporter);
-    for (const other of this.shown.values()) {
-      if (other.serverId === left.serverId && other.workspace === left.workspace) return;
-    }
-    this.counts.get(left.serverId)?.delete(left.workspace);
-  }
-
-  private render() {
+  /** What a page published, or the servers, changed: the number and the menu follow. */
+  changed() {
     const total = this.total;
     app.setBadgeCount(total);
     if (!this.tray) return;
     this.tray.setTitle(total > 0 ? String(total) : "");
-    this.tray.setToolTip(total > 0 ? `${app.name}: ${total} unread` : app.name);
+    this.tray.setToolTip(total > 0 ? `${app.name}: ${total} waiting on you` : app.name);
     const linux = process.platform === "linux";
     this.menu = Menu.buildFromTemplate([
       ...(linux
@@ -133,14 +95,4 @@ export class Unread {
     // Elsewhere a context menu would take the click from the panel.
     if (linux) this.tray.setContextMenu(this.menu);
   }
-
-  /** The servers whose windows show a workspace now. */
-  showing(): string[] {
-    return [...this.counts].filter(([, workspaces]) => workspaces.size > 0).map(([serverId]) => serverId);
-  }
-}
-
-interface Workspace {
-  serverId: string;
-  workspace: string;
 }

@@ -3,92 +3,127 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ServerStore } from "@/main/servers";
+import type { DesktopSummary } from "@/shared/bridge";
 
-const badge = { count: 0 };
+const seen = { badge: 0, title: "", menu: [] as string[] };
 vi.mock("electron", () => ({
-  app: { name: "Quadit", setBadgeCount: (count: number) => void (badge.count = count) },
-  Menu: { buildFromTemplate: () => ({}) },
+  app: { name: "Quadit", setBadgeCount: (count: number) => void (seen.badge = count) },
+  Menu: {
+    buildFromTemplate: (items: { label?: string }[]) => {
+      seen.menu = items.flatMap((item) => (item.label ? [item.label] : []));
+      return {};
+    },
+  },
   nativeImage: { createFromPath: () => ({ setTemplateImage() {} }) },
   Tray: class {
+    on() {}
     setToolTip() {}
-    setTitle() {}
+    setTitle(title: string) {
+      seen.title = title;
+    }
     setContextMenu() {}
   },
 }));
 
-const { Unread } = await import("@/main/unread");
+const { MenuBar } = await import("@/main/menu-bar");
 
-function setUp() {
-  const store = new ServerStore(join(mkdtempSync(join(tmpdir(), "quadit-desktop-unread-")), "servers.json"));
-  const one = store.add("https://one.example.com", "One", { handoff: 1, inset: 0 });
-  const two = store.add("https://two.example.com", "Two", { handoff: 1, inset: 0 });
-  const unread = new Unread(store, { trayIcon: "", openServer() {}, showServerList() {}, togglePanel() {} });
-  return { store, one: one.id, two: two.id, unread };
+const QUESTION = { title: "Which level?", detail: "SVA-5 Levels", path: "/acme/t/SVA-5", actions: [] };
+const TASK = { key: "SVA-53", title: "Check the new level graphics", who: "@codex", path: "/acme/t/SVA-53" };
+const RUN = { key: "SVA-9", title: "Boss", line: "Not started: …", path: "/acme/t/SVA-9" };
+
+/** A workspace's summary: `waiting` questions, and the new lists when given (an older page has none). */
+function summary(id: string, parts: Partial<DesktopSummary> = {}): DesktopSummary {
+  return {
+    workspace: { id, slug: id, name: id },
+    me: { name: "Ann", canCreateAgents: true },
+    waiting: [],
+    agents: [],
+    projects: [],
+    ...parts,
+  };
 }
 
-describe("Unread", () => {
-  beforeEach(() => void (badge.count = 0));
+function setUp() {
+  const store = new ServerStore(join(mkdtempSync(join(tmpdir(), "quadit-desktop-bar-")), "servers.json"));
+  const one = store.add("https://one.example.com", "One", { handoff: 1, inset: 0 });
+  const two = store.add("https://two.example.com", "Two", { handoff: 1, inset: 0 });
+  let shown: { serverId: string; summary: DesktopSummary }[] = [];
+  const bar = new MenuBar(store, {
+    trayIcon: "",
+    openServer() {},
+    showServerList() {},
+    togglePanel() {},
+    summaries: () => shown,
+  });
+  bar.start();
+  return {
+    store,
+    one: one.id,
+    two: two.id,
+    bar,
+    show: (next: typeof shown) => {
+      shown = next;
+      bar.changed();
+    },
+  };
+}
 
-  it("adds up a server's workspaces, each once however many windows report it", () => {
-    const { one, unread } = setUp();
-    unread.report(one, 1, "acme", 7);
-    unread.report(one, 2, "games", 2);
-    // A second window on acme says the same count: still counted once.
-    unread.report(one, 3, "acme", 7);
-    expect(badge.count).toBe(9);
-    // The newest report of a workspace is its count.
-    unread.report(one, 1, "acme", 5);
-    expect(badge.count).toBe(7);
+describe("MenuBar", () => {
+  beforeEach(() => Object.assign(seen, { badge: 0, title: "", menu: [] }));
+
+  it("counts what waits on the person: questions, tasks that wait on them, runs that need them, and the rest of each", () => {
+    const { one, bar, show } = setUp();
+    show([
+      {
+        serverId: one,
+        summary: summary("acme", {
+          waiting: [QUESTION],
+          waitingMore: 2,
+          tasks: { items: [TASK], more: 0 },
+          runs: { items: [RUN], more: 1 },
+          working: { items: [], more: 0 },
+        }),
+      },
+    ]);
+    expect(bar.total).toBe(6);
+    expect(seen.badge).toBe(6);
+    expect(seen.title).toBe("6");
   });
 
-  it("takes a report of 0 as the workspace's count, not as a window's word taken back", () => {
-    const { one, unread } = setUp();
-    unread.report(one, 1, "acme", 7);
-    unread.report(one, 2, "acme", 7);
-    // Everything read: the newest report says so, and the older 7 is out of date.
-    unread.report(one, 1, "acme", 0);
-    expect(badge.count).toBe(0);
+  it("shows no number when nothing waits, whatever runs or is unread", () => {
+    const { one, show } = setUp();
+    const working = {
+      items: [{ agent: "@claude", key: "SVA-1", title: "x", state: "Working", since: 0, path: "/" }],
+      more: 0,
+    };
+    show([
+      {
+        serverId: one,
+        summary: summary("acme", { tasks: { items: [], more: 0 }, runs: { items: [], more: 0 }, working }),
+      },
+    ]);
+    expect(seen.title).toBe("");
+    expect(seen.badge).toBe(0);
   });
 
-  it("keeps a workspace's newest count when the window that reported it leaves and another still shows it", () => {
-    const { one, unread } = setUp();
-    // Window 1 says 7 and then hears nothing more (it lost its server); window 2 says 0 afterwards.
-    unread.report(one, 1, "acme", 7);
-    unread.report(one, 2, "acme", 0);
-    unread.forget(2);
-    expect(badge.count).toBe(0);
-    unread.report(one, 3, "acme", 0);
-    unread.report(one, 3, "games", 0);
-    expect(badge.count).toBe(0);
-    // And the other way round: the newer 7 stays when the window that said 0 leaves.
-    unread.report(one, 4, "games", 0);
-    unread.report(one, 5, "games", 7);
-    unread.report(one, 4, "", 0);
-    expect(badge.count).toBe(7);
+  it("counts only the questions of a page from before the other lists", () => {
+    const { one, bar, show } = setUp();
+    show([{ serverId: one, summary: summary("acme", { waiting: [QUESTION, QUESTION, QUESTION] }) }]);
+    expect(bar.total).toBe(3);
   });
 
-  it("takes off a window's count when it leaves its workspace, shows none, or closes", () => {
-    const { one, unread } = setUp();
-    unread.report(one, 1, "acme", 7);
-    unread.report(one, 2, "games", 2);
-    unread.report(one, 3, "acme", 7);
-    // Window 2 goes over to acme: its games goes with it.
-    unread.report(one, 2, "acme", 7);
-    expect(badge.count).toBe(7);
-    // Window 1 shows no workspace (signed out, say), window 2 closes: window 3 still reports acme.
-    unread.report(one, 1, "", 0);
-    unread.forget(2);
-    expect(badge.count).toBe(7);
-    unread.forget(3);
-    expect(badge.count).toBe(0);
-  });
-
-  it("adds up the servers, and forgets a removed one", () => {
-    const { store, one, two, unread } = setUp();
-    unread.report(one, 1, "acme", 3);
-    unread.report(two, 2, "acme", 4);
-    expect(badge.count).toBe(7);
+  it("adds the servers' workspaces up, says each server's own in its menu, and leaves a removed server out", () => {
+    const { store, one, two, bar, show } = setUp();
+    show([
+      { serverId: one, summary: summary("acme", { waiting: [QUESTION] }) },
+      { serverId: one, summary: summary("games", { waiting: [QUESTION, QUESTION] }) },
+      { serverId: two, summary: summary("acme", { tasks: { items: [TASK], more: 3 } }) },
+    ]);
+    expect(bar.of(one)).toBe(3);
+    expect(bar.of(two)).toBe(4);
+    expect(seen.menu.slice(0, 2)).toEqual(["One (3)", "Two (4)"]);
     store.remove(two);
-    expect(badge.count).toBe(3);
+    expect(bar.total).toBe(3);
+    expect(seen.badge).toBe(3);
   });
 });

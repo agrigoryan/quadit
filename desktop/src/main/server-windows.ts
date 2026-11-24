@@ -77,7 +77,6 @@ import type { Requests } from "@/main/requests";
 import { newServerId, type Server, type ServerStore } from "@/main/servers";
 import { FIRST_RUN_SPEAKS, type Frame, frameFor } from "@/main/window-frame";
 import {
-  BRIDGE_BADGE,
   BRIDGE_LISTENING,
   BRIDGE_NOTIFY,
   BRIDGE_LOCAL_AGENTS,
@@ -87,7 +86,6 @@ import {
   BRIDGE_ORIGIN,
   BRIDGE_OUTCOME,
   BRIDGE_PUBLISH,
-  badgeOf,
   type DesktopRequest,
   summaryOf,
   VERSION_SWITCH,
@@ -122,10 +120,6 @@ export interface WindowsSetup {
   connectionErrorUrl(words: { name: string; origin: string; reason: string }): string;
   /** Starts the browser sign-in for a server. */
   signIn(serverId: string): void;
-  /** A page of a server (the web contents `reporter`) reported the unread count of one of its workspaces. */
-  reportUnread(serverId: string, reporter: number, workspace: string, count: number): void;
-  /** A page went away: what it reported no longer counts. */
-  forgetUnread(reporter: number): void;
   /** Where the pages' summaries and their answers to requests go. */
   requests: Requests;
   /** A window was shown, hidden or focused: the menus that list them change. */
@@ -233,11 +227,6 @@ export class ServerWindows {
     // A server's answer changed (its hand-off at start, say): the sign-in bar may come or go.
     store.onChange(() => {
       for (const [serverId, win] of this.windows) this.placeBar(win, serverId);
-    });
-    ipcMain.on(BRIDGE_BADGE, (event, raw: unknown) => {
-      const server = this.bridgeSender(event);
-      const badge = badgeOf(raw);
-      if (server && badge) setup.reportUnread(server.id, event.sender.id, badge.workspace, badge.count);
     });
   }
 
@@ -702,7 +691,6 @@ export class ServerWindows {
     const reporter = contents.id;
     contents.once("destroyed", () => {
       this.owners.delete(reporter);
-      this.setup.forgetUnread(reporter);
       this.setup.requests.forget(reporter);
     });
     giveContextMenu(contents);
@@ -765,8 +753,7 @@ export class ServerWindows {
         this.appSignIn.navigationStarted(serverId);
     });
     contents.on("did-navigate", () => {
-      // A new page: what the last one reported and published goes with it, and this one reports anew.
-      this.setup.forgetUnread(reporter);
+      // A new page: what the last one published goes with it, and this one publishes anew.
       this.setup.requests.forget(reporter);
       pageChanged();
     });

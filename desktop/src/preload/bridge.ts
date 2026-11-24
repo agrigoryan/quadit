@@ -12,7 +12,6 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 import {
-  BRIDGE_BADGE,
   BRIDGE_LISTENING,
   BRIDGE_LOCAL_AGENTS,
   BRIDGE_NOTIFY,
@@ -21,7 +20,6 @@ import {
   BRIDGE_OUTCOME,
   BRIDGE_PUBLISH,
   BRIDGE_REQUEST,
-  badgeOf,
   type DesktopNotification,
   type DesktopOutcome,
   type DesktopRequest,
@@ -74,10 +72,8 @@ if (typeof origin === "string" && origin && window.location.origin === origin) {
       });
       if (notification) ipcRenderer.send(BRIDGE_NOTIFY, notification);
     },
-    setBadge(count: number, workspace?: string) {
-      const badge = badgeOf({ count: Number(count), workspace: String(workspace ?? "") });
-      if (badge) ipcRenderer.send(BRIDGE_BADGE, badge);
-    },
+    // The app's number is what waits on the person, read from the summary: the unread count a page gives is not used.
+    setBadge() {},
     publish(summary: unknown) {
       if (summary === null) return ipcRenderer.send(BRIDGE_PUBLISH, null);
       const kept = summaryOf(summary);

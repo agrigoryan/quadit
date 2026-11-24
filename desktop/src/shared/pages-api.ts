@@ -435,8 +435,14 @@ export interface PagesApi {
   summaries(): Promise<SummaryView[]>;
   /** Opens a server's window at `path`, a page of its web app. */
   openPath(serverId: string, path: string): Promise<void>;
-  /** The panel's button on a decision waiting on the person. */
+  /** The panel's button on a decision waiting on the person, or on a run (Stop): carried out by the workspace's own page. */
   act(serverId: string, workspaceId: string, action: { request: string; text?: string }): Promise<DesktopOutcome>;
+  /** The panel is `height` pixels tall as drawn: the app sizes it to that, up to its most, past which it scrolls. */
+  fitPanel(height: number): Promise<void>;
+  /** Opens quick capture, for a new task. */
+  openCapture(): Promise<void>;
+  /** Opens Connect agents over the server's window at one agent (a user id), for `intent` when given. */
+  openAgent(serverId: string, agent: string, intent?: "connect"): Promise<void>;
 
   /** Makes a task or a page through the workspace's window, and remembers where. */
   capture(c: CaptureTarget & { title: string; body: string }): Promise<DesktopOutcome>;

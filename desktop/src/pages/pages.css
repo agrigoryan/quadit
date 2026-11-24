@@ -373,6 +373,7 @@ pre.diff {
 
 /* The menu-bar panel. */
 
+/* As tall as what it shows (the app sizes the window to it), scrolling past its most. */
 body.panel {
   height: 100vh;
   overflow-y: auto;
@@ -551,4 +552,43 @@ body:not(.sheet-mode) .sheet-only {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* The menu-bar panel's rows: an agent's handle, quieter beside its name; its card's line in the card's colours; New task and Open Quadit. */
+.item .handle {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.status.tone-ok {
+  color: #4cc38a;
+}
+
+.status.tone-work {
+  color: #a3b3ff;
+}
+
+.status.tone-wait {
+  color: var(--warn);
+}
+
+.status.tone-quiet {
+  color: var(--muted);
+}
+
+.workspace .more {
+  margin: 6px 2px 0;
+  font-size: 13px;
+}
+
+.panel-foot {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.panel-foot button {
+  flex: 1;
 }

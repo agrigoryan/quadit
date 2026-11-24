@@ -172,14 +172,19 @@ export class ConnectPage {
     return this.parts.runner.available ? this.parts.connections.runAs(harness) : null;
   }
 
-  /** The person asked: lays Connect agents over the window of the server `serverId` (made and shown when it is not), in front. */
-  show(serverId: string) {
+  /** The person asked: lays Connect agents over the window of the server `serverId` (made and shown when it is not), in front, at `focus` when given (the panel's agent). */
+  show(serverId: string, focus: ConnectFocus | null = null) {
     const shown = this.shown;
+    const asked = focus ? { asked: focus, id: ++this.asks } : null;
     if (shown?.serverId === serverId) {
       this.parts.windows.cover(shown.view, serverId, () => this.close(shown));
+      if (asked) {
+        shown.focus = asked;
+        this.parts.pages.changed();
+      }
       return;
     }
-    this.open(serverId, false);
+    this.open(serverId, false, asked);
   }
 
   /**

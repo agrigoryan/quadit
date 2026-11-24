@@ -1,5 +1,5 @@
 import { APP_VERSION, expect, test } from "./desktop";
-import { quadit } from "./run";
+import { newTask, OWNER, quadit } from "./run";
 
 test("the bridge is given to the server's own pages and to nothing else", async ({ desktop, run }) => {
   await desktop.addServer(run.server);
@@ -83,7 +83,7 @@ test("the page cannot send the main process more than it would keep", async ({ d
     const sent: unknown[] = [];
     Object.assign(globalThis, { sent });
     const short = (value: unknown) => (typeof value === "string" && value.length > 20 ? `${value.length} long` : value);
-    for (const channel of ["bridge:notify", "bridge:badge"]) {
+    for (const channel of ["bridge:notify"]) {
       ipcMain.on(channel, (_event, raw: object) =>
         sent.push(Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, short(value)]))),
       );
@@ -98,69 +98,32 @@ test("the page cannot send the main process more than it would keep", async ({ d
     desktop?.notify({ title: "t", body: "b", path: "/" + huge });
     desktop?.notify({ title: "t", body: "b", path: "/e2e", tag: huge });
     desktop?.notify({ title: "t", body: "b", path: "/e2e", id: huge });
-    desktop?.setBadge(1, huge);
-    desktop?.setBadge(2, "acme");
   });
-  await expect.poll(sent).toEqual([
-    { title: "200 long", body: "1000 long", path: "/e2e", tag: "t", id: "n" },
-    { count: 2, workspace: "acme" },
-  ]);
+  await expect.poll(sent).toEqual([{ title: "200 long", body: "1000 long", path: "/e2e", tag: "t", id: "n" }]);
 });
 
-test("each server's unread count adds up on the dock badge", async ({ desktop, run }) => {
-  await desktop.addServer(run.server, "One");
-  const one = await desktop.signedIn(run.server);
-  await desktop.addServer(run.other, "Two");
-  const two = await desktop.signedIn(run.other);
-
-  await one.evaluate(() => window.quaditDesktop?.setBadge(3, "acme"));
-  await two.evaluate(() => window.quaditDesktop?.setBadge(4, "acme"));
-  await expect.poll(() => desktop.badge()).toBe(7);
-
-  // Nonsense is ignored; 0 is a count.
-  await two.evaluate(() => window.quaditDesktop?.setBadge(Number.NaN, "acme"));
-  await two.evaluate(() => window.quaditDesktop?.setBadge("lots" as unknown as number, "acme"));
-  await expect.poll(() => desktop.badge()).toBe(7);
-  await one.evaluate(() => window.quaditDesktop?.setBadge(0, "acme"));
-  await expect.poll(() => desktop.badge()).toBe(4);
-
-  // A removed server's count leaves the sum.
-  const list = await desktop.serverList();
-  await list.getByRole("button", { name: "Remove Two" }).click();
-  await list.getByRole("button", { name: "Yes, remove Two" }).click();
-  await expect.poll(() => desktop.badge()).toBe(0);
-  await expect(list.getByText("Two", { exact: true })).toBeHidden();
-});
-
-test("a server's count adds each workspace once at its newest report, and a window that goes takes off only its own", async ({
+test("the Dock badge counts what waits on the person in each server's workspace, never what is unread", async ({
   desktop,
   run,
 }) => {
-  await desktop.addServer(run.server);
-  const main = await desktop.signedIn(run.server);
-  const opened = desktop.app.waitForEvent("window");
-  // A page of the server without the web app, which would report its own workspace's count
-  // whenever it came to it, over what this test reports for the window.
-  await main.evaluate(() => window.open("/licenses", "_blank"));
-  const second = await opened;
-  await second.waitForLoadState();
-
-  await main.evaluate(() => window.quaditDesktop?.setBadge(7, "acme"));
-  await second.evaluate(() => window.quaditDesktop?.setBadge(2, "games"));
-  await expect.poll(() => desktop.badge()).toBe(9);
-  // The second window goes over to acme: acme counted once, and games went with the window.
-  await second.evaluate(() => window.quaditDesktop?.setBadge(7, "acme"));
-  await expect.poll(() => desktop.badge()).toBe(7);
-  // Everything in acme read, as the first says last: the second's 7 is out of date.
-  await main.evaluate(() => window.quaditDesktop?.setBadge(0, "acme"));
+  const { key } = await newTask(run, "Pick a level");
+  await desktop.addServer(run.server, "One");
+  const one = await desktop.signedIn(run.server);
+  // What a page says is unread counts for nothing.
+  await one.evaluate(() => window.quaditDesktop?.setBadge(7, "e2e"));
   await expect.poll(() => desktop.badge()).toBe(0);
-  // A new item, and the second window closes: acme stays with the first.
-  await main.evaluate(() => window.quaditDesktop?.setBadge(1, "acme"));
-  await second.close();
+  // A question asked of the person waits on them.
+  await quadit(run, ["ask", key, "Which level?", "option=One", "option=Two", `ask=@${OWNER.handle}`], run.agentToken);
+  await expect.poll(() => desktop.badge(), { timeout: 20_000 }).toBe(1);
+  // The same workspace through another server's window: that server's number adds up.
+  await desktop.addServer(run.other, "Two");
+  await desktop.signedIn(run.other);
+  await expect.poll(() => desktop.badge(), { timeout: 20_000 }).toBe(2);
+  // A removed server's number leaves the sum.
+  const list = await desktop.serverList();
+  await list.getByRole("button", { name: "Remove Two" }).click();
+  await list.getByRole("button", { name: "Yes, remove Two" }).click();
   await expect.poll(() => desktop.badge()).toBe(1);
-  // The first shows no workspace (signed out): nothing is left.
-  await main.evaluate(() => window.quaditDesktop?.setBadge(0));
-  await expect.poll(() => desktop.badge()).toBe(0);
 });
 
 test("an inbox item is shown once whichever windows tell it, and not while its server's window is in front", async ({

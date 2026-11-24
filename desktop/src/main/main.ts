@@ -5,7 +5,7 @@
 // (requests.ts), the first run (first-run.ts), the app's own pages
 // (app-pages.ts: the server list, setup, Connect agents, the menu-bar panel,
 // quick capture), the browser sign-in
-// (handoff.ts), the unread badge (unread.ts), the menu (menu.ts), the
+// (handoff.ts), the menu-bar icon and its number (menu-bar.ts), the menu (menu.ts), the
 // update notice (updates.ts) and the server on this computer
 // (local-server.ts), which runs while the app does. Started with
 // --background (launch.ts), by the quadit command finding that server not
@@ -48,6 +48,7 @@ import { LocalServer, loopbackPorts } from "@/main/local-server";
 import { localAgents } from "@/main/local-agents";
 import { appendLog } from "@/main/log-file";
 import { menuTemplate } from "@/main/menu";
+import { MenuBar } from "@/main/menu-bar";
 import { Panel } from "@/main/panel";
 import { loginShellPath, QuaditCli } from "@/main/quadit-cli";
 import { QuitGuard } from "@/main/quit";
@@ -63,7 +64,6 @@ import { Setup } from "@/main/setup-page";
 import { StoppedMark } from "@/main/stopped-mark";
 import { refusedSwitches } from "@/main/switches";
 import { toolProgram } from "@/main/tool-program";
-import { Unread } from "@/main/unread";
 import { isReleasePage, type Release, UpdateWatch } from "@/main/updates";
 import { BRIDGE_REQUEST } from "@/shared/bridge";
 
@@ -192,13 +192,18 @@ function start() {
       contents.send(BRIDGE_REQUEST, message);
       return true;
     },
-    () => pages.changed(),
+    // What a page published changed: the app's pages, and the number of what waits on the person, follow.
+    () => {
+      pages.changed();
+      menuBar.changed();
+    },
   );
-  const unread = new Unread(store, {
+  const menuBar = new MenuBar(store, {
     trayIcon: join(app.getAppPath(), "assets", "trayTemplate.png"),
     openServer: (id) => windows.show(id),
     showServerList: () => list.show(),
     togglePanel: (tray) => panel.toggle(tray),
+    summaries: () => requests.summaries(),
   });
   const windows = new ServerWindows(store, {
     version,
@@ -207,8 +212,6 @@ function start() {
     signInBarUrl: (serverId) => `${pagesUrl}sign-in-bar.html?server=${encodeURIComponent(serverId)}`,
     connectionErrorUrl: (words) => `${pagesUrl}connection-error.html?${new URLSearchParams(words)}`,
     signIn,
-    reportUnread: (serverId, reporter, workspace, count) => unread.report(serverId, reporter, workspace, count),
-    forgetUnread: (reporter) => unread.forget(reporter),
     requests,
     changed: () => refreshMenu(),
     whenReachable: (serverId) =>
@@ -233,8 +236,11 @@ function start() {
     local,
     loginItem,
   });
-  const panel = new Panel(pages, requests);
   const capture = new Capture(pages, settings, requests);
+  const panel = new Panel(pages, requests, {
+    openCapture: () => capture.toggle(),
+    openAgent: (serverId, agent, intent) => connect.show(serverId, { agent, ...(intent ? { intent } : {}) }),
+  });
   const connections = new Connections({
     home: homedir(),
     dataDir,
@@ -367,7 +373,7 @@ function start() {
     settings,
     shortcut: () => capture.shortcut(),
     applyShortcut: () => capture.applyShortcut(),
-    signedIn: () => [...new Set([...unread.showing(), ...requests.summaries().map((s) => s.serverId)])],
+    signedIn: () => [...new Set(requests.summaries().map((s) => s.serverId))],
     openConnect,
   });
   const run = promisify(execFile);
@@ -426,7 +432,7 @@ function start() {
             showSetup: () => setup.show(),
             showConnect: openConnect,
             quickCapture: () => capture.toggle(),
-            togglePanel: () => panel.toggle(unread.trayBounds()),
+            togglePanel: () => panel.toggle(menuBar.trayBounds()),
             openServer: (id) => windows.show(id),
             signInInFront: () => front && signIn(front.id),
             openUpdate: (release) => void tellAboutUpdate(release),
@@ -525,7 +531,7 @@ function start() {
 
   // Asleep, a page's connections died quietly; awake, they are checked at once.
   powerMonitor.on("resume", () => windows.wake());
-  unread.start();
+  menuBar.start();
   capture.applyShortcut();
   // Started before the windows are made, so that its window waits for it (whenReachable).
   if (list.localServer()) {

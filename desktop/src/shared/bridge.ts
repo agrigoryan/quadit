@@ -48,9 +48,43 @@ export interface DesktopSummary {
     detail: string;
     path: string;
     usable: boolean;
+    /** The first line of its card on the Agents page, coloured as there; absent from an older page. */
+    line?: { text: string; tone: "ok" | "work" | "wait" | "quiet" };
+    /** How far it is heard: not connected, connected and nothing hears it, or heard; absent from an older page. */
+    reach?: "not_connected" | "not_listening" | "heard";
   }[];
   /** Projects I may create tasks in, for quick capture. */
   projects: { key: string; name: string }[];
+  /** How many more decisions wait on me than `waiting` holds (it holds at most 10). */
+  waitingMore?: number;
+  /** Tasks that wait on me (no question of theirs is in `waiting`): the task, and the handle of its assignee, who waits ("" for none). */
+  tasks?: SummaryList<{ key: string; title: string; who: string; path: string }>;
+  /**
+   * Runs of agents I answer for that failed or did not start, which nothing
+   * newer on their task replaced, in the last day: the task, and the run's
+   * own reason line ("Not started: … ").
+   */
+  runs?: SummaryList<{ key: string; title: string; line: string; path: string }>;
+  /**
+   * Runs open now: waiting, working, or done and waiting for an answer; the
+   * agent's handle, the task, the state's word, when it started (ms), and
+   * Stop where I may stop it.
+   */
+  working?: SummaryList<{
+    agent: string;
+    key: string;
+    title: string;
+    state: string;
+    since: number;
+    path: string;
+    stop?: DesktopAction;
+  }>;
+}
+
+/** At most 10 of something, newest or most pressing first, and how many more there are. */
+export interface SummaryList<T> {
+  items: T[];
+  more: number;
 }
 
 /** What the person asked for in the app, handed to the page that is to do it. */
@@ -130,10 +164,9 @@ export interface QuaditDesktop {
   /** Show a native notification; clicking it focuses the window and navigates to `path`. */
   notify(n: DesktopNotification): void;
   /**
-   * The unread count of `workspace` (its id), the one this window shows; 0
-   * is a count like any other. Without a workspace, the window shows none
-   * and its count is taken back. The app counts each workspace of a server
-   * once (its newest report) and adds the servers up for the dock and tray badge.
+   * Kept for the pages that call it, and does nothing: the app's number (on
+   * the menu-bar icon and the Dock) is what waits on the person, which it
+   * reads from the summary (waitsOnYou), not the unread count.
    */
   setBadge(count: number, workspace?: string): void;
   /** Replaces this window's summary; null takes it back (signed out, shell gone). */
@@ -204,7 +237,6 @@ export function focusOf(raw: unknown, programs: readonly string[] = []): Connect
 }
 
 export const BRIDGE_NOTIFY = "bridge:notify";
-export const BRIDGE_BADGE = "bridge:badge";
 /** Page to app: a summary, or null. */
 export const BRIDGE_PUBLISH = "bridge:publish";
 /** App to page: `{id, request}`. */
@@ -229,6 +261,8 @@ const BODY_MAX = 1000;
 const PATH_MAX = 2048;
 const ID_MAX = 200;
 const COUNT_MAX = 99_999;
+/** The most of each list a summary carries (SummaryList), the rest counted. */
+const LIST_MAX = 10;
 const LABEL_MAX = 40;
 const REQUEST_MAX = 500;
 const PLACEHOLDER_MAX = 80;
@@ -330,19 +364,49 @@ export function notificationOf(raw: unknown): DesktopNotification | null {
   });
 }
 
-/** `raw` as a badge report the app keeps (a whole count, from 0 up to a ceiling; "" for no workspace), or null when it is none. */
-export function badgeOf(raw: unknown): { count: number; workspace: string } | null {
-  return kept(() => {
-    const { count, workspace } = record(raw);
-    if (typeof count !== "number" || !Number.isFinite(count)) throw refused;
-    return { count: Math.min(Math.max(Math.floor(count), 0), COUNT_MAX), workspace: exact(workspace, ID_MAX) };
-  });
+/**
+ * How many things in `summary` wait on the person: the questions asked of
+ * them, the tasks that wait on them and the runs that need them, the rest
+ * beyond each list counted too. A page from before these lists says only
+ * its questions.
+ */
+export function waitsOnYou(summary: DesktopSummary): number {
+  const { waiting, waitingMore = 0, tasks, runs } = summary;
+  const all = (list: SummaryList<unknown> | undefined) => (list ? list.items.length + list.more : 0);
+  return waiting.length + waitingMore + all(tasks) + all(runs);
 }
+
+/** A count a page gives: a whole number from 0 up to a ceiling; refused when it is not a number. */
+function countOf(raw: unknown): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) throw refused;
+  return Math.min(Math.max(Math.floor(raw), 0), COUNT_MAX);
+}
+
+/** A time a page gives (ms since 1970); refused when it is not one. */
+function timeOf(raw: unknown): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0) throw refused;
+  return Math.floor(raw);
+}
+
+/** A short list a page gives (SummaryList): at most LIST_MAX items, each read by `item`, and how many more. */
+function shortList<T>(raw: unknown, item: (raw: unknown) => T): SummaryList<T> {
+  const { items, more } = record(raw);
+  return { items: list(items, LIST_MAX, item), more: countOf(more) };
+}
+
+/** One of `values`, or refused. */
+function oneOf<T extends string>(raw: unknown, values: readonly T[]): T {
+  if (typeof raw !== "string" || !(values as readonly string[]).includes(raw)) throw refused;
+  return raw as T;
+}
+
+const TONES = ["ok", "work", "wait", "quiet"] as const;
+const REACHES = ["not_connected", "not_listening", "heard"] as const;
 
 /** `raw` as a summary the app keeps, as fresh plain data, or null when it is none. */
 export function summaryOf(raw: unknown): DesktopSummary | null {
   return kept(() => {
-    const { workspace, me, waiting, agents, projects } = record(raw);
+    const { workspace, me, waiting, waitingMore, tasks, runs, working, agents, projects } = record(raw);
     const ws = record(workspace);
     const person = record(me);
     return {
@@ -368,11 +432,57 @@ export function summaryOf(raw: unknown): DesktopSummary | null {
           detail: shown(agent.detail, BODY_MAX),
           path: exact(agent.path, PATH_MAX),
           usable: flag(agent.usable),
+          ...defined({
+            line: optional(agent.line, (v) => {
+              const line = record(v);
+              return { text: shown(line.text, BODY_MAX), tone: oneOf(line.tone, TONES) };
+            }),
+            reach: optional(agent.reach, (v) => oneOf(v, REACHES)),
+          }),
         };
       }),
       projects: list(projects, PROJECTS_MAX, (v) => {
         const project = record(v);
         return { key: exact(project.key, ID_MAX), name: shown(project.name, TITLE_MAX) };
+      }),
+      ...defined({
+        waitingMore: optional(waitingMore, countOf),
+        tasks: optional(tasks, (v) =>
+          shortList(v, (i) => {
+            const task = record(i);
+            return {
+              key: exact(task.key, ID_MAX),
+              title: shown(task.title, TITLE_MAX),
+              who: shown(task.who, LABEL_MAX),
+              path: exact(task.path, PATH_MAX),
+            };
+          }),
+        ),
+        runs: optional(runs, (v) =>
+          shortList(v, (i) => {
+            const run = record(i);
+            return {
+              key: exact(run.key, ID_MAX),
+              title: shown(run.title, TITLE_MAX),
+              line: shown(run.line, BODY_MAX),
+              path: exact(run.path, PATH_MAX),
+            };
+          }),
+        ),
+        working: optional(working, (v) =>
+          shortList(v, (i) => {
+            const run = record(i);
+            return defined({
+              agent: shown(run.agent, LABEL_MAX),
+              key: exact(run.key, ID_MAX),
+              title: shown(run.title, TITLE_MAX),
+              state: shown(run.state, LABEL_MAX),
+              since: timeOf(run.since),
+              path: exact(run.path, PATH_MAX),
+              stop: optional(run.stop, actionOf),
+            });
+          }),
+        ),
       }),
     };
   });
