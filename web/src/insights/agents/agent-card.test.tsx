@@ -129,39 +129,72 @@ afterEach(async () => {
   delete window.quaditDesktop;
 });
 
-describe("the card's one action, in the app", () => {
-  it("connects an agent that has not, in the app's Connect window", () => {
+describe("the card in the app, in the app's card's words", () => {
+  it("says it is not connected, and connects it in the app's Connect window", () => {
     show(reading({ connected_at: undefined, tool: undefined }), {});
+    expect(within(card()).getByText("Not connected")).toBeTruthy();
+    expect(within(card()).queryByText("Connected")).toBeNull();
     fireEvent.click(within(card()).getByRole("button", { name: "Connect" }));
     expect(open).toHaveBeenCalledWith({ agent: "a1", intent: "connect" });
   });
 
-  it("gives the words that have it listen, and Run by Quadit where this computer can", async () => {
+  it("says it is connected and not listening, with the words to write, and Run by Quadit where this computer can", async () => {
     show(reading(), { a1: here() });
-    expect(within(card()).getByText("Say “listen to Quadit” to it in a chat.")).toBeTruthy();
+    expect(within(card()).getByText("Connected")).toBeTruthy();
+    expect(
+      within(card()).getByText(
+        "Not listening yet. To have it answer what you write in Quadit, open Claude Code in your project’s folder and write:",
+      ),
+    ).toBeTruthy();
+    expect(within(card()).getByText("listen to Quadit")).toBeTruthy();
+    expect(
+      within(card()).getByText(
+        "Quadit can start Claude Code for you when you assign @claude a task or comment on one, in the project’s folder on this computer.",
+      ),
+    ).toBeTruthy();
     fireEvent.click(within(card()).getByRole("button", { name: "Run by Quadit…" }));
     expect(open).toHaveBeenCalledWith({ agent: "a1", intent: "run" });
     // Copying gives the words alone.
     const write = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText: write } });
-    fireEvent.click(within(card()).getByRole("button", { name: "Copy “listen to Quadit”" }));
+    fireEvent.click(within(card()).getByRole("button", { name: "Copy “listen to Quadit” for Claude" }));
     await waitFor(() => expect(write).toHaveBeenCalledWith("listen to Quadit"));
 
     show(reading(), { a1: here({ canRun: false }) });
     expect(within(card()).queryByRole("button", { name: "Run by Quadit…" })).toBeNull();
   });
 
-  it("stops Quadit running it on this computer, in the app's Connect window", () => {
+  it("says what Quadit runs on this computer and how it stands, and stops it in the app's Connect window", () => {
     show(listening(runner), { a1: here({ runs: ["p1"] }) });
-    expect(within(card()).getByText(/^Runs Game on Aram's Mac/)).toBeTruthy();
-    fireEvent.click(within(card()).getByRole("button", { name: "Stop running" }));
+    expect(within(card()).getByText("Runs SVA in ~/game.")).toBeTruthy();
+    expect(within(card()).getByText("Ready.")).toBeTruthy();
+    fireEvent.click(within(card()).getByRole("button", { name: "Stop running SVA on this computer" }));
     expect(open).toHaveBeenCalledWith({ agent: "a1", intent: "run" });
+    show(listening({ ...runner, runner: { ...runner.runner!, task: "SVA-4" } }), { a1: here({ runs: ["p1"] }) });
+    expect(within(card()).getByText("Working on SVA-4.")).toBeTruthy();
+    show(listening({ ...runner, runner: { ...runner.runner!, paused: "not_signed_in" } }), {
+      a1: here({ runs: ["p1"] }),
+    });
+    expect(
+      within(card()).getByText("Paused: Claude Code is not signed in. Open Claude Code and sign in."),
+    ).toBeTruthy();
+    show(listening({ ...runner, runner: { ...runner.runner!, holding: false } }), { a1: here({ runs: ["p1"] }) });
+    expect(
+      within(card()).getByText("A chat listens to SVA now. Quadit runs it again when that chat stops."),
+    ).toBeTruthy();
   });
 
-  it("offers nothing when a chat listens, or when another computer runs it", () => {
-    show(listening({ project_id: "p1", project: "SVA", by: "a chat", live: true }), { a1: here() });
-    expect(buttons()).toEqual(["More for Claude"]);
-    show(listening(runner), { a1: here() });
+  it("says what a chat that listens means in one sentence, and that another computer runs it, with nothing to press", () => {
+    show(listening({ project_id: "p1", project: "SVA", by: "a chat", live: true }), { a1: here({ canRun: false }) });
+    expect(within(card()).getByText("Listening to Game, from a chat")).toBeTruthy();
+    expect(
+      within(card()).getByText(
+        "It answers what you assign to it or ask it in Quadit while that chat is open. One chat listens to a project at a time. To stop, tell that chat to stop listening.",
+      ),
+    ).toBeTruthy();
+    expect(buttons()).toEqual(["Disconnect Claude from this computer", "More for Claude"]);
+    show(listening(runner), null);
+    expect(within(card()).getByText("Quadit runs SVA on Aram's Mac.")).toBeTruthy();
     expect(buttons()).toEqual(["More for Claude"]);
   });
 
@@ -185,7 +218,7 @@ describe("the card's one action, in the app", () => {
       },
     );
     expect(within(card()).getAllByRole("button", { name: "Stop @claude's run on SVA-1" })).toHaveLength(1);
-    expect(within(card()).queryByRole("button", { name: "Stop running" })).toBeNull();
+    expect(within(card()).queryByRole("button", { name: /^Stop running/ })).toBeNull();
   });
 
   it("offers Connect only to whoever may make the agent a connect code", () => {
@@ -194,7 +227,7 @@ describe("the card's one action, in the app", () => {
   });
 });
 
-describe("the card's one action, in a browser", () => {
+describe("the card in a browser", () => {
   beforeEach(() => {
     delete window.quaditDesktop;
   });
@@ -206,12 +239,17 @@ describe("the card's one action, in a browser", () => {
     );
   });
 
-  it("gives the words that have it listen, with no Run by Quadit, and no Stop running", () => {
+  it("gives the words to write, with no Run by Quadit, no Stop running and no Disconnect", () => {
     show(reading(), null);
-    expect(within(card()).getByText("Say “listen to Quadit” to it in a chat.")).toBeTruthy();
+    expect(
+      within(card()).getByText(
+        "Not listening yet. To have it answer what you write in Quadit, open Claude Code in your project’s folder and write:",
+      ),
+    ).toBeTruthy();
     expect(within(card()).queryByRole("button", { name: "Run by Quadit…" })).toBeNull();
+    expect(within(card()).queryByRole("button", { name: /^Disconnect/ })).toBeNull();
     show(listening(runner), null);
-    expect(within(card()).queryByRole("button", { name: "Stop running" })).toBeNull();
+    expect(within(card()).queryByRole("button", { name: /^Stop running/ })).toBeNull();
   });
 
   it("is the same in an app whose word on this computer's agents failed", () => {
@@ -255,18 +293,17 @@ describe("the card's menu", () => {
       .map((m) => m.textContent);
   };
 
-  it("offers an admin the settings and removing it, and disconnecting it where this computer connects it", () => {
+  it("offers an admin the settings and removing it, and a member the settings alone", () => {
     show(reading(), { a1: here() });
-    expect(items()).toEqual(["Settings", "Disconnect from this computer", "Remove agent"]);
-    fireEvent.click(screen.getByRole("menuitem", { name: "Disconnect from this computer" }));
-    expect(open).toHaveBeenCalledWith({ agent: "a1", intent: "disconnect" });
+    expect(items()).toEqual(["Settings", "Remove agent"]);
+    show(reading(), { a1: here() }, { me: bea });
+    expect(items()).toEqual(["Settings"]);
   });
 
-  it("offers a member the settings alone, and a browser no Disconnect", () => {
-    show(reading(), { a1: here() }, { me: bea });
-    expect(items()).toEqual(["Settings", "Disconnect from this computer"]);
-    show(reading(), null);
-    expect(items()).toEqual(["Settings", "Remove agent"]);
+  it("disconnects it from this computer beside Connected, in the app's Connect window", () => {
+    show(reading(), { a1: here() });
+    fireEvent.click(within(card()).getByRole("button", { name: "Disconnect Claude from this computer" }));
+    expect(open).toHaveBeenCalledWith({ agent: "a1", intent: "disconnect" });
   });
 
   it("removes the agent after asking, as Settings does", async () => {

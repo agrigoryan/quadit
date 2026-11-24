@@ -20,17 +20,49 @@ export const agentsStrings = {
   "agents.claim.holding": "Holds {name} until {time}",
   "agents.claim.waiting": "In line for {name}",
 
-  // What a card offers for the agent's state, and its menu.
+  // An agent's card, in the words of the desktop app's card for the same state (desktop/src/pages/tool-card.ts, run-by-quadit.ts).
   "agents.card.where": "{program} on {computer}",
+  "agents.card.connected": "Connected",
+  "agents.card.notConnected": "Not connected",
   "agents.card.connect": "Connect",
-  "agents.card.listen": "Say “listen to Quadit” to it in a chat.",
+  "agents.card.disconnect": "Disconnect",
+  "agents.card.disconnectLabel": "Disconnect {name} from this computer",
+  "agents.card.listening": "Listening",
+  "agents.card.listeningSaid": "It answers what you assign to it or ask it in Quadit.",
+  "agents.card.chatSaid":
+    "It answers what you assign to it or ask it in Quadit while that chat is open. One chat listens to a project at a time. To stop, tell that chat to stop listening.",
+  "agents.card.chatsSaid":
+    "It answers what you assign to it or ask it in Quadit while those chats are open. One chat listens to a project at a time. To stop one, tell its chat to stop listening.",
+  "agents.card.companionSaid": "A companion runs in a terminal, and stops with Ctrl-C or when that terminal closes.",
+  "agents.card.notListening":
+    "Not listening yet. To have it answer what you write in Quadit, open {program} in your project’s folder and write:",
+  "agents.card.notListeningNoProgram":
+    "Not listening yet. To have it answer what you write in Quadit, write this in its chat, in your project’s folder:",
+  "agents.card.nextStep": "Next: have {name} listen",
   "agents.card.listenWords": "listen to Quadit",
-  "agents.card.copyListen": "Copy “listen to Quadit”",
+  "agents.card.copyListen": "Copy “listen to Quadit” for {name}",
+  "agents.card.runs": "Runs {project} in {folder}.",
+  "agents.card.ready": "Ready.",
+  "agents.card.working": "Working on {task}.",
+  "agents.card.aside": "A chat listens to {project} now. Quadit runs it again when that chat stops.",
+  "agents.card.runsElsewhere": "Quadit runs {project} on {machine}.",
+  "agents.card.paused.usage_limit": "Paused until {time}: {program}’s usage limit.",
+  "agents.card.paused.usage_limitUnknown": "Paused: {program}’s usage limit.",
+  "agents.card.paused.not_signed_in": "Paused: {program} is not signed in. Open {program} and sign in.",
+  "agents.card.paused.program_missing": "Paused: {program} was not found on {machine}.",
+  "agents.card.paused.folder_missing": "Paused: the folder is gone. Stop running and pick it again.",
+  "agents.card.paused.login_mismatch": "Paused: {program} is set to work as another agent. Connect it again.",
+  "agents.card.paused.server_old": "Paused: this server needs an update to run agents.",
+  "agents.card.paused.other": "Paused.",
+  "agents.card.offer":
+    "Quadit can start {program} for you when you assign @{handle} a task or comment on one, in the project’s folder on this computer.",
+  "agents.card.offerFor":
+    "Quadit can start {program} under your account when @{owner} assigns @{handle} a task or writes to it on one, in the project’s folder on this computer.",
   "agents.card.runByQuadit": "Run by Quadit…",
   "agents.card.stopRunning": "Stop running",
+  "agents.card.stopRunningLabel": "Stop running {project} on this computer",
   "agents.card.more": "More for {name}",
   "agents.card.settings": "Settings",
-  "agents.card.disconnect": "Disconnect from this computer",
 
   "agents.helpers": "Helpers",
   "agents.helper.oneTask": "for one task",
