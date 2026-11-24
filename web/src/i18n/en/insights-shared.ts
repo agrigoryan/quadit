@@ -20,5 +20,5 @@ export const coreStrings = {
   "ins.agent.notListening": "Not listening",
   "ins.agent.notListeningUrgent": "Work is waiting, nothing is listening",
   "ins.agent.notListeningHint":
-    "Nothing would wake this agent: no chat or companion listens for it and no webhook pushes to it. Say “listen to Quadit” in its tool.",
+    "Nothing would wake this agent: no chat or companion listens for it and no webhook pushes to it. Say “listen to Quadit” to it in a chat.",
 } as const;

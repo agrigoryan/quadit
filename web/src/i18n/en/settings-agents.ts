@@ -12,16 +12,16 @@ export const agentStrings = {
     "Something is waiting for this agent's work right now: a held request, or a webhook for its inbox.",
   "agents.notListening": "Nothing is listening",
   "agents.notListeningHint":
-    "Nothing is waiting for this agent's work. Tasks given to it wait until it looks; say “listen to Quadit” in its tool to have it answer them as they come.",
+    "Nothing is waiting for this agent's work. Tasks given to it wait until it looks; say “listen to Quadit” to it in a chat to have it answer them as they come.",
   "agents.connection.listening": "Listening",
   "agents.connection.connected": "Connected, not listening",
   "agents.connection.not_connected": "Not connected yet",
   "agents.connection.listeningHint":
     "It is listening for its work right now, or a webhook pushes to it: it will see what is written here.",
   "agents.connection.connectedHint":
-    "It has reached Quadit from inside its tool and works when someone asks it there; until then, what is written here waits. Say “listen to Quadit” in its tool to have it answer as things come.",
+    "It has proven it reaches Quadit, and works when someone asks it in a chat; until then, what is written here waits. Say “listen to Quadit” to it in a chat to have it answer as things come.",
   "agents.connection.not_connectedHint":
-    "It has never reached Quadit from inside its tool. Connect it from the desktop app, or with a connect code on its page in Settings.",
+    "It has not proven yet that it reaches Quadit. Connect it from the desktop app, or with a connect code on its page in Settings.",
   "agents.state.working": "Working",
   "agents.state.waiting": "Waiting on someone",
   "agents.state.has_work": "Has work",
@@ -103,8 +103,8 @@ export const agentStrings = {
 
   "connectCode.title": "Connect code",
   "connectCode.lead":
-    "Proves the agent reaches Quadit from inside its tool: say the line in the tool, and the agent gives the code back with its own login. Good once, for seven days.",
-  "connectCode.tool": "Tool",
+    "Proves the agent reaches Quadit from where it runs: say the line in its chat, and it gives the code back with its own login. Good once, for seven days.",
+  "connectCode.tool": "Runs in",
   "connectCode.toolHint": "Where the agent runs, as you would name it: Codex, Claude Code, Cursor.",
   "connectCode.make": "Make a connect code",
   "connectCode.again": "Make a new code",

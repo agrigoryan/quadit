@@ -62,7 +62,7 @@ describe("the line under the comment box", () => {
     expect(await screen.findByText("@codex is listening and will see this.")).toBeTruthy();
   });
 
-  it("says when an agent that is not listening will see it, and what to say in its tool", async () => {
+  it("says when an agent that is not listening will see it, and what to say to it in a chat", async () => {
     agents(false, "Codex");
     show({ ...base, assignee_id: "u1", waiting_on_id: "a1" });
     expect(
@@ -77,7 +77,7 @@ describe("the line under the comment box", () => {
     show({ ...base, assignee_id: "a1" });
     expect(
       await screen.findByText(
-        "@codex is not listening. To have it answer here, say “listen to Quadit” in its tool. Until then it sees this when you next ask it to check Quadit.",
+        "@codex is not listening. To have it answer here, say “listen to Quadit” to it in a chat. Until then it sees this when you next ask it to check Quadit.",
       ),
     ).toBeTruthy();
   });

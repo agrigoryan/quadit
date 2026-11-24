@@ -32,7 +32,7 @@ test("the comment box says what happens to a comment in each of the agent's stat
   // In a browser, the way to connect is the agent's page in Settings.
   await activity.getByRole("link", { name: "Connect it in Settings" }).click();
   await expect(page).toHaveURL(`/${WORKSPACE.slug}/settings/agents/${handle}`);
-  await expect(page.getByRole("textbox", { name: "Tool" })).toHaveValue("Codex");
+  await expect(page.getByRole("textbox", { name: "Runs in" })).toHaveValue("Codex");
   await page.getByRole("button", { name: "Make a connect code" }).click();
   await expect(page.getByText("In Codex, say:")).toBeVisible();
   const line = (await page.getByRole("code").filter({ hasText: "Connect to Quadit" }).textContent()) ?? "";

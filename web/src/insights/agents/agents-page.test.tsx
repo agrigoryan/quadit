@@ -18,9 +18,9 @@ import { TooltipProvider } from "@/ui/tooltip";
 
 const me = { user_id: "u1", role: "owner", name: "Me", kind: "person", handle: "me" } as Member;
 const bot = { user_id: "a1", role: "member", name: "Claude Code", kind: "agent", handle: "claude" } as Member;
-const connect = "Connect a tool on this computer";
+const connect = "Connect an agent on this computer";
 // With the title "No agents yet" above it, the empty state says §8's sentence.
-const connectHint = "Connect Claude Code, Codex or another tool on this computer, and it becomes a member here.";
+const connectHint = "Connect Claude Code, Codex or another AI tool on this computer, and it becomes a member here.";
 
 function show(members: Member[]) {
   loadBootstrap("acme", {
