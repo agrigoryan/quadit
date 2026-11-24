@@ -786,10 +786,11 @@ func usageLimited() []fakeagent.Step {
 		{Out: fmt.Sprintf(`{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","resetsAt":%d}}`, resets.Unix())}, exit(1)}
 }
 
-// TestAKeptHeadGoesOnThoughTheServerSaysItIsFromBefore: the head an entry
-// keeps after a usage limit, which a server counts as taken by the run
-// (ack before), is continued, not acknowledged.
-func TestAKeptHeadGoesOnThoughTheServerSaysItIsFromBefore(t *testing.T) {
+// TestAKeptHeadIsAcknowledgedWhenTheServerNoLongerRunsIt: the head an
+// entry keeps after a usage limit goes on only when the server still runs
+// it; one it acknowledges meanwhile (the task given to someone else while
+// the agent was paused: ack before) is acknowledged, and nothing starts.
+func TestAKeptHeadIsAcknowledgedWhenTheServerNoLongerRunsIt(t *testing.T) {
 	rt := newRunTest(t, core.ProgramClaude, usageLimited(), claudeDone("done"))
 	head := rt.f.addItem(fakeItem{Task: "SVA-12"})
 	rt.serve()
@@ -797,13 +798,10 @@ func TestAKeptHeadGoesOnThoughTheServerSaysItIsFromBefore(t *testing.T) {
 		t.Fatalf("the first run ended %v", row)
 	}
 	rt.eventually("paused", func() bool { return readStatus(rt.files.status()).Entries[rt.entry.ID].Pause == core.PauseUsageLimit })
-	rt.f.set(func(f *fakeQuadit) { f.items[0].Do, f.items[0].Why = wakeAck, whyBefore })
+	rt.f.set(func(f *fakeQuadit) { f.items[0].Do, f.items[0].Why = wakeAck, "before" })
 	rt.clock.jump(61 * time.Minute)
-	if row := rt.ended(1); row["state"] != core.AgentSessionDone {
-		t.Fatalf("the continuation ended %v", row)
-	}
 	rt.acked(head)
-	if p := rt.records()[1].Stdin; !strings.Contains(p, "Your last run stopped at Claude Code's limit before it finished") {
-		t.Fatalf("the second run is not the continuation:\n%s", p)
+	if len(rt.records()) != 1 || len(rt.f.allRuns()) != 1 {
+		t.Fatalf("%d starts, %d runs: the withdrawn head went on", len(rt.records()), len(rt.f.allRuns()))
 	}
 }

@@ -86,10 +86,6 @@ const (
 	wakeRefuse = "refuse"
 )
 
-// whyBefore is why an item from before the runner began is acknowledged:
-// it no longer waits on the agent.
-const whyBefore = "before"
-
 // understood reports whether the runner can act on w: a do it knows. Why
 // an item is acknowledged does not matter (any why, known or not, is a
 // plain acknowledgment); a refusal's why goes on the row, so it must have
