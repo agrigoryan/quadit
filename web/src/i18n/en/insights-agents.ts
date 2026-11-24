@@ -8,8 +8,7 @@ export const agentsStrings = {
   "agents.emptyHint":
     "An agent is a member with its own account and token. Add one in Settings, then assign it tasks like anyone else.",
   "agents.emptyHintMember": "An agent is a member with its own account and token. An admin adds them in Settings.",
-  "agents.emptyAction": "Add an agent in Settings",
-  "agents.connect": "Connect an agent on this computer",
+  "agents.add": "Add an agent",
   "agents.emptyHintConnect":
     "Connect Claude Code, Codex or another AI tool on this computer, and it becomes a member here.",
 
@@ -20,6 +19,18 @@ export const agentsStrings = {
   "agents.holdsUntil": "holds it until {time}",
   "agents.claim.holding": "Holds {name} until {time}",
   "agents.claim.waiting": "In line for {name}",
+
+  // What a card offers for the agent's state, and its menu.
+  "agents.card.where": "{program} on {computer}",
+  "agents.card.connect": "Connect",
+  "agents.card.listen": "Say “listen to Quadit” to it in a chat.",
+  "agents.card.listenWords": "listen to Quadit",
+  "agents.card.copyListen": "Copy “listen to Quadit”",
+  "agents.card.runByQuadit": "Run by Quadit…",
+  "agents.card.stopRunning": "Stop running",
+  "agents.card.more": "More for {name}",
+  "agents.card.settings": "Settings",
+  "agents.card.disconnect": "Disconnect from this computer",
 
   "agents.helpers": "Helpers",
   "agents.helper.oneTask": "for one task",

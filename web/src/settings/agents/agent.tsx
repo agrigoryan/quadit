@@ -26,6 +26,7 @@ import { useSettingsBase } from "@/settings/base";
 import { Fact } from "@/ui/fact";
 import { When } from "@/ui/when";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { RemoveAgentDialog } from "@/settings/agents/remove-agent";
 import { FormAlert, FormFoot, useFieldErrors, useSubmit } from "@/ui/form";
 import { Card, Page, Section } from "@/ui/page-layout";
 import { Avatar } from "@/ui/avatar";
@@ -202,16 +203,11 @@ function AgentBody({ agent }: { agent: AgentMember }) {
           mutate({ type: "member.update", args: { id: agent.user_id, suspended: true } }, undefined, { quiet: true })
         }
       />
-      <ConfirmDialog
+      <RemoveAgentDialog
+        agent={agent}
         open={ask === "remove"}
         onOpenChange={(open) => !open && setAsk(null)}
-        title={t("agent.remove.title", { name: agent.name })}
-        body={t("agent.removeLead")}
-        confirm={t("s.remove")}
-        onConfirm={async () => {
-          await mutate({ type: "member.remove", args: { id: agent.user_id } }, undefined, { quiet: true });
-          void navigate(`${base}/agents`);
-        }}
+        onRemoved={() => void navigate(`${base}/agents`)}
       />
     </Page>
   );

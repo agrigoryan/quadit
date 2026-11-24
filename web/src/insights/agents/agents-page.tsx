@@ -4,11 +4,11 @@
 // moves as the feed does.
 
 import { useMemo, useState } from "react";
-import { Bot } from "lucide-react";
-import { Link } from "react-router";
+import { Bot, Plus } from "lucide-react";
+import { useNavigate } from "react-router";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
-import { useLookupEvenIfGone, useMembers, useSlug } from "@/data/selectors";
+import { useLookupEvenIfGone, useMembers } from "@/data/selectors";
 import type { Dict } from "@/data/store";
 import type { AgentSession } from "@/types/core";
 import { usePageTitle } from "@/lib/ui-state";
@@ -22,19 +22,49 @@ import { NO_WORK, useAgentWork, useClaims, useResources } from "@/insights/agent
 import { Resources } from "@/insights/agents/resources";
 import { useSessions } from "@/insights/agents/session-data";
 import { isFinishedHelper, placeHelpers, useHelperLabel } from "@/settings/agents/helper-agents";
-import { canConnectTools, ConnectToolsButton } from "@/ui/connect-tools";
+import { CreateAgentDialog } from "@/settings/agents/agent-create";
+import { useSettingsBase } from "@/settings/base";
+import { Button } from "@/ui/button";
+import { canOpenConnect, openConnect, useLocalAgents } from "@/ui/desktop-agents";
 import { Checkbox } from "@/ui/form";
 import { EmptyState } from "@/ui/empty";
 
 const NO_SESSIONS: AgentSession[] = [];
 const everySession = () => true;
 
-/** Opens the desktop app's Connect, which sets agent tools on this computer up to work here. */
-function ConnectToolButton({ main }: { main?: boolean }) {
+/**
+ * Adds an agent: in the desktop app, its Connect window, which connects the
+ * programs found on this computer; in a browser, for an admin, the dialog
+ * Settings makes one with, then the new agent's page there. Nothing for
+ * anyone else in a browser.
+ */
+function AddAgent({ main }: { main?: boolean }) {
+  const admin = useCan().administer;
+  const settings = useSettingsBase();
+  const navigate = useNavigate();
+  const [creating, setCreating] = useState(false);
+  const inApp = canOpenConnect();
+  if (!inApp && !admin) return null;
   return (
-    <ConnectToolsButton variant={main ? "primary" : "secondary"} size={main ? "md" : "sm"}>
-      {t("agents.connect")}
-    </ConnectToolsButton>
+    <>
+      <Button
+        variant={main ? "primary" : "secondary"}
+        size={main ? "md" : "sm"}
+        onClick={() => (inApp ? openConnect() : setCreating(true))}
+      >
+        <Plus className="size-3.5" aria-hidden />
+        {t("agents.add")}
+      </Button>
+      {creating && (
+        <CreateAgentDialog
+          onClose={() => setCreating(false)}
+          onCreated={(handle) => {
+            setCreating(false);
+            void navigate(`${settings}/agents/${handle}`);
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -43,7 +73,6 @@ const ORDER = { working: 0, has_work: 1, waiting: 2, idle: 3 } as const;
 
 export function AgentsPage() {
   usePageTitle(t("nav.agents"));
-  const slug = useSlug();
   const can = useCan();
   const members = useMembers();
   const now = useNow(15_000);
@@ -54,7 +83,8 @@ export function AgentsPage() {
   const claims = useClaims();
   const resources = useResources();
   const work = useAgentWork(claims);
-  const connects = canConnectTools();
+  const connects = canOpenConnect();
+  const app = useLocalAgents();
 
   const states = useMemo(() => {
     const out: Dict<AgentState> = {};
@@ -132,7 +162,7 @@ export function AgentsPage() {
             </Checkbox>
           </span>
         )}
-        {connects && <ConnectToolButton />}
+        <AddAgent />
       </PageBar>
       <div className="min-h-0 flex-1 overflow-y-auto bg-canvas pb-10">
         {agents.length === 0 ? (
@@ -145,21 +175,7 @@ export function AgentsPage() {
                   ? t("agents.emptyHintConnect")
                   : t(can.administer ? "agents.emptyHint" : "agents.emptyHintMember")
               }
-              action={
-                (connects || can.administer) && (
-                  <div className="flex flex-col items-center gap-3">
-                    {connects && <ConnectToolButton main />}
-                    {can.administer && (
-                      <Link
-                        to={`/${slug}/settings/agents`}
-                        className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
-                      >
-                        {t("agents.emptyAction")}
-                      </Link>
-                    )}
-                  </div>
-                )
-              }
+              action={<AddAgent main />}
             />
           </div>
         ) : (
@@ -174,6 +190,7 @@ export function AgentsPage() {
                 work={work[member.user_id] ?? NO_WORK}
                 sessions={byAgent[member.user_id] ?? NO_SESSIONS}
                 resourceNames={resourceNames}
+                app={app}
                 now={now}
               />
             ))}

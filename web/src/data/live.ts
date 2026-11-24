@@ -4,7 +4,7 @@
 // (the cache asks again when the stream comes back). Two pages reading the
 // same path share one answer. The key they are cached under is here.
 
-import { useQuery } from "@tanstack/react-query";
+import { type QueryKey, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api, workspacePath } from "@/data/api";
 import { inWorkspace, queryClient, readError } from "@/data/query";
@@ -42,7 +42,7 @@ export function useLive<T>(
     enabled: path !== null,
     refetchInterval: opts.everyMs,
   });
-  useFollowFeed(path === null ? [] : [path], opts);
+  useFollowFeed(path === null ? [] : [liveKey(slug, path)], opts);
 
   return {
     data: query.data,
@@ -54,20 +54,20 @@ export function useLive<T>(
 }
 
 /**
- * Asks again for the live reads of `paths` (cached under liveKey) whenever
- * the feed moves, at most once every `throttleMs` after the oldest of them
- * was read: what useLive does for its one path, for a read made of several.
+ * Asks again for the reads cached under `keys` whenever the feed moves, at
+ * most once every `throttleMs` after the oldest of them was read: what
+ * useLive does for its one path, for a read made of several, or of
+ * something that is not a path of the server.
  */
-export function useFollowFeed(paths: string[], opts: { throttleMs?: number; only?: string[] } = {}) {
-  const slug = useStore((s) => s.slug);
+export function useFollowFeed(keys: readonly QueryKey[], opts: { throttleMs?: number; only?: string[] } = {}) {
   const throttle = opts.throttleMs ?? 2000;
   const only = opts.only?.join(",") ?? "";
-  // One string, so the effect starts over only when the set of paths does.
-  const joined = paths.join("\n");
+  // One string, so the effect starts over only when the set of keys does.
+  const joined = keys.length > 0 ? JSON.stringify(keys) : "";
 
   useEffect(() => {
     if (!joined) return;
-    const keys = joined.split("\n").map((path) => liveKey(slug, path));
+    const keys = JSON.parse(joined) as QueryKey[];
     const kinds = only ? new Set(only.split(",")) : null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const off = onEvents((events) => {
@@ -86,7 +86,7 @@ export function useFollowFeed(paths: string[], opts: { throttleMs?: number; only
       clearTimeout(timer);
       off();
     };
-  }, [slug, joined, throttle, only]);
+  }, [joined, throttle, only]);
 }
 
 /** The time now, updated on a slow tick, for "elapsed" and "until" readouts. */

@@ -51,7 +51,10 @@ export function useRunOutlook(
     })),
     combine,
   });
-  useFollowFeed(paths, { only: ["session", "notification", "member", ...(cause === "assign" ? ["task"] : [])] });
+  useFollowFeed(
+    paths.map((path) => liveKey(slug, path)),
+    { only: ["session", "notification", "member", ...(cause === "assign" ? ["task"] : [])] },
+  );
   return read;
 }
 

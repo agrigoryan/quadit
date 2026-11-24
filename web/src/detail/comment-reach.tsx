@@ -24,7 +24,8 @@ import { EMPTY_DRAFT, useDrafts, type Draft } from "@/detail/comment-actions";
 import { isOpenSession, type Member, type Task } from "@/types/core";
 import type { RunOutlook } from "@/types/dashboard";
 import { useSettingsBase } from "@/settings/base";
-import { canConnectTools, ConnectToolsButton } from "@/ui/connect-tools";
+import { Button } from "@/ui/button";
+import { canOpenConnect, openConnect } from "@/ui/desktop-agents";
 
 /** Members' handles as the server finds them in a comment (mentionRE in internal/engine/notify.go). */
 const MENTION = /(^|[^A-Za-z0-9_@/])@([a-z0-9][a-z0-9_-]{1,31})/g;
@@ -156,12 +157,15 @@ function runPhrase(o: RunOutlook): Key {
 function RunReach({ outlook, members, here }: { outlook: RunOutlook; members: Member[]; here: boolean }) {
   const words = wordsOf(outlook, members);
   const unset = outlook.outcome === "will_not_start" && outlook.reason === "no_runner_here";
+  const agent = members.find((m) => `@${m.handle}` === outlook.agent);
   return (
     <p className={LINE}>
       <span>{t(runLine(outlook, here), words)}</span>
       {unset &&
-        (canConnectTools() ? (
-          <ConnectToolsButton size="sm">{t("comment.run.setUp")}</ConnectToolsButton>
+        (canOpenConnect() ? (
+          <Button size="sm" onClick={() => openConnect(agent?.user_id, "run")}>
+            {t("comment.run.setUp")}
+          </Button>
         ) : (
           <span>{t("comment.run.setUpInApp", words)}</span>
         ))}
@@ -255,8 +259,13 @@ const LINE = "mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs te
 function ConnectIt({ agents }: { agents: Member[] }) {
   const settings = useSettingsBase();
   const n = agents.length;
-  if (canConnectTools()) return <ConnectToolsButton size="sm">{t("comment.reach.connect", { n })}</ConnectToolsButton>;
   const [only] = agents;
+  if (canOpenConnect())
+    return (
+      <Button size="sm" onClick={() => openConnect(n === 1 ? only?.user_id : undefined, "connect")}>
+        {t("comment.reach.connect", { n })}
+      </Button>
+    );
   return (
     <Link
       to={n === 1 && only ? `${settings}/agents/${only.handle}` : `${settings}/agents`}

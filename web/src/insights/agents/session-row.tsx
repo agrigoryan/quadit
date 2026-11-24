@@ -127,10 +127,17 @@ function Asked({ question, agent, taskKey }: { question: Decision; agent: Member
 }
 
 /**
- * Asks a runner's open run to stop. The runner stops the program; until
- * the run's state says so, the button says it is stopping.
+ * Asks a runner's open run to stop, for whoever may change its task;
+ * nothing for anyone else, or for a run that ended or that Quadit did not
+ * start. The runner stops the program; until the run's state says so, the
+ * button says it is stopping. Used on the run's line and on its agent's
+ * card.
  */
-function Stop({ session, agent, taskKey }: { session: AgentSession; agent: Member | undefined; taskKey: string }) {
+export function StopRun({ session }: { session: AgentSession }) {
+  const agent = useMember(session.agent_id);
+  const task = useRowEvenIfGone("tasks", session.task_id);
+  const can = useCan();
+  if (!session.machine_id || !isOpenSession(session) || !task || !can.editTask(task)) return null;
   const stopping = !!session.stop_requested_at;
   return (
     <Button
@@ -139,7 +146,7 @@ function Stop({ session, agent, taskKey }: { session: AgentSession; agent: Membe
       aria-label={
         stopping
           ? undefined
-          : t("agents.session.stopLabel", { agent: agent ? `@${agent.handle}` : t("common.agent"), key: taskKey })
+          : t("agents.session.stopLabel", { agent: agent ? `@${agent.handle}` : t("common.agent"), key: task.key })
       }
       className="relative z-[1] text-ink-2"
       onClick={() => send({ type: "session.stop", args: { id: session.id } })}
@@ -258,18 +265,18 @@ interface Props {
   question?: Decision;
   /** It is the newest run Quadit's runner started for its agent on its task: once ended, it may be continued in a terminal. */
   newestRun?: boolean;
+  /** Leave Stop off the line: the page shows it elsewhere (an agent's card, on the run in hand). */
+  noStop?: boolean;
 }
 
-export function SessionRow({ session, now, showAgent, showTask, question, newestRun }: Props) {
+export function SessionRow({ session, now, showAgent, showTask, question, newestRun, noStop }: Props) {
   const [open, setOpen] = useState(false);
   const agent = useMember(session.agent_id);
   const me = useMe();
-  const can = useCan();
   const task = useRowEvenIfGone("tasks", session.task_id);
   const title = session.title || t("agents.session.untitled");
   const runner = !!session.machine_id;
   const shown: Shown = session.state === "done" && question ? "awaiting" : session.state;
-  const canStop = runner && isOpenSession(session) && !!task && can.editTask(task);
   // Only the person the agent works for continues its session, on the computer it ran on.
   const resume =
     runner && newestRun && !isOpenSession(session) && !!agent && agent.responsible_id === me.user_id
@@ -294,7 +301,7 @@ export function SessionRow({ session, now, showAgent, showTask, question, newest
           <span className="min-w-0 truncate md:min-w-24">{title}</span>
         </button>
         {runner && session.machine_name && (
-          <span className="max-w-40 min-w-0 shrink truncate text-xs text-ink-3" title={session.folder}>
+          <span className="max-w-40 min-w-0 shrink truncate text-xs text-ink-3 max-md:hidden" title={session.folder}>
             {session.machine_name}
           </span>
         )}
@@ -302,7 +309,7 @@ export function SessionRow({ session, now, showAgent, showTask, question, newest
         <span className="shrink-0 text-xs text-ink-3 tnum" title={exact(session.started_at)}>
           {timing(session, now)}
         </span>
-        {canStop && task && <Stop session={session} agent={agent} taskKey={task.key} />}
+        {!noStop && <StopRun session={session} />}
       </div>
       {runner && session.reason && (
         <p className={notes}>
