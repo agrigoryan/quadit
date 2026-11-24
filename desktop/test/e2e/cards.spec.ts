@@ -173,7 +173,7 @@ test("a card says that connecting lets the tool run quadit without asking, and o
 }) => {
   await open(page, { connected: false, handshake: null, slowMs: 0 });
   const card = page.getByRole("article", { name: "Claude Code" });
-  await expect(card.getByText(/and lets Claude Code run quadit without asking/)).toBeVisible();
+  await expect(card.getByText(/a login file for Claude Code, and lets it run quadit without asking/)).toBeVisible();
   await card.getByRole("button", { name: "More options for Claude Code" }).click();
   await expect(card.getByRole("form", { name: "How to connect Claude Code" })).toBeVisible();
   await expect(page.getByRole("checkbox", { name: /without asking/ })).toHaveCount(0);
@@ -185,7 +185,7 @@ test("a connected card that is not listening makes the line to write its main st
 }) => {
   await open(page, { connected: true, handshake: { state: "connected", listening: false }, slowMs: 0 });
   const steps = page.getByRole("region", { name: "To have an agent answer you in Quadit" });
-  await expect(steps.getByText("Connect its tool here.")).toBeVisible();
+  await expect(steps.getByText("Connect it here.")).toBeVisible();
   await expect(steps.locator("code")).toHaveText("listen to Quadit");
   await expect(steps.getByText(/^Other ways: MCP \(under More options\)/)).toBeVisible();
 

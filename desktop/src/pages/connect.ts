@@ -268,7 +268,7 @@ function optionsForm(h: HarnessView): { form: HTMLFormElement; fill: () => void 
   const how = make("fieldset", "", "choice");
   how.append(make("legend", "How"));
   const cli = check("cli", "The quadit command and its skill", true);
-  const mcp = check("mcp", "Quadit's MCP server (signs in through the tool)", false);
+  const mcp = check("mcp", `Quadit's MCP server (signs in through ${h.name})`, false);
   how.append(cli.label);
   if (h.mcp) how.append(mcp.label);
 
@@ -376,7 +376,7 @@ async function render() {
       ? [
           make(
             "li",
-            `This computer's default quadit login is ${loginName(view.defaultLogin)}. The tools without a login of their own work as it.`,
+            `This computer's default quadit login is ${loginName(view.defaultLogin)}. The AI tools without a login of their own work as it.`,
             "hint",
           ),
         ]
@@ -491,7 +491,7 @@ const how = listenSteps();
 how.append(
   make(
     "p",
-    "Other ways: MCP (under More options) gives a tool Quadit’s tools in its chats, but cannot listen. To answer with no chat open, run a companion command in a terminal or set up a webhook: docs/agents.md in Quadit’s repository says how.",
+    "Other ways: MCP (under More options) gives an agent Quadit’s tools in its chats, but cannot listen. To answer with no chat open, run a companion command in a terminal or set up a webhook: docs/agents.md in Quadit’s repository says how.",
     "how-other",
   ),
 );

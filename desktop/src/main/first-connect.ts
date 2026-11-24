@@ -170,7 +170,7 @@ export class FirstConnect {
 
   private async plan(toolId: string): Promise<Planned> {
     const tool = this.offered.find((t) => t.id === toolId);
-    if (!tool) return { ok: false, error: "That tool is not offered here: connect it from Connect Agents…" };
+    if (!tool) return { ok: false, error: "That agent is not offered here: connect it from Connect Agents…" };
     const shown = await this.workspaceShown();
     if (!shown) return { ok: false, error: "Your workspace's window has not finished opening. Try again in a moment." };
     return this.parts.connections.planConnect(defaultChoice(tool, this.serverId, shown));

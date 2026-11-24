@@ -24,7 +24,7 @@ export function diskLine(
   const things = [
     ...(addsCommand ? ["the quadit command"] : []),
     "the Quadit skill",
-    ...(tool.ownLogin ? [done ? "a login file" : "a login file for this tool"] : []),
+    ...(tool.ownLogin ? [done ? "a login file" : `a login file for ${tool.name}`] : []),
   ];
   const listed = things.length > 1 ? `${things.slice(0, -1).join(", ")} and ${things.at(-1)}` : things.join("");
   const login = tool.ownLogin
@@ -32,7 +32,9 @@ export function diskLine(
     : tool.worksAs
       ? `; it works as ${tool.worksAs}, this computer’s Quadit login`
       : "; it signs in with this computer’s Quadit login";
-  const lets = tool.allows ? `, and ${done ? "let" : "lets"} ${tool.name} run quadit without asking` : "";
+  // Named once: "a login file for Codex, and lets it run…".
+  const named = tool.ownLogin && !done ? "it" : tool.name;
+  const lets = tool.allows ? `, and ${done ? "let" : "lets"} ${named} run quadit without asking` : "";
   return done
     ? `Added ${listed}${login}${lets}. A backup of everything is kept.`
     : `Adds ${listed}${login}${lets}. Nothing else is touched; a backup is kept.`;
@@ -97,7 +99,7 @@ function roleWords(role: FileRole, tool: string): Omit<FileWords, "chip"> {
     case "settings":
       return { title: `${tool}’s settings`, what: `Tells ${tool} how to reach Quadit.` };
     case "command":
-      return { title: "The quadit command", what: "Lets your AI tools run quadit, the way they talk to Quadit." };
+      return { title: "The quadit command", what: "Lets your agents run quadit, the way they talk to Quadit." };
     case "folder":
       return { title: "A folder for the quadit command", what: "Made in your home folder to hold it." };
     case "profile":

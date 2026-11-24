@@ -437,7 +437,7 @@ export class Connections {
     const { home, cli } = this.parts;
     if (this.parts.platform === "win32")
       throw new EditRefused(
-        "Connecting agent tools is not available on Windows yet: it needs the quadit command, which has no Windows build.",
+        "Connecting agents is not available on Windows yet: it needs the quadit command, which has no Windows build.",
       );
     const harness = HARNESSES.find((h) => h.id === choice.harness);
     if (!harness) throw new EditRefused("There is no such harness.");

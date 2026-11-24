@@ -169,7 +169,7 @@ test("a card set up from the Agents page turns Connected when the agent gives it
     await page.goto(`${run.server}/e2e/agents`);
     // The page's header has it; an empty Agents page has it again as its main action.
     const connect = await connectOver(desktop, run.server, () =>
-      page.getByRole("button", { name: "Connect a tool on this computer" }).first().click(),
+      page.getByRole("button", { name: "Connect an agent on this computer" }).first().click(),
     );
     const card = connect.getByRole("article", { name: "Claude Code" });
     // A server's page asked: it says which, and takes input only after its first moment on screen.

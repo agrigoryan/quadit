@@ -81,7 +81,7 @@ describe("diskLine", () => {
   it("says in a few words that connecting lets a tool run quadit without asking, where it has settings for that", () => {
     const codex = { name: "Codex", ownLogin: true, worksAs: null, allows: true };
     expect(diskLine(codex, false, false)).toBe(
-      "Adds the Quadit skill and a login file for this tool, and lets Codex run quadit without asking. Nothing else is touched; a backup is kept.",
+      "Adds the Quadit skill and a login file for Codex, and lets it run quadit without asking. Nothing else is touched; a backup is kept.",
     );
     expect(diskLine(codex, false, true)).toBe(
       "Added the Quadit skill and a login file, and let Codex run quadit without asking. A backup of everything is kept.",
@@ -90,7 +90,7 @@ describe("diskLine", () => {
 
   it("says what connecting a tool with a login of its own adds, and that nothing else is touched", () => {
     expect(diskLine({ name: "Cursor", ownLogin: true, worksAs: null, allows: false }, false, false)).toBe(
-      "Adds the Quadit skill and a login file for this tool. Nothing else is touched; a backup is kept.",
+      "Adds the Quadit skill and a login file for Cursor. Nothing else is touched; a backup is kept.",
     );
     expect(diskLine({ name: "Cursor", ownLogin: true, worksAs: null, allows: false }, false, true)).toBe(
       "Added the Quadit skill and a login file. A backup of everything is kept.",
@@ -99,7 +99,7 @@ describe("diskLine", () => {
 
   it("names the quadit command when the computer has none yet, and the computer's login for a tool without its own", () => {
     expect(diskLine({ name: "Cursor", ownLogin: true, worksAs: null, allows: false }, true, false)).toBe(
-      "Adds the quadit command, the Quadit skill and a login file for this tool. Nothing else is touched; a backup is kept.",
+      "Adds the quadit command, the Quadit skill and a login file for Cursor. Nothing else is touched; a backup is kept.",
     );
     expect(diskLine({ name: "Cursor", ownLogin: false, worksAs: null, allows: false }, false, false)).toBe(
       "Adds the Quadit skill; it signs in with this computer’s Quadit login. Nothing else is touched; a backup is kept.",

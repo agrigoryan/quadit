@@ -25,11 +25,11 @@ export function listenSteps(): HTMLElement {
     return item;
   };
   const first = step(
-    make("b", "Connect its tool here."),
+    make("b", "Connect it here."),
     " It can then reach Quadit, and works there when you ask it in a chat.",
   );
   const second = step(
-    make("b", "In that tool, in your project’s folder, write "),
+    make("b", "In its chat, in your project’s folder, write "),
     make("code", LISTEN_LINE),
     make("b", "."),
     " This is the way we recommend: it then answers what you assign to it or ask it in Quadit as it comes in.",

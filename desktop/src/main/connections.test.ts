@@ -1142,7 +1142,7 @@ describe("on Windows", () => {
     expect(await connections.planConnect(choice("claude"))).toEqual({
       ok: false,
       error:
-        "Connecting agent tools is not available on Windows yet: it needs the quadit command, which has no Windows build.",
+        "Connecting agents is not available on Windows yet: it needs the quadit command, which has no Windows build.",
     });
     expect(existsSync(join(home, ".claude"))).toBe(false);
   });
