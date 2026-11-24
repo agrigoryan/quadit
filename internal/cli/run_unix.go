@@ -9,6 +9,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -32,7 +33,8 @@ func fileIdentity(path string) (string, error) {
 	if !ok {
 		return "", errors.New("no identity for " + path)
 	}
-	return strconv.FormatUint(uint64(sys.Dev), 10) + ":" + strconv.FormatUint(sys.Ino, 10), nil
+	// Printed, not converted: the device number is a different integer type on each system.
+	return fmt.Sprintf("%d:%d", sys.Dev, sys.Ino), nil
 }
 
 // tryLock takes f's lock for this process, or answers errLocked at once
