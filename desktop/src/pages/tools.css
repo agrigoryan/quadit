@@ -454,6 +454,169 @@ button.link-blue:hover {
 }
 
 /*
+ * Run by Quadit (run-by-quadit.ts), under where a connected tool stands, set
+ * apart by a rule: what it would do, the choice in the card, or a line for
+ * each project it runs, coloured by what it does now.
+ */
+.runs {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+  font-size: 13.5px;
+}
+
+.run-offer {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.run-said {
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.run-list {
+  justify-self: stretch;
+  display: grid;
+  gap: 8px;
+}
+
+.run-entry {
+  display: grid;
+  gap: 4px;
+}
+
+.run-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.run-line {
+  flex: 1 1 240px;
+  min-width: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+.run-what {
+  font-weight: 550;
+}
+
+.run-status {
+  color: var(--ink-2);
+}
+
+.run-status.ok {
+  color: var(--ok);
+}
+
+.run-status.busy {
+  color: var(--link);
+}
+
+.run-status.wait {
+  color: var(--wait);
+}
+
+.run-status.fail {
+  color: var(--fail);
+}
+
+.run-blocked {
+  font-size: 13px;
+  color: var(--wait);
+  overflow-wrap: anywhere;
+}
+
+.run-blocked button.link-blue,
+.run-more button.link-blue {
+  font-size: 13px;
+}
+
+.run-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+/* The choice, in the card: a project, a folder, what that means, and Start running. */
+.run-choose {
+  justify-self: stretch;
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+}
+
+.run-ask {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.run-ask ~ .run-ask {
+  margin-top: 6px;
+}
+
+.run-select {
+  height: 32px;
+  max-width: 100%;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+  font: inherit;
+  font-size: 13.5px;
+}
+
+.run-folder-row {
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.run-folder {
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+  font: 500 13px/1.4 var(--mono);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.run-note {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.run-buttons {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.run-choose .card-error {
+  margin-top: 0;
+}
+
+/*
  * The two steps to an agent that answers (listen-steps.ts), above the cards:
  * set apart, since "Connected" alone reads as "it will answer me".
  */

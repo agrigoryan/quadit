@@ -1,0 +1,401 @@
+// "Run by Quadit" on a connected Claude Code's or Codex's card
+// (agent-runs-contract.md §8.2), in Connect agents and the first run's tools
+// step: Quadit starts the program for the agent's tasks of a project, in the
+// project's folder on this computer, whenever the person assigns the agent
+// a task there or comments on one (main/runner.ts runs `quadit run`). Its
+// states:
+//   none      what it would do, and "Run by Quadit…";
+//   choosing  in the card, no window: which project, which folder (the
+//             native picker), what running there means and whose words
+//             start it, then "Start running" or "Cancel"; a refusal shows
+//             under the folder, as quadit run said it;
+//   running   a line for each project it runs, with what it does now and
+//             "Stop running", writes the server refused said under it;
+//             then "Run another project…" and "Show log".
+// Its nodes are kept and their text changed when what they show changes, so
+// focus on a control survives the lines under it changing. The card asks
+// for its entries every couple of seconds while it is shown (tool-card.ts).
+// Styled by tools.css.
+
+import { button, make } from "@/pages/dom";
+import type { PagesApi, RunEntryView, RunsView } from "@/shared/pages-api";
+
+/** The app's pages API, asked only once the card is on its page. */
+const api = () => window.quaditPages as PagesApi;
+
+/** What a Run by Quadit line is about: the program ("Claude Code"), and what the card calls this computer. */
+export interface RunWords {
+  program: string;
+  here: string;
+}
+
+/** What the card says when Quadit runs no project for the agent yet. */
+export function offerLine({ program, here }: RunWords, agent: string): string {
+  return `Quadit can start ${program} for you when you assign ${agent} a task or comment on one, in the project’s folder on ${here}.`;
+}
+
+/** What running in a folder means, and whose words start a run (decision 8), said before the person starts it. */
+export function choosingNote({ program }: RunWords, agent: string, project: string | null): string {
+  return `${program} runs there with full access, as you, whenever you assign ${agent} a task in ${project ?? "the project"} or comment on one. Only your words, or those of your other agents, start it.`;
+}
+
+/** What an entry is: the project and its folder. */
+export function entryLine(entry: Pick<RunEntryView, "project" | "folder">): string {
+  return `Runs ${entry.project} in ${entry.folder}.`;
+}
+
+/** What an entry does now. */
+export function statusLine({ program, here }: RunWords, entry: RunEntryView, now = new Date()): string {
+  const { status } = entry;
+  switch (status.state) {
+    case "starting":
+      return "Starting…";
+    case "ready":
+      return "Ready.";
+    case "working":
+      return `Working on ${status.task}.`;
+    case "aside":
+      return `A chat listens to ${entry.project} now. Quadit runs it again when that chat stops.`;
+    case "removing":
+      return "Stopping…";
+    case "error":
+      return `Not running: ${status.message}`;
+    case "not_served":
+      return status.message;
+    case "paused":
+      switch (status.pause) {
+        case "usage_limit":
+          return status.until
+            ? `Paused until ${untilWords(status.until, now)}: ${program}’s usage limit.`
+            : `Paused: ${program}’s usage limit.`;
+        case "not_signed_in":
+          return `Paused: ${program} is not signed in. Open ${program} and sign in.`;
+        case "program_missing":
+          return `Paused: ${program} was not found on ${here}.`;
+        case "folder_missing":
+          return "Paused: the folder is gone. Stop running and pick it again.";
+        case "login_mismatch":
+          return `Paused: ${program} is set to work as another agent. Connect it again.`;
+        case "server_old":
+          return "Paused: this server needs an update to run agents.";
+      }
+  }
+}
+
+/** A write about a run that the server refused for good. */
+export function blockedLine(blocked: RunEntryView["blocked"][number]): string {
+  return `Quadit could not record how a run on ${blocked.task} ended (${blocked.error}).`;
+}
+
+/** When a pause ends, as a person reads it: the time, with the day when it is not today. */
+export function untilWords(iso: string, now = new Date()): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return iso;
+  const time = at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return at.toDateString() === now.toDateString()
+    ? time
+    : `${at.toLocaleDateString(undefined, { weekday: "short" })} ${time}`;
+}
+
+/** How an entry's line is coloured: well, at work, held back, or not running. */
+function toneOf(status: RunEntryView["status"]): string {
+  switch (status.state) {
+    case "ready":
+      return "ok";
+    case "working":
+      return "busy";
+    case "paused":
+    case "aside":
+      return "wait";
+    case "error":
+    case "not_served":
+      return "fail";
+    default:
+      return "";
+  }
+}
+
+/** Whether Start running may be pressed: a project and a folder chosen, and nothing under way. */
+export function mayStart(chosen: { project: string; folder: string | null; busy: boolean }): boolean {
+  return !!chosen.project && !!chosen.folder && !chosen.busy;
+}
+
+/** An entry's nodes, kept while it is there. */
+interface Row {
+  box: HTMLDivElement;
+  what: HTMLSpanElement;
+  status: HTMLSpanElement;
+  stop: HTMLButtonElement;
+  blocked: HTMLDivElement;
+  /** What its blocked lines were drawn from. */
+  drawn: string;
+}
+
+export class RunByQuadit {
+  readonly element: HTMLElement;
+  private words: RunWords;
+  private runs: RunsView | null = null;
+  private rows = new Map<string, Row>();
+  private offer: HTMLDivElement;
+  private offerText: HTMLParagraphElement;
+  private offerButton: HTMLButtonElement;
+  private list: HTMLDivElement;
+  private more: HTMLParagraphElement;
+  private another: HTMLButtonElement;
+  private error: HTMLParagraphElement;
+  /** The form while the person chooses; null otherwise. */
+  private choosing: { form: HTMLFormElement; note: HTMLParagraphElement } | null = null;
+
+  constructor(
+    private tool: { id: string; name: string },
+    here: string,
+  ) {
+    this.words = { program: tool.name, here };
+    const section = make("section", "", "runs");
+    section.setAttribute("aria-label", `Run by Quadit for ${tool.name}`);
+    this.offer = make("div", "", "run-offer");
+    this.offerText = make("p", "", "run-said");
+    this.offerButton = button("Run by Quadit…", () => this.choose(), "btn btn-line btn-sm", "");
+    this.offer.append(this.offerText, this.offerButton);
+    this.list = make("div", "", "run-list");
+    this.more = make("p", "", "run-more");
+    this.another = button("Run another project…", () => this.choose(), "link-blue");
+    this.more.append(
+      this.another,
+      button("Show log", () => void api().showRunnerLog(), "link-blue", "Show the log of Quadit’s runner"),
+    );
+    this.error = make("p", "", "card-error");
+    this.error.setAttribute("role", "alert");
+    section.append(this.offer, this.list, this.more, this.error);
+    this.element = section;
+    this.show(null);
+  }
+
+  /** Shows what Quadit runs for the tool's agent (`runs`), or nothing (null: the tool is not connected, or cannot be run). */
+  show(runs: RunsView | null) {
+    this.runs = runs;
+    this.element.hidden = runs === null;
+    if (!runs) {
+      this.close();
+      return;
+    }
+    const { entries, agent } = runs;
+    setText(this.offerText, offerLine(this.words, agent));
+    this.offerButton.setAttribute("aria-label", `Run ${this.tool.name} by Quadit for a project`);
+    this.another.setAttribute("aria-label", `Run ${agent} by Quadit for another project`);
+    if (this.choosing) setText(this.choosing.note, choosingNote(this.words, agent, this.chosenProject()));
+
+    // A row for each entry, kept while it is there; one gone takes its focus to the control that stays.
+    const focusLost = [...this.rows.entries()].some(
+      ([id, row]) => !entries.some((e) => e.id === id) && row.box.contains(document.activeElement),
+    );
+    for (const [id, row] of this.rows) {
+      if (entries.some((e) => e.id === id)) continue;
+      row.box.remove();
+      this.rows.delete(id);
+    }
+    for (const entry of entries) {
+      const row = this.rows.get(entry.id) ?? this.newRow(entry, agent);
+      setText(row.what, entryLine(entry));
+      setText(row.status, statusLine(this.words, entry));
+      row.status.className = `run-status ${toneOf(entry.status)}`.trim();
+      row.stop.disabled = entry.status.state === "removing" || row.stop.dataset.busy === "1";
+      const blocked = JSON.stringify(entry.blocked);
+      if (blocked !== row.drawn) {
+        row.drawn = blocked;
+        row.blocked.replaceChildren(
+          ...entry.blocked.map((b) => {
+            const line = make("p", "", "run-blocked");
+            line.append(
+              make("span", blockedLine(b)),
+              " ",
+              button("Show log", () => void api().showRunnerLog(), "link-blue", "Show the log of Quadit’s runner"),
+            );
+            return line;
+          }),
+        );
+      }
+    }
+    // Rows in the order the registry lists them, each moved only when out of place (a move takes focus away).
+    entries.forEach((entry, at) => {
+      const row = this.rows.get(entry.id);
+      const there = this.list.children[at] ?? null;
+      if (row && there !== row.box) this.list.insertBefore(row.box, there);
+    });
+    this.place();
+    if (focusLost) (entries.length > 0 ? this.another : this.offerButton).focus();
+  }
+
+  /** Which of the parts show: the offer with no entry, the lines and what is under them with some, the form while choosing. */
+  private place() {
+    const some = (this.runs?.entries.length ?? 0) > 0;
+    this.offer.hidden = some || !!this.choosing;
+    this.list.hidden = !some;
+    this.more.hidden = !some || !!this.choosing;
+  }
+
+  private newRow(entry: RunEntryView, agent: string): Row {
+    const box = make("div", "", "run-entry");
+    const line = make("p", "", "run-line");
+    const what = make("span", "", "run-what");
+    const status = make("span", "", "run-status");
+    line.append(what, " ", status);
+    const stop = button(
+      "Stop running",
+      () => void this.stop(entry.id, stop),
+      "undo",
+      `Stop running ${entry.project} for ${agent}`,
+    );
+    const head = make("div", "", "run-head");
+    head.append(line, stop);
+    const blocked = make("div", "", "run-blocked-lines");
+    box.append(head, blocked);
+    const row: Row = { box, what, status, stop, blocked, drawn: "" };
+    this.rows.set(entry.id, row);
+    return row;
+  }
+
+  /** Asks the app for the entries now (after the person changed them). */
+  private async refresh() {
+    this.show(await api().runEntries(this.tool.id));
+  }
+
+  private async stop(entryId: string, control: HTMLButtonElement) {
+    this.error.textContent = "";
+    control.disabled = true;
+    control.dataset.busy = "1";
+    const done = await api().stopRunning(this.tool.id, entryId);
+    delete control.dataset.busy;
+    control.disabled = false;
+    if (!done.ok) this.error.textContent = done.error;
+    await this.refresh();
+  }
+
+  /** The project chosen in the form, if any. */
+  private chosenProject(): string | null {
+    return this.choosing?.form.querySelector("select")?.value || null;
+  }
+
+  /** Opens the form in the card: which project, which folder, and what that means. */
+  private choose() {
+    if (this.choosing || !this.runs) return;
+    this.error.textContent = "";
+    const { agent, entries } = this.runs;
+    const id = `run-${this.tool.id}`;
+    const form = make("form", "", "run-choose");
+    form.noValidate = true;
+    form.setAttribute("aria-label", `Run ${this.tool.name} by Quadit for a project`);
+
+    const projectLabel = make("label", "Which project?", "run-ask");
+    projectLabel.htmlFor = `${id}-project`;
+    const select = make("select", "", "run-select");
+    select.id = `${id}-project`;
+    select.append(new Option("Loading projects…", ""));
+    const projectError = make("p", "", "card-error");
+    projectError.setAttribute("role", "alert");
+
+    const folderLabel = make("p", "In which folder?", "run-ask");
+    folderLabel.id = `${id}-folder`;
+    let folder: string | null = null;
+    const shown = make("code", "", "run-folder");
+    shown.hidden = true;
+    const pick = button(
+      "Choose folder…",
+      () =>
+        void api()
+          .pickFolder()
+          .then((picked) => {
+            if (!picked) return;
+            folder = picked.path;
+            shown.textContent = picked.shown;
+            shown.hidden = false;
+            update();
+          }),
+      "btn btn-line btn-sm",
+    );
+    pick.setAttribute("aria-describedby", folderLabel.id);
+    const folderRow = make("div", "", "run-folder-row");
+    folderRow.append(pick, shown);
+    const refused = make("p", "", "card-error");
+    refused.setAttribute("role", "alert");
+
+    const note = make("p", "", "run-note");
+    let busy = false;
+    const start = button("Start running", () => void go(), "btn btn-move btn-sm");
+    const cancel = button("Cancel", () => this.close(true), "btn-text");
+    const buttons = make("div", "", "run-buttons");
+    buttons.append(start, cancel);
+    form.append(projectLabel, select, projectError, folderLabel, folderRow, refused, note, buttons);
+    form.addEventListener("submit", (e) => e.preventDefault());
+
+    const update = () => {
+      start.disabled = !mayStart({ project: select.value, folder, busy });
+      setText(note, choosingNote(this.words, this.runs?.agent ?? agent, select.value || null));
+    };
+    select.addEventListener("change", update);
+    const go = async () => {
+      if (!folder || !select.value) return;
+      busy = true;
+      refused.textContent = "";
+      start.textContent = "Starting…";
+      update();
+      const done = await api().startRunning(this.tool.id, select.value, folder);
+      busy = false;
+      start.textContent = "Start running";
+      update();
+      if (!done.ok) {
+        refused.textContent = done.error;
+        return;
+      }
+      this.close();
+      await this.refresh();
+      this.another.focus();
+    };
+
+    this.choosing = { form, note };
+    this.element.insertBefore(form, this.more);
+    update();
+    this.place();
+    select.focus();
+
+    // The projects the agent may work in, but those Quadit runs it for already.
+    void api()
+      .agentProjects(this.tool.id)
+      .then((answer) => {
+        if (this.choosing?.form !== form) return;
+        select.replaceChildren();
+        if (!answer.ok) {
+          select.disabled = true;
+          projectError.textContent = answer.error;
+          return;
+        }
+        const runs = new Set(entries.map((e) => e.project));
+        const open = answer.projects.filter((p) => !runs.has(p.key));
+        if (open.length === 0) {
+          select.disabled = true;
+          projectError.textContent =
+            entries.length > 0
+              ? `Quadit runs ${agent} for every project it may work in.`
+              : `${agent} may not work in any project.`;
+          return;
+        }
+        if (open.length > 1) select.append(new Option("Choose a project", ""));
+        for (const p of open) select.append(new Option(p.name === p.key ? p.key : `${p.key} · ${p.name}`, p.key));
+        update();
+      });
+  }
+
+  /** Takes the form away; `refocus`: the person cancelled, and focus goes back to what opened it. */
+  private close(refocus = false) {
+    if (!this.choosing) return;
+    this.choosing.form.remove();
+    this.choosing = null;
+    this.place();
+    if (refocus) ((this.runs?.entries.length ?? 0) > 0 ? this.another : this.offerButton).focus();
+  }
+}
+
+/** Sets the text of `node`, leaving it alone when it says that already (a selection in it survives). */
+function setText(node: Node, text: string) {
+  if (node.textContent !== text) node.textContent = text;
+}

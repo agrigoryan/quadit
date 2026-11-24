@@ -14,7 +14,8 @@
 //              with Copy, and how that chat listens (CardTool.chatListens);
 // and what the app does by itself (desktop contract §11, third amendment):
 // "Connecting…" while it gives the code back, and the reason when it could
-// not (above the line to paste);
+// not (above the line to paste); and, connected, Run by Quadit for a Claude
+// Code or Codex with an agent's login of its own (run-by-quadit.ts);
 // and, set up but where it stands not known here (it works as another
 // server's login, or no answer came yet), a plain line saying so, never
 // "Connected". A set-up card asks the app where its tool stands every couple
@@ -25,6 +26,7 @@
 
 import { button, lineIcon, make } from "@/pages/dom";
 import { LISTEN_LINE } from "@/pages/listen-steps";
+import { RunByQuadit } from "@/pages/run-by-quadit";
 import { isConnectCode } from "@/shared/bridge";
 import { diskLine, unrevokedWords } from "@/shared/change-words";
 import type { ChatListens, Disconnected, Handshake, Heard, PagesApi, Refused, SelfRun } from "@/shared/pages-api";
@@ -107,6 +109,8 @@ export class ToolCard {
   private note: HTMLParagraphElement;
   private caution: HTMLParagraphElement;
   private connectButton: HTMLButtonElement;
+  /** Run by Quadit, under where it stands: shown only once it is connected and Quadit can run it. */
+  private runs: RunByQuadit;
   /** Room under the card's text for what a page adds (Connect agents' More options). */
   readonly extra: HTMLDivElement;
 
@@ -132,6 +136,7 @@ export class ToolCard {
     head.append(name, this.act);
 
     this.stand = make("div", "", "stand");
+    this.runs = new RunByQuadit(tool, HERE);
     this.gives = make("p", "", "gives");
     const disk = make("p", "", "disk");
     this.diskText = document.createTextNode("");
@@ -152,7 +157,18 @@ export class ToolCard {
     this.caution = make("p", "", "card-caution");
     this.caution.setAttribute("role", "alert");
     this.caution.hidden = true;
-    body.append(head, this.stand, this.gives, disk, unverified, this.error, this.note, this.caution, this.extra);
+    body.append(
+      head,
+      this.stand,
+      this.runs.element,
+      this.gives,
+      disk,
+      unverified,
+      this.error,
+      this.note,
+      this.caution,
+      this.extra,
+    );
 
     card.append(this.tileEl, body);
     this.element = card;
@@ -176,6 +192,7 @@ export class ToolCard {
   markSetUp(setUp: boolean, handshake: Handshake | null = null) {
     this.setUp = setUp;
     this.handshake = setUp ? handshake : null;
+    if (!setUp) this.runs.show(null);
     this.show();
     this.watch(handshake === null);
   }
@@ -215,13 +232,19 @@ export class ToolCard {
     return done;
   }
 
-  /** Asks where the tool stands now, unless the card is gone from its page or not set up; shows it when it changed. */
+  /**
+   * Asks where the tool stands now, unless the card is gone from its page or
+   * not set up, and, connected, what Quadit runs it for; shows it when it changed.
+   */
   private async ask() {
     if (this.asking || !this.setUp) return;
     this.asking = true;
-    const [now, self] = await Promise.all([api.toolHandshake(this.tool.id), api.toolSelf(this.tool.id)]).finally(
-      () => (this.asking = false),
-    );
+    const [now, self, runs] = await Promise.all([api.toolHandshake(this.tool.id), api.toolSelf(this.tool.id)])
+      .then(
+        async ([now, self]) =>
+          [now, self, now?.state === "connected" ? await api.runEntries(this.tool.id) : null] as const,
+      )
+      .finally(() => (this.asking = false));
     if (!this.setUp) return;
     if (now === null) {
       // Taken back elsewhere (another page of the app).
@@ -229,6 +252,7 @@ export class ToolCard {
       this.actions.changed();
       return;
     }
+    this.runs.show(runs);
     if (JSON.stringify([now, self]) === JSON.stringify([this.handshake, this.self])) return;
     this.handshake = now;
     this.self = self;

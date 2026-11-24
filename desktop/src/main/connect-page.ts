@@ -20,14 +20,17 @@
 //
 // It answers what the page asks of Connect (connections.ts), and what any
 // tool card asks, the first run's too: where a tool stands with Quadit, a new
-// connect code, copying a code's line, and updating a skill changed by hand.
+// connect code, copying a code's line, updating a skill changed by hand, and
+// Run by Quadit (runner.ts): the projects Quadit runs a connected Claude
+// Code's or Codex's agent for, starting and stopping one, the folder picker.
 
 import type { WebContents, WebContentsView } from "electron";
 import type { AppPages } from "@/main/app-pages";
-import type { Connections } from "@/main/connections";
+import { type Connections, homely } from "@/main/connections";
+import type { Runner } from "@/main/runner";
 import type { SelfRuns } from "@/main/self-runs";
 import type { ServerWindows } from "@/main/server-windows";
-import type { ConnectChoice, ConnectTarget } from "@/shared/pages-api";
+import type { ConnectChoice, ConnectTarget, Refused } from "@/shared/pages-api";
 
 export interface ConnectPageParts {
   pages: Pick<AppPages, "answer" | "view">;
@@ -42,6 +45,7 @@ export interface ConnectPageParts {
     | "handshake"
     | "newCode"
     | "updateSkill"
+    | "runAs"
   >;
   windows: Pick<ServerWindows, "cover" | "uncover" | "isCovered">;
   /** Whether `serverId` is the server the app runs on this computer. */
@@ -56,7 +60,17 @@ export interface ConnectPageParts {
   showLog(path: string): Promise<void>;
   /** Shows the folder of the backups Connect keeps. */
   showBackups(): Promise<void>;
+  /** Quadit running agents for projects of this computer (runner.ts). */
+  runner: Pick<Runner, "available" | "entries" | "projects" | "add" | "remove" | "logFile">;
+  /** Where a tool's program is, as the app finds it (tool-program.ts); null when it is not found. */
+  programOf(toolId: string): Promise<string | null>;
+  /** The native folder picker over the window of the page `sender`; null when cancelled. */
+  pickFolder(sender: WebContents): Promise<string | null>;
+  /** The home folder, written ~ in the folders the pages show. */
+  home: string;
 }
+
+const NOT_RUN: Refused = { ok: false, error: "Quadit cannot run this tool for a project." };
 
 /** Connect agents over one server's window; `byPage`: another server's page asked for it, not the person. */
 interface Shown {
@@ -94,7 +108,48 @@ export class ConnectPage {
       toolSelf: (_sender, harness) => parts.selfRuns.self(String(harness)),
       showToolLog: (_sender, harness) => parts.showLog(parts.selfRuns.logOf(String(harness))),
       copyText: (_sender, text) => parts.copy(String(text)),
+      runEntries: async (_sender, harness) => {
+        const tool = this.runAs(String(harness));
+        return tool ? { agent: tool.agent, entries: await parts.runner.entries(tool.login) } : null;
+      },
+      agentProjects: (_sender, harness) => {
+        const tool = this.runAs(String(harness));
+        return tool ? parts.runner.projects(tool.login) : NOT_RUN;
+      },
+      pickFolder: async (sender) => {
+        const path = await parts.pickFolder(sender);
+        return path ? { path, shown: homely(parts.home, path) } : null;
+      },
+      startRunning: async (_sender, harness, project, folder) => {
+        const tool = this.runAs(String(harness));
+        if (!tool) return NOT_RUN;
+        const programPath = (await parts.programOf(tool.program)) ?? undefined;
+        return parts.runner.add({
+          login: tool.login,
+          project: String(project),
+          folder: String(folder),
+          program: tool.program,
+          programPath,
+        });
+      },
+      stopRunning: async (_sender, harness, entry) => {
+        const tool = this.runAs(String(harness));
+        if (!tool) return NOT_RUN;
+        // Only an entry of this tool's agent: the page names it by its id.
+        if (!(await parts.runner.entries(tool.login)).some((e) => e.id === entry))
+          return { ok: false, error: `Quadit does not run that project for ${tool.agent}.` };
+        return parts.runner.remove({ entry: String(entry) });
+      },
+      showRunnerLog: async () => {
+        const file = await parts.runner.logFile();
+        if (file) await parts.showLog(file);
+      },
     });
+  }
+
+  /** The agent Quadit can run the tool `harness` as: none when the app carries no quadit to run it with. */
+  private runAs(harness: string) {
+    return this.parts.runner.available ? this.parts.connections.runAs(harness) : null;
   }
 
   /** The person asked: lays Connect agents over the window of the server `serverId` (made and shown when it is not), in front. */

@@ -244,6 +244,16 @@ export interface RunEntryView {
 }
 
 /**
+ * "Run by Quadit" on a tool's card (agent-runs-contract.md §8.2): the agent
+ * Quadit runs the tool as ("@claude"), and the projects it runs it for on
+ * this computer.
+ */
+export interface RunsView {
+  agent: string;
+  entries: RunEntryView[];
+}
+
+/**
  * The window Connect agents is laid over: its server, the workspace its page
  * shows (null: none yet, or signed out), and whether that server's page
  * asked for Connect (`openedByPage`), a server other than the app's own,
@@ -422,6 +432,22 @@ export interface PagesApi {
   toolSelf(id: string): Promise<SelfRun | null>;
   /** Opens the log of what the app ran for a tool. */
   showToolLog(id: string): Promise<void>;
+  /**
+   * Run by Quadit for a tool: its agent and the projects Quadit runs it for
+   * on this computer, with what each does now; null when Quadit cannot run
+   * it (not Claude Code or Codex, no login of its own, no quadit in the app).
+   */
+  runEntries(toolId: string): Promise<RunsView | null>;
+  /** The projects the tool's agent may work in. */
+  agentProjects(toolId: string): Promise<{ ok: true; projects: { key: string; name: string }[] } | Refused>;
+  /** The native folder picker over the page's window: the folder chosen, and as a person writes it (~); null when cancelled. */
+  pickFolder(): Promise<{ path: string; shown: string } | null>;
+  /** Has Quadit run the tool's agent for `project` in `folder` (quadit run add); the runner is started if it was not running. */
+  startRunning(toolId: string, project: string, folder: string): Promise<{ ok: true } | Refused>;
+  /** Has Quadit stop running the tool's agent for the entry `entryId` (quadit run remove), waiting for it to be done. */
+  stopRunning(toolId: string, entryId: string): Promise<{ ok: true } | Refused>;
+  /** Opens the runner's log (runner/runner.log). */
+  showRunnerLog(): Promise<void>;
   /** Writes the app's Quadit skill over a connected tool's one the person changed by hand. */
   updateSkill(id: string): Promise<{ ok: true } | Refused>;
   /** Puts `text` on the clipboard (a connect code's line). */

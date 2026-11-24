@@ -2,17 +2,37 @@ import type { WebContents, WebContentsView } from "electron";
 import { describe, expect, it } from "vitest";
 import type { PageHandlers } from "@/main/app-pages";
 import { ConnectPage } from "@/main/connect-page";
-import type { ConnectTarget } from "@/shared/pages-api";
+import type { ConnectTarget, RunEntryView } from "@/shared/pages-api";
+
+/** An entry of quadit run's registry, ready. */
+const entry = (id: string, project: string): RunEntryView => ({
+  id,
+  project,
+  folder: "~/game",
+  program: "claude",
+  status: { state: "ready" },
+  blocked: [],
+});
 
 /**
  * Connect agents over stand-ins: each view is `{ webContents: { id } }`; the
  * windows record what they are asked, and the window of the server
  * `covered`, when given, has another of the app's pages over it already;
- * "local" is the server the app runs on this computer.
+ * "local" is the server the app runs on this computer. Quadit runs Claude
+ * Code as @claude (its login /q/claude.json) for SVA, and Codex as @codex
+ * for GS; `available`: the app carries a quadit.
  */
-function harness({ covered = "" }: { covered?: string } = {}) {
+function harness({ covered = "", available = true }: { covered?: string; available?: boolean } = {}) {
   let handlers: Partial<PageHandlers> = {};
   const said: string[] = [];
+  const logins: Record<string, { login: string; agent: string; program: "claude" | "codex" }> = {
+    claude: { login: "/q/claude.json", agent: "@claude", program: "claude" },
+    codex: { login: "/q/codex.json", agent: "@codex", program: "codex" },
+  };
+  const entries: Record<string, RunEntryView[]> = {
+    "/q/claude.json": [entry("e1", "SVA")],
+    "/q/codex.json": [entry("e2", "GS")],
+  };
   const closers = new Map<number, () => void>();
   let views = 0;
   const viewId = (view: WebContentsView) => (view.webContents as unknown as { id: number }).id;
@@ -23,6 +43,7 @@ function harness({ covered = "" }: { covered?: string } = {}) {
     },
     connections: {
       dropPlans: () => void said.push("drop plans"),
+      runAs: (id: string) => logins[id] ?? null,
     } as unknown as ConstructorParameters<typeof ConnectPage>[0]["connections"],
     windows: {
       cover: (view, serverId, closed) => {
@@ -45,8 +66,25 @@ function harness({ covered = "" }: { covered?: string } = {}) {
     }),
     copy: async () => {},
     selfRuns: { self: () => null, logOf: (id) => `/logs/${id}.log` },
-    showLog: async () => {},
+    showLog: async (path) => void said.push(`show ${path}`),
     showBackups: async () => {},
+    runner: {
+      available,
+      entries: async (login) => entries[login] ?? [],
+      projects: async (login) => ({ ok: true, projects: [{ key: login, name: "as asked" }] }),
+      add: async (a) => {
+        said.push(`add ${JSON.stringify(a)}`);
+        return { ok: true };
+      },
+      remove: async (by) => {
+        said.push(`remove ${JSON.stringify(by)}`);
+        return { ok: true };
+      },
+      logFile: async () => "/q/runner/runner.log",
+    },
+    programOf: async (id) => (id === "claude" ? "/h/.local/bin/claude" : null),
+    pickFolder: async (sender) => ((sender as unknown as { id: number }).id === 1 ? "/h/devel/game" : null),
+    home: "/h",
   });
   /** Calls the page's method `name` as the page in the view `view` (its number) would. */
   const call = <K extends keyof PageHandlers>(view: number, name: K, ...args: unknown[]) =>
@@ -102,6 +140,53 @@ describe("ConnectPage", () => {
     expect(await call(7, "connectTarget")).toBeNull();
     await call(7, "closeConnect");
     expect(said).toEqual(["cover s1 with 1"]);
+  });
+});
+
+describe("ConnectPage, Run by Quadit", () => {
+  it("gives a tool's agent and its entries, and nothing for a tool Quadit cannot run or an app without a quadit", async () => {
+    const { call } = harness();
+    expect(await call(1, "runEntries", "claude")).toEqual({ agent: "@claude", entries: [entry("e1", "SVA")] });
+    expect(await call(1, "runEntries", "gemini")).toBeNull();
+    expect(await harness({ available: false }).call(1, "runEntries", "claude")).toBeNull();
+  });
+
+  it("asks the projects as the tool's own login", async () => {
+    const { call } = harness();
+    expect(await call(1, "agentProjects", "codex")).toEqual({
+      ok: true,
+      projects: [{ key: "/q/codex.json", name: "as asked" }],
+    });
+    expect(await call(1, "agentProjects", "gemini")).toMatchObject({ ok: false });
+  });
+
+  it("starts running a project with the tool's login, program and the program the app finds", async () => {
+    const { call, said } = harness();
+    expect(await call(1, "startRunning", "claude", "SVA", "/h/devel/game")).toEqual({ ok: true });
+    await call(1, "startRunning", "codex", "GS", "/h/devel/site");
+    expect(said).toEqual([
+      `add ${JSON.stringify({ login: "/q/claude.json", project: "SVA", folder: "/h/devel/game", program: "claude", programPath: "/h/.local/bin/claude" })}`,
+      `add ${JSON.stringify({ login: "/q/codex.json", project: "GS", folder: "/h/devel/site", program: "codex" })}`,
+    ]);
+  });
+
+  it("stops running only an entry of the tool's own agent", async () => {
+    const { call, said } = harness();
+    expect(await call(1, "stopRunning", "claude", "e2")).toEqual({
+      ok: false,
+      error: "Quadit does not run that project for @claude.",
+    });
+    expect(said).toEqual([]);
+    expect(await call(1, "stopRunning", "claude", "e1")).toEqual({ ok: true });
+    expect(said).toEqual([`remove ${JSON.stringify({ entry: "e1" })}`]);
+  });
+
+  it("gives the folder picked over the page's window as a person writes it, and opens the runner's log", async () => {
+    const { call, said } = harness();
+    expect(await call(1, "pickFolder")).toEqual({ path: "/h/devel/game", shown: "~/devel/game" });
+    expect(await call(2, "pickFolder")).toBeNull();
+    await call(1, "showRunnerLog");
+    expect(said).toEqual(["show /q/runner/runner.log"]);
   });
 });
 

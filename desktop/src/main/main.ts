@@ -19,6 +19,7 @@ import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import {
   app,
+  BaseWindow,
   BrowserWindow,
   clipboard,
   dialog,
@@ -26,7 +27,9 @@ import {
   net,
   powerMonitor,
   shell,
+  type OpenDialogOptions,
   type WebContents,
+  WebContentsView,
   webContents,
 } from "electron";
 import { accountName } from "@/main/account-name";
@@ -256,14 +259,15 @@ function start() {
       return false;
     }
   };
+  // Where the apps are installed, whose copies of a tool's program are looked for after the login shell's PATH.
+  const toolsWhere = (path: string[]) => ({
+    home: homedir(),
+    path,
+    applications: ["/Applications", join(homedir(), "Applications")],
+  });
   const selfRuns = new SelfRuns({
     look: async () => {
       const look = await cli.look();
-      const where = {
-        home: homedir(),
-        path: look.path,
-        applications: ["/Applications", join(homedir(), "Applications")],
-      };
       const tools = (await connections.selfRunTools()).flatMap((tool) => {
         const harness = HARNESSES.find((h) => h.id === tool.id);
         if (!harness) return [];
@@ -271,7 +275,7 @@ function start() {
           {
             id: tool.id,
             name: harness.name,
-            program: toolProgram(harness, where),
+            program: toolProgram(harness, toolsWhere(look.path)),
             oneShot: harness.oneShot ?? null,
             login: tool.login,
             here: loginIsHere(tool.login),
@@ -324,6 +328,23 @@ function start() {
       mkdirSync(connections.backupsDir, { recursive: true });
       await shell.openPath(connections.backupsDir);
     },
+    runner,
+    programOf: async (id) => {
+      const harness = HARNESSES.find((h) => h.id === id);
+      return harness ? toolProgram(harness, toolsWhere((await cli.look()).path)) : null;
+    },
+    // A sheet of the window the page is laid over (as a view), else a dialog of its own.
+    pickFolder: async (sender) => {
+      const options: OpenDialogOptions = { properties: ["openDirectory", "createDirectory"] };
+      const win = BaseWindow.getAllWindows().find((w) =>
+        w.contentView.children.some((view) => view instanceof WebContentsView && view.webContents === sender),
+      );
+      const { canceled, filePaths } = win
+        ? await dialog.showOpenDialog(win, options)
+        : await dialog.showOpenDialog(options);
+      return canceled ? null : (filePaths[0] ?? null);
+    },
+    home: homedir(),
   });
   // The menu's Connect Agents… and setup's: over the server window in front, else one on screen, else the
   // server on this computer's, else the first server's, made and shown; with no server, the list to add one.
