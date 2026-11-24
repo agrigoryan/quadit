@@ -289,6 +289,37 @@ describe("a tool's card in the app's Connect", () => {
     expect(reads).toEqual(["/api/v1/w/acme/agents/connection"]);
   });
 
+  it("says which listener Quadit's runner holds now, and not one a chat took from it", async () => {
+    const runner = { machine: "Lou's Mac", folder: "~/game", program: "claude", program_version: "2.1.331", since: "" };
+    serve(
+      [
+        {
+          user_id: "a1",
+          listening: true,
+          connected_at: "2026-11-21 14:02",
+          listeners: [
+            {
+              project_id: "p1",
+              project: "SVA",
+              by: "Quadit's runner",
+              live: true,
+              runner: { ...runner, holding: true },
+            },
+            { project_id: "gs", project: "GS", by: "a chat", live: true, runner: { ...runner, holding: false } },
+          ],
+          listening_projects: ["p1", "gs"],
+        },
+      ],
+      false,
+    );
+    expect(await answer({ kind: "agent-state", agent: "a1" })).toMatchObject({
+      listeners: [
+        { project: { key: "SVA", name: "Samurai" }, by: "Quadit's runner", runner: true },
+        { project: { key: "GS", name: "Getting started" }, by: "a chat" },
+      ],
+    });
+  });
+
   it("names as unheard only the projects the agent itself may work in", async () => {
     patchRow("members", "a1", { scope: { projects: ["p1"] } });
     serve([{ user_id: "a1", listening: false, connected_at: "2026-11-21 14:02" }], false);

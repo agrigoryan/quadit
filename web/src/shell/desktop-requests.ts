@@ -141,7 +141,8 @@ async function agentState(agent: string, code: string | undefined): Promise<Desk
 
 /**
  * What listens as an agent, for its card in the app: each live listener, by
- * its project's key and name (none: everything else) and what holds it;
+ * its project's key and name (none: everything else), what holds it, and
+ * whether Quadit's runner holds it now (the card says that one its own way);
  * whether a webhook pushes to it; and the projects of its own (those it may
  * work in) nothing hears now.
  */
@@ -156,7 +157,11 @@ function heard(
     // A project this page does not hold is not said as everything else.
     if (l.project_id && !project) return [];
     return [
-      { ...(project ? { project: { key: project.key, name: project.name } } : {}), ...(l.by ? { by: l.by } : {}) },
+      {
+        ...(project ? { project: { key: project.key, name: project.name } } : {}),
+        ...(l.by ? { by: l.by } : {}),
+        ...(l.runner?.holding ? { runner: true } : {}),
+      },
     ];
   });
   return {

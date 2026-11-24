@@ -112,6 +112,8 @@ export type DesktopOutcome =
 export interface HeardListener {
   project?: { key: string; name: string };
   by?: string;
+  /** Quadit's runner holds it now (agent-runs-contract.md §3.2): Quadit runs the agent for that project on a computer. */
+  runner?: boolean;
 }
 
 export interface QuaditDesktop {
@@ -375,6 +377,7 @@ export function outcomeOf(raw: unknown): DesktopOutcome | null {
               return { key: projectKey(project.key), name: shown(project.name, TITLE_MAX) };
             }),
             by: optional(l.by, (b) => shown(b, LABEL_MAX)),
+            runner: optional(l.runner, flag),
           });
         }),
       ),

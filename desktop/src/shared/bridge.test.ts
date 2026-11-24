@@ -117,11 +117,16 @@ describe("outcomeOf", () => {
       ok: true,
       connected: true,
       listening: true,
-      listeners: [{ project: { key: "SVA", name: "Samurai vs Aliens" }, by: "a chat" }, { by: "a companion" }],
+      listeners: [
+        { project: { key: "SVA", name: "Samurai vs Aliens" }, by: "a chat" },
+        { project: { key: "GS", name: "Getting started" }, by: "Quadit's runner", runner: true },
+        { by: "a companion" },
+      ],
       pushed: false,
       unheard: ["GS"],
     };
     expect(outcomeOf(heard)).toEqual(heard);
+    expect(outcomeOf({ ok: true, listeners: [{ runner: "yes" }] })).toBeNull();
     expect(outcomeOf({ ok: true, listeners: [{ by: "x".repeat(300) }] })).toEqual({
       ok: true,
       listeners: [{ by: "x".repeat(40) }],
