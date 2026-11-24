@@ -344,6 +344,7 @@ type decisionPickArgs struct {
 // changes, or approved or declined for an approval; or sends it back. The
 // asker is told, and the task goes back to them.
 func decisionPick(c *cx, a decisionPickArgs) error {
+	before := c.tx.Seq()
 	d, t, err := c.decisionTask(a.ID)
 	if err != nil {
 		return err
@@ -382,6 +383,14 @@ func decisionPick(c *cx, a decisionPickArgs) error {
 	}
 	c.ref, c.key = d.ID, t.Key
 	if err := c.emit(event{seq: seq, typ: "decision.picked", entity: "decision", entityID: d.ID, place: inTask(t), data: core.EventData{Row: d, Key: &t.Key}}); err != nil {
+		return err
+	}
+	// Answered, the question asks nothing of anyone any more; and the one
+	// who answered has acted on the task.
+	if err := c.readQuestion(d.ID); err != nil {
+		return err
+	}
+	if err := c.readWrittenOn(t.ID, before); err != nil {
 		return err
 	}
 	if err := c.watch(c.actor.UserID, "task", t.ID); err != nil {
@@ -539,6 +548,7 @@ type decisionUnclearArgs struct {
 // decisionUnclear is the asker saying the answer does not settle the
 // question. The decision opens again and goes back to whoever answered.
 func decisionUnclear(c *cx, a decisionUnclearArgs) error {
+	before := c.tx.Seq()
 	d, t, err := c.decisionTask(a.ID)
 	if err != nil {
 		return err
@@ -570,6 +580,9 @@ func decisionUnclear(c *cx, a decisionUnclearArgs) error {
 	if err := c.notifyTask(answerer, core.NoteUnclear, t, about{entity: "decision", id: d.ID, text: a.Note}); err != nil {
 		return err
 	}
+	if err := c.readWrittenOn(t.ID, before); err != nil {
+		return err
+	}
 	return c.setWaitingOn(t, answerer, "unclear: "+snippet(a.Note, 80))
 }
 
@@ -585,6 +598,10 @@ func decisionDelete(c *cx, a idArgs) error {
 		return err
 	}
 	if err := c.trash(target{table: "decisions", entity: "decision", id: d.ID, place: inTask(t), extra: core.EventData{Key: &t.Key}}); err != nil {
+		return err
+	}
+	// Taken back, the question asks nothing of anyone any more.
+	if err := c.readQuestion(d.ID); err != nil {
 		return err
 	}
 	return c.touchTask(t.ID, c.tx.Seq())

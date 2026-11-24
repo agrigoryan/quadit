@@ -677,7 +677,7 @@ data/properties.json | deflated | 397 | be182b84fd472a4df5f7d24cde2617677310c71a
 data/preferences.json | deflated | 134 | 24085cc7c3325fa74f3db6d810f23fc525110007139aca3048b1ddb24680ee02
 data/views.json | deflated | 3 | 37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570
 data/tasks.json | deflated | 2312 | e3f0e10264f8fd8d9f14defa6a7f07c18ab66c84dc0599a042c7731db627a68b
-data/events.json | deflated | 39155 | 6d75a7acc3d188389e243e2d403906cc54a620dd60053454b5e835c8c2cef015
+data/events.json | deflated | 40243 | 41832977a15c42800d22cd0115770ce150d2574eedd551ecb7c69b0f485bcfec
 tasks/SVA/SVA-1 Boss design.md | deflated | 731 | 5d296083ad02d6137e3286fcbd56d91dabae98b173d0bb44f46e3d86e43dafef
 tasks/SVA/SVA-2 Boss music.md | deflated | 139 | d991d93cc46ce7ed7bea1d59521d4a9f5d5ba75d5747e9e5316bd34fbd30250e
 tasks/SVA/SVA-3 Explosion effect.md | deflated | 176 | 34046b56614aed05d3b99776206bf73d6dea854f8a1079c9637db83e6d8cc8a1

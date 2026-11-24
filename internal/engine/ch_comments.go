@@ -171,6 +171,7 @@ func inThread(cm core.Comment, taskID, docID string) error {
 // on a task it follows by choice; or a person's comment that mentions
 // nobody, on a task that is with the agent or in a thread it wrote in.
 func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
+	before := c.tx.Seq()
 	thread := cm
 	t, err := c.commentSubject(&cm, a)
 	if err != nil {
@@ -236,6 +237,9 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 		}
 	}
 	if err := c.notifyWatchers(t, note, what); err != nil {
+		return err
+	}
+	if err := c.readWrittenOn(t.ID, before); err != nil {
 		return err
 	}
 	return c.index(taskCommentEntry(t, cm))

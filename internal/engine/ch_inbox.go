@@ -34,7 +34,7 @@ func notificationRead(c *cx, a notificationReadArgs) error {
 	if a.Archive && a.Unarchive {
 		return invalid("unarchive", "say archive or unarchive, not both")
 	}
-	conds := []store.Cond{store.Eq("user_id", c.actor.UserID)}
+	var conds []store.Cond
 	switch {
 	case len(a.IDs) > 0:
 		conds = append(conds, store.In("id", a.IDs))
@@ -66,6 +66,15 @@ func notificationRead(c *cx, a notificationReadArgs) error {
 		conds = append(conds, store.Null("read_at"))
 		set = map[string]any{"read_at": c.at}
 	}
+	return c.markInbox(c.actor.UserID, conds, set)
+}
+
+// markInbox sets set on the inbox items of the member userID that conds
+// select, and tells that member alone (notification.updated, with the ids
+// and the changes), as notification.read does for the caller's own: the
+// one place an inbox item is marked.
+func (c *cx) markInbox(userID string, conds []store.Cond, set map[string]any) error {
+	conds = append([]store.Cond{store.Eq("user_id", userID)}, conds...)
 	// Every notification the conditions select, read and then changed by
 	// the same conditions: no other write to the workspace runs between.
 	var rows []core.Notification
@@ -86,7 +95,45 @@ func notificationRead(c *cx, a notificationReadArgs) error {
 	for k, v := range set {
 		changes[k] = core.FieldChange{To: v}
 	}
-	return c.emit(event{seq: c.tx.NextSeq(), typ: "notification.updated", entity: "notification", entityID: ids[0], place: inWorkspace(c.ws), audience: c.actor.UserID, data: core.EventData{IDs: ids, Changes: changes}})
+	return c.emit(event{seq: c.tx.NextSeq(), typ: "notification.updated", entity: "notification", entityID: ids[0], place: inWorkspace(c.ws), audience: userID, data: core.EventData{IDs: ids, Changes: changes}})
+}
+
+// readWrittenOn marks read the actor's own unread inbox items of the task
+// taskID at or before the feed position upTo, for a write of theirs on the
+// task (a comment, a reply, a result, an answer): acting on a task is
+// having read what was there. Only a change its actor applies in person
+// does: what the engine writes in a member's name (a rule, a sync, a job,
+// all through System) reads nothing of theirs.
+func (c *cx) readWrittenOn(taskID string, upTo int64) error {
+	if c.system {
+		return nil
+	}
+	return c.markInbox(c.actor.UserID, []store.Cond{store.Eq("task_id", taskID), store.Lte("seq", upTo), store.Null("read_at")},
+		map[string]any{"read_at": c.at})
+}
+
+// readQuestion marks read, for whoever has them, the unread inbox items
+// that asked a member to answer the decision decisionID (decision_asked,
+// unclear), once it is no longer open to them: answered, or in the trash.
+// The asker's item of the answer (picked) is news, and stays as it is.
+func (c *cx) readQuestion(decisionID string) error {
+	conds := []store.Cond{store.Eq("entity_type", "decision"), store.Eq("entity_id", decisionID),
+		store.In("type", []string{core.NoteAsked, core.NoteUnclear}), store.Null("read_at")}
+	var rows []core.Notification
+	if err := c.tx.List(c.ctx, &rows, store.Q{Where: conds, Order: "seq"}); err != nil {
+		return err
+	}
+	done := map[string]bool{}
+	for _, r := range rows {
+		if done[r.UserID] {
+			continue
+		}
+		done[r.UserID] = true
+		if err := c.markInbox(r.UserID, conds, map[string]any{"read_at": c.at}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type notifyArgs struct {
