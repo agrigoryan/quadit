@@ -194,8 +194,13 @@ export const detail = {
   "comment.reach.line": "“listen to Quadit for {project}”",
   "comment.reach.lineAny": "“listen to Quadit”",
   "comment.reach.notConnected": "@{handle} has not connected yet.",
-  "comment.reach.connect": "Connect it",
-  "comment.reach.connectInSettings": "Connect it in Settings",
+  "comment.reach.listeningMany":
+    "{handles} is listening and will see this. | {handles} are listening and will see this.",
+  "comment.reach.notListeningMany":
+    "{handles} is not listening here and sees this when next asked. | {handles} are not listening here and see this when next asked.",
+  "comment.reach.notConnectedMany": "{handles} has not connected yet. | {handles} have not connected yet.",
+  "comment.reach.connect": "Connect it | Connect them",
+  "comment.reach.connectInSettings": "Connect it in Settings | Connect them in Settings",
   "comment.label": "New comment",
   "comment.send": "Send",
   "comment.attach": "Attach files",
