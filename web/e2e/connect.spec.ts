@@ -47,7 +47,7 @@ test("the comment box says what happens to a comment in each of the agent's stat
   await page.goto(`/${WORKSPACE.slug}/task/${key}`);
   await expect(
     activity.getByText(
-      `@${handle} is not listening. It will see this when you next ask it: in Codex, say “check Quadit”.`,
+      `@${handle} is not listening. To have it answer here, say “listen to Quadit” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.`,
     ),
   ).toBeVisible();
 

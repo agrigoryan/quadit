@@ -12,14 +12,14 @@ export const agentStrings = {
     "Something is waiting for this agent's work right now: a held request, or a webhook for its inbox.",
   "agents.notListening": "Nothing is listening",
   "agents.notListeningHint":
-    "No program is waiting for this agent's work. Tasks given to it will sit until one connects with its token.",
+    "Nothing is waiting for this agent's work. Tasks given to it wait until it looks; say “listen to Quadit” in its tool to have it answer them as they come.",
   "agents.connection.listening": "Listening",
   "agents.connection.connected": "Connected, not listening",
   "agents.connection.not_connected": "Not connected yet",
   "agents.connection.listeningHint":
     "It is listening for its work right now, or a webhook pushes to it: it will see what is written here.",
   "agents.connection.connectedHint":
-    "It has reached Quadit from inside its tool and works when someone asks it there. Until then, what is written here waits.",
+    "It has reached Quadit from inside its tool and works when someone asks it there; until then, what is written here waits. Say “listen to Quadit” in its tool to have it answer as things come.",
   "agents.connection.not_connectedHint":
     "It has never reached Quadit from inside its tool. Connect it from the desktop app, or with a connect code on its page in Settings.",
   "agents.state.working": "Working",

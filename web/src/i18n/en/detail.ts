@@ -186,8 +186,9 @@ export const detail = {
   "comment.placeholder": "Leave a comment… @ mentions someone",
   "comment.reach.listening": "@{handle} is listening and will see this.",
   "comment.reach.connected":
-    "@{handle} is not listening. It will see this when you next ask it: in {tool}, say “check Quadit”.",
-  "comment.reach.connectedNoTool": "@{handle} is not listening. It will see this when you next ask it to check Quadit.",
+    "@{handle} is not listening. To have it answer here, say “listen to Quadit” in {tool}. Until then it sees this when you next ask it, for example “check Quadit”.",
+  "comment.reach.connectedNoTool":
+    "@{handle} is not listening. To have it answer here, say “listen to Quadit” in its tool. Until then it sees this when you next ask it to check Quadit.",
   "comment.reach.notConnected": "@{handle} has not connected yet.",
   "comment.reach.connect": "Connect it",
   "comment.reach.connectInSettings": "Connect it in Settings",
