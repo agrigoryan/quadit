@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { childEnv, EVENTS_FILE, GUARD_SCRIPT, startChild } from "@/main/child-guard";
+import { childEnv, GUARD_SCRIPT, startChild } from "@/main/child-guard";
 
 const posixOnly = describe.skipIf(process.platform === "win32");
 
@@ -57,24 +57,6 @@ posixOnly("startChild", () => {
     });
     expect(await child.exited).toBe(0);
     await until(() => pids.length === 1 && pids.every((pid) => !alive(pid)));
-  });
-
-  it("hands its program a file the app reads, which its output never reaches", async () => {
-    const lines: string[] = [];
-    const events: string[] = [];
-    const child = startChild(
-      "/bin/sh",
-      ["-c", 'echo started >> "$1"; echo noise; echo "ended 0" >> "$1"', "sh", EVENTS_FILE],
-      {
-        cwd: "/tmp",
-        env: { PATH: "/usr/bin:/bin" },
-        line: (line) => lines.push(line),
-        events: (e) => events.push(e),
-      },
-    );
-    await child.exited;
-    expect(lines).toEqual(["noise"]);
-    expect(events).toEqual(["started", "ended 0"]);
   });
 
   it("ends a program that ignores being asked to stop, and is over only once it is gone", async () => {
