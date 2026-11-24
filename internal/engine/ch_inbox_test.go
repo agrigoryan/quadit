@@ -2,10 +2,12 @@ package engine_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -247,5 +249,80 @@ func TestAQuestionNoLongerOpenReadsItsItems(t *testing.T) {
 				t.Fatalf("the owner has %q unread", w.unreadOf(w.owner.ID, taskID))
 			}
 		})
+	})
+}
+
+// TestAQuietWriteReadsNothing: a comment brought in with an import's
+// history (quiet) tells nobody, and marks nothing of its writer's read.
+func TestAQuietWriteReadsNothing(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.agent("artist")
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		key := w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Boss"}).Key
+		w.do(w.agent("coder"), "comment.create", M{"task": key, "body": "@aram look"})
+		raw, _ := json.Marshal(M{"task": key, "body": "From the old tracker."})
+		if _, err := w.e.Apply(context.Background(), w.ws.ID, engine.Actor{UserID: w.owner.ID}, engine.Change{ID: id.New(), Type: "comment.create", Args: raw, Quiet: true}); err != nil {
+			t.Fatal(err)
+		}
+		if got := w.unreadOf(w.owner.ID, w.task(key).ID); len(got) != 1 {
+			t.Fatalf("after a quiet comment the owner's unread items are %q", got)
+		}
+	})
+}
+
+// TestMarkingAllReadCanKeepToOneGroup: notification.read with all and
+// addressed marks read only the items meant for the caller (true) or only
+// the others (false), up to up_to; addressed without all is refused.
+func TestMarkingAllReadCanKeepToOneGroup(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		artist := w.agent("artist")
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		key := w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Boss"}).Key
+		w.do(artist, "watch.set", M{"subject": key})
+		w.do(w.owner.ID, "comment.create", M{"task": key, "body": "Started on it myself."}) // heard as a follower
+		w.do(w.owner.ID, "comment.create", M{"task": key, "body": "@artist look"})          // meant for it
+		upTo := w.do(w.owner.ID, "comment.create", M{"task": key, "body": "@artist and this"}).Seq
+		w.do(w.owner.ID, "comment.create", M{"task": key, "body": "@artist and later"})
+		unread := func(addressed bool) int {
+			n := 0
+			for _, item := range w.inbox(artist) {
+				if item.ReadAt == 0 && item.Addressed == addressed {
+					n++
+				}
+			}
+			return n
+		}
+		w.refused(engine.CodeInvalid, artist, "notification.read", M{"task": key, "addressed": true})
+		w.do(artist, "notification.read", M{"all": true, "addressed": true, "up_to": upTo})
+		if unread(true) != 1 || unread(false) != 1 {
+			t.Fatalf("after marking the addressed read up to %d: %d addressed and %d others unread", upTo, unread(true), unread(false))
+		}
+		w.do(artist, "notification.read", M{"all": true, "addressed": false})
+		if unread(true) != 1 || unread(false) != 0 {
+			t.Fatalf("after marking the others read: %d addressed and %d others unread", unread(true), unread(false))
+		}
+	})
+}
+
+// TestTheItemsOfAnAnsweredQuestionAreFoundByTheOneAsked: the items an
+// answer reads are looked up by the member the question is asked of, as
+// the inbox's own index serves it: answered again after an unclear, the
+// answerer's unclear item is read and the asker's are not touched.
+func TestTheItemsOfAnAnsweredQuestionAreFoundByTheOneAsked(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		artist := w.agent("artist")
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		key := w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Boss"}).Key
+		d := w.do(artist, "decision.open", M{"task": key, "question": "Which?", "ask": "@aram", "options": []M{{"label": "Big"}, {"label": "Small"}}}).Ref
+		res := w.do(w.owner.ID, "decision.pick", M{"id": d, "option": 1})
+		if got := readEvent(t, res, w.owner.ID); len(got) != 1 || readEvent(t, res, artist) != nil {
+			t.Fatalf("the answer read %q of the owner's and %q of the asker's", got, readEvent(t, res, artist))
+		}
 	})
 }

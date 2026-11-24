@@ -19,6 +19,9 @@ type notificationReadArgs struct {
 	// Task marks everything about one task. All marks the whole inbox.
 	Task string `json:"task"`
 	All  bool   `json:"all"`
+	// Addressed, with all, keeps to the items meant for the caller (true)
+	// or to those heard only as a follower (false): one group of the inbox.
+	Addressed Opt[bool] `json:"addressed"`
 	// UpTo limits "all" to items at or before this feed position, so items
 	// that arrived while the caller was reading stay unread.
 	UpTo int64 `json:"up_to"`
@@ -47,6 +50,12 @@ func notificationRead(c *cx, a notificationReadArgs) error {
 	case a.All:
 	default:
 		return invalid("ids", "say which items: ids, task, or all")
+	}
+	if a.Addressed.Set {
+		if !a.All || a.Addressed.Null {
+			return invalid("addressed", "addressed (true or false) keeps all to one group: give it with all")
+		}
+		conds = append(conds, store.Eq("addressed", a.Addressed.V))
 	}
 	if a.UpTo > 0 {
 		conds = append(conds, store.Lte("seq", a.UpTo))
@@ -105,35 +114,28 @@ func (c *cx) markInbox(userID string, conds []store.Cond, set map[string]any) er
 // does: what the engine writes in a member's name (a rule, a sync, a job,
 // all through System) reads nothing of theirs.
 func (c *cx) readWrittenOn(taskID string, upTo int64) error {
-	if c.system {
+	// A quiet change brings history in (an import): nothing of its
+	// writer's was read by it.
+	if c.system || c.quiet {
 		return nil
 	}
 	return c.markInbox(c.actor.UserID, []store.Cond{store.Eq("task_id", taskID), store.Lte("seq", upTo), store.Null("read_at")},
 		map[string]any{"read_at": c.at})
 }
 
-// readQuestion marks read, for whoever has them, the unread inbox items
-// that asked a member to answer the decision decisionID (decision_asked,
-// unclear), once it is no longer open to them: answered, or in the trash.
-// The asker's item of the answer (picked) is news, and stays as it is.
-func (c *cx) readQuestion(decisionID string) error {
-	conds := []store.Cond{store.Eq("entity_type", "decision"), store.Eq("entity_id", decisionID),
-		store.In("type", []string{core.NoteAsked, core.NoteUnclear}), store.Null("read_at")}
-	var rows []core.Notification
-	if err := c.tx.List(c.ctx, &rows, store.Q{Where: conds, Order: "seq"}); err != nil {
-		return err
+// readQuestion marks read the unread inbox items that asked the member it
+// is asked of to answer the decision d (decision_asked, unclear), once it
+// is no longer open to them: answered, or in the trash. Each answer reads
+// the items of the one asked then, so those of whoever was asked before
+// were read by theirs; and the member's unread items are what the inbox's
+// index finds. The asker's item of the answer (picked) is news, and stays
+// as it is.
+func (c *cx) readQuestion(d core.Decision) error {
+	if d.AskedID == "" {
+		return nil
 	}
-	done := map[string]bool{}
-	for _, r := range rows {
-		if done[r.UserID] {
-			continue
-		}
-		done[r.UserID] = true
-		if err := c.markInbox(r.UserID, conds, map[string]any{"read_at": c.at}); err != nil {
-			return err
-		}
-	}
-	return nil
+	return c.markInbox(d.AskedID, []store.Cond{store.Null("read_at"), store.Eq("entity_type", "decision"), store.Eq("entity_id", d.ID),
+		store.In("type", []string{core.NoteAsked, core.NoteUnclear})}, map[string]any{"read_at": c.at})
 }
 
 type notifyArgs struct {

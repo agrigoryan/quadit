@@ -387,7 +387,7 @@ func decisionPick(c *cx, a decisionPickArgs) error {
 	}
 	// Answered, the question asks nothing of anyone any more; and the one
 	// who answered has acted on the task.
-	if err := c.readQuestion(d.ID); err != nil {
+	if err := c.readQuestion(d); err != nil {
 		return err
 	}
 	if err := c.readWrittenOn(t.ID, before); err != nil {
@@ -601,7 +601,7 @@ func decisionDelete(c *cx, a idArgs) error {
 		return err
 	}
 	// Taken back, the question asks nothing of anyone any more.
-	if err := c.readQuestion(d.ID); err != nil {
+	if err := c.readQuestion(d); err != nil {
 		return err
 	}
 	return c.touchTask(t.ID, c.tx.Seq())

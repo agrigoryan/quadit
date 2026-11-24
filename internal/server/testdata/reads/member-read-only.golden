@@ -158,7 +158,7 @@ milestone.create (member): id, epic (required), name (required), description, ta
 milestone.delete (member): id (required)
 milestone.restore (member): id (required)
 milestone.update (member): id (required), name, description, target_on, rank
-notification.read (member): ids, task, all, up_to, unread, archive, unarchive
+notification.read (member): ids, task, all, addressed, up_to, unread, archive, unarchive
 notify (member): user (required), task, message (required)
 preference.create (admin): id, body (required), project, decision, labels
 preference.delete (admin): id (required)

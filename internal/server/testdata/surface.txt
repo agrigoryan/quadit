@@ -403,6 +403,7 @@ change milestone.update arg name
 change milestone.update arg rank
 change milestone.update arg target_on
 change notification.read
+change notification.read arg addressed
 change notification.read arg all
 change notification.read arg archive
 change notification.read arg ids

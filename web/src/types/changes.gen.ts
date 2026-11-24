@@ -330,6 +330,7 @@ export interface Changes {
     ids?: string[];
     task?: string;
     all?: boolean;
+    addressed?: boolean | null;
     up_to?: number;
     unread?: boolean;
     archive?: boolean;
