@@ -79,7 +79,8 @@ func (who *viewer) projectKeys(names *nameLookup) []string {
 	return keys
 }
 
-// cursorSeqs is where each of the caller's cursors stands, by name.
+// cursorSeqs is where each of the caller's cursors stands, by name, of
+// those the viewer may see (mayCursor).
 func (who *viewer) cursorSeqs(ctx context.Context) (map[string]int64, error) {
 	var cursors []core.Cursor
 	if err := who.db.List(ctx, &cursors, store.Where(store.Eq("user_id", who.member.UserID))); err != nil {
@@ -87,7 +88,9 @@ func (who *viewer) cursorSeqs(ctx context.Context) (map[string]int64, error) {
 	}
 	seqs := map[string]int64{}
 	for _, cursor := range cursors {
-		seqs[cursor.Name] = cursor.Seq
+		if who.mayCursor(cursor.Name) {
+			seqs[cursor.Name] = cursor.Seq
+		}
 	}
 	return seqs, nil
 }

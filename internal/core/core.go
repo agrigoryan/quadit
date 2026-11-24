@@ -34,6 +34,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"slices"
+	"strings"
 )
 
 // Role is what a member may do in a workspace. A role is a ceiling: an
@@ -236,6 +237,12 @@ func ListenCursorOf(projectID string) string {
 	return ListenCursor + ":" + projectID
 }
 
+// ListenCursorProject is the project whose listener delivers from the
+// cursor of that name, when it is one (ListenCursorOf).
+func ListenCursorProject(name string) (projectID string, ok bool) {
+	return strings.CutPrefix(name, ListenCursor+":")
+}
+
 // Listener is the hold one session has on delivering an agent's inbox, in
 // one scope: the items of one project (ProjectID), or, with no project,
 // everything else. One session at a time holds a listener's lease; while
@@ -254,6 +261,10 @@ type Listener struct {
 	// HeldBy is what holds the lease, in words a person reads ("a chat",
 	// "a companion", "the Quadit app"), as the holder said.
 	HeldBy string `json:"held_by,omitempty" db:"held_by"`
+	// HandedSeq is the feed position of the last item a session of this
+	// listener was handed: past its cursor, it is in hand, not yet
+	// acknowledged.
+	HandedSeq int64 `json:"-" db:"handed_seq"`
 }
 
 // ListenerLabel is the form of what a listener says it is (by=, "the

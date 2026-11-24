@@ -727,6 +727,38 @@ func TestWhereAProjectsFirstListenerStarts(t *testing.T) {
 		t.Helper()
 		testdb.Each(t, func(t *testing.T, st store.Store) { test(t, newProjectListening(t, st)) })
 	}
+	t.Run("the first queued item of its project, not handed out yet, is the project listener's", func(t *testing.T) {
+		each(t, func(t *testing.T, p projectListening) {
+			everything := p.listen(t, "wait=0")
+			queued := p.give(t, "SVA")
+			if sva := p.listen(t, "wait=0&project=SVA"); sva.Item == nil || sva.Item.Task != queued {
+				t.Fatalf("SVA's first wait got %+v, want %s, which the listener of everything had not been handed", sva.Item, queued)
+			}
+			if got := p.listen(t, "wait=0&lease="+everything.Lease); got.Item != nil {
+				t.Fatalf("the listener of everything got %+v, SVA's", got.Item)
+			}
+		})
+	})
+
+	t.Run("a session of everything on a token kept to SVA holds an SVA item; a session of SVA on a token for all is not handed it", func(t *testing.T) {
+		each(t, func(t *testing.T, p projectListening) {
+			var kept struct{ Token string }
+			p.call(t, p.owner, "", "POST", w+"/tokens", M{"user": "@coder", "projects": []string{"SVA"}}, 201, &kept)
+			var everything listened
+			p.call(t, nil, kept.Token, "GET", w+"/listen?wait=0", nil, 200, &everything)
+			p.give(t, "ART")
+			key := p.give(t, "SVA")
+			var inHand listened
+			p.call(t, nil, kept.Token, "GET", w+"/listen?wait=0&lease="+everything.Lease, nil, 200, &inHand)
+			if inHand.Item == nil || inHand.Item.Task != key {
+				t.Fatalf("the session of everything on the token kept to SVA got %+v, want %s", inHand.Item, key)
+			}
+			if sva := p.listen(t, "wait=0&project=SVA"); sva.Item != nil {
+				t.Fatalf("SVA's first wait was handed %+v, which the session of everything holds", sva.Item)
+			}
+		})
+	})
+
 	t.Run("beside a live listener of everything, it takes over the queued items of its project", func(t *testing.T) {
 		each(t, func(t *testing.T, p projectListening) {
 			everything := p.listen(t, "wait=0")
@@ -1004,6 +1036,134 @@ func TestAnAgentListensToAProjectWithTheCommand(t *testing.T) {
 		}
 		if out := run("listening", "forget", "project=SVA"); !strings.HasPrefix(out, "Forgot the listener of SVA") || p.listenersOf(t) != 0 {
 			t.Fatalf("forget said:\n%s", out)
+		}
+	})
+}
+
+// TestForgettingAProjectNeverReplays: after a project's listener is
+// forgotten its items go to the listener of everything from now on: what
+// was pending for either stays unread in the inbox, and nothing already
+// acknowledged comes again.
+func TestForgettingAProjectNeverReplays(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newProjectListening(t, st)
+		everything := p.listen(t, "wait=0")
+		p.give(t, "ART") // pending for everything, which is far behind
+		sva := p.listen(t, "wait=0&project=SVA")
+		p.give(t, "SVA")
+		got := p.listen(t, "wait=0&project=SVA&lease="+sva.Lease)
+		p.call(t, nil, p.coder, "PUT", w+"/cursors/listen", M{"seq": got.Seq, "lease": sva.Lease}, 200, nil)
+		runOut(t, st, sva.Lease)
+		p.call(t, nil, p.coder, "DELETE", w+"/listening/SVA", nil, 200, nil)
+		if old := p.listen(t, "wait=0&lease="+everything.Lease); old.Item != nil {
+			t.Fatalf("after the forget the listener of everything got %+v, from before it", old.Item)
+		}
+		key := p.give(t, "SVA")
+		if now := p.listen(t, "wait=0&lease="+everything.Lease); now.Item == nil || now.Item.Task != key {
+			t.Fatalf("a new item of the forgotten project went %+v, want %s to the listener of everything", now.Item, key)
+		}
+	})
+}
+
+// TestALoginKeptToSomeProjectsLearnsNothingOfTheOthersListeners: a login
+// kept to SVA asking to listen to ART is answered as for a project that
+// does not exist, naming only the projects it may read; it does not see
+// the cursor of the agent's listener of ART, nor move it, while the cursor
+// listen keeps its acknowledgment without a lease.
+func TestALoginKeptToSomeProjectsLearnsNothingOfTheOthersListeners(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newProjectListening(t, st)
+		p.listen(t, "wait=0&project=ART")
+		art := p.project(t, "ART")
+		var kept struct{ Token string }
+		p.call(t, p.owner, "", "POST", w+"/tokens", M{"user": "@coder", "projects": []string{"SVA"}}, 201, &kept)
+
+		var hidden, missing refusal
+		var hiddenAllowed, missingAllowed struct{ Error struct{ Allowed []string } }
+		raw := p.call(t, nil, kept.Token, "GET", w+"/listen?wait=0&project=ART", nil, 404, &hidden)
+		_ = json.Unmarshal([]byte(raw), &hiddenAllowed)
+		raw = p.call(t, nil, kept.Token, "GET", w+"/listen?wait=0&project=NOPE", nil, 404, &missing)
+		_ = json.Unmarshal([]byte(raw), &missingAllowed)
+		if hidden.Error.Message != `project "ART" does not exist in this workspace` || missing.Error.Message != `project "NOPE" does not exist in this workspace` ||
+			strings.Join(hiddenAllowed.Error.Allowed, ",") != "SVA" || strings.Join(missingAllowed.Error.Allowed, ",") != "SVA" {
+			t.Fatalf("a hidden project is answered %+v %v, a missing one %+v %v", hidden.Error, hiddenAllowed.Error.Allowed, missing.Error, missingAllowed.Error.Allowed)
+		}
+
+		var me struct{ Cursors map[string]int64 }
+		p.call(t, nil, kept.Token, "GET", w+"/me", nil, 200, &me)
+		if _, seen := me.Cursors["listen:"+art.ID]; seen {
+			t.Fatalf("the login kept to SVA sees the cursors %v", me.Cursors)
+		}
+		p.call(t, nil, p.coder, "GET", w+"/me", nil, 200, &me)
+		if _, seen := me.Cursors["listen:"+art.ID]; !seen {
+			t.Fatalf("the agent's own login does not see the cursor of its listener of ART: %v", me.Cursors)
+		}
+		p.give(t, "ART")
+		seq := p.seq(t)
+		p.call(t, nil, kept.Token, "PUT", w+"/cursors/listen:"+art.ID, M{"seq": seq}, 404, nil)
+		p.call(t, nil, kept.Token, "GET", w+"/cursors/listen:"+art.ID, nil, 404, nil)
+		p.call(t, nil, kept.Token, "GET", w+"/events?cursor=listen:"+art.ID+"&ack="+strconv.FormatInt(seq, 10), nil, 404, nil)
+		p.call(t, nil, kept.Token, "PUT", w+"/cursors/listen", M{"seq": seq}, 200, nil)
+	})
+}
+
+// seq is where the feed stands.
+func (p projectListening) seq(t *testing.T) int64 {
+	t.Helper()
+	var me struct{ Seq int64 }
+	p.call(t, nil, p.coder, "GET", w+"/me", nil, 200, &me)
+	return me.Seq
+}
+
+// TestAListenerFromBeforeTheLeaseLeavesOutProjectsListenedToByThemselves:
+// the read a `quadit listen` from before the lease makes is the listener of
+// everything's, and leaves out the items of a project that has a listener
+// of its own.
+func TestAListenerFromBeforeTheLeaseLeavesOutProjectsListenedToByThemselves(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newProjectListening(t, st)
+		p.listen(t, "wait=0&project=SVA")
+		p.call(t, nil, p.coder, "PUT", w+"/cursors/listen", M{"seq": p.seq(t)}, 200, nil)
+		p.give(t, "SVA")
+		art := p.give(t, "ART")
+		var page struct {
+			Events []struct {
+				ProjectID string `json:"project_id"`
+			}
+		}
+		p.call(t, nil, p.coder, "GET", w+"/events?cursor=listen&inbox=1&wait=1&limit=5&types=notification.created", nil, 200, &page)
+		if len(page.Events) != 1 || page.Events[0].ProjectID != p.project(t, "ART").ID {
+			t.Fatalf("the old companion's read gave %+v, want only %s's item", page.Events, art)
+		}
+	})
+}
+
+// TestADryAcknowledgmentChecksTheCursorOfItsLease: an acknowledgment's dry
+// run says where the cursor of its lease's listener would stand, and
+// refuses a lease taken over, as the acknowledgment itself would.
+func TestADryAcknowledgmentChecksTheCursorOfItsLease(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newProjectListening(t, st)
+		sva := p.listen(t, "wait=0&project=SVA")
+		p.give(t, "SVA")
+		got := p.listen(t, "wait=0&project=SVA&lease="+sva.Lease)
+		var dry struct {
+			Name string
+			Seq  int64
+		}
+		p.call(t, nil, p.coder, "PUT", w+"/cursors/listen?dry_run=1", M{"seq": got.Seq, "lease": sva.Lease}, 200, &dry)
+		if dry.Name != "listen:"+p.project(t, "SVA").ID || dry.Seq != got.Seq {
+			t.Fatalf("the dry acknowledgment answered %+v", dry)
+		}
+		p.listen(t, "wait=0&project=SVA&take=1")
+		var r refusal
+		p.call(t, nil, p.coder, "PUT", w+"/cursors/listen?dry_run=1", M{"seq": got.Seq, "lease": sva.Lease}, 409, &r)
+		if r.Error.Reason != "lease_stale" {
+			t.Fatalf("a dry acknowledgment with a lease taken over is refused with %+v", r.Error)
 		}
 	})
 }

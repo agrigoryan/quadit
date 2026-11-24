@@ -81,6 +81,9 @@ func (s *Server) handleReadFeed(x *c) error {
 	f.Limit, f.Types = min(x.intParam("limit", defaultFeedPage), maxFeedPage), splitList(v.Get("types"))
 	cursor := v.Get("cursor")
 	if cursor != "" {
+		if !x.mayCursor(cursor) {
+			return errNotFound("cursor " + cursor)
+		}
 		if ack := x.intParam("ack", 0); ack > 0 {
 			if _, err := s.setCursor(x, cursor, int64(ack), ""); err != nil {
 				return err
@@ -101,6 +104,16 @@ func (s *Server) handleReadFeed(x *c) error {
 	}
 	if truthyParam(v, "inbox") {
 		f.OnlyAudience = x.member.UserID
+		// The read of a `quadit listen` from before the lease is the
+		// listener of everything's, which leaves out the projects listened
+		// to by themselves.
+		if cursor == core.ListenCursor {
+			listeners, err := listenersOf(ctx, x.db, x.member.UserID)
+			if err != nil {
+				return err
+			}
+			f = listenFilter(f, "", listeners.own())
+		}
 	}
 	if ref := v.Get("task"); ref != "" {
 		t, err := x.taskByRef(x.ctx(), ref)
@@ -218,36 +231,51 @@ func hasTaskFilter(q core.TaskQuery) bool {
 }
 
 // setCursor moves a cursor forward, and says which: a cursor never moves
-// back. A move made with a listener's lease moves that listener's cursor,
-// named listen (as every listener's acknowledgment names it) or by its own
-// name, and only while the lease is still its listener's, checked in the
-// same write as the move, so a takeover cannot land between the two
-// (listenerHolding).
+// back. A move made with a listener's lease moves that listener's cursor
+// (cursorToMove), only while the lease is still its listener's, checked in
+// the same write as the move, so a takeover cannot land between the two.
 func (s *Server) setCursor(x *c, name string, seq int64, lease string) (moved string, err error) {
 	if err := s.checkCursorPosition(x, name, seq); err != nil {
 		return "", err
 	}
 	// One conditional statement, so acknowledgments racing each other
 	// leave the cursor at the furthest, whichever lands last.
-	move := func(db store.DB, name string) error {
-		return db.Advance(x.ctx(), core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: name, Seq: seq, UpdatedAt: time.Now().UnixMilli()},
+	move := func(db store.DB) error {
+		var err error
+		if moved, err = x.cursorToMove(x.ctx(), db, name, lease); err != nil {
+			return err
+		}
+		return db.Advance(x.ctx(), core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: moved, Seq: seq, UpdatedAt: time.Now().UnixMilli()},
 			"seq", "workspace_id", "user_id", "name")
 	}
 	if lease == "" {
-		return name, move(x.db, name)
+		return moved, move(x.db)
 	}
-	err = s.st.Write(x.ctx(), x.ws.ID, func(tx store.Tx) error {
-		held, err := listenerHolding(x.ctx(), tx, x.member, lease)
+	err = s.st.Write(x.ctx(), x.ws.ID, func(tx store.Tx) error { return move(tx) })
+	return moved, err
+}
+
+// cursorToMove is the cursor a move of the cursor name, made with lease
+// (or none), moves: without a lease, the cursor named; with one, the cursor
+// of the listener holding it (listenerHolding), named listen (as every
+// listener's acknowledgment names it) or by its own name. A listener's
+// cursor of a project the viewer may not read is not found.
+func (who *viewer) cursorToMove(ctx context.Context, db store.DB, name, lease string) (string, error) {
+	moved := name
+	if lease != "" {
+		held, err := listenerHolding(ctx, db, who.member, lease)
 		if err != nil {
-			return err
+			return "", err
 		}
 		moved = core.ListenCursorOf(held.ProjectID)
 		if name != core.ListenCursor && name != moved {
-			return &engine.Error{Code: engine.CodeInvalid, Field: "lease", Message: fmt.Sprintf("a lease moves its listener's cursor, %s: the cursor %s is moved without one", moved, name)}
+			return "", &engine.Error{Code: engine.CodeInvalid, Field: "lease", Message: fmt.Sprintf("a lease moves its listener's cursor, %s: the cursor %s is moved without one", moved, name)}
 		}
-		return move(tx, moved)
-	})
-	return moved, err
+	}
+	if !who.mayCursor(moved) {
+		return "", errNotFound("cursor " + moved)
+	}
+	return moved, nil
 }
 
 // checkCursorPosition refuses a cursor name the server cannot keep, and a
@@ -279,6 +307,9 @@ func (s *Server) handleShowFeedCursor(x *c) error {
 // showCursor answers where the caller's cursor of that name stands; one
 // never moved stands at 0.
 func showCursor(x *c, name string) error {
+	if !x.mayCursor(name) {
+		return errNotFound("cursor " + name)
+	}
 	var cursor core.Cursor
 	if _, err := store.Find(x.ctx(), x.db, &cursor, store.Eq("user_id", x.member.UserID), store.Eq("name", name)); err != nil {
 		return err
@@ -309,11 +340,15 @@ func (s *Server) handleMoveFeedCursor(x *c) error {
 	if err := s.checkCursorPosition(x, name, body.Seq); err != nil {
 		return err
 	}
-	var cursor core.Cursor
-	if _, err := store.Find(x.ctx(), x.db, &cursor, store.Eq("user_id", x.member.UserID), store.Eq("name", name)); err != nil {
+	moved, err := x.cursorToMove(x.ctx(), x.db, name, body.Lease)
+	if err != nil {
 		return err
 	}
-	return x.ok(map[string]any{"name": name, "seq": max(cursor.Seq, body.Seq), "dry_run": true})
+	var cursor core.Cursor
+	if _, err := store.Find(x.ctx(), x.db, &cursor, store.Eq("user_id", x.member.UserID), store.Eq("name", moved)); err != nil {
+		return err
+	}
+	return x.ok(map[string]any{"name": moved, "seq": max(cursor.Seq, body.Seq), "dry_run": true})
 }
 
 // handleStreamFeed is the live stream: server-sent events, one per feed event, from

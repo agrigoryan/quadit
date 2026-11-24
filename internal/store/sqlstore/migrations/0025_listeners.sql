@@ -1,7 +1,8 @@
 -- What listens as an agent: a listener of one project, or the listener of
 -- everything else (no project), each with the lease of the one session
--- that holds it. A project's row stays when its session stops, so that the
--- project keeps waiting for its next listener.
+-- that holds it, and the feed position of the last item it handed out. A
+-- project's row stays when its session stops, so that the project keeps
+-- waiting for its next listener.
 CREATE TABLE listeners (
     workspace_id  {{ID}} NOT NULL REFERENCES workspaces (id),
     agent_id      {{ID}} NOT NULL REFERENCES users (id),
@@ -9,7 +10,8 @@ CREATE TABLE listeners (
     lease         TEXT NOT NULL,
     lease_until   {{TS}} NOT NULL,
     heard_at      {{TS}} NOT NULL,
-    held_by       TEXT NOT NULL
+    held_by       TEXT NOT NULL,
+    handed_seq    {{BIGINT}} NOT NULL DEFAULT 0
 );
 CREATE INDEX listeners_agent ON listeners (workspace_id, agent_id);
 -- The lease a member's row held is the listener of everything's. The

@@ -24,6 +24,7 @@ package server
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -137,19 +138,35 @@ func leaseLives(l core.Listener, now time.Time) bool {
 }
 
 // listenProject is the project a listener is asked for by key or id, or
-// none for "": the listener of everything.
+// none for "": the listener of everything. A project the viewer may not
+// read is refused as one that does not exist, naming only the projects it
+// may read.
 func (who *viewer) listenProject(ctx context.Context, ref string) (core.Project, error) {
 	if ref == "" {
 		return core.Project{}, nil
 	}
 	project, err := who.resolver(ctx).Project(ref)
+	var refused *engine.Error
+	switch {
+	case err == nil && who.canProject(project.ID):
+		return project, nil
+	case err != nil && (!errors.As(err, &refused) || refused.Code != engine.CodeNotFound):
+		return core.Project{}, err
+	}
+	keys, err := who.readableProjectKeys(ctx)
 	if err != nil {
 		return core.Project{}, err
 	}
-	if !who.canProject(project.ID) {
-		return core.Project{}, errNotFound("project " + ref)
-	}
-	return project, nil
+	return core.Project{}, &engine.Error{Code: engine.CodeNotFound, Field: "project", Message: fmt.Sprintf("project %q does not exist in this workspace", ref),
+		Allowed: slices.Sorted(maps.Values(keys))}
+}
+
+// mayCursor reports whether the viewer may see and move its member's cursor
+// of that name: a listener's cursor of a project only when it may read the
+// project.
+func (who *viewer) mayCursor(name string) bool {
+	project, ok := core.ListenCursorProject(name)
+	return !ok || who.canProject(project)
 }
 
 // handleNextInboxItem answers the next inbox item of the listener asked
@@ -200,9 +217,10 @@ func (s *Server) handleNextInboxItem(x *c) error {
 	if len(page.events) == 0 {
 		return x.ok(out)
 	}
-	// The wait may have slept through a takeover, or through the item's
-	// project getting a listener of its own, as the writes that did would
-	// have seen.
+	// The wait may have slept through a takeover, through the item's
+	// project getting a listener of its own, or through a forget moving the
+	// cursor past it, as the writes that did would have seen. An item
+	// handed over is recorded on its listener (Listener.HandedSeq).
 	ev := page.events[0]
 	covered := false
 	err = s.st.Write(x.ctx(), x.ws.ID, func(tx store.Tx) error {
@@ -213,8 +231,16 @@ func (s *Server) handleNextInboxItem(x *c) error {
 		if held, _ := listeners.of(project.ID); held.Lease != lease {
 			return listeningElsewhere(x.member, held, project.Key)
 		}
-		covered = covers(project.ID, ev.ProjectID, listeners.own())
-		return nil
+		var cursor core.Cursor
+		if _, err := store.Find(x.ctx(), tx, &cursor, store.Eq("user_id", x.member.UserID), store.Eq("name", core.ListenCursorOf(project.ID))); err != nil {
+			return err
+		}
+		covered = ev.Seq > cursor.Seq && covers(project.ID, ev.ProjectID, listeners.own())
+		if !covered {
+			return nil
+		}
+		_, err = tx.Update(x.ctx(), "listeners", map[string]any{"handed_seq": ev.Seq}, listenerOf(x.member.UserID, project.ID)...)
+		return err
 	})
 	if err != nil {
 		return err
@@ -258,12 +284,9 @@ func (s *Server) listenStart(x *c, cursorName string) (int64, error) {
 // project, in the write that makes it, from listeners as they were before
 // it. While the listener of everything's lease lives, what lies between
 // its cursor and the present is its queue, not history: the project's
-// listener takes over the queue's items of its project, after the item the
-// listener of everything may hold in hand, delivered and not acknowledged.
-// That is the first item after its cursor it covers, since it is handed
-// that one until it acknowledges it; it is taken to be in hand even when it
-// may not have been handed yet, because an item missed stays in the inbox,
-// and one handed to two sessions is done twice. With no live listener of
+// listener takes over the queue's items of its project, from that cursor,
+// or past the item that listener holds in hand (handed out, past its
+// cursor) when that item is of the project. With no live listener of
 // everything, the project's listener starts at the present, so history is
 // never replayed.
 func (who *viewer) startProjectListener(ctx context.Context, tx store.Tx, listeners agentListeners, projectID string, now time.Time) error {
@@ -275,15 +298,15 @@ func (who *viewer) startProjectListener(ctx context.Context, tx store.Tx, listen
 		return err
 	}
 	if there && leaseLives(everything, now) {
-		f := listenFilter(who.feed(), "", listeners.own())
-		f.After, f.OnlyAudience, f.Types, f.Limit = queue.Seq, who.member.UserID, []string{"notification.created"}, 1
-		inHand, err := tx.Events(ctx, f)
-		if err != nil {
-			return err
-		}
 		start = queue.Seq
-		if len(inHand) > 0 {
-			start = inHand[0].Seq
+		if everything.HandedSeq > queue.Seq {
+			var inHand core.Event
+			if err := tx.Get(ctx, &inHand, store.Eq("seq", everything.HandedSeq)); err != nil {
+				return err
+			}
+			if inHand.ProjectID == projectID {
+				start = inHand.Seq
+			}
 		}
 	}
 	return tx.Advance(ctx, core.Cursor{WorkspaceID: who.ws.ID, UserID: who.member.UserID, Name: core.ListenCursorOf(projectID), Seq: start, UpdatedAt: now.UnixMilli()},
@@ -505,8 +528,14 @@ func (s *Server) handleForgetListener(x *c) error {
 		if _, err := tx.Delete(x.ctx(), "listeners", listenerOf(x.member.UserID, project.ID)...); err != nil {
 			return err
 		}
-		_, err = tx.Delete(x.ctx(), "cursors", store.Eq("user_id", x.member.UserID), store.Eq("name", core.ListenCursorOf(project.ID)))
-		return err
+		if _, err := tx.Delete(x.ctx(), "cursors", store.Eq("user_id", x.member.UserID), store.Eq("name", core.ListenCursorOf(project.ID))); err != nil {
+			return err
+		}
+		// From now on: the listener of everything takes the project's items
+		// from the present, so nothing either acknowledged comes again, and
+		// what was pending for either stays unread in the inbox.
+		return tx.Advance(x.ctx(), core.Cursor{WorkspaceID: x.ws.ID, UserID: x.member.UserID, Name: core.ListenCursor, Seq: tx.Seq(), UpdatedAt: time.Now().UnixMilli()},
+			"seq", "workspace_id", "user_id", "name")
 	})
 	if err != nil {
 		return err
