@@ -210,6 +210,7 @@ type listenServer struct {
 	older   bool // from before listening by project: project= is not answered
 	asked   []url.Values
 	checked int // the asks of GET /listening
+	away    int // the first asks of GET /listening it fails, as a server starting up
 }
 
 // requests are what the asks of GET /listen asked, so far.
@@ -232,10 +233,15 @@ func (s *listenServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasSuffix(r.URL.Path, "/listening") {
 		s.mu.Lock()
 		s.checked++
+		away := s.checked <= s.away
 		s.mu.Unlock()
-		if s.older {
+		switch {
+		case away:
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = io.WriteString(w, `{"error":{"code":"unavailable","message":"starting"}}`)
+		case s.older:
 			_, _ = io.WriteString(w, `{"listening":false}`)
-		} else {
+		default:
 			_, _ = io.WriteString(w, `{"listening":false,"listeners":[]}`)
 		}
 		return
@@ -246,7 +252,10 @@ func (s *listenServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mu.Unlock()
 	if item == "" {
 		wait, _ := strconv.Atoi(q.Get("wait"))
-		time.Sleep(time.Duration(wait) * time.Second)
+		select { // a hold, which ends early when the client gives up on it
+		case <-time.After(time.Duration(wait) * time.Second):
+		case <-r.Context().Done():
+		}
 		item = "null"
 	}
 	lease := s.lease
@@ -860,5 +869,35 @@ func TestListeningForgetsAProjectsListener(t *testing.T) {
 	}
 	if err := r.listening(input{pos: []string{"forget"}}); err == nil || !strings.Contains(err.Error(), "project= is a project's key") {
 		t.Fatalf("forget with no project ended with %v", err)
+	}
+}
+
+// TestAProjectsCompanionWaitsOutAServerAwayAtItsStart: the check a
+// companion of a project makes before it takes a lease is tried again,
+// as its reads are, while the server is away; it goes on to listen once
+// the server answers.
+func TestAProjectsCompanionWaitsOutAServerAwayAtItsStart(t *testing.T) {
+	t.Setenv("QUADIT_CONFIG", filepath.Join(t.TempDir(), "codex.json"))
+	srv := &listenServer{away: 1}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	out := &syncBuffer{}
+	r := &runner{ctx: ctx, c: testClient(t, srv), out: out}
+	done := make(chan error, 1)
+	go func() { done <- r.listenWith(listenArgs([]string{"project=SVA", "--exec", "true"}), time.Minute) }()
+	for deadline := time.Now().Add(10 * time.Second); len(srv.requests()) == 0; time.Sleep(20 * time.Millisecond) {
+		select {
+		case err := <-done:
+			t.Fatalf("the companion ended with %v before it listened; it said:\n%s", err, out)
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the companion never listened; it said:\n%s", out)
+		}
+	}
+	cancel()
+	<-done
+	if srv.checks() != 2 || !strings.Contains(out.String(), "retrying:") {
+		t.Fatalf("the companion checked %d times and said:\n%s", srv.checks(), out)
 	}
 }

@@ -90,18 +90,22 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 	}
 	defer kept.close()
 	lease := kept.kept()
-	if err := r.checkListensByProject(opts.project, lease); err != nil {
-		return err
-	}
 	var failedSeq int64 // the item whose runs failed, failed times in a row
 	failed := 0
 	for {
-		page, err := r.nextItem(r.ctx, listenAsk{project: opts.project, lease: lease, take: take, by: opts.by}, waitHold)
+		// Until it holds a lease, a companion of a project first checks the
+		// server can listen by project; a server away is tried again as a
+		// read is.
+		var page listened
+		err := r.checkListensByProject(opts.project, lease)
+		if err == nil {
+			page, err = r.nextItem(r.ctx, listenAsk{project: opts.project, lease: lease, take: take, by: opts.by}, waitHold)
+		}
 		if err != nil {
 			if r.ctx.Err() != nil {
 				return r.ctx.Err()
 			}
-			if listenRefused(err, events) {
+			if errors.Is(err, errOlderServer) || listenRefused(err, events) {
 				return err
 			}
 			fmt.Fprintln(r.out, "retrying:", err)
