@@ -10,7 +10,8 @@
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
 import { useConnection } from "@/data/listening";
-import { useMember, useRowEvenIfGone } from "@/data/selectors";
+import { mayBeGivenWork } from "@/data/access";
+import { useMember, useProjects, useRowEvenIfGone } from "@/data/selectors";
 import type { Member, Task } from "@/types/core";
 import { useSettingsBase } from "@/settings/base";
 import { canConnectTools, ConnectToolsButton } from "@/ui/connect-tools";
@@ -28,7 +29,17 @@ function AgentReach({ agent, task }: { agent: Member; task: Task }) {
   const reach = useConnection()(agent, task.project_id);
   // An archived project still has its key, as the task's header shows it.
   const project = useRowEvenIfGone("projects", task.project_id)?.key;
-  const line = project ? t("comment.reach.line", { project }) : t("comment.reach.lineAny");
+  // An agent of one project listens to everything when told plain “listen to Quadit” (the skill), so a project added
+  // later is heard too: the line names the project only where the agent may work in several.
+  const several =
+    new Set([
+      ...useProjects()
+        .filter((p) => mayBeGivenWork(agent, p.id))
+        .map((p) => p.id),
+      task.project_id,
+    ]).size > 1;
+  const line = (key: string | undefined) =>
+    key ? t("comment.reach.line", { project: key }) : t("comment.reach.lineAny");
   const settings = useSettingsBase();
   if (!reach) return null;
   const { connection, tool, elsewhere } = reach;
@@ -38,10 +49,10 @@ function AgentReach({ agent, task }: { agent: Member; task: Task }) {
       {connection === "listening" && t("comment.reach.listening", { handle })}
       {connection === "connected" &&
         (elsewhere
-          ? t("comment.reach.elsewhere", { handle, line })
+          ? t("comment.reach.elsewhere", { handle, line: line(project) })
           : tool
-            ? t("comment.reach.connected", { handle, tool, line })
-            : t("comment.reach.connectedNoTool", { handle, line }))}
+            ? t("comment.reach.connected", { handle, tool, line: line(several ? project : undefined) })
+            : t("comment.reach.connectedNoTool", { handle, line: line(several ? project : undefined) }))}
       {connection === "not_connected" && (
         <>
           <span>{t("comment.reach.notConnected", { handle })}</span>

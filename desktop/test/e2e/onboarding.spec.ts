@@ -193,9 +193,12 @@ test("a tool the app can run gives its code back by itself in the first run, and
     const origin = await desktop.localOrigin();
     const page = await desktop.pageOf(origin);
     await expect(page.getByText(/is for Claude Code/)).toBeVisible({ timeout: 20_000 });
-    // Under its task's comment box: nothing listens for it, and the line that has it listen.
+    // Under its task's comment box: nothing listens for it, and the line that has it listen. The workspace has one
+    // project (the samples): the line is plain, so the chat listens to everything and a project added later is heard.
     await page.goto(`${origin}/personal/task/GS-3`);
-    await expect(page.getByText(/is not listening\..*“listen to Quadit for GS”/)).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByText(/is not listening\. To have it answer here, say “listen to Quadit” in Claude Code\./),
+    ).toBeVisible({ timeout: 20_000 });
     await screen(page, "08b-not-listening.png");
   } finally {
     await desktop.close();

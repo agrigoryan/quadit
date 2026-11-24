@@ -19,14 +19,18 @@ const ann = { user_id: "u1", handle: "ann", name: "Ann", kind: "person", role: "
 const codex = { user_id: "a1", handle: "codex", name: "Codex", kind: "agent", role: "member" } as Member;
 const base = { id: "t1", key: "SVA-1", project_id: "p1", status_id: "s1", title: "Boss" } as Task;
 
-function load(agent: Member, project: Record<string, unknown> = {}) {
+/** The store with `agent`, the project SVA (with `project`'s fields) and, with `others`, a second project, GS. */
+function load(agent: Member, project: Record<string, unknown> = {}, others = false) {
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
     me: ann,
     user: { id: "u1" } as User,
     workspace: { id: "w", slug: "acme" } as Workspace,
-    projects: [{ id: "p1", key: "SVA", name: "Game", rank: "a", ...project }],
+    projects: [
+      { id: "p1", key: "SVA", name: "Game", rank: "a", ...project },
+      ...(others ? [{ id: "p2", key: "GS", name: "Getting started", rank: "b" }] : []),
+    ],
     members: [ann, agent],
   });
 }
@@ -78,7 +82,8 @@ describe("the line under the comment box", () => {
     expect(await screen.findByText("@codex is listening and will see this.")).toBeTruthy();
   });
 
-  it("says when an agent that is not listening will see it, and what to say to it in a chat", async () => {
+  it("says when an agent that is not listening will see it, and what to say to it in a chat, naming the project when it has several", async () => {
+    load({ ...codex, connected_at: 1700000000000 }, {}, true);
     agents(false, "Codex");
     show({ ...base, assignee_id: "u1", waiting_on_id: "a1" });
     expect(
@@ -86,6 +91,21 @@ describe("the line under the comment box", () => {
         "@codex is not listening. To have it answer here, say “listen to Quadit for SVA” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.",
       ),
     ).toBeTruthy();
+  });
+
+  it("says plain “listen to Quadit” to an agent with one project: it then listens to everything, a project added later too", async () => {
+    agents(false, "Codex");
+    show({ ...base, assignee_id: "a1" });
+    expect(
+      await screen.findByText(
+        "@codex is not listening. To have it answer here, say “listen to Quadit” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.",
+      ),
+    ).toBeTruthy();
+    cleanup();
+    // Several projects in the workspace, but the agent may work in one of them only.
+    load({ ...codex, connected_at: 1700000000000, scope: { projects: ["p1"] } }, {}, true);
+    show({ ...base, assignee_id: "a1" });
+    expect(await screen.findByText(/say “listen to Quadit” in Codex\./)).toBeTruthy();
   });
 
   it("says when the agent listens only to other projects, and the line that has it listen to this one", async () => {
@@ -99,7 +119,7 @@ describe("the line under the comment box", () => {
   });
 
   it("names the project of a task in an archived project, and leaves it out when there is none to name", async () => {
-    load({ ...codex, connected_at: 1700000000000 }, { archived_at: 1 });
+    load({ ...codex, connected_at: 1700000000000 }, { archived_at: 1 }, true);
     agents(false, "Codex");
     show({ ...base, assignee_id: "a1" });
     expect(await screen.findByText(/say “listen to Quadit for SVA” in Codex\./)).toBeTruthy();
@@ -113,7 +133,7 @@ describe("the line under the comment box", () => {
     show({ ...base, assignee_id: "a1" });
     expect(
       await screen.findByText(
-        "@codex is not listening. To have it answer here, say “listen to Quadit for SVA” to it in a chat. Until then it sees this when you next ask it to check Quadit.",
+        "@codex is not listening. To have it answer here, say “listen to Quadit” to it in a chat. Until then it sees this when you next ask it to check Quadit.",
       ),
     ).toBeTruthy();
   });
