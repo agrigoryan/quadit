@@ -5,6 +5,7 @@ api DELETE /api/v1/auth/sessions/{id}
 api DELETE /api/v1/push/subscriptions
 api DELETE /api/v1/w/{workspace}/invites/{id}
 api DELETE /api/v1/w/{workspace}/listening/{key}
+api DELETE /api/v1/w/{workspace}/listening/{key}/runner
 api DELETE /api/v1/w/{workspace}/samples
 api DELETE /api/v1/w/{workspace}/tokens/{id}
 api GET /.well-known/oauth-authorization-server
@@ -68,6 +69,7 @@ api GET /api/v1/w/{workspace}/sources
 api GET /api/v1/w/{workspace}/tasks
 api GET /api/v1/w/{workspace}/tasks/{ref}
 api GET /api/v1/w/{workspace}/tasks/{ref}/context
+api GET /api/v1/w/{workspace}/tasks/{ref}/run-outlook
 api GET /api/v1/w/{workspace}/tokens
 api GET /desktop/finish
 api GET /f/{id}/{name}
@@ -180,6 +182,7 @@ change comment.create arg occurrence
 change comment.create arg option
 change comment.create arg parent
 change comment.create arg quote
+change comment.create arg session
 change comment.create arg start
 change comment.create arg task
 change comment.create arg waiting_on
@@ -519,14 +522,30 @@ change secret.set arg id
 change secret.set arg name
 change secret.set arg value
 change session.start
+change session.start arg folder
 change session.start arg id
 change session.start arg instructions
+change session.start arg item_seq
+change session.start arg lease
+change session.start arg machine_id
+change session.start arg machine_name
+change session.start arg program
+change session.start arg program_session
+change session.start arg reason
+change session.start arg state
 change session.start arg task
 change session.start arg title
+change session.stop
+change session.stop arg id
 change session.update
 change session.update arg add_links
 change session.update arg add_steps
+change session.update arg fresh
 change session.update arg id
+change session.update arg items_through
+change session.update arg program_session
+change session.update arg reason
+change session.update arg resets_at
 change session.update arg state
 change session.update arg summary
 change session.update arg title

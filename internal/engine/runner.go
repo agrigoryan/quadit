@@ -25,14 +25,23 @@ type Runner struct {
 
 var machineIDForm = regexp.MustCompile(`^[0-9a-f]{16}$`)
 
+// CheckMachineID refuses what is not a runner's machine id.
+func CheckMachineID(machineID string) error {
+	if !machineIDForm.MatchString(machineID) {
+		return invalid("machine_id", "machine_id is the runner's machine id: 16 lower-case hexadecimal characters")
+	}
+	return nil
+}
+
 // Check holds what the runner said to its forms, the machine's name trimmed
 // first, and names the argument at fault. Every value shows on pages, so
 // none may carry a control character.
 func (r *Runner) Check() error {
 	r.MachineName = strings.TrimSpace(r.MachineName)
+	if err := CheckMachineID(r.MachineID); err != nil {
+		return err
+	}
 	switch {
-	case !machineIDForm.MatchString(r.MachineID):
-		return invalid("machine_id", "machine_id is the runner's machine id: 16 lower-case hexadecimal characters")
 	case !plainText(r.MachineName, 64):
 		return invalid("machine_name", "machine_name is the machine's name: 1 to 64 characters, none of them a control character")
 	case !plainText(r.Folder, 200) || !strings.HasPrefix(r.Folder, "/") && !strings.HasPrefix(r.Folder, "~"):

@@ -1,10 +1,12 @@
 package server_test
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -133,6 +135,27 @@ func TestWhoAmINamesEachProjectAfterItsKey(t *testing.T) {
 		s.call(t, s.owner, "", "GET", w+"/me", nil, 200, &me)
 		if strings.Join(me.Projects, ",") != "ART,SVA" || me.ProjectNames["ART"] != "Art, (old)\npipeline" || me.ProjectNames["SVA"] != "Samurai vs Aliens" || len(me.ProjectNames) != 2 {
 			t.Fatalf("/me says projects %v, names %v", me.Projects, me.ProjectNames)
+		}
+	})
+}
+
+// TestMeGivesTheWorkspaceID: an agent's login says which workspace it is
+// of by its id, which a rename or a new slug does not change.
+func TestMeGivesTheWorkspaceID(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		agent := s.agentToken(t, "claude")
+		var ws core.Workspace
+		if err := st.Get(context.Background(), &ws, store.Eq("slug", "games")); err != nil {
+			t.Fatal(err)
+		}
+		var me struct {
+			Workspace struct{ ID, Slug, Name string }
+		}
+		s.call(t, nil, agent, "GET", "/api/v1/w/-/me", nil, 200, &me)
+		if me.Workspace.ID != ws.ID || me.Workspace.Slug != "games" || me.Workspace.Name != "Games" {
+			t.Fatalf("/me names the workspace %+v", me.Workspace)
 		}
 	})
 }

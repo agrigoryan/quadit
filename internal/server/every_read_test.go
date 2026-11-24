@@ -485,6 +485,16 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 	as(rw.ops, "session ops ended", "session.start", M{"task": "OPS-2", "title": "Checking backups"})
 	change(nil, rw.ops, "session.update", M{"id": rw.id("session ops ended"), "state": "done", "summary": "all there"})
 	as(rw.ops, "session no task", "session.start", M{"title": "Looking around"})
+	// Quadit's runner runs @ops for OPS on a machine, and works on OPS-2.
+	runner := "machine_id=3f9c0a7d5e21b864&machine_name=Ops+box&folder=~/ops&program=codex&program_version=0.170.0"
+	var held struct{ Lease string }
+	s.call(t, nil, rw.ops, "GET", w+"/listen?project=OPS&by=Quadit%27s+runner&"+runner, nil, 200, &held)
+	// It holds the lease all through the reads, however slow the machine.
+	if _, err := st.Update(context.Background(), "listeners", map[string]any{"lease_until": time.Now().Add(time.Hour).UnixMilli()}, store.Eq("lease", held.Lease)); err != nil {
+		t.Fatal(err)
+	}
+	as(rw.ops, "run ops", "session.start", M{"task": "OPS-2", "state": "waiting", "program": "codex", "machine_id": "3f9c0a7d5e21b864", "machine_name": "Ops box",
+		"folder": "~/ops", "lease": held.Lease, "item_seq": 1, "instructions": "#1 assigned"})
 	change(nil, rw.artist, "task.take", M{"id": "SVA-1"})
 	change(owner, "", "watch.set", M{"subject": "OPS-1"})
 	change(bea, "", "watch.set", M{"subject": "SVA-1"})
@@ -726,6 +736,9 @@ func (rw *richWorkspace) reads() []read {
 	add(inWS("/agents", "/agents", "/agents?format=text")...)
 	add(inWS("/agents/connection", "/agents/connection")...)
 	add(inWS("/listening", "/listening")...)
+	add(inWS("/tasks/{ref}/run-outlook", "/tasks/OPS-1/run-outlook?agents=@ops,@artist,@nobody&cause=comment", "/tasks/OPS-2/run-outlook?agents=@ops&cause=assign",
+		"/tasks/OPS-1/run-outlook?agents=@ops&cause=assign", "/tasks/SVA-1/run-outlook?agents=@ops,@artist&cause=comment", "/tasks/OPS-1/run-outlook?agents=@ops&cause=nope",
+		"/tasks/OPS-1/run-outlook?cause=comment", "/tasks/NOPE-1/run-outlook?agents=@ops&cause=comment")...)
 
 	// Files, tokens, secrets and the rest.
 	for _, name := range []string{"file notes.txt", "file vault.txt", "file ring.txt", "file nights.txt", "file gone.txt", "file ops-gone.txt", "file burst.txt", "file loose.txt",

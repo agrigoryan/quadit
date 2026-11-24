@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
 )
@@ -1165,5 +1167,370 @@ func TestADryAcknowledgmentChecksTheCursorOfItsLease(t *testing.T) {
 		if r.Error.Reason != "lease_stale" {
 			t.Fatalf("a dry acknowledgment with a lease taken over is refused with %+v", r.Error)
 		}
+	})
+}
+
+// listenerRow is the agent's listener of SVA as stored.
+func (r *aRunner) listenerRow(t *testing.T) core.Listener {
+	t.Helper()
+	var l core.Listener
+	if err := r.st.Get(context.Background(), &l, store.Eq("agent_id", r.claudeID), store.Eq("project_id", r.sva.ID)); err != nil {
+		t.Fatal(err)
+	}
+	return l
+}
+
+// shownRunner is a runner listener's mark as pages read it.
+type shownRunner struct {
+	Machine, Folder, Program, Since, Paused, Task string
+	ProgramVersion                                string `json:"program_version"`
+	PausedUntil                                   string `json:"paused_until"`
+	Holding                                       bool
+}
+
+// runnerShown is the mark of @claude's listener of SVA in GET /listening,
+// as its agent reads it, or nil.
+func (r *aRunner) runnerShown(t *testing.T) *shownRunner {
+	t.Helper()
+	var out struct {
+		Listeners []struct {
+			Project string
+			Runner  *shownRunner
+		}
+	}
+	r.call(t, nil, r.claude, "GET", w+"/listening", nil, 200, &out)
+	for _, l := range out.Listeners {
+		if l.Project == "SVA" {
+			return l.Runner
+		}
+	}
+	t.Fatalf("no listener of SVA in %+v", out)
+	return nil
+}
+
+func TestARunnerHoldMarksTheListenerWithItsMachine(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		l := r.listenerRow(t)
+		if l.MachineID != "3f9c0a7d5e21b864" || l.MachineName != "Aram's MacBook Pro" || l.RunnerFolder != "~/devel/game" || l.RunnerProgram != "claude" ||
+			l.RunnerVersion != "2.1.331" || !l.RunnerHolds || l.RunnerSeenAt == 0 || l.RunnerSeenAt != l.HeardAt || l.HeldBy != "Quadit's runner" {
+			t.Fatalf("the runner's listener is %+v", l)
+		}
+		if got := r.runnerShown(t); got == nil || !got.Holding || got.Machine != "Aram's MacBook Pro" || got.ProgramVersion != "2.1.331" || got.Since == "" || got.Paused != "" {
+			t.Fatalf("the listener is shown with %+v", got)
+		}
+		r.hold(t, "&paused=usage_limit&paused_until=1732471200000")
+		if got := r.runnerShown(t); got.Paused != "usage_limit" || got.PausedUntil == "" {
+			t.Fatalf("a paused runner is shown %+v", got)
+		}
+		r.hold(t, "&paused=not_signed_in")
+		if got := r.runnerShown(t); got.Paused != "not_signed_in" || got.PausedUntil != "" {
+			t.Fatalf("the runner's new pause is shown %+v", got)
+		}
+		r.hold(t, "&paused=")
+		if got := r.runnerShown(t); got.Paused != "" {
+			t.Fatalf("a pause cleared is shown %+v", got)
+		}
+	})
+}
+
+func TestAnyOtherHoldClearsRunnerHolds(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		var chat listened
+		r.call(t, nil, r.claude, "GET", w+"/listen?wait=0&project=SVA&take=1&by=a+chat", nil, 200, &chat)
+		l := r.listenerRow(t)
+		if l.RunnerHolds || l.MachineID == "" || l.MachineName != "Aram's MacBook Pro" || l.Lease != chat.Lease {
+			t.Fatalf("after a chat took over, the listener is %+v", l)
+		}
+		if got := r.runnerShown(t); got == nil || got.Holding {
+			t.Fatalf("a listener a chat holds shows its runner as %+v", got)
+		}
+		var refused struct{ Error struct{ Reason string } }
+		r.call(t, nil, r.claude, "GET", w+"/listen?wait=0&project=SVA&"+runnerOf+"&lease="+r.lease, nil, 409, &refused)
+		if refused.Error.Reason != "listening_elsewhere" {
+			t.Fatalf("the runner was refused %+v", refused)
+		}
+	})
+}
+
+func TestAMachineOnlyListensToOneProject(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		for _, bad := range []struct{ query, field string }{
+			{"/listen?wait=0&" + runnerOf, "project"},
+			{"/listen?wait=0&project=SVA&batch=1", "machine_id"},
+			{"/listen?wait=0&project=SVA&folder=~/x", "machine_id"},
+			{"/listen?wait=0&project=SVA&" + strings.Replace(runnerOf, "3f9c0a7d5e21b864", "3F9C", 1), "machine_id"},
+			{"/listen?wait=0&project=SVA&" + strings.Replace(runnerOf, "~/devel/game", "devel", 1), "folder"},
+			{"/listen?wait=0&project=SVA&" + strings.Replace(runnerOf, "program=claude", "program=vim", 1), "program"},
+			{"/listen?wait=0&project=SVA&" + strings.Replace(runnerOf, "2.1.331", "2.1+331", 1), "program_version"},
+			{"/listen?wait=0&project=SVA&" + strings.Replace(runnerOf, "Aram%27s+MacBook+Pro", "%0A", 1), "machine_name"},
+			{"/listen?wait=0&project=SVA&paused=asleep&" + runnerOf, "paused"},
+			{"/listen?wait=0&project=SVA&paused=not_signed_in&paused_until=5&" + runnerOf, "paused_until"},
+		} {
+			var refused struct{ Error struct{ Field string } }
+			r.call(t, nil, r.claude, "GET", w+bad.query, nil, 400, &refused)
+			if refused.Error.Field != bad.field {
+				t.Errorf("%s was refused naming %q, want %q", bad.query, refused.Error.Field, bad.field)
+			}
+		}
+		// A person's login listens to nothing.
+		r.call(t, r.owner, "", "GET", w+"/listen?wait=0&project=SVA&"+runnerOf, nil, 403, nil)
+	})
+}
+
+func TestReleasingARunnerClearsItsMarkAndEndsItsLease(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		var out struct {
+			Project  string
+			Released bool
+			DryRun   bool `json:"dry_run"`
+		}
+		r.call(t, nil, r.claude, "DELETE", w+"/listening/SVA/runner?machine_id=3f9c0a7d5e21b864&dry_run=1", nil, 200, &out)
+		if !out.Released || !out.DryRun || r.listenerRow(t).MachineID == "" {
+			t.Fatalf("a dry release answered %+v", out)
+		}
+		r.call(t, r.owner, "", "DELETE", w+"/listening/SVA/runner?machine_id=3f9c0a7d5e21b864", nil, 403, nil)
+		r.call(t, nil, r.claude, "DELETE", w+"/listening/SVA/runner?machine_id=nope", nil, 400, nil)
+		cursorBefore := r.cursor(t)
+		r.call(t, nil, r.claude, "DELETE", w+"/listening/SVA/runner?machine_id=3f9c0a7d5e21b864", nil, 200, &out)
+		l := r.listenerRow(t)
+		if out.Project != "SVA" || !out.Released || l.MachineID != "" || l.MachineName != "" || l.RunnerFolder != "" || l.RunnerHolds || l.RunnerSeenAt != 0 ||
+			l.LeaseLives(time.Now().UnixMilli()) || r.cursor(t) != cursorBefore {
+			t.Fatalf("the release answered %+v and left %+v", out, l)
+		}
+		if r.listening(t, "claude") {
+			t.Fatal("the agent still shows as listening")
+		}
+		// A chat listens at once, without taking over; and a release again is done already.
+		r.call(t, nil, r.claude, "GET", w+"/listen?wait=0&project=SVA&by=a+chat", nil, 200, nil)
+		r.call(t, nil, r.claude, "DELETE", w+"/listening/SVA/runner?machine_id=3f9c0a7d5e21b864", nil, 200, &out)
+		if out.Released {
+			t.Fatalf("a second release answered %+v", out)
+		}
+	})
+}
+
+// cursor is where the runner's listener of SVA stands.
+func (r *aRunner) cursor(t *testing.T) int64 {
+	t.Helper()
+	var c core.Cursor
+	if err := r.st.Get(context.Background(), &c, store.Eq("user_id", r.claudeID), store.Eq("name", "listen:"+r.sva.ID)); err != nil {
+		t.Fatal(err)
+	}
+	return c.Seq
+}
+
+func TestReleasingARunnerOfAnotherMachineReleasesNothing(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		var out struct{ Released bool }
+		r.call(t, nil, r.claude, "DELETE", w+"/listening/SVA/runner?machine_id=0000000000000000", nil, 200, &out)
+		if l := r.listenerRow(t); out.Released || l.MachineID != "3f9c0a7d5e21b864" || !l.HeldByRunner(time.Now().UnixMilli()) {
+			t.Fatalf("another machine's release answered %+v and left %+v", out, l)
+		}
+		// A chat that holds the project keeps it when the runner is let go.
+		r.call(t, nil, r.claude, "GET", w+"/listen?wait=0&project=SVA&take=1&by=a+chat", nil, 200, nil)
+		r.call(t, nil, r.claude, "DELETE", w+"/listening/SVA/runner?machine_id=3f9c0a7d5e21b864", nil, 200, &out)
+		if l := r.listenerRow(t); !out.Released || !l.LeaseLives(time.Now().UnixMilli()) {
+			t.Fatalf("the release ended the chat's lease: %+v", l)
+		}
+	})
+}
+
+func TestListenAnswersTheOtherItemsOfTheSameTaskWhenAskedForABatch(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		key := r.task(t, M{"assignee": "@claude"})
+		other := r.task(t, M{"assignee": "@claude"})
+		r.drain(t)
+		r.change(t, r.owner, "", "comment.create", M{"task": key, "body": "first"})
+		r.change(t, r.owner, "", "comment.create", M{"task": other, "body": "elsewhere"})
+		r.itemOf(t, core.Notification{Type: core.NoteWaitingOn, ActorID: r.ownerID(t), TaskID: r.taskID(t, key), Addressed: true}, id.New())
+		for i := range 21 {
+			r.change(t, r.owner, "", "comment.create", M{"task": key, "body": fmt.Sprint("more ", i)})
+		}
+		got := r.hold(t, "&batch=1")
+		if got.Item.Task != key || got.Wake.Do != "run" || len(got.Batch) != 20 {
+			t.Fatalf("the head %+v came with %d more", got.Item, len(got.Batch))
+		}
+		if b := got.Batch[0]; b.Item.Task != key || b.Wake.Do+" "+b.Wake.Why != "ack rule" {
+			t.Errorf("the rule's item is told %+v", b)
+		}
+		for i, b := range got.Batch {
+			if b.Item.Task != key || b.Seq != b.Item.Seq || b.Line == "" || b.Wake.Do == "" || (i > 0 && b.Seq <= got.Batch[i-1].Seq) {
+				t.Fatalf("batch item %d is %+v", i, b)
+			}
+		}
+		if l := r.listenerRow(t); l.HandedSeq != got.Seq {
+			t.Fatalf("the batch was recorded as handed: %d, the head %d", l.HandedSeq, got.Seq)
+		}
+		// Without batch=1, or for an item of no task, no batch.
+		var plain map[string]json.RawMessage
+		r.call(t, nil, r.claude, "GET", w+"/listen?wait=0&project=SVA&"+runnerOf+"&lease="+r.lease, nil, 200, &plain)
+		if _, has := plain["batch"]; has {
+			t.Fatal("a hold that did not ask for a batch got one")
+		}
+		r.drain(t)
+		page := r.change(t, r.owner, "", "doc.create", M{"title": "Design", "project": "SVA"})["ref"]
+		r.change(t, r.owner, "", "comment.create", M{"doc": page, "body": "@claude read this"})
+		if got := r.hold(t, "&batch=1"); got.Item.ID == "" || got.Batch != nil {
+			t.Fatalf("a page's item came with a batch: %+v", got)
+		}
+	})
+}
+
+func TestListenNamesTheDecisionOfADecisionItem(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		key := r.task(t, nil)
+		r.drain(t)
+		question := r.change(t, r.owner, "", "decision.open", M{"task": key, "question": "Which boss?", "options": []M{{"label": "Big"}, {"label": "Small"}}, "ask": "@claude"})["ref"]
+		got := r.hold(t, "")
+		if got.Item.Type != "decision_asked" || got.Item.Decision != question {
+			t.Fatalf("the item about a decision is %+v", got.Item)
+		}
+		r.ack(t, got.Seq)
+		r.change(t, r.owner, "", "comment.create", M{"task": key, "body": "@claude and this"})
+		if got := r.hold(t, ""); got.Item.Type != "mentioned" || got.Item.Decision != "" {
+			t.Fatalf("an item about no decision is %+v", got.Item)
+		}
+	})
+}
+
+// TestAHoldWithoutTheRunnersParametersAnswersAsBefore: what the released
+// command and skill send gets, byte for byte, what it got before runners,
+// but for what every item answer now carries: what a runner would do with
+// it (wake).
+func TestAHoldWithoutTheRunnersParametersAnswersAsBefore(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		p := newProjectListening(t, st)
+		var first listened
+		raw := p.call(t, nil, p.coder, "GET", w+"/listen?wait=0&project=SVA&by=a+chat", nil, 200, &first)
+		if want := fmt.Sprintf(`{"lease":%q,"project":"SVA"}`, first.Lease); raw != want+"\n" && raw != want {
+			t.Fatalf("an empty hold answered %s", raw)
+		}
+		p.give(t, "SVA")
+		var item struct {
+			Item struct{ ID, At string }
+			Line string
+			Seq  int64
+		}
+		raw = p.call(t, nil, p.coder, "GET", w+"/listen?wait=0&project=SVA&lease="+first.Lease, nil, 200, &item)
+		head := fmt.Sprintf(`{"item":{"id":%q,"seq":%d,"type":"assigned","by":"@aram","task":"SVA-1","title":"SVA-1 Work in SVA","at":%q},"lease":%q,"line":%q,"project":"SVA","seq":%d`,
+			item.Item.ID, item.Seq, item.Item.At, first.Lease, item.Line, item.Seq)
+		if strings.TrimSpace(raw) != head+`,"wake":{"do":"run","why":"for_you"}}` {
+			t.Fatalf("an item was answered\n%s\nwant what it was before, and its wake:\n%s}", raw, head)
+		}
+		var all listened
+		p.call(t, nil, p.coder, "GET", w+"/listen?wait=0", nil, 200, &all)
+		p.mention(t)
+		raw = p.call(t, nil, p.coder, "GET", w+"/listen?wait=0&lease="+all.Lease, nil, 200, &item)
+		if !strings.HasPrefix(raw, `{"item":{"id":`) || !strings.HasSuffix(strings.TrimSpace(raw), fmt.Sprintf(`"lease":%q,"line":%q,"seq":%d,"wake":{"do":"ack","why":"page"}}`, all.Lease, item.Line, item.Seq)) {
+			t.Fatalf("an item of no project was answered %s", raw)
+		}
+	})
+}
+
+func TestTheConnectionReadsTellARunnerAndItsState(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		r.change(t, r.owner, "", "project.create", M{"key": "ART", "name": "Art"})
+		key := r.task(t, nil)
+		art := r.change(t, r.owner, "", "task.create", M{"project": "ART", "title": "Sky"})["key"].(string)
+		// read is the mark of @claude's listener of SVA as /agents and
+		// /agents/connection tell it to the owner.
+		read := func(t *testing.T) *shownRunner {
+			t.Helper()
+			var out struct {
+				Agents []struct {
+					Handle    string
+					Listeners []struct {
+						Project string
+						Runner  *shownRunner
+					}
+				}
+			}
+			var runners []*shownRunner
+			for _, path := range []string{"/agents", "/agents/connection"} {
+				r.call(t, r.owner, "", "GET", w+path, nil, 200, &out)
+				for _, a := range out.Agents {
+					for _, l := range a.Listeners {
+						if a.Handle == "@claude" && l.Project == "SVA" {
+							runners = append(runners, l.Runner)
+						}
+					}
+				}
+			}
+			if len(runners) != 2 || (runners[0] == nil) != (runners[1] == nil) || runners[0] != nil && *runners[0] != *runners[1] {
+				t.Fatalf("the reads differ: %+v", runners)
+			}
+			return runners[0]
+		}
+
+		t.Run("holding, with the task of its own project it works on", func(t *testing.T) {
+			// A run of the agent on that machine on another project's task is
+			// not this listener's.
+			var artLease listened
+			r.call(t, nil, r.claude, "GET", w+"/listen?wait=0&project=ART&"+runnerOf, nil, 200, &artLease)
+			r.change(t, nil, r.claude, "session.start", M{"task": art, "state": "waiting", "program": "claude", "machine_id": "3f9c0a7d5e21b864",
+				"machine_name": "Aram's MacBook Pro", "folder": "~/devel/art", "lease": artLease.Lease, "item_seq": 1})
+			if got := read(t); got == nil || !got.Holding || got.Task != "" {
+				t.Fatalf("a runner working on another project's task is told %+v", got)
+			}
+			r.hold(t, "")
+			r.change(t, nil, r.claude, "session.start", M{"task": key, "state": "waiting", "program": "claude", "machine_id": "3f9c0a7d5e21b864",
+				"machine_name": "Aram's MacBook Pro", "folder": "~/devel/game", "lease": r.lease, "item_seq": 1})
+			if got := read(t); got == nil || !got.Holding || got.Task != key || got.Machine != "Aram's MacBook Pro" {
+				t.Fatalf("a runner working on %s is told %+v", key, got)
+			}
+		})
+		t.Run("paused", func(t *testing.T) {
+			r.hold(t, "&paused=program_missing")
+			if got := read(t); got.Paused != "program_missing" || !got.Holding {
+				t.Fatalf("a paused runner is told %+v", got)
+			}
+		})
+		t.Run("a chat holds it", func(t *testing.T) {
+			r.call(t, nil, r.claude, "GET", w+"/listen?wait=0&project=SVA&take=1", nil, 200, nil)
+			if got := read(t); got == nil || got.Holding {
+				t.Fatalf("a listener a chat holds is told %+v", got)
+			}
+		})
+		t.Run("away", func(t *testing.T) {
+			runOut(t, st, r.listenerRow(t).Lease)
+			if got := read(t); got == nil || got.Holding || got.Since == "" {
+				t.Fatalf("a runner that went away is told %+v", got)
+			}
+		})
+		t.Run("not to a member who may not read the project", func(t *testing.T) {
+			var tok struct{ Token string }
+			r.call(t, r.owner, "", "POST", w+"/tokens", M{"user": "me", "projects": []string{"ART"}}, 201, &tok)
+			var out struct {
+				Agents []struct {
+					Handle    string
+					Listeners []struct{ Project string }
+				}
+			}
+			r.call(t, nil, tok.Token, "GET", w+"/agents/connection", nil, 200, &out)
+			for _, a := range out.Agents {
+				for _, l := range a.Listeners {
+					if l.Project == "SVA" {
+						t.Fatalf("a login kept to ART is told of %+v", a)
+					}
+				}
+			}
+		})
 	})
 }

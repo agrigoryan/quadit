@@ -27,7 +27,10 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/url"
+	"regexp"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -50,14 +53,19 @@ const (
 	// reasonListeningElsewhere: another session holds the live lease.
 	reasonListeningElsewhere = "listening_elsewhere"
 	// reasonLeaseStale: the lease given was taken over since.
-	reasonLeaseStale = "lease_stale"
+	reasonLeaseStale = engine.ReasonLeaseStale
 )
+
+// A runner's hold (GET /listen with machine_id=) is answered, besides its
+// head item, with at most batchLength other items of the head's task.
+const batchLength = 20
 
 // listenerRoutes are the routes of the listener.
 func (s *Server) listenerRoutes() []route {
 	return []route{
 		{"GET /api/v1/w/{ws}/listening", s.workspaceMember(s.handleShowListeners), "What listens as the caller, without taking a lease: {listening, by, last_heard} of the listener of everything (by is what holds the lease, as the holder said: \"a chat\", \"a companion\", \"the Quadit app\"), and listeners, every listener of the caller's: [{project_id, project, by, last_heard, live}], the listener of everything with no project. A project's listener stays when its session stops (live false): its items wait for its next listener, and the listener of everything leaves them out.", "", "follow"},
-		{"GET /api/v1/w/{ws}/listen", s.workspaceMember(s.handleNextInboxItem), "The listener's read: the next item of the caller's inbox after the listener's cursor, waiting for one up to wait seconds (at most 55). With project=, the listener of that project: its items only, from the cursor listen:<project id>. Without, the listener of everything: the items of no project and of every project that never had a listener of its own, from the cursor listen. It holds that listener's lease: the first call takes it, and each call after gives its id as lease=; while it lives (90 seconds past the end of the hold its holder last asked for) another session is refused (reason listening_elsewhere) unless it asks with take=1, and the agent counts as listening. Answers {lease} when the wait ended with nothing, or {lease, seq, item, line} (line: the item as the feed writes it), with project: the project's key, for a project's listener. Nothing moves the cursor but an acknowledgment with the lease: PUT cursors/listen {seq, lease}. An agent's login only.", "wait: seconds, up to 55; project: a project's key or id, to listen to that project only; lease: the id the last call answered with; take: true to take the lease from the session that holds it; by: what listens, in a few plain words, said to whoever asks (\"a chat\", \"a companion\")", "follow"},
+		{"GET /api/v1/w/{ws}/listen", s.workspaceMember(s.handleNextInboxItem), "The listener's read: the next item of the caller's inbox after the listener's cursor, waiting for one up to wait seconds (at most 55). With project=, the listener of that project: its items only, from the cursor listen:<project id>. Without, the listener of everything: the items of no project and of every project that never had a listener of its own, from the cursor listen. It holds that listener's lease: the first call takes it, and each call after gives its id as lease=; while it lives (90 seconds past the end of the hold its holder last asked for) another session is refused (reason listening_elsewhere) unless it asks with take=1, and the agent counts as listening. Answers {lease} when the wait ended with nothing, or {lease, seq, item, line, wake} (line: the item as the feed writes it; wake: what Quadit's runner does with it, {do: run, ack or refuse, why}), with project: the project's key, for a project's listener. A runner's hold (machine_id=) marks the listener as its own; with batch=1 and a head item of a task, batch is the other items of that task after it that this listener would be handed, oldest first, at most 20, each {seq, item, line, wake}, not handed by being told. Nothing moves the cursor but an acknowledgment with the lease: PUT cursors/listen {seq, lease}. An agent's login only.", "wait: seconds, up to 55; project: a project's key or id, to listen to that project only; lease: the id the last call answered with; take: true to take the lease from the session that holds it; by: what listens, in a few plain words, said to whoever asks (\"a chat\", \"a companion\"); machine_id: Quadit's runner's machine (16 lower-case hex), which makes the hold a runner's, of a project's listener only; machine_name, folder (its label, from / or ~), program (claude, codex), program_version: what the runner says of itself; paused: why it holds every item back (usage_limit, not_signed_in, program_missing, folder_missing, login_mismatch, server_old), empty for nothing; paused_until: with paused=usage_limit, when it tries again (Unix ms); batch: true to be answered also the other items of the head's task", "follow"},
+		{"DELETE /api/v1/w/{ws}/listening/{key}/runner", s.workspaceMember(s.handleReleaseRunner), "Let Quadit's runner on a machine go from the caller's listener of a project (its key, or its id): when machine_id is the machine that marked it, the mark goes, and the lease ends if the runner holds it, so a chat can listen at once; the listener and its cursor stay. Answers {project, released}: released false when there was no mark, or another machine's. dry_run=1 checks without doing. An agent's login only.", "machine_id: the runner's machine; dry_run: true to check only", "follow"},
 		{"DELETE /api/v1/w/{ws}/listening/{key}", s.workspaceMember(s.handleForgetListener), "Forget the caller's listener of a project (its key, or its id), and its cursor, so that from now on the project's items go to the listener of everything, whose cursor moves to the present: nothing acknowledged comes again, and what was pending for either stays unread in the inbox. Refused (conflict, reason listening_elsewhere) while its lease lives. Answers {project, forgotten}: forgotten false when the project had no listener of its own. dry_run=1 checks without forgetting.", "", "follow"},
 	}
 }
@@ -121,7 +129,7 @@ func (ls agentListeners) own() map[string]bool {
 // items of project ("" for those of no project).
 func (ls agentListeners) hears(project string, now time.Time) bool {
 	own := ls.own()
-	return slices.ContainsFunc(ls, func(l core.Listener) bool { return leaseLives(l, now) && covers(l.ProjectID, project, own) })
+	return slices.ContainsFunc(ls, func(l core.Listener) bool { return l.LeaseLives(now.UnixMilli()) && covers(l.ProjectID, project, own) })
 }
 
 // listenerOf picks out the agent's listener of scope in a write.
@@ -130,11 +138,6 @@ func listenerOf(agentID, scope string) []store.Cond {
 		return []store.Cond{store.Eq("agent_id", agentID), store.Null("project_id")}
 	}
 	return []store.Cond{store.Eq("agent_id", agentID), store.Eq("project_id", scope)}
-}
-
-// leaseLives reports whether l's lease lives at now.
-func leaseLives(l core.Listener, now time.Time) bool {
-	return l.Lease != "" && l.LeaseUntil > now.UnixMilli()
 }
 
 // listenProject is the project a listener is asked for by key or id, or
@@ -174,7 +177,9 @@ func (who *viewer) mayCursor(name string) bool {
 // when it comes, the lease is still this session's and the listener still
 // covers it: one taken over meanwhile is refused here, and an item whose
 // project got a listener of its own meanwhile is that one's, so two
-// sessions never both deliver an item.
+// sessions never both deliver an item. Every item comes with what Quadit's
+// runner would do with it (wake); a runner's hold marks the listener as
+// its own, and may ask for the other items of the head's task (batch).
 func (s *Server) handleNextInboxItem(x *c) error {
 	// An agent listening with a person's login (the computer's own, when its
 	// tool did not get the agent's) would answer as that person.
@@ -187,11 +192,18 @@ func (s *Server) handleNextInboxItem(x *c) error {
 	if by != "" && !core.ListenerLabel.MatchString(by) {
 		return &engine.Error{Code: engine.CodeInvalid, Field: "by", Message: "by= names what listens in a few plain words (\"a chat\", \"a companion\"): at most 40 letters, digits, spaces, - and '"}
 	}
+	runner, batch, err := runnerHoldOf(v)
+	if err != nil {
+		return err
+	}
 	project, err := x.listenProject(x.ctx(), v.Get("project"))
 	if err != nil {
 		return err
 	}
-	lease, own, err := s.holdLease(x, project, leaseAsk{lease: v.Get("lease"), take: truthyParam(v, "take"), by: by}, time.Duration(wait)*time.Second)
+	if runner != nil && project.ID == "" {
+		return &engine.Error{Code: engine.CodeInvalid, Field: "project", Message: "a runner listens to one project: give project="}
+	}
+	lease, own, err := s.holdLease(x, project, leaseAsk{lease: v.Get("lease"), take: truthyParam(v, "take"), by: by, runner: runner}, time.Duration(wait)*time.Second)
 	if err != nil {
 		return err
 	}
@@ -217,11 +229,29 @@ func (s *Server) handleNextInboxItem(x *c) error {
 	if len(page.events) == 0 {
 		return x.ok(out)
 	}
+	// What a runner does with the item, and with the items of its task
+	// after it, is decided before anything is handed: a read that fails
+	// hands nothing out.
+	ev := page.events[0]
+	names, err := x.names(x.ctx())
+	if err != nil {
+		return err
+	}
+	head, err := x.handed(x.ctx(), ev, names)
+	if err != nil {
+		return err
+	}
+	batch = batch && ev.ScopeType == "task"
+	var more []handedItem
+	if batch {
+		if more, err = x.taskBatch(x.ctx(), ev, project.ID, own, names); err != nil {
+			return err
+		}
+	}
 	// The wait may have slept through a takeover, through the item's
 	// project getting a listener of its own, or through a forget moving the
 	// cursor past it, as the writes that did would have seen. An item
 	// handed over is recorded on its listener (Listener.HandedSeq).
-	ev := page.events[0]
 	covered := false
 	err = s.st.Write(x.ctx(), x.ws.ID, func(tx store.Tx) error {
 		listeners, err := listenersOf(x.ctx(), tx, x.member.UserID)
@@ -248,17 +278,118 @@ func (s *Server) handleNextInboxItem(x *c) error {
 	if !covered {
 		return x.ok(out)
 	}
-	names, err := x.names(x.ctx())
+	out["seq"], out["item"], out["line"], out["wake"] = head.Seq, head.Item, head.Line, head.Wake
+	if batch {
+		out["batch"] = more
+	}
+	return x.ok(out)
+}
+
+// handedItem is an inbox item as a listener is handed it: the item, its
+// line as the feed writes it, and what Quadit's runner does with it.
+type handedItem struct {
+	Seq  int64     `json:"seq"`
+	Item inboxItem `json:"item"`
+	Line string    `json:"line"`
+	Wake wake      `json:"wake"`
+}
+
+// handed is the viewer's item of the notification.created event ev, as a
+// listener is handed it.
+func (who *viewer) handed(ctx context.Context, ev core.Event, names *nameLookup) (handedItem, error) {
+	w, err := who.wakeOf(ctx, who.member, ev)
 	if err != nil {
-		return err
+		return handedItem{}, err
 	}
 	var note core.Notification
 	if data, err := ev.Payload(); err == nil {
 		data.ReadRow(&note)
 	}
 	note.Seq = ev.Seq
-	out["seq"], out["item"], out["line"] = ev.Seq, x.inboxItem(x.ctx(), note, names), x.eventLine(x.ctx(), ev, names)
-	return x.ok(out)
+	return handedItem{Seq: ev.Seq, Item: who.inboxItem(ctx, note, names), Line: who.eventLine(ctx, ev, names), Wake: w}, nil
+}
+
+// taskBatch is what a runner's hold answers with its head ev beside it: the
+// viewer's items after it, of the same task, that the listener of scope
+// would be handed (listenFilter), up to the present, oldest first, at most
+// batchLength. They are not recorded as handed: each comes again as a head.
+func (who *viewer) taskBatch(ctx context.Context, ev core.Event, scope string, own map[string]bool, names *nameLookup) ([]handedItem, error) {
+	f := listenFilter(who.feed(), scope, own)
+	f.After, f.OnlyAudience, f.Types, f.ScopeType, f.ScopeID, f.Limit = ev.Seq, who.member.UserID, []string{"notification.created"}, ev.ScopeType, ev.ScopeID, batchLength
+	evs, err := who.readFeed(ctx, f)
+	if err != nil {
+		return nil, err
+	}
+	out := []handedItem{}
+	for _, later := range evs {
+		item, err := who.handed(ctx, later, names)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+// runnerHold is what Quadit's runner says of itself with a hold of its
+// listener: its machine, folder and program, the program's version, and
+// why it holds every item back for now (core.Pause*, "" for nothing) and,
+// for a usage limit, until when (Unix ms).
+type runnerHold struct {
+	engine.Runner
+	version     string
+	paused      string
+	pausedUntil int64
+}
+
+var programVersionForm = regexp.MustCompile(`^[0-9A-Za-z.+-]{1,32}$`)
+
+// pauses are the reasons a runner holds its items back.
+var pauses = []string{core.PauseUsageLimit, core.PauseNotSignedIn, core.PauseProgramMissing, core.PauseFolderMissing, core.PauseLoginMismatch, core.PauseServerOld}
+
+// runnerHoldOf reads a runner's parameters of GET /listen: none for a hold
+// that is not a runner's, and whether the hold asks for a batch, which only
+// a runner does.
+func runnerHoldOf(v url.Values) (*runnerHold, bool, error) {
+	batch := truthyParam(v, "batch")
+	if v.Get("machine_id") == "" {
+		for _, name := range []string{"machine_name", "folder", "program", "program_version", "paused", "paused_until", "batch"} {
+			if v.Has(name) {
+				return nil, false, &engine.Error{Code: engine.CodeInvalid, Field: "machine_id", Message: name + "= is said by Quadit's runner, which names its machine with machine_id="}
+			}
+		}
+		return nil, false, nil
+	}
+	r := &runnerHold{Runner: engine.Runner{MachineID: v.Get("machine_id"), MachineName: v.Get("machine_name"), Folder: v.Get("folder"), Program: v.Get("program")},
+		version: v.Get("program_version"), paused: v.Get("paused")}
+	if err := r.Check(); err != nil {
+		return nil, false, err
+	}
+	if r.version != "" && !programVersionForm.MatchString(r.version) {
+		return nil, false, &engine.Error{Code: engine.CodeInvalid, Field: "program_version", Message: "program_version is the program's version: 1 to 32 letters, digits, dots, + and -"}
+	}
+	if r.paused != "" && !slices.Contains(pauses, r.paused) {
+		return nil, false, &engine.Error{Code: engine.CodeInvalid, Field: "paused", Message: fmt.Sprintf("unknown pause %q", r.paused), Allowed: pauses}
+	}
+	if until := v.Get("paused_until"); until != "" {
+		n, err := strconv.ParseInt(until, 10, 64)
+		if err != nil || n <= 0 || r.paused != core.PauseUsageLimit {
+			return nil, false, &engine.Error{Code: engine.CodeInvalid, Field: "paused_until", Message: "paused_until is when a usage limit resets, in Unix milliseconds, with paused=usage_limit"}
+		}
+		r.pausedUntil = n
+	}
+	return r, batch, nil
+}
+
+// mark is the columns of a listener a hold writes of what holds it: a
+// runner's hold sets the runner's mark and that the lease is the runner's;
+// any other leaves the mark and says the lease is not.
+func (r *runnerHold) mark(now int64) map[string]any {
+	if r == nil {
+		return map[string]any{"runner_holds": false}
+	}
+	return map[string]any{"machine_id": r.MachineID, "machine_name": r.MachineName, "runner_folder": r.Folder, "runner_program": r.Program,
+		"runner_version": r.version, "runner_paused": r.paused, "runner_paused_until": r.pausedUntil, "runner_seen_at": now, "runner_holds": true}
 }
 
 // listenStart is where a listener reads on from, its cursor: one never
@@ -297,7 +428,7 @@ func (who *viewer) startProjectListener(ctx context.Context, tx store.Tx, listen
 	if err != nil {
 		return err
 	}
-	if there && leaseLives(everything, now) {
+	if there && everything.LeaseLives(now.UnixMilli()) {
 		start = queue.Seq
 		if everything.HandedSeq > queue.Seq {
 			var inHand core.Event
@@ -315,11 +446,13 @@ func (who *viewer) startProjectListener(ctx context.Context, tx store.Tx, listen
 
 // leaseAsk is what a wait asks of the lease: the id it holds (or none),
 // whether to take it from another session, and what it is, in words a
-// person reads, for whoever asks what listens.
+// person reads, for whoever asks what listens; and for Quadit's runner,
+// what it says of itself.
 type leaseAsk struct {
-	lease string
-	take  bool
-	by    string
+	lease  string
+	take   bool
+	by     string
+	runner *runnerHold
 }
 
 // holdLease gives the caller's listener of project (none: of everything)
@@ -342,7 +475,7 @@ func (s *Server) holdLease(x *c, project core.Project, ask leaseAsk, wait time.D
 			return err
 		}
 		held, found := listeners.of(project.ID)
-		live := leaseLives(held, now)
+		live := held.LeaseLives(now.UnixMilli())
 		switch {
 		case live && ask.lease == held.Lease:
 		case live && !ask.take:
@@ -352,17 +485,21 @@ func (s *Server) holdLease(x *c, project core.Project, ask leaseAsk, wait time.D
 		}
 		row := core.Listener{WorkspaceID: x.ws.ID, AgentID: agentID, ProjectID: project.ID, Lease: lease,
 			LeaseUntil: now.Add(wait + leaseLife).UnixMilli(), HeardAt: now.UnixMilli(), HeldBy: ask.by}
-		if found {
-			_, err = tx.Update(ctx, "listeners", map[string]any{"lease": row.Lease, "lease_until": row.LeaseUntil, "heard_at": row.HeardAt, "held_by": row.HeldBy},
-				listenerOf(agentID, project.ID)...)
-		} else {
-			err = tx.Insert(ctx, row)
-			if err == nil && project.ID != "" {
-				err = x.startProjectListener(ctx, tx, listeners, project.ID, now)
+		set := ask.runner.mark(now.UnixMilli())
+		set["lease"], set["lease_until"], set["heard_at"], set["held_by"] = row.Lease, row.LeaseUntil, row.HeardAt, row.HeldBy
+		if !found {
+			// A new listener is made, then written as every hold writes it.
+			if err := tx.Insert(ctx, row); err != nil {
+				return err
+			}
+			if project.ID != "" {
+				if err := x.startProjectListener(ctx, tx, listeners, project.ID, now); err != nil {
+					return err
+				}
 			}
 			listeners = append(listeners, row)
 		}
-		if err != nil {
+		if _, err := tx.Update(ctx, "listeners", set, listenerOf(agentID, project.ID)...); err != nil {
 			return err
 		}
 		until := row.LeaseUntil
@@ -413,25 +550,118 @@ func listeningElsewhere(m core.Member, held core.Listener, projectKey string) er
 
 // listenerShown is a listener as it is told: its project (its id and key;
 // none for the listener of everything), what holds its lease, as the holder
-// said, when it was last heard, and whether its lease lives.
+// said, when it was last heard, whether its lease lives, and what Quadit's
+// runner said of itself, when one marked it.
 type listenerShown struct {
-	ProjectID string `json:"project_id,omitempty"`
-	Project   string `json:"project,omitempty"`
-	By        string `json:"by,omitempty"`
-	LastHeard string `json:"last_heard,omitempty"`
-	Live      bool   `json:"live"`
+	ProjectID string       `json:"project_id,omitempty"`
+	Project   string       `json:"project,omitempty"`
+	By        string       `json:"by,omitempty"`
+	LastHeard string       `json:"last_heard,omitempty"`
+	Live      bool         `json:"live"`
+	Runner    *runnerShown `json:"runner,omitempty"`
+}
+
+// runnerShown is a runner listener's mark as it is told: the machine, the
+// folder's label and the program; whether the runner holds the lease now
+// (a chat may, or the runner may be away since it was last heard); why it
+// holds every item back, and until when; and the task it works on, of the
+// listener's project.
+type runnerShown struct {
+	Machine        string `json:"machine"`
+	Folder         string `json:"folder"`
+	Program        string `json:"program"`
+	ProgramVersion string `json:"program_version"`
+	Holding        bool   `json:"holding"`
+	Since          string `json:"since"`
+	Paused         string `json:"paused,omitempty"`
+	PausedUntil    string `json:"paused_until,omitempty"`
+	Task           string `json:"task,omitempty"`
+}
+
+// listenerReads is what telling listeners reads besides them: the keys of
+// the projects the viewer may read, by id (readableProjectKeys), and the
+// task each runner works on there now.
+type listenerReads struct {
+	keys    map[string]string
+	working map[runnerAt]string // the key of the task of the newest open run
+}
+
+// runnerAt is one agent's runner on one machine, for one project.
+type runnerAt struct {
+	agent, machine, project string
+}
+
+// listenerReads reads them.
+func (who *viewer) listenerReads(ctx context.Context) (listenerReads, error) {
+	keys, err := who.readableProjectKeys(ctx)
+	if err != nil {
+		return listenerReads{}, err
+	}
+	reads := listenerReads{keys: keys, working: map[runnerAt]string{}}
+	runs, tasks, err := who.openRuns(ctx, nil)
+	if err != nil {
+		return reads, err
+	}
+	for _, run := range runs {
+		t := tasks[run.TaskID]
+		at := runnerAt{agent: run.AgentID, machine: run.MachineID, project: t.ProjectID}
+		if _, seen := reads.working[at]; !seen {
+			reads.working[at] = t.Key
+		}
+	}
+	return reads, nil
+}
+
+// openRuns are the runs Quadit's runners have open (waiting or running),
+// newest first, on tasks the viewer may read, of the projects given (nil:
+// of every project), with those tasks by id.
+func (who *viewer) openRuns(ctx context.Context, projects []string) ([]core.AgentSession, map[string]core.Task, error) {
+	var runs []core.AgentSession
+	if err := who.db.List(ctx, &runs, store.Q{Where: []store.Cond{store.In("state", []string{core.AgentSessionWaiting, core.AgentSessionRunning}),
+		store.Ne("machine_id", "")}, Order: "-started_at,id"}); err != nil {
+		return nil, nil, err
+	}
+	var ids []string
+	for _, run := range runs {
+		ids = append(ids, run.TaskID)
+	}
+	byID := map[string]core.Task{}
+	if len(ids) == 0 {
+		return nil, byID, nil
+	}
+	f := who.readable(store.TaskFilter{IDs: ids, Archived: true, Limit: maxTasksByID})
+	if projects != nil {
+		f.ProjectIDs = projects // and each is held to canProject below
+	}
+	tasks, err := who.db.Tasks(ctx, f)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, t := range tasks {
+		if who.canProject(t.ProjectID) {
+			byID[t.ID] = t
+		}
+	}
+	return keep(runs, func(run core.AgentSession) bool { _, ok := byID[run.TaskID]; return ok }), byID, nil
 }
 
 // shown is the listeners as they are told, the listener of everything
-// first, then by project key. keys are the projects the viewer may read,
-// key by id (readableProjectKeys); a listener of another project is left
-// out. Never nil.
-func shown(ls agentListeners, keys map[string]string, now time.Time) []listenerShown {
+// first, then by project key. A listener of a project the viewer may not
+// read is left out. Never nil.
+func shown(ls agentListeners, reads listenerReads, now time.Time) []listenerShown {
 	out := []listenerShown{}
 	for _, l := range ls {
-		if key, readable := keys[l.ProjectID]; readable || l.ProjectID == "" {
-			out = append(out, listenerShown{ProjectID: l.ProjectID, Project: key, By: l.HeldBy, LastHeard: formatTime(l.HeardAt), Live: leaseLives(l, now)})
+		key, readable := reads.keys[l.ProjectID]
+		if !readable && l.ProjectID != "" {
+			continue
 		}
+		one := listenerShown{ProjectID: l.ProjectID, Project: key, By: l.HeldBy, LastHeard: formatTime(l.HeardAt), Live: l.LeaseLives(now.UnixMilli())}
+		if l.MachineID != "" {
+			one.Runner = &runnerShown{Machine: l.MachineName, Folder: l.RunnerFolder, Program: l.RunnerProgram, ProgramVersion: l.RunnerVersion,
+				Holding: l.HeldByRunner(now.UnixMilli()), Since: formatTime(l.RunnerSeenAt), Paused: l.RunnerPaused, PausedUntil: formatTime(l.RunnerPausedUntil),
+				Task: reads.working[runnerAt{agent: l.AgentID, machine: l.MachineID, project: l.ProjectID}]}
+		}
+		out = append(out, one)
 	}
 	slices.SortFunc(out, func(a, b listenerShown) int {
 		return cmp.Or(cmp.Compare(len(a.ProjectID), len(b.ProjectID)), cmp.Compare(a.Project, b.Project))
@@ -468,10 +698,10 @@ type listenersReach struct {
 }
 
 // reachOf is it, for an agent with these listeners, and pushed when a
-// webhook is heard for it, among the projects of keys (readableProjectKeys).
-func reachOf(ls agentListeners, pushed bool, keys map[string]string, now time.Time) listenersReach {
-	r := listenersReach{Listeners: shown(ls, keys, now), ListeningProjects: []string{}, ListeningOutsideProjects: pushed || ls.hears("", now)}
-	for _, project := range slices.Sorted(maps.Keys(keys)) {
+// webhook is heard for it, among the projects the viewer may read.
+func reachOf(ls agentListeners, pushed bool, reads listenerReads, now time.Time) listenersReach {
+	r := listenersReach{Listeners: shown(ls, reads, now), ListeningProjects: []string{}, ListeningOutsideProjects: pushed || ls.hears("", now)}
+	for _, project := range slices.Sorted(maps.Keys(reads.keys)) {
 		if pushed || ls.hears(project, now) {
 			r.ListeningProjects = append(r.ListeningProjects, project)
 		}
@@ -488,15 +718,80 @@ func (s *Server) handleShowListeners(x *c) error {
 	if err != nil {
 		return err
 	}
-	keys, err := x.readableProjectKeys(x.ctx())
+	reads, err := x.listenerReads(x.ctx())
 	if err != nil {
 		return err
 	}
 	now := time.Now()
 	everything, _ := listeners.of("")
-	out := map[string]any{"listening": leaseLives(everything, now), "listeners": shown(listeners, keys, now)}
+	out := map[string]any{"listening": everything.LeaseLives(now.UnixMilli()), "listeners": shown(listeners, reads, now)}
 	if out["listening"] == true {
 		out["by"], out["last_heard"] = everything.HeldBy, formatTime(everything.HeardAt)
+	}
+	return x.ok(out)
+}
+
+// handleReleaseRunner lets a machine's runner go from the caller's
+// listener of a project: what a runner does when the person removes the
+// project from it. Only the machine that marked the listener can clear its
+// mark, and the lease is ended only when that runner holds it: a chat that
+// holds it keeps it.
+func (s *Server) handleReleaseRunner(x *c) error {
+	if x.member.Kind != core.KindAgent {
+		return errForbidden("this login is @%s's, a person's, not an agent's: a runner listens with the agent's own login", x.member.Handle)
+	}
+	machine := x.r.URL.Query().Get("machine_id")
+	if err := engine.CheckMachineID(machine); err != nil {
+		return err
+	}
+	project, err := x.listenProject(x.ctx(), x.r.PathValue("key"))
+	if err != nil {
+		return err
+	}
+	if project.ID == "" {
+		return &engine.Error{Code: engine.CodeInvalid, Field: "key", Message: "a runner listens to one project: name it"}
+	}
+	dry := truthyParam(x.r.URL.Query(), "dry_run")
+	released := false
+	err = s.st.Write(x.ctx(), x.ws.ID, func(tx store.Tx) error {
+		listeners, err := listenersOf(x.ctx(), tx, x.member.UserID)
+		if err != nil {
+			return err
+		}
+		held, there := listeners.of(project.ID)
+		if !there || held.MachineID != machine {
+			return nil
+		}
+		released = true
+		if dry {
+			return nil
+		}
+		now := time.Now().UnixMilli()
+		set := map[string]any{"machine_id": "", "machine_name": "", "runner_folder": "", "runner_program": "", "runner_version": "", "runner_paused": "",
+			"runner_paused_until": int64(0), "runner_seen_at": int64(0), "runner_holds": false}
+		ends := held.HeldByRunner(now)
+		if ends {
+			set["lease_until"] = now
+		}
+		if _, err := tx.Update(x.ctx(), "listeners", set, listenerOf(x.member.UserID, project.ID)...); err != nil || !ends {
+			return err
+		}
+		// The member listens on until the last of its other leases ends.
+		until := now
+		for _, l := range listeners {
+			if l.ProjectID != project.ID {
+				until = max(until, l.LeaseUntil)
+			}
+		}
+		_, err = tx.Update(x.ctx(), "members", map[string]any{"listening_until": until}, store.Eq("user_id", x.member.UserID))
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	out := map[string]any{"project": project.Key, "released": released}
+	if dry {
+		out["dry_run"] = true
 	}
 	return x.ok(out)
 }
@@ -518,7 +813,7 @@ func (s *Server) handleForgetListener(x *c) error {
 		if err != nil || !there {
 			return err
 		}
-		if leaseLives(held, time.Now()) {
+		if held.LeaseLives(time.Now().UnixMilli()) {
 			return listeningElsewhere(x.member, held, project.Key)
 		}
 		forgotten = true

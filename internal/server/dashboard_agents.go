@@ -62,7 +62,7 @@ func (who *viewer) agentStates(ctx context.Context, tasks []core.Task, names *na
 }
 
 // agentWork is what agentStates reads once and then looks at for each
-// agent: the open tasks, the sessions that are running, who is heard by a
+// agent: the open tasks, the sessions that are open, who is heard by a
 // webhook, and the open questions. It is one run of work, made and used up
 // inside viewer.agentStates, which is why it holds a ctx.
 type agentWork struct {
@@ -84,7 +84,10 @@ type agentWork struct {
 // the whole workspace).
 func (who *viewer) agentWork(ctx context.Context, tasks []core.Task, names *nameLookup, projects []string) (*agentWork, error) {
 	w := &agentWork{who: who, ctx: ctx, names: names, now: time.Now(), tasks: tasks, keyOf: map[string]core.Task{}}
-	if err := who.db.List(ctx, &w.sessions, store.Q{Where: []store.Cond{store.Eq("state", core.AgentSessionRunning), store.Gte("started_at", w.now.Add(-12*time.Hour).UnixMilli())},
+	// A run Quadit's runner received and has not started yet (waiting) is
+	// the agent's work as much as one that runs.
+	if err := who.db.List(ctx, &w.sessions, store.Q{Where: []store.Cond{store.In("state", []string{core.AgentSessionWaiting, core.AgentSessionRunning}),
+		store.Gte("started_at", w.now.Add(-12*time.Hour).UnixMilli())},
 		Order: "-started_at,id"}); err != nil {
 		return nil, err
 	}
@@ -296,7 +299,7 @@ type agentReach struct {
 	pushed    map[string]bool
 	tools     map[string]string
 	listeners map[string]agentListeners // by agent
-	keys      map[string]string         // readableProjectKeys
+	reads     listenerReads
 }
 
 // agentReach reads it.
@@ -329,7 +332,7 @@ func (who *viewer) agentReach(ctx context.Context) (agentReach, error) {
 		r.listeners[l.AgentID] = append(r.listeners[l.AgentID], l)
 	}
 	var err error
-	r.keys, err = who.readableProjectKeys(ctx)
+	r.reads, err = who.listenerReads(ctx)
 	return r, err
 }
 
@@ -337,7 +340,7 @@ func (who *viewer) agentReach(ctx context.Context) (agentReach, error) {
 func (r agentReach) of(m core.Member, now time.Time) agentConnection {
 	return agentConnection{Handle: "@" + m.Handle, UserID: m.UserID, ConnectedAt: formatTime(m.ConnectedAt),
 		Listening: m.ListeningUntil > now.UnixMilli() || r.pushed[m.UserID], Tool: r.tools[m.UserID],
-		listenersReach: reachOf(r.listeners[m.UserID], r.pushed[m.UserID], r.keys, now)}
+		listenersReach: reachOf(r.listeners[m.UserID], r.pushed[m.UserID], r.reads, now)}
 }
 
 // handleListAgentConnections is how far every agent is connected: the

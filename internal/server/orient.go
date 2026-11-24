@@ -28,7 +28,7 @@ func (s *Server) handleShowWhoAmI(x *c) error {
 	}
 	out := map[string]any{
 		"handle": "@" + x.member.Handle, "name": x.member.Name, "kind": x.member.Kind, "role": x.member.Role, "user_id": x.member.UserID,
-		"workspace": map[string]any{"slug": ws.Slug, "name": ws.Name}, "seq": ws.Seq, "server_time": time.Now().UTC().Format(time.RFC3339),
+		"workspace": map[string]any{"id": ws.ID, "slug": ws.Slug, "name": ws.Name}, "seq": ws.Seq, "server_time": time.Now().UTC().Format(time.RFC3339),
 		"version": s.cfg.Version,
 	}
 	projects := x.readableProjects(names)
@@ -170,6 +170,9 @@ type inboxItem struct {
 	Snippet string `json:"snippet,omitempty"`
 	At      string `json:"at"`
 	Read    bool   `json:"read,omitempty"`
+	// Decision is the decision's id, when the item is about one: asked,
+	// answered, found unclear.
+	Decision string `json:"decision,omitempty"`
 	noteRefs
 }
 
@@ -216,6 +219,9 @@ func (who *viewer) inboxItem(ctx context.Context, note core.Notification, names 
 		Title: note.Title, Snippet: note.Snippet, At: formatTime(note.CreatedAt), Read: note.ReadAt != 0, noteRefs: who.refsOf(ctx, note)}
 	if note.TaskID != "" {
 		item.Task, _, _ = strings.Cut(note.Title, " ") // a task's notification is titled with its key first
+	}
+	if note.EntityType == "decision" {
+		item.Decision = note.EntityID
 	}
 	return item
 }

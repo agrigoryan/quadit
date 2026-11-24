@@ -67,6 +67,11 @@ func TestUpgradeKeepsSessionsListenersCommentsAndInboxItemsAsTheyWere(t *testing
 			if len(notesBefore) == 0 {
 				t.Fatal("the workspace has no inbox items to upgrade")
 			}
+			// What the engine of now says of them is in a column the database
+			// of before has not: it reads false after the upgrade.
+			for i := range notesBefore {
+				notesBefore[i].Addressed = false
+			}
 
 			upgrade(t, st)
 			var sessionAfter core.AgentSession
