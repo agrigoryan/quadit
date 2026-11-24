@@ -63,8 +63,12 @@ function Line({
   );
 }
 
-/** A Quadit runner's status, in the app's words: ready, working, a chat holds it for now, or paused and why. */
-function runnerStatus(
+/**
+ * A Quadit runner's status, in the app's words: ready, working, a chat holds
+ * it for now, or paused and why. The card says it, and so does the summary
+ * the desktop app is given (shell/desktop-summary.ts).
+ */
+export function runnerStatus(
   runner: RunnerShown,
   live: boolean,
   project: string,

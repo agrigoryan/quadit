@@ -17,6 +17,7 @@ import { useStore } from "@/data/store";
 import { useMinute } from "@/hooks/tick";
 import { isKey, t, tMaybe } from "@/lib/i18n";
 import { exact, parseWhen } from "@/lib/time";
+import { runnerStatus } from "@/insights/agents/agent-reach";
 import { taskPath } from "@/nav/task-link";
 import { pickAction } from "@/shell/desktop-requests";
 import {
@@ -301,7 +302,7 @@ function cardLine(
       if (!l.project_id || !local?.runs.includes(l.project_id))
         return heard(t("agents.card.runsElsewhere", { project, machine: runner.machine }));
       const program = state.tool || local.programName || tMaybe(`run.program.${runner.program}`, runner.program);
-      const status = runnerWords(runner, l.live, project, program);
+      const status = runnerStatus(runner, l.live, project, program);
       return heard(`${t("agents.card.runs", { project, folder: runner.folder })} ${status.text}`, status.tone);
     }
     if (!l.live) continue;
@@ -313,27 +314,6 @@ function cardLine(
   if (state.listening_outside_projects) return heard(t("agents.listener.webhook"));
   if (state.listening) return heard(t("agents.card.listening"));
   return { line: { text: t("agents.card.notListening"), tone: "wait" }, reach: "not_listening" };
-}
-
-/** A Quadit runner's status on this computer, in the card's words: a chat holds it, paused and why, working, or ready. */
-function runnerWords(
-  runner: NonNullable<AgentState["listeners"][number]["runner"]>,
-  live: boolean,
-  project: string,
-  program: string,
-): { text: string; tone: Tone } {
-  if (live && !runner.holding) return { text: t("agents.card.aside", { project }), tone: "wait" };
-  if (runner.paused) {
-    const until = parseWhen(runner.paused_until);
-    const key =
-      runner.paused === "usage_limit" && !until
-        ? "agents.card.paused.usage_limitUnknown"
-        : `agents.card.paused.${runner.paused}`;
-    const words = { program, machine: runner.machine, time: until ? exact(until) : "" };
-    return { text: t(isKey(key) ? key : "agents.card.paused.other", words), tone: "wait" };
-  }
-  if (runner.task) return { text: t("agents.card.working", { task: runner.task }), tone: "work" };
-  return { text: t("agents.card.ready"), tone: "ok" };
 }
 
 /** One line of plain words for what an agent is doing, as the dashboard says it. */
