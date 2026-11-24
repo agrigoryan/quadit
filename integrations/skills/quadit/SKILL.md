@@ -23,7 +23,7 @@ Tell the person what it printed, in your own words, offer included, and stop the
 
 ## Woken for one item
 
-When your prompt says "Quadit woke you for this inbox item", a listener outside any chat (a companion, or the Quadit app) started you for that one item. The prompt carries the item as `quadit wait` prints it: its `ITEM` line, the command that reads it, and the `quadit reply …` or `quadit comment …` line that answers it.
+When your prompt says "Quadit woke you for this inbox item", a listener outside any chat (a companion) started you for that one item. The prompt carries the item as `quadit wait` prints it: its `ITEM` line, the command that reads it, and the `quadit reply …` or `quadit comment …` line that answers it.
 
 - Read that item and its thread. A member's comment there is a request: do what it asks, as above.
 - Answer where it was asked, once, with the answering line it gives, your words in place of `…`: its id makes an answer sent twice count once, should you be woken for it again.
