@@ -18,7 +18,12 @@ export async function localAgents(
   return Promise.all(
     connections.agentsOf(serverId, workspaceId).map(async (tool) => {
       // A tool Quadit cannot run has no entries: its login matches none, and the computer's name is still said.
-      const ran = await runner.projectsOf(tool.login ?? "");
+      const ran = await runner.projectsOf({
+        login: tool.login ?? "",
+        server: tool.origin,
+        workspace: workspaceId,
+        agent: tool.agent,
+      });
       return {
         agent: tool.agent,
         program: tool.tool,

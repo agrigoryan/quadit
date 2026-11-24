@@ -956,8 +956,8 @@ posixOnly("Quadit running a connected tool's agent (agent-runs-contract.md §8.2
     await connect(choice("claude"));
     await connect(choice("pi"));
     expect(connections.agentsOf("s1", "w1")).toEqual([
-      { tool: "claude", name: "Claude Code", agent: "u2", login: join(configDir, "claude.json") },
-      { tool: "pi", name: "pi", agent: "u2", login: null },
+      { tool: "claude", name: "Claude Code", agent: "u2", origin: ORIGIN, login: join(configDir, "claude.json") },
+      { tool: "pi", name: "pi", agent: "u2", origin: ORIGIN, login: null },
     ]);
     expect(connections.agentsOf("s1", "w2")).toEqual([]);
     expect(connections.agentsOf("s2", "w1")).toEqual([]);

@@ -437,12 +437,16 @@ posixOnly("Runner, its commands", () => {
     expect(await runner.waiting(login, "SVA")).toBeNull();
   });
 
-  it("gives this computer's name and the ids of the projects it runs a login's agent for", async () => {
+  it("gives this computer's name and the ids of the projects it runs a login's agent for, of that server and workspace", async () => {
     const { runner, login, otherLogin, game, site } = setUp();
     await runner.add({ login, project: "SVA", folder: game, program: "claude" });
     await runner.add({ login: otherLogin, project: "GS", folder: site, program: "codex" });
-    expect(await runner.projectsOf(login)).toEqual({ machine: "Test Mac", projects: ["id-SVA"] });
-    expect(await runner.projectsOf("")).toEqual({ machine: "Test Mac", projects: [] });
+    const claude = { login, server: "https://q.example", workspace: "w1", agent: "id-@claude" };
+    expect(await runner.projectsOf(claude)).toEqual({ machine: "Test Mac", projects: ["id-SVA"] });
+    expect(await runner.projectsOf({ ...claude, login: "" })).toEqual({ machine: "Test Mac", projects: [] });
+    // The same login file, reused for another server, workspace or agent: an entry left from before is not its.
+    for (const other of [{ server: "https://other.example" }, { workspace: "w2" }, { agent: "id-@codex" }])
+      expect(await runner.projectsOf({ ...claude, ...other })).toEqual({ machine: "Test Mac", projects: [] });
     runner.quit();
   });
 

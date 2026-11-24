@@ -10,16 +10,25 @@ describe("localAgents", () => {
           agentsOf: (serverId, workspaceId) => {
             asked.push(`${serverId}/${workspaceId}`);
             return [
-              { tool: "claude", name: "Claude Code", agent: "u2", login: "/h/Library/quadit/claude.json" },
-              { tool: "pi", name: "pi", agent: "u3", login: null },
+              {
+                tool: "claude",
+                name: "Claude Code",
+                agent: "u2",
+                origin: "https://q.example",
+                login: "/h/Library/quadit/claude.json",
+              },
+              { tool: "pi", name: "pi", agent: "u3", origin: "https://q.example", login: null },
             ];
           },
         },
         runner: {
           available: true,
-          projectsOf: async (login) => ({
+          projectsOf: async (of) => ({
             machine: "Aram's MacBook Pro",
-            projects: login === "/h/Library/quadit/claude.json" ? ["p-sva"] : [],
+            projects:
+              of.login === "/h/Library/quadit/claude.json" && of.server === "https://q.example" && of.workspace === "w1"
+                ? ["p-sva"]
+                : [],
           }),
         },
       },
@@ -45,7 +54,11 @@ describe("localAgents", () => {
   it("offers no run where the app carries no quadit", async () => {
     const agents = await localAgents(
       {
-        connections: { agentsOf: () => [{ tool: "claude", name: "Claude Code", agent: "u2", login: "/x.json" }] },
+        connections: {
+          agentsOf: () => [
+            { tool: "claude", name: "Claude Code", agent: "u2", origin: "https://q.example", login: "/x.json" },
+          ],
+        },
         runner: { available: false, projectsOf: async () => ({ machine: "", projects: [] }) },
       },
       "s1",

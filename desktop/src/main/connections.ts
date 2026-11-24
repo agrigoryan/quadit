@@ -863,18 +863,19 @@ export class Connections {
   /**
    * The tools Connect set up that work as an agent of the workspace
    * `workspaceId` of the server `serverId` (never another's): the tool, the
-   * agent's user id, and the login file Quadit runs it with (runAs), null
-   * when Quadit cannot run it.
+   * agent's user id, the server's address, and the login file Quadit runs it
+   * with (runAs), null when Quadit cannot run it.
    */
   agentsOf(
     serverId: string,
     workspaceId: string,
-  ): { tool: string; name: string; agent: string; login: string | null }[] {
+  ): { tool: string; name: string; agent: string; origin: string; login: string | null }[] {
     return Object.entries(this.ledger().harnesses).flatMap(([id, connection]) => {
       const harness = HARNESSES.find((h) => h.id === id);
       const member = harness && memberOfRecord(connection, harness);
       if (!harness || !member || connection.serverId !== serverId || connection.workspaceId !== workspaceId) return [];
-      return [{ tool: id, name: harness.name, agent: member.id, login: this.runAs(id)?.login ?? null }];
+      const origin = this.parts.server(serverId)?.origin ?? "";
+      return [{ tool: id, name: harness.name, agent: member.id, origin, login: this.runAs(id)?.login ?? null }];
     });
   }
 

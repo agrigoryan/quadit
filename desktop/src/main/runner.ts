@@ -49,6 +49,10 @@ interface Listed {
   project: string;
   /** The project's id, as the registry binds it. */
   project_id?: string;
+  /** The server (the login's address), the workspace and the agent the entry is bound to. */
+  server?: string;
+  workspace_id?: string;
+  agent_id?: string;
   folder: string;
   program: string;
   removing?: boolean;
@@ -163,13 +167,28 @@ export class Runner {
 
   /**
    * This computer's name, and the ids of the projects Quadit runs the agent
-   * of the login `login` for (matched by real path); nothing when the list
-   * cannot be read.
+   * `agent` of the workspace `workspace` on the server `server` (its address)
+   * for, with the login `login` (matched by real path): an entry the same
+   * login file had for another server, workspace or agent is not its. Nothing
+   * when the list cannot be read.
    */
-  async projectsOf(login: string): Promise<{ machine: string; projects: string[] }> {
+  async projectsOf(of: {
+    login: string;
+    server: string;
+    workspace: string;
+    agent: string;
+  }): Promise<{ machine: string; projects: string[] }> {
     const list = this.available ? await this.list().catch(() => null) : null;
     if (!list) return { machine: "", projects: [] };
-    const projects = list.entries.flatMap((e) => (sameFile(e.login, login) && e.project_id ? [e.project_id] : []));
+    const projects = list.entries.flatMap((e) =>
+      sameFile(e.login, of.login) &&
+      sameServer(e.server ?? "", of.server) &&
+      e.workspace_id === of.workspace &&
+      e.agent_id === of.agent &&
+      e.project_id
+        ? [e.project_id]
+        : [],
+    );
     return { machine: list.machine, projects };
   }
 
@@ -483,6 +502,11 @@ export class Runner {
       });
     });
   }
+}
+
+/** Whether two server addresses are the same server's: alike but for a trailing "/". */
+function sameServer(a: string, b: string): boolean {
+  return a !== "" && a.replace(/\/+$/, "") === b.replace(/\/+$/, "");
 }
 
 /** Whether two paths name the same file, links resolved where they can be. */
