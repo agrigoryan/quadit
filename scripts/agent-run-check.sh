@@ -196,6 +196,16 @@ start_runner() {
 added() { "$real" run add "login=$W/a.json" project=RC "folder=$repo" "program=$program" "registry=$registry"; }
 expect "quadit run add registers the project" 30 added
 start_runner
+# The program's own settings may make it work as another Quadit agent: then
+# the entry pauses, and this check cannot go on without changing them,
+# which it never does.
+listens_or_mismatch() { "$real" run list "registry=$registry" | grep -Eq 'ready|working on|login' || grep -q ": listening" "$W/run.out"; }
+expect "quadit run starts the entry" 30 listens_or_mismatch
+if "$real" run list "registry=$registry" | grep -q "work as another Quadit login"; then
+	title=$([ "$program" = claude ] && echo "Claude Code" || echo "Codex")
+	echo "STOP  $title on this computer is set up to work as another Quadit agent (its settings set QUADIT_CONFIG): this check cannot run here without changing that. Run it where $title is not connected to another Quadit."
+	exit 1
+fi
 expect "quadit run listens" 30 said ": listening"
 
 key=$(P --json new RC "Add a line saying hello to README" | field key)
