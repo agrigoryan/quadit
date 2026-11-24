@@ -32,6 +32,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -131,6 +132,14 @@ type claudeResult struct {
 	Errors  []json.RawMessage `json:"errors"`
 }
 
+// claudeBlock is one block of a message's content.
+type claudeBlock struct {
+	Type  string          `json:"type"`
+	Text  string          `json:"text"`
+	Name  string          `json:"name"`
+	Input json.RawMessage `json:"input"`
+}
+
 // claudeLine is one line of the output, with the fields the reader uses.
 type claudeLine struct {
 	Type      string          `json:"type"`
@@ -138,12 +147,7 @@ type claudeLine struct {
 	SessionID string          `json:"session_id"`
 	Error     json.RawMessage `json:"error"`
 	Message   *struct {
-		Content []struct {
-			Type  string          `json:"type"`
-			Text  string          `json:"text"`
-			Name  string          `json:"name"`
-			Input json.RawMessage `json:"input"`
-		} `json:"content"`
+		Content []claudeBlock `json:"content"`
 	} `json:"message"`
 	RateLimit *struct {
 		Status   string  `json:"status"`
@@ -157,7 +161,7 @@ type claudeLine struct {
 func (r *claudeReader) Line(line []byte) []programEvent {
 	var l claudeLine
 	if json.Unmarshal(line, &l) != nil {
-		return nil
+		return unreadable(line)
 	}
 	switch l.Type {
 	case "system":
@@ -186,6 +190,11 @@ func (r *claudeReader) Line(line []byte) []programEvent {
 			}
 		}
 		return events
+	case "user":
+		// A tool's result: the tool ran, whether or not its call was read.
+		if l.Message != nil && slices.ContainsFunc(l.Message.Content, func(b claudeBlock) bool { return b.Type == "tool_result" }) {
+			return []programEvent{{Kind: evTool}}
+		}
 	case "rate_limit_event":
 		if l.RateLimit != nil && l.RateLimit.Status == "rejected" {
 			r.limited = true
@@ -256,7 +265,11 @@ func (r *claudeReader) End(exit int, stderr []byte) outcome {
 	case r.apiError == "authentication_failed":
 		return outcome{Kind: outcomeNotSignedIn, Detail: "the provider refused the sign-in"}
 	case r.result != nil && !r.result.IsError && exit == 0:
-		return outcome{Kind: outcomeOK, Final: r.result.Result}
+		final := r.result.Result
+		if len(final) > maxFinal {
+			final = final[:maxFinal]
+		}
+		return outcome{Kind: outcomeOK, Final: final}
 	}
 	text := []string{string(stderr)}
 	if r.result != nil && r.result.IsError {

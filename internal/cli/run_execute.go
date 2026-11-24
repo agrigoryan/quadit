@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -33,6 +34,7 @@ type agentRun struct {
 
 	stopAsked, leaseGone chan struct{}
 	stopOnce, leaseOnce  sync.Once
+	accessLost           atomic.Bool // the lease went because the login was refused (401, 403)
 
 	mu           sync.Mutex
 	j            journal
@@ -63,8 +65,10 @@ const (
 	endedByStop
 	endedIdle
 	endedTimeLimit
-	endedInfra     // the runner stopping, or the entry removed
-	endedLeaseLost // a chat or another machine took the project
+	endedInfra      // the runner stopping, or the entry removed
+	endedLeaseLost  // a chat or another machine took the project, or the login lost its access
+	endedNotStarted // the program was not started: its launch could not be written down
+	endedUnrecorded // the program started, but what recognizes it could not be written down: it was stopped at once
 )
 
 // errStartBlocked is a run's start the server refused for good.
@@ -110,7 +114,7 @@ func (e *liveEntry) run(ctx context.Context, items []listenItem, continuing bool
 	}
 	r.mu.Lock()
 	r.j.StartSeq = startSeq
-	r.saveJournal()
+	_ = r.saveJournal() // not written: recovery finds the start in the server's row, not here; the launch's own write decides
 	r.mu.Unlock()
 	if head.ByAgent {
 		_ = e.state.countStart(r.key, r.id, r.received) // not counted: the guards see one run fewer
@@ -287,9 +291,6 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 	t := e.srv.host.times
 	lost := false
 	for attempt := 1; ; attempt++ {
-		if row, ok, err := e.api.runRowOf(ctx, r.key, r.id); err == nil && ok && (row.StopRequestedAt > 0 || ended(row.State)) {
-			r.askStop()
-		}
 		if end, ok := r.endedYet(ctx); !ok {
 			return end // the runner stopping, or the lease lost, between two attempts
 		}
@@ -300,7 +301,7 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 		if !e.loginUnchanged() {
 			// The program would work as whatever login is at the path now:
 			// it starts only with the login verified.
-			e.loginChanged.Store(true)
+			e.halt(errLoginRefused)
 			return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, line: "failed: the login file changed since it was verified"}
 		}
 		if p := e.state.pause(); p != nil {
@@ -315,7 +316,7 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 			// Who the agent works for is read for each run: without it,
 			// nothing starts (the run waits, or the login is checked again).
 			if err == nil {
-				e.loginChanged.Store(true)
+				e.halt(errLoginRefused)
 				return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, line: "failed: the login is no longer the agent's"}
 			}
 			if end, ok := r.pauseWithin(ctx, e.srv.host.times.awayMax); !ok {
@@ -334,22 +335,34 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 		if resume == "" && e.prog.Name() == core.ProgramClaude {
 			spec.Session = r.session
 		}
+		// Right before the start, after every probe and wait: the run's row
+		// read now (open, no stop asked), the lease still held.
+		if end, ok := r.readyToStart(ctx); !ok {
+			return end
+		}
 		if attempt == 1 || lost {
 			e.sayRun(r.key, "running %s, %s, run %s", e.prog.Title(), r.sessionWords(resume), r.id)
 		}
-		out, how := r.attempt(ctx, spec, prompt, attempt)
+		out, how, err := r.attempt(ctx, spec, prompt, attempt)
 		r.mu.Lock()
 		accepted, tools := r.accepted, r.toolActivity
 		r.mu.Unlock()
 		switch {
-		case how == endedByStop || r.stopped():
+		case how == endedNotStarted:
+			e.halt(entryError("a run could not be written down on this computer: " + err.Error()))
+			return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, line: "failed: " + err.Error()}
+		case how == endedUnrecorded:
+			// Never started again by itself: it may have done something.
+			e.halt(entryError(err.Error()))
+			return runEnding{state: core.AgentSessionFailed, reason: core.RunInterrupted, ack: true, line: "interrupted: " + err.Error(),
+				summary: "Quadit stopped the program on " + e.srv.machineNow().Name + " at once: it could not keep what recognizes it."}
+		case how == endedByStop:
 			return r.stoppedEnd(out.Final)
 		case how == endedInfra:
 			return runEnding{state: core.AgentSessionFailed, reason: core.RunInterrupted, summary: r.stoppedSummary(), ack: accepted,
 				line: "interrupted: Quadit stopped while this run worked"}
 		case how == endedLeaseLost:
-			return runEnding{state: core.AgentSessionFailed, reason: core.RunInterrupted, ack: false,
-				summary: "A chat or another computer took " + e.projectKey + " over while this run worked.", line: "interrupted: a chat took " + e.projectKey + " over"}
+			return r.leaseLostEnd("while this run worked")
 		case out.Kind == outcomeUsageLimit:
 			until := e.srv.pauseAgent(e.reg, out.ResetsAt)
 			r.keepToContinue(accepted || tools)
@@ -369,6 +382,10 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 			lost, resume = true, ""
 			r.freshSession()
 			continue
+		case out.Kind == outcomeLostSession && !tools && lost:
+			// The one fresh session was lost too: that is final.
+			return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, ack: true,
+				line: fmt.Sprintf("failed: %s lost its session twice on %s", e.prog.Title(), e.srv.machineNow().Name)}
 		case out.Kind == outcomeOK:
 			if !accepted {
 				r.sawAccepted() // a turn that ended well was taken, whatever the output showed of it
@@ -387,6 +404,69 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 				line: fmt.Sprintf("failed: %s did not start on %s (%s)", e.prog.Title(), e.srv.machineNow().Name, out.Detail)}
 		}
 	}
+}
+
+// readyToStart makes the last checks before the program is let go: the
+// run's row read now, open and with no stop asked; the lease held (a short
+// hold that answers with it); the run not ended meanwhile. A read that
+// fails is tried again, the program never started without one.
+func (r *agentRun) readyToStart(ctx context.Context) (runEnding, bool) {
+	e := r.e
+	away := e.srv.host.times.awayFirst
+	for {
+		if end, ok := r.endedYet(ctx); !ok {
+			return end, false
+		}
+		row, found, err := e.api.runRowOf(ctx, r.key, r.id)
+		if err == nil && found && (row.StopRequestedAt > 0 || ended(row.State)) {
+			r.askStop()
+			continue
+		}
+		if err == nil && !found {
+			return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, line: "failed: the server does not know this run"}, false
+		}
+		if err == nil {
+			ask := e.holdAsk(time.Second, false)
+			ask.lease = r.lease
+			ans, holdErr := e.api.hold(ctx, ask)
+			switch {
+			case holdErr == nil && ans.Lease == r.lease:
+				return r.endedYet(ctx)
+			case holdErr == nil, leaseLost(holdErr), accessRefused(holdErr):
+				r.loseLease()
+				continue
+			}
+		}
+		if end, ok := r.pauseWithin(ctx, away); !ok {
+			return end, false
+		}
+		away = min(away*2, e.srv.host.times.awayMax)
+	}
+}
+
+// endNow is what ends an attempt that is about to start, if anything has:
+// a stop asked, the lease lost, the runner stopping.
+func (r *agentRun) endNow(ctx context.Context) attemptEnd {
+	switch {
+	case r.stopped():
+		return endedByStop
+	case chanClosed(r.leaseGone):
+		return endedLeaseLost
+	case ctx.Err() != nil:
+		return endedInfra
+	}
+	return endedItself
+}
+
+// leaseLostEnd is the end of a run whose lease went to another session,
+// or whose login lost its access: interrupted, the head not acknowledged.
+func (r *agentRun) leaseLostEnd(when string) runEnding {
+	if r.accessLost.Load() {
+		return runEnding{state: core.AgentSessionFailed, reason: core.RunInterrupted, summary: "The agent's login was refused " + when + ".",
+			line: "interrupted: the agent's login was refused"}
+	}
+	return runEnding{state: core.AgentSessionFailed, reason: core.RunInterrupted, summary: "A chat or another computer took " + r.e.projectKey + " over " + when + ".",
+		line: "interrupted: a chat took " + r.e.projectKey + " over"}
 }
 
 // ended reports whether a run's state is an ended one.
@@ -505,8 +585,7 @@ func (r *agentRun) endedYet(ctx context.Context) (runEnding, bool) {
 	case r.stopped():
 		return r.stoppedEnd(""), false
 	case chanClosed(r.leaseGone):
-		return runEnding{state: core.AgentSessionFailed, reason: core.RunInterrupted, ack: false,
-			summary: "A chat or another computer took " + r.e.projectKey + " over while this run waited.", line: "interrupted: a chat took " + r.e.projectKey + " over"}, false
+		return r.leaseLostEnd("while this run waited"), false
 	case ctx.Err() != nil:
 		r.mu.Lock()
 		accepted := r.accepted
@@ -586,10 +665,10 @@ func (r *agentRun) writeLocked(name string, change *pendingChange) outboxWrite {
 	return outboxWrite{Run: r.id, Task: r.key, Head: r.items[0].Seq, Write: name, Ordinal: n, ChangeID: changeID(r.id, name, n), Change: change}
 }
 
-// saveJournal writes the journal; the caller holds r.mu. A journal not
-// written is found one step behind at the next start, which ends the run
-// the same way.
-func (r *agentRun) saveJournal() { _ = writeJournal(r.e.dir, r.j) }
+// saveJournal writes the journal; the caller holds r.mu. Before a launch
+// its error stops the launch; later, a journal not written is found one
+// step behind at the next start, which ends the run the same way.
+func (r *agentRun) saveJournal() error { return writeJournal(r.e.dir, r.j) }
 
 // askStop says a member asked the run to stop.
 func (r *agentRun) askStop() { r.stopOnce.Do(func() { close(r.stopAsked) }) }
@@ -651,6 +730,12 @@ func (r *agentRun) renewLease(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+		if accessRefused(err) {
+			// The login lost its access: an infrastructure stop.
+			r.accessLost.Store(true)
+			r.loseLease()
+			return
+		}
 		if leaseLost(err) || (err == nil && ans.Lease != r.lease) {
 			r.loseLease()
 			return
@@ -698,7 +783,7 @@ func (r *agentRun) sawSession(session string) {
 	defer r.mu.Unlock()
 	r.session = session
 	r.j.Session = session
-	r.saveJournal()
+	_ = r.saveJournal() // after the launch: see saveJournal
 	r.queueSession()
 	_ = r.e.state.changeTask(r.key, func(t *taskState) { t.Session = session }) // not written: the next run starts fresh
 }
@@ -713,7 +798,7 @@ func (r *agentRun) sawAccepted() {
 	}
 	r.accepted = true
 	r.j.Phase = phaseAccepted
-	r.saveJournal()
+	_ = r.saveJournal() // after the launch: see saveJournal
 	through := slicesMax(r.j.Prompted)
 	_ = r.e.state.changeTask(r.key, func(t *taskState) { t.Through = max(t.Through, through) })                                                                                             // not written: the server's row says it
 	_, _ = r.e.out.add(r.writeLocked(writeAccepted, &pendingChange{Type: "session.update", Args: map[string]any{"id": r.id, "state": core.AgentSessionRunning, "items_through": through}})) // not stored: the end still says how it ended
@@ -736,12 +821,12 @@ func (r *agentRun) sawEvents(events []programEvent, at time.Time) {
 			r.sawSession(ev.Session)
 		case evAccepted:
 			r.sawAccepted()
-		case evTool:
+		case evTool, evUnreadable:
 			r.mu.Lock()
 			if !r.toolActivity {
 				r.toolActivity = true
 				r.j.ToolActivity = true
-				r.saveJournal()
+				_ = r.saveJournal() // after the launch: see saveJournal
 			}
 			r.mu.Unlock()
 		case evStep:

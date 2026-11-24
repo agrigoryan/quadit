@@ -183,13 +183,13 @@ func TestALostSessionIsStartedFreshOnceWithinTheThreeAttempts(t *testing.T) {
 			t.Fatalf("the new session was not told fresh: %s", rt.changeTypes())
 		}
 	})
-	t.Run("never twice", func(t *testing.T) {
+	t.Run("never twice: a second lost session is final", func(t *testing.T) {
 		rt := newRunTest(t, core.ProgramClaude, lost)
 		rt.seedState(func(s *entryState) { s.Tasks["SVA-12"] = &taskState{Session: old} })
 		rt.f.addItem(fakeItem{Task: "SVA-12"})
 		rt.serve()
 		row := rt.ended(0)
-		if row["reason"] != core.RunStartFailed || len(rt.records()) != 3 {
+		if row["reason"] != core.RunStartFailed || len(rt.records()) != 2 {
 			t.Fatalf("%v after %d starts", row, len(rt.records()))
 		}
 	})
@@ -595,4 +595,140 @@ func TestARunAfterTheOwnerChangedNamesTheNewOne(t *testing.T) {
 	if p := rt.records()[1].Stdin; !strings.Contains(p, "You work for @bea now.") {
 		t.Fatalf("the resumed run's prompt:\n%s", p)
 	}
+}
+
+// gateVersion holds the program's version checks from now on; the
+// returned function lets them go.
+func (rt *runTest) gateVersion() (gate string, open func()) {
+	rt.t.Helper()
+	gate = filepath.Join(rt.dir, "version-gate")
+	if err := os.WriteFile(gate, nil, 0o600); err != nil {
+		rt.t.Fatal(err)
+	}
+	rt.t.Setenv("FAKEAGENT_VERSION_GATE", gate)
+	return gate, func() { _ = os.Remove(gate) }
+}
+
+func TestAStopDuringTheLastCheckStartsNothing(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
+	rt.serve()
+	rt.eventually("listening", func() bool { return strings.Contains(rt.out.String(), ": listening") })
+	gate, open := rt.gateVersion()
+	defer open()
+	head := rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.eventually("the check before the start held", func() bool { _, err := os.Stat(gate + ".waiting"); return err == nil })
+	rt.f.stopRun(rt.f.allRuns()[0]["id"].(string))
+	rt.eventually("the stop handed to the runner", func() bool { return rt.f.count(func(f *fakeQuadit) int { return f.stopsHanded }) > 0 })
+	open()
+	if row := rt.ended(0); row["state"] != core.AgentSessionStopped || len(rt.records()) != 0 {
+		t.Fatalf("%v after %d starts", row, len(rt.records()))
+	}
+	rt.acked(head)
+}
+
+func TestNoProgramStartsWithoutAFreshReadOfItsRow(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
+	rt.seedState(func(s *entryState) { s.Tasks["SVA-12"] = &taskState{Through: 900} })
+	rt.serve()
+	rt.eventually("listening", func() bool { return strings.Contains(rt.out.String(), ": listening") })
+	gate, open := rt.gateVersion()
+	defer open()
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.eventually("the check before the start held", func() bool { _, err := os.Stat(gate + ".waiting"); return err == nil })
+	rt.f.set(func(f *fakeQuadit) { f.runsAway = true })
+	open()
+	rt.eventually("the row's reads refused", func() bool { return rt.f.count(func(f *fakeQuadit) int { return f.runsAwayHits }) >= 2 })
+	if len(rt.records()) != 0 {
+		t.Fatal("the program started without a read of its row")
+	}
+	rt.f.set(func(f *fakeQuadit) { f.runsAway = false })
+	if row := rt.ended(0); row["state"] != core.AgentSessionDone {
+		t.Fatalf("%v", row)
+	}
+}
+
+func TestARenewalRefusedForAccessEndsTheRun(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, untilSignal())
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	rt.running(0)
+	rt.f.set(func(f *fakeQuadit) { delete(f.members, agentToken) }) // the agent's token revoked
+	rt.eventually("the program stopped", func() bool { return len(rt.records()) == 1 && !alive(rt.records()[0].PID) })
+	rt.eventually("the run said interrupted", func() bool { return strings.Contains(rt.out.String(), "SVA-12 @claude: interrupted") })
+}
+
+func TestAStopAfterTheProgramEndedLeavesItDone(t *testing.T) {
+	// The program ends well, but what it started still holds its output, so
+	// the drain goes on: a stop arriving then changes nothing.
+	ends := []fakeagent.Step{claudeInit(), claudeSays("On it."), {Child: true}, claudeEnds("done")}
+	rt := newRunTest(t, core.ProgramClaude, ends)
+	rt.times.drain = time.Minute
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	row := rt.running(0)
+	rt.eventually("the program exited, its child still there", func() bool {
+		return len(rt.records()) == 1 && !alive(rt.records()[0].PID) && len(rt.children()) == 1
+	})
+	rt.f.stopRun(row["id"].(string))
+	rt.eventually("the stop handed to the runner", func() bool { return rt.f.count(func(f *fakeQuadit) int { return f.stopsHanded }) > 0 })
+	_ = syscall.Kill(rt.children()[0], syscall.SIGKILL) // the drain ends
+	if row := rt.ended(0); row["state"] != core.AgentSessionDone {
+		t.Fatalf("a stop asked after the program ended made it %v", row)
+	}
+}
+
+func TestStoppingTheRunnerCutsAMembersStopShort(t *testing.T) {
+	stubborn := []fakeagent.Step{claudeInit(), claudeSays("Counting."), {Ignore: "SIGINT"}, {Child: true}, {UntilSignal: []string{"{}"}}}
+	rt := newRunTest(t, core.ProgramClaude, stubborn)
+	rt.times.stopLadder = defaultTimings.stopLadder // ten seconds for SIGINT
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	row := rt.running(0)
+	rt.f.stopRun(row["id"].(string))
+	rt.eventually("the member's stop began (SIGINT, passed over)", func() bool {
+		for _, r := range fakeagent.Records(rt.record) {
+			if r.Signal == "interrupt" {
+				return true
+			}
+		}
+		return false
+	})
+	began := time.Now()
+	rt.stop()
+	if took := time.Since(began); took > 3*time.Second {
+		t.Fatalf("the runner took %s to stop during a member's stop", took)
+	}
+	if alive(rt.records()[0].PID) || alive(rt.children()[0]) {
+		t.Fatal("the program's group still runs")
+	}
+}
+
+func TestStoppingTheRunnerCutsADrainShort(t *testing.T) {
+	ends := []fakeagent.Step{claudeInit(), claudeSays("On it."), {Child: true}, exit(0)}
+	rt := newRunTest(t, core.ProgramClaude, ends)
+	rt.times.drain = time.Minute
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	rt.eventually("the program exited, its child holding the output", func() bool {
+		return len(rt.records()) == 1 && !alive(rt.records()[0].PID) && len(rt.children()) == 1
+	})
+	began := time.Now()
+	rt.stop()
+	if took := time.Since(began); took > 3*time.Second {
+		t.Fatalf("the runner took %s to stop during a drain", took)
+	}
+	if alive(rt.children()[0]) {
+		t.Fatal("what the program left still runs")
+	}
+}
+
+func TestAnUnreadableRecordMeansTheAttemptIsNotRepeated(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, []fakeagent.Step{claudeInit(), claudeSays("On it."), {Out: `{"type":"assistant","message":{"content":[{"type":"tool_use"`}, exit(1)})
+	head := rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	row := rt.ended(0)
+	if row["reason"] != core.RunProgramError || len(rt.records()) != 1 {
+		t.Fatalf("%v after %d starts", row, len(rt.records()))
+	}
+	rt.acked(head)
 }

@@ -342,6 +342,13 @@ func refusalReason(err error) string {
 	return ""
 }
 
+// accessRefused reports whether err says the login lost its access: a
+// definitive refusal (401, 403), not a server away.
+func accessRefused(err error) bool {
+	ae, ok := refusalOf(err)
+	return ok && (ae.Status == http.StatusUnauthorized || ae.Status == http.StatusForbidden)
+}
+
 // leaseLost reports whether err says another session holds the listener.
 func leaseLost(err error) bool {
 	ae, ok := refusalOf(err)

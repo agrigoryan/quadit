@@ -68,8 +68,9 @@ const keptStderr = 64 << 10
 
 // attempt starts the program once and waits for its end. It gives the
 // outcome its reader read, and what ended it when the program did not
-// end by itself.
-func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n int) (outcome, attemptEnd) {
+// end by itself; endedNotStarted when it was not started at all (the run
+// ended first, or the launch could not be recorded: then an error).
+func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n int) (outcome, attemptEnd, error) {
 	e := r.e
 	t := e.srv.host.times
 	clock := e.srv.host.clock
@@ -79,13 +80,13 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 
 	outRead, outWrite, err := os.Pipe()
 	if err != nil {
-		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedItself
+		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedItself, nil
 	}
 	errRead, errWrite, err := os.Pipe()
 	if err != nil {
 		outRead.Close()
 		outWrite.Close()
-		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedItself
+		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedItself, nil
 	}
 	// The program is stopped by its group's ladder, never by a context.
 	cmd := exec.CommandContext(context.WithoutCancel(ctx), e.reg.ProgramPath, e.prog.Command(spec)...)
@@ -94,10 +95,28 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Stdout, cmd.Stderr = outWrite, errWrite
 
+	closeAll := func() {
+		outRead.Close()
+		outWrite.Close()
+		errRead.Close()
+		errWrite.Close()
+	}
+	// The launch is written down before it happens; a launch that cannot
+	// be written down does not happen.
 	r.mu.Lock()
 	r.j.Phase, r.j.Attempt, r.j.PGID, r.j.ProcStart = phaseLaunching, n, 0, ""
-	r.saveJournal()
+	err = r.saveJournal()
 	r.mu.Unlock()
+	if err != nil {
+		closeAll()
+		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedNotStarted, fmt.Errorf("the run's journal: %w", err)
+	}
+	// The last look before the start: nothing slow lies between it and the
+	// start.
+	if end := r.endNow(ctx); end != endedItself {
+		closeAll()
+		return outcome{Kind: outcomeFailed}, end, nil
+	}
 	err = startInGroup(cmd)
 	outWrite.Close() // the program holds its own ends now
 	errWrite.Close()
@@ -105,17 +124,31 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 		outRead.Close()
 		errRead.Close()
 		log.line("attempt", "not started: "+err.Error())
-		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedItself
+		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedItself, nil
 	}
+	// Known gap, left on purpose: a runner killed in the few milliseconds
+	// between the start and the journal's next write leaves a program whose
+	// group is not on disk; recovery then ends its run as interrupted but
+	// cannot stop it. Closing it needs the child held until its group is
+	// written, which takes a wrapper process.
 	pgid := cmd.Process.Pid
-	started, _ := processStart(ctx, pgid) // none: a later start cannot recognize it, so it is never stopped by mistake
+	started, startErr := processStart(ctx, pgid)
 	r.mu.Lock()
 	r.j.Phase, r.j.PGID, r.j.ProcStart = phaseLaunched, pgid, started
 	if r.accepted {
 		r.j.Phase = phaseAccepted // an earlier attempt's program took the prompt
 	}
-	r.saveJournal()
+	err = errors.Join(startErr, r.saveJournal())
 	r.mu.Unlock()
+	if err != nil {
+		// What would let a later start recognize the program is not on
+		// disk: it is stopped at once rather than left to run unseen.
+		e.srv.ladder(pgid, t.infraLadder, nil, nil)
+		_ = cmd.Wait() // its group is stopped; its status says nothing more
+		outRead.Close()
+		errRead.Close()
+		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedUnrecorded, fmt.Errorf("the program could not be recorded: %w", err)
+	}
 	awake := keepAwake(ctx, pgid)
 
 	reader := e.prog.Reader(spec)
@@ -124,14 +157,21 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 	var stderr tail
 	var readers sync.WaitGroup
 	readers.Go(func() {
-		eachLine(outRead, func(line []byte) {
+		eachLine(outRead, func(line []byte, discarded bool) {
 			lastOutput.Store(int64(clock.Awake()))
+			if discarded {
+				// A record that could not be read may have been a tool's:
+				// the attempt is not safe to repeat.
+				log.line("out", "(a line too long to read, passed over)")
+				r.sawEvents([]programEvent{{Kind: evUnreadable}}, clock.Now())
+				return
+			}
 			log.line("out", string(line))
 			r.sawEvents(reader.Line(line), clock.Now())
 		})
 	})
 	readers.Go(func() {
-		eachLine(errRead, func(line []byte) {
+		eachLine(errRead, func(line []byte, _ bool) {
 			lastOutput.Store(int64(clock.Awake()))
 			log.line("err", string(line))
 			stderr.add(line)
@@ -153,27 +193,33 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 		defer timer.Stop()
 		capped = timer.C
 	}
+	// What ended the program is decided when it exits: a stop asked by
+	// then makes the run stopped; one asked later changes nothing. The
+	// slower ladders give way to the runner's own stop (ctx).
 watch:
 	for {
 		select {
 		case <-exited:
+			if r.stopped() {
+				how = endedByStop
+			}
 			break watch
 		case <-r.stopAsked:
 			how = endedByStop
-			e.srv.ladder(pgid, t.stopLadder, exited)
+			e.srv.ladder(pgid, t.stopLadder, exited, ctx.Done())
 		case <-r.leaseGone:
 			how = endedLeaseLost
-			e.srv.ladder(pgid, t.infraLadder, exited)
+			e.srv.ladder(pgid, t.infraLadder, exited, nil)
 		case <-ctx.Done():
 			how = endedInfra
-			e.srv.ladder(pgid, t.infraLadder, exited)
+			e.srv.ladder(pgid, t.infraLadder, exited, nil)
 		case <-capped:
 			how = endedTimeLimit
-			e.srv.ladder(pgid, t.stopLadder, exited)
+			e.srv.ladder(pgid, t.stopLadder, exited, ctx.Done())
 		case <-tick.C:
 			if clock.Awake()-time.Duration(lastOutput.Load()) >= t.idle {
 				how = endedIdle
-				e.srv.ladder(pgid, t.stopLadder, exited)
+				e.srv.ladder(pgid, t.stopLadder, exited, ctx.Done())
 			}
 		}
 		if how != endedItself {
@@ -182,19 +228,23 @@ watch:
 		}
 	}
 
-	// Its output is drained, for a while at most: what it started may still
-	// hold the pipes. Then what is left of its group is stopped.
+	// Its output is drained, for a while at most, and no longer than the
+	// runner's own stop allows: what it started may still hold the pipes.
+	// Then what is left of its group is stopped.
 	drained := make(chan struct{})
 	go func() {
 		readers.Wait()
 		close(drained)
 	}()
+	drainFor := time.NewTimer(t.drain)
+	defer drainFor.Stop()
 	select {
 	case <-drained:
-	case <-time.After(t.drain):
+	case <-drainFor.C:
+	case <-ctx.Done():
 	}
 	if groupAlive(pgid) {
-		e.srv.ladder(pgid, t.infraLadder, nil)
+		e.srv.ladder(pgid, t.infraLadder, nil, nil)
 	}
 	outRead.Close()
 	errRead.Close()
@@ -204,12 +254,13 @@ watch:
 	exit := cmd.ProcessState.ExitCode()
 	out := reader.End(exit, stderr.bytes())
 	log.line("attempt", fmt.Sprintf("%d ended: exit %d, %s", n, exit, out.Detail))
-	return out, how
+	return out, how, nil
 }
 
 // eachLine calls each for every line read from rd, without its line
-// break, until rd ends. A line longer than maxLine is given empty.
-func eachLine(rd io.Reader, each func([]byte)) {
+// break, until rd ends. A line longer than maxLine is given empty, and
+// said discarded.
+func eachLine(rd io.Reader, each func(line []byte, discarded bool)) {
 	br := bufio.NewReaderSize(rd, 64<<10)
 	var line []byte
 	tooLong := false
@@ -225,7 +276,7 @@ func eachLine(rd io.Reader, each func([]byte)) {
 			continue
 		}
 		if len(line) > 0 || tooLong || len(chunk) > 0 {
-			each([]byte(strings.TrimRight(string(line), "\r\n")))
+			each([]byte(strings.TrimRight(string(line), "\r\n")), tooLong)
 		}
 		line, tooLong = line[:0], false
 		if err != nil {
@@ -289,27 +340,39 @@ func (l *runLog) close() {
 // ladder stops a process group: each step's signal to the whole group,
 // then the step's time for the group to be gone, before the next. With
 // exited, the group's leader is reaped by whoever closes it; without,
-// someone else already reaped it.
-func (srv *serving) ladder(pgid int, steps []ladderStep, exited <-chan struct{}) {
+// someone else already reaped it. When hurry closes, the ladder gives way
+// to the infrastructure ladder at once: the runner itself is stopping.
+func (srv *serving) ladder(pgid int, steps []ladderStep, exited, hurry <-chan struct{}) {
 	for _, step := range steps {
 		signalGroup(pgid, step.sig)
 		deadline := time.Now().Add(step.within)
 		for {
-			leaderGone := exited == nil
-			if !leaderGone {
-				select {
-				case <-exited:
-					leaderGone = true
-				default:
-				}
-			}
-			if leaderGone && !groupAlive(pgid) {
+			if !chanOpen(exited) && !groupAlive(pgid) {
 				return
 			}
 			if !time.Now().Before(deadline) {
 				break
 			}
-			time.Sleep(srv.host.times.pollGroup)
+			select {
+			case <-hurry:
+				srv.ladder(pgid, srv.host.times.infraLadder, exited, nil)
+				return
+			case <-time.After(srv.host.times.pollGroup):
+			}
 		}
+	}
+}
+
+// chanOpen reports whether ch is a channel not closed yet (nil: none, so
+// not open).
+func chanOpen(ch <-chan struct{}) bool {
+	if ch == nil {
+		return false
+	}
+	select {
+	case <-ch:
+		return false
+	default:
+		return true
 	}
 }

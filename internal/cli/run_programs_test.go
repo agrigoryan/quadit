@@ -95,7 +95,9 @@ func TestUnknownOutputLinesArePassedOver(t *testing.T) {
 		t.Run(p.Name(), func(t *testing.T) {
 			reader := p.Reader(runSpec{Folder: "/f", Now: time.Now})
 			for _, line := range []string{"", "not json", "{", `{"type":"something_new","x":1}`, `{"type":"assistant","message":"a string"}`, `[1,2]`, `{"type":"item.started","item":null}`, strings.Repeat("x", 100000)} {
-				if ev := reader.Line([]byte(line)); len(ev) > 1 || (len(ev) == 1 && ev[0].Kind != evAccepted) {
+				// Passed over: nothing comes of it but, for a line that is not
+				// the protocol's, that the attempt is not safe to repeat.
+				if ev := reader.Line([]byte(line)); len(ev) > 1 || (len(ev) == 1 && ev[0].Kind != evAccepted && ev[0].Kind != evUnreadable) {
 					t.Fatalf("the line %.40q gave %+v", line, ev)
 				}
 			}
@@ -165,5 +167,40 @@ func TestAResetTimeIsTheNextSuchTime(t *testing.T) {
 	}
 	if _, ok := nextTimeOfDay("soon", "", now); ok {
 		t.Fatal("no time read as one")
+	}
+}
+
+func TestALineTooLongIsSaidDiscarded(t *testing.T) {
+	long := strings.Repeat("x", maxLine+10)
+	var got []bool
+	eachLine(strings.NewReader("ok\n"+long+"\nafter\n"), func(_ []byte, discarded bool) { got = append(got, discarded) })
+	if !slices.Equal(got, []bool{false, true, false}) {
+		t.Fatalf("got %v", got)
+	}
+}
+
+func TestToolEvidenceIsReadOnEitherEdge(t *testing.T) {
+	kinds := func(r streamReader, lines ...string) []eventKind {
+		var out []eventKind
+		for _, l := range lines {
+			for _, ev := range r.Line([]byte(l)) {
+				out = append(out, ev.Kind)
+			}
+		}
+		return out
+	}
+	spec := runSpec{Folder: "/f", Now: time.Now}
+	if got := kinds((codex{}).Reader(spec), `{"type":"item.started","item":null}`); len(got) != 0 {
+		t.Fatalf("an event with no item read as %v", got)
+	}
+	if got := kinds((codex{}).Reader(spec), `{"type":"item.completed","item":{"id":"i1","type":"command_execution","status":"completed"}}`); !slices.Contains(got, evTool) {
+		t.Fatalf("a command seen only completed read as %v", got)
+	}
+	both := kinds((codex{}).Reader(spec), `{"type":"item.started","item":{"id":"i1","type":"command_execution"}}`, `{"type":"item.completed","item":{"id":"i1","type":"command_execution"}}`)
+	if n := len(slices.DeleteFunc(both, func(k eventKind) bool { return k != evStep })); n != 1 {
+		t.Fatalf("one command made %d steps", n)
+	}
+	if got := kinds((claudeCode{}).Reader(spec), `{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t","content":"x"}]}}`); !slices.Contains(got, evTool) {
+		t.Fatalf("a tool's result read as %v", got)
 	}
 }

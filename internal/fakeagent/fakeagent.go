@@ -15,9 +15,12 @@
 //	FAKEAGENT          claude or codex: which program to be
 //	FAKEAGENT_SCRIPTS  a JSON file: a list of scripts, each a list of steps
 //	FAKEAGENT_RECORD   a file each start appends one JSON line to (Record),
-//	                   and each grandchild it starts one more ({"child": pid})
+//	                   each grandchild it starts one more ({"child": pid}), and
+//	                   each SIGINT it passes over one more ({"signal": …})
 //	FAKEAGENT_SIGNIN   when set, the program is signed in only while this
 //	                   file exists
+//	FAKEAGENT_VERSION_GATE  when set, --version waits while this file exists
+//	                   (writing FILE.waiting meanwhile)
 package fakeagent
 
 import (
@@ -60,13 +63,14 @@ type Step struct {
 
 // Record is what one start was given.
 type Record struct {
-	Argv  []string          `json:"argv"`
-	Dir   string            `json:"dir"`
-	Stdin string            `json:"stdin"`
-	Env   map[string]string `json:"env"` // QUADIT_*, CLAUDECODE, CLAUDE_CODE_*, ELECTRON_*
-	PID   int               `json:"pid"`
-	Start int               `json:"start"` // which start this was, from 0
-	Child int               `json:"child,omitempty"`
+	Argv   []string          `json:"argv"`
+	Dir    string            `json:"dir"`
+	Stdin  string            `json:"stdin"`
+	Env    map[string]string `json:"env"` // QUADIT_*, CLAUDECODE, CLAUDE_CODE_*, ELECTRON_*
+	PID    int               `json:"pid"`
+	Start  int               `json:"start"` // which start this was, from 0
+	Child  int               `json:"child,omitempty"`
+	Signal string            `json:"signal,omitempty"` // a signal it caught and passed over`
 }
 
 // Main acts as the program FAKEAGENT names, and exits; it returns false,
@@ -83,6 +87,17 @@ func Main() bool {
 func run(which string, args []string) int {
 	switch {
 	case len(args) == 1 && args[0] == "--version":
+		if gate := os.Getenv("FAKEAGENT_VERSION_GATE"); gate != "" {
+			// A test holds the version check here: while the gate is there,
+			// it waits, and says so beside the gate.
+			for {
+				if _, err := os.Stat(gate); err != nil {
+					break
+				}
+				_ = os.WriteFile(gate+".waiting", nil, 0o600) // the test's barrier
+				time.Sleep(5 * time.Millisecond)
+			}
+		}
 		fmt.Println(map[string]string{"claude": ClaudeVersion, "codex": CodexVersion}[which])
 		return 0
 	case len(args) == 2 && (args[0] == "auth" || args[0] == "login") && args[1] == "status":
@@ -123,7 +138,15 @@ func run(which string, args []string) int {
 				fmt.Println(fill.Replace(line))
 			}
 		case step.Ignore == "SIGINT":
-			signal.Ignore(os.Interrupt)
+			// Caught and passed over, not ignored by the system, so each one
+			// is recorded: a test's barrier.
+			interrupts := make(chan os.Signal, 4)
+			signal.Notify(interrupts, os.Interrupt)
+			go func() {
+				for range interrupts {
+					record(Record{Signal: "interrupt", Start: start})
+				}
+			}()
 			ignored = true
 		case step.Child:
 			child := exec.CommandContext(context.Background(), "sleep", "600") // the fake's own main: nothing above it to end it

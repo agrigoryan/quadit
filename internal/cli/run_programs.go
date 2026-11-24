@@ -6,6 +6,9 @@
 package cli
 
 import (
+	"bytes"
+	"io"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -86,11 +89,12 @@ type programEvent struct {
 type eventKind int
 
 const (
-	evSession  eventKind = iota // the program said its session id
-	evAccepted                  // the provider took the turn
-	evTool                      // tool activity began (the work may have had effects); comes with evStep
-	evStep                      // a step for the record
-	evText                      // an assistant message
+	evSession    eventKind = iota // the program said its session id
+	evAccepted                    // the provider took the turn
+	evTool                        // tool activity began (the work may have had effects); comes with evStep
+	evStep                        // a step for the record
+	evText                        // an assistant message
+	evUnreadable                  // a line on the protocol's output that could not be read: it may have been a tool's
 )
 
 // step is one step of a run as the server keeps it: a tool's name and,
@@ -122,6 +126,32 @@ const (
 	outcomeNotSignedIn
 	outcomeLostSession
 )
+
+// unreadable is what a line of the protocol's output that could not be
+// read says: nothing for a blank line, else that it may have been a
+// tool's (the attempt is not repeated).
+func unreadable(line []byte) []programEvent {
+	if len(bytes.TrimSpace(line)) == 0 {
+		return nil
+	}
+	return []programEvent{{Kind: evUnreadable}}
+}
+
+// maxFinal is the most of a program's last message read: the fallback
+// comment keeps less.
+const maxFinal = 64 << 10
+
+// readAtMost is the start of a file, at most n bytes; nothing when it
+// cannot be read.
+func readAtMost(path string, n int64) []byte {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	raw, _ := io.ReadAll(io.LimitReader(f, n)) // what was read is what there is
+	return raw
+}
 
 // maxStepText is the most of a step's text kept; the server cuts longer.
 const maxStepText = 200

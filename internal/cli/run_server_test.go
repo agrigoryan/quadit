@@ -64,6 +64,8 @@ type fakeQuadit struct {
 	// program would) when a run goes running.
 	changesAway    bool
 	runsAway       bool   // GET /list/sessions answers 503
+	runsAwayHits   int    // how often it did
+	stopsHanded    int    // how often GET /events handed out a stop
 	changesAwayFor string // the same, for one login's changes alone
 	staleStart     bool
 	stopOnStart    bool
@@ -255,6 +257,13 @@ func (f *fakeQuadit) cursorOf(user string) int64 {
 	return f.cursors[user]
 }
 
+// count reads one of the fake's counters.
+func (f *fakeQuadit) count(read func(f *fakeQuadit) int) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return read(f)
+}
+
 func (f *fakeQuadit) callList() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -306,6 +315,9 @@ func (f *fakeQuadit) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		away := f.runsAway
 		f.mu.Unlock()
 		if away {
+			f.mu.Lock()
+			f.runsAwayHits++
+			f.mu.Unlock()
 			refuse(w, http.StatusServiceUnavailable, "unavailable", "", "the runs are away")
 			return
 		}
@@ -635,6 +647,13 @@ func (f *fakeQuadit) feed(w http.ResponseWriter, r *http.Request) {
 		if len(out) > 0 || wait == 0 || time.Now().After(deadline) {
 			if out == nil {
 				out = []fakeEvent{}
+			}
+			for _, ev := range out {
+				if changes, ok := ev.Data["changes"].(map[string]any); ok && changes["stop_requested_at"] != nil {
+					f.mu.Lock()
+					f.stopsHanded++
+					f.mu.Unlock()
+				}
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"events": out, "seq": seq, "more": false})
 			return

@@ -149,8 +149,9 @@ var codexWords = errorWords{
 type codexReader struct {
 	spec      runSpec
 	accepted  bool
-	completed bool     // turn.completed was seen
-	errors    []string // the messages of turn.failed and error lines
+	completed bool            // turn.completed was seen
+	errors    tail            // the messages of turn.failed and error lines, their last keptStderr bytes
+	tools     map[string]bool // the tool items seen, by id: each makes its step once, on either edge
 	lastText  string
 }
 
@@ -163,6 +164,7 @@ type codexLine struct {
 		Message string `json:"message"`
 	} `json:"error"`
 	Item *struct {
+		ID      string `json:"id"`
 		Type    string `json:"type"`
 		Text    string `json:"text"`
 		Server  string `json:"server"`
@@ -177,7 +179,7 @@ type codexLine struct {
 func (r *codexReader) Line(line []byte) []programEvent {
 	var l codexLine
 	if json.Unmarshal(line, &l) != nil {
-		return nil
+		return unreadable(line)
 	}
 	var events []programEvent
 	switch l.Type {
@@ -186,22 +188,22 @@ func (r *codexReader) Line(line []byte) []programEvent {
 			events = append(events, programEvent{Kind: evSession, Session: l.ThreadID})
 		}
 	case "item.started", "item.completed":
+		if l.Item == nil {
+			break // no item: nothing was taken
+		}
 		if !r.accepted {
 			r.accepted = true
 			events = append(events, programEvent{Kind: evAccepted})
-		}
-		if l.Item == nil {
-			break
 		}
 		events = append(events, r.item(l.Type == "item.started", l.Item.Type, l)...)
 	case "turn.completed":
 		r.completed = true
 	case "turn.failed":
 		if l.Error != nil {
-			r.errors = append(r.errors, l.Error.Message)
+			r.errors.add([]byte(l.Error.Message))
 		}
 	case "error":
-		r.errors = append(r.errors, l.Message)
+		r.errors.add([]byte(l.Message))
 	}
 	return events
 }
@@ -209,18 +211,34 @@ func (r *codexReader) Line(line []byte) []programEvent {
 // item is what an item says: a tool's activity with its step, or the
 // agent's message.
 func (r *codexReader) item(started bool, kind string, l codexLine) []programEvent {
+	// A tool's activity counts on whichever edge of its item is seen
+	// first; its step is made once.
+	first := func() bool {
+		if r.tools == nil {
+			r.tools = map[string]bool{}
+		}
+		seen := r.tools[l.Item.ID]
+		r.tools[l.Item.ID] = true
+		return !seen || l.Item.ID == ""
+	}
 	tool := func(s step) []programEvent {
+		if !first() {
+			return []programEvent{{Kind: evTool}}
+		}
 		return []programEvent{{Kind: evTool}, {Kind: evStep, Step: s}}
 	}
-	switch {
-	case started && kind == "command_execution":
+	switch kind {
+	case "command_execution":
 		return tool(step{Tool: "shell"})
-	case started && kind == "mcp_tool_call":
+	case "mcp_tool_call":
 		return tool(step{Tool: stepText(l.Item.Server + "." + l.Item.Tool)})
-	case started && kind == "web_search":
+	case "web_search":
 		return tool(step{Tool: "web search"})
-	case !started && kind == "file_change":
+	case "file_change":
 		events := []programEvent{{Kind: evTool}}
+		if !first() {
+			return events
+		}
 		for _, change := range l.Item.Changes {
 			s := step{Tool: "edit"}
 			if rel, ok := relativeIn(r.spec.Folder, change.Path); ok {
@@ -229,7 +247,10 @@ func (r *codexReader) item(started bool, kind string, l codexLine) []programEven
 			events = append(events, programEvent{Kind: evStep, Step: s})
 		}
 		return events
-	case !started && kind == "agent_message":
+	case "agent_message":
+		if started {
+			return nil
+		}
 		r.lastText = l.Item.Text
 		return []programEvent{{Kind: evText, Text: l.Item.Text}}
 	}
@@ -239,10 +260,10 @@ func (r *codexReader) item(started bool, kind string, l codexLine) []programEven
 func (r *codexReader) End(exit int, stderr []byte) outcome {
 	if r.completed && exit == 0 {
 		final := r.lastText
-		if raw, err := os.ReadFile(r.spec.LastMessageFile); err == nil && len(bytes.TrimSpace(raw)) > 0 {
+		if raw := readAtMost(r.spec.LastMessageFile, maxFinal); len(bytes.TrimSpace(raw)) > 0 {
 			final = string(raw)
 		}
 		return outcome{Kind: outcomeOK, Final: final}
 	}
-	return codexWords.classify(string(stderr)+"\n"+strings.Join(r.errors, "\n"), r.spec.Now())
+	return codexWords.classify(string(stderr)+"\n"+string(r.errors.bytes()), r.spec.Now())
 }

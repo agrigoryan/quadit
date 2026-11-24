@@ -47,11 +47,12 @@ type liveEntry struct {
 	leaseFile *leaseFile
 
 	// loginRaw is the login file as it was verified (verifyLogin); verified
-	// says it was, and nothing is sent for the entry before. loginChanged
-	// is set by a run that found the file changed since.
-	loginRaw     []byte
-	verified     bool
-	loginChanged atomic.Bool
+	// says it was, and nothing is sent for the entry before. halted is
+	// what a run found that the entry must stop for and check again (the
+	// login changed, the disk refused a write).
+	loginRaw []byte
+	verified bool
+	halted   atomic.Pointer[entryError]
 
 	// unkept is a run's terminal record that could not be stored, and what
 	// follows its storing; the entry does nothing else until it is stored.
@@ -285,9 +286,12 @@ func (e *liveEntry) verifyLogin(ctx context.Context) error {
 		e.leaseFile, e.lease = nil, ""
 	}
 	e.api, e.me, e.projectKey, e.loginRaw, e.verified = api, me, projects[i].Key, raw, true
-	e.loginChanged.Store(false)
 	return nil
 }
+
+// halt stops the entry's listening for why, before its next hold; it is
+// shown and checked again.
+func (e *liveEntry) halt(why entryError) { e.halted.Store(&why) }
 
 // loginUnchanged reports whether the login file still holds what was
 // verified.
@@ -511,8 +515,8 @@ func (e *liveEntry) listen(ctx context.Context) error {
 		if e.state.pause() != nil {
 			return nil
 		}
-		if e.loginChanged.Load() {
-			return errLoginRefused // verified again before anything more is sent
+		if why := e.halted.Swap(nil); why != nil {
+			return *why // checked again (the login verified again) before anything more
 		}
 		if !e.out.empty() {
 			_ = e.flush(ctx) // what is not sent now is sent before the next run, which waits for it
@@ -783,7 +787,7 @@ func (e *liveEntry) recoverRun(ctx context.Context, j journal) {
 	if j.Phase != phaseReceived {
 		if j.PGID > 0 && j.ProcStart != "" {
 			if started, err := processStart(ctx, j.PGID); err == nil && started == j.ProcStart {
-				e.srv.ladder(j.PGID, e.srv.host.times.infraLadder, nil)
+				e.srv.ladder(j.PGID, e.srv.host.times.infraLadder, nil, nil)
 			}
 		}
 		t.Ack = true
