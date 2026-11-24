@@ -234,7 +234,7 @@ function start() {
     // The running app itself, which the quadit command starts: an AppImage by its own file, not where it is mounted.
     appFor: (id) => (id === list.localServer()?.id ? process.env.APPIMAGE || app.getPath("exe") : null),
     ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
-    // A code to give back first (one program at a time: the listener follows it), else the listener at once.
+    // A code to give back first (one program at a time: the listener, when the app answers, follows it), else a sync.
     connected: (id, code) => void (code ? selfRuns.prove(id, code) : selfRuns.sync()),
     disconnected: () => void selfRuns.sync(),
   });
@@ -254,6 +254,8 @@ function start() {
     }
   };
   const selfRuns = new SelfRuns({
+    // Off for now: a tool answers from a chat told to listen. On brings back a listener per connected tool, Pause/Resume.
+    answers: false,
     look: async () => {
       const look = await cli.look();
       const where = {

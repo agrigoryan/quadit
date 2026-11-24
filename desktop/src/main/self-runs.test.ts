@@ -38,11 +38,15 @@ function tool(extra: Partial<SelfRunTool> = {}): SelfRunTool {
 /**
  * SelfRuns over a fake spawner and the tools `list` (changeable), the server
  * saying the code came back when `back`. With `lateExit`, a program stopped
- * ends only when the test ends it.
+ * ends only when the test ends it; `answers` is the app's switch.
  */
 function setUp(
   list: SelfRunTool[] = [tool()],
-  { quadit = "/bin/quadit", lateExit = false }: { quadit?: string | null; lateExit?: boolean } = {},
+  {
+    quadit = "/bin/quadit",
+    lateExit = false,
+    answers = true,
+  }: { quadit?: string | null; lateExit?: boolean; answers?: boolean } = {},
 ) {
   const started: Started[] = [];
   const remembered: [string, boolean][] = [];
@@ -54,6 +58,7 @@ function setUp(
   let hold: Promise<void> | null = null;
   const dir = mkdtempSync(join(tmpdir(), "quadit-desktop-self-"));
   const runs = new SelfRuns({
+    answers,
     look: async () => {
       if (hold) await hold;
       return { tools: list, quadit, path: "/opt/homebrew/bin:/usr/bin:/bin" };
@@ -468,6 +473,36 @@ describe("SelfRuns, answering by itself", () => {
     expect(readFileSync(runs.logOf("codex"), "utf8")).toContain("ITEM #4 comment GS-3 from @lou");
     // Windows keeps no such modes.
     if (process.platform !== "win32") expect(statSync(runs.logOf("codex")).mode & 0o777).toBe(0o600);
+  });
+});
+
+describe("SelfRuns, with answering switched off as in the app", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("still gives the code back, and starts no listener after it", async () => {
+    const { runs, started, setBack, ran } = setUp([tool({ ran: false })], { answers: false });
+    void runs.prove("codex", "ABC234");
+    await flush();
+    expect(started.map((c) => c.program)).toEqual(["/bin/codex"]);
+    setBack(true);
+    started[0]?.end(0);
+    await flush();
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(ran).toEqual(["codex"]);
+    expect(started).toHaveLength(1);
+    expect(runs.self("codex")).toEqual({ proving: null, answering: "none" });
+  });
+
+  it("starts no listener on sync, nor when asked to answer, and says none", async () => {
+    const { runs, started } = setUp([tool()], { answers: false });
+    await runs.sync();
+    expect(started).toHaveLength(0);
+    expect(runs.self("codex")).toEqual({ proving: null, answering: "none" });
+    await runs.setAnswering("codex", true);
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(started).toHaveLength(0);
+    expect(runs.self("codex")?.answering).toBe("none");
   });
 });
 

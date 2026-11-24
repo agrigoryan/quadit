@@ -16,8 +16,9 @@
 //   (ran); otherwise the card falls back to the line to paste, with the
 //   reason.
 //
-//   Answering: only for a tool the app ran and saw give its code back, one
-//   listener for each login (on by default),
+//   Answering (off in the app for now: SelfRunsParts.answers): only for a
+//   tool the app ran and saw give its code back, one listener for each login
+//   (on by default),
 //   `quadit listen by=the Quadit app limit=600 tries=3 events=FILE --exec`,
 //   whose command runs the tool's one-prompt command for each inbox item.
 //   quadit listen bounds each run and gives an item up after three failed
@@ -70,6 +71,12 @@ export interface SelfRunsLook {
 }
 
 export interface SelfRunsParts {
+  /**
+   * Whether the app answers for its tools at all: false, and no listener
+   * ever starts, `self` says "none", and the card says nothing of answering;
+   * giving the code back is the same either way.
+   */
+  answers: boolean;
   look(): Promise<SelfRunsLook>;
   /** Starts a program, held to the app (child-guard.ts, startChild). */
   start(
@@ -302,9 +309,15 @@ export class SelfRuns {
     return tool.answering ? "on" : "paused";
   }
 
-  /** Whether the tool may answer by itself at all: the app runs it, it found it, and saw it give its code back. */
+  /** Whether the tool may answer by itself at all: the app answers, runs it, found it, and saw it give its code back. */
   private mayAnswer(tool: SelfRunTool): boolean {
-    return this.mayRun(tool) && !!tool.program && !!this.quaditPath && (tool.ran || !!this.held.get(tool.id)?.proven);
+    return (
+      this.parts.answers &&
+      this.mayRun(tool) &&
+      !!tool.program &&
+      !!this.quaditPath &&
+      (tool.ran || !!this.held.get(tool.id)?.proven)
+    );
   }
 
   /** Remembers whether a tool answers by itself, in the ledger and in the tools as last looked at. */
