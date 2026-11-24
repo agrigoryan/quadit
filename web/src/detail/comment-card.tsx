@@ -5,11 +5,11 @@ import { memo, useState } from "react";
 import { MoreHorizontal, Pencil, Reply, Trash2 } from "lucide-react";
 import { useCan } from "@/data/access";
 import { MOD } from "@/hooks/hotkeys";
-import { t } from "@/lib/i18n";
-import { useMe, useMember } from "@/data/selectors";
+import { t, tMaybe } from "@/lib/i18n";
+import { useMe, useMember, useRowEvenIfGone } from "@/data/selectors";
 import type { Dict } from "@/data/store";
 import { exact } from "@/lib/time";
-import type { Comment, Task } from "@/types/core";
+import type { Comment, Member, Task } from "@/types/core";
 import { caretToEnd } from "@/detail/caret-to-end";
 import { createComment, deleteComment, updateComment } from "@/detail/comment-actions";
 import type { Attached } from "@/detail/data";
@@ -118,6 +118,30 @@ function Edited({ earlier }: { earlier: Earlier[] }) {
   );
 }
 
+/**
+ * Marks a comment Quadit posted for a run: what the run's program said
+ * last, since the agent wrote nothing on the task during the run.
+ */
+function FromRun({ sessionId, author }: { sessionId: string; author: Member | undefined }) {
+  // The run is in the copy for a week; past that its program is not named.
+  const program = useRowEvenIfGone("sessions", sessionId)?.program;
+  const agent = author ? `@${author.handle}` : t("common.agent");
+  const hint = program
+    ? t("comment.fromRunHint", { agent, program: tMaybe(`run.program.${program}`, program) })
+    : t("comment.fromRunHintNoProgram", { agent });
+  return (
+    <Tooltip label={hint} side="top">
+      <span
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focusable so the keyboard can show the tooltip that says why Quadit posted it
+        tabIndex={0}
+        className="min-w-0 shrink truncate text-xs text-ink-3"
+      >
+        {t("comment.fromRun")}
+      </span>
+    </Tooltip>
+  );
+}
+
 interface EntryProps {
   comment: Comment;
   files: Attached[];
@@ -146,6 +170,7 @@ function Entry({ comment, files, earlier, projectId, readOnly, onReply }: EntryP
         <Avatar member={author} size="sm" />
         <span className="min-w-0 truncate text-sm font-medium">{author?.name ?? t("common.someone")}</span>
         {comment.kind === "result" && <Badge tone="ok">{t("comment.result")}</Badge>}
+        {comment.session_id && <FromRun sessionId={comment.session_id} author={author} />}
         <When at={comment.created_at} />
         {/* An edit by someone else arrives as an event that changes only the text: the history then says it was edited. */}
         {(!!comment.edited_at || earlier.length > 0) && <Edited earlier={earlier} />}
