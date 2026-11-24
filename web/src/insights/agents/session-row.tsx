@@ -3,29 +3,28 @@
 // ended. Used on the agents page and in the task panel.
 
 import { useState } from "react";
-import { Check, ChevronRight, Loader, Square, X } from "lucide-react";
+import { Check, ChevronRight, CircleSlash, Hourglass, Loader, type LucideIcon, Square, X } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMember, useRowEvenIfGone } from "@/data/selectors";
 import { ago, exact } from "@/lib/time";
-import type { AgentSession } from "@/types/core";
+import { isOpenSession, type AgentSession, type SessionState } from "@/types/core";
 import { sessionLink, stepText } from "@/insights/agents/session-data";
 import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
 
-const marks = {
+const marks: Record<SessionState, { icon: LucideIcon; tone: string }> = {
+  waiting: { icon: Hourglass, tone: "text-ink-3" },
   running: { icon: Loader, tone: "text-accent-text" },
   done: { icon: Check, tone: "text-ok" },
   failed: { icon: X, tone: "text-danger" },
   stopped: { icon: Square, tone: "text-ink-3" },
-} as const;
-
-type StateName = keyof typeof marks;
-const stateOf = (s: AgentSession): StateName => (s.state in marks ? (s.state as StateName) : "stopped");
+  not_started: { icon: CircleSlash, tone: "text-ink-3" },
+};
 
 function StateMark({ session }: { session: AgentSession }) {
-  const state = stateOf(session);
+  const { state } = session;
   const { icon: Icon, tone } = marks[state];
   const label = t(`agents.session.${state}`);
   return (
@@ -151,7 +150,7 @@ export function SessionRow({ session, now, showAgent, showTask }: Props) {
   const [open, setOpen] = useState(false);
   const agent = useMember(showAgent ? session.agent_id : undefined);
   const title = session.title || t("agents.session.untitled");
-  const running = session.state === "running";
+  const ongoing = isOpenSession(session);
   return (
     <li className="border-b border-line/70 last:border-b-0">
       <div className="relative flex min-h-8 items-center gap-1.5 py-1 text-sm max-md:min-h-10">
@@ -169,7 +168,7 @@ export function SessionRow({ session, now, showAgent, showTask }: Props) {
         </button>
         {showTask && session.task_id && <TaskKey taskId={session.task_id} />}
         <span className="shrink-0 text-xs text-ink-3 tnum" title={exact(session.started_at)}>
-          {running
+          {ongoing
             ? t("agents.session.startedAgo", { time: ago(session.started_at, now) })
             : ago(session.started_at, now)}
         </span>

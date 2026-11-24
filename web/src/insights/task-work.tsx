@@ -20,7 +20,7 @@ import {
 import { t, tMaybe } from "@/lib/i18n";
 import { useCan } from "@/data/access";
 import { useRows } from "@/data/selectors";
-import type { AgentSession, Task, TaskLink } from "@/types/core";
+import { isOpenSession, type AgentSession, type Task, type TaskLink } from "@/types/core";
 import { BranchCommits } from "@/detail/branch-commits";
 import { linkName, useTaskLinks } from "@/detail/data";
 import { Section } from "@/detail/section";
@@ -115,9 +115,9 @@ function CodeLink({ link, readOnly }: { link: TaskLink; readOnly: boolean }) {
 }
 
 function Sessions({ sessions }: { sessions: AgentSession[] }) {
-  // The clock only has to run while something is running.
-  const running = sessions.some((s) => s.state === "running");
-  const now = useNow(running ? 15_000 : 600_000);
+  // The clock only has to run while a session is open.
+  const ongoing = sessions.some(isOpenSession);
+  const now = useNow(ongoing ? 15_000 : 600_000);
   return (
     <Section title={t("taskwork.sessions")} meta={<span className="text-xs text-ink-3 tnum">{sessions.length}</span>}>
       <ul>

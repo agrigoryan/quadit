@@ -6,7 +6,7 @@ import { CornerDownRight, Ear } from "lucide-react";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
 import { ago, exact, parseWhen, timeOfDay } from "@/lib/time";
-import type { AgentSession, Member, Task } from "@/types/core";
+import { isOpenSession, type AgentSession, type Member, type Task } from "@/types/core";
 import { useLookup, useRowEvenIfGone } from "@/data/selectors";
 import { count } from "@/lib/amounts";
 import type { AgentState } from "@/types/dashboard";
@@ -224,7 +224,7 @@ function claimLine(claim: Claim, name: string): string {
 
 export function AgentCard({ member, state, helpers, helperNote, work, sessions, resourceNames, now }: Props) {
   const [allSessions, setAllSessions] = useState(false);
-  const running = sessions.find((s) => s.state === "running");
+  const running = sessions.find(isOpenSession);
   const waits = work.asked.length + work.waiting.length;
   const shown = allSessions ? sessions : sessions.slice(0, SHOWN);
   return (
