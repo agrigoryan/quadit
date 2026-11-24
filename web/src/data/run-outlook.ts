@@ -17,8 +17,10 @@ const REREAD_MS = 20_000;
 
 /**
  * The outlook for each agent named (handles, with or without @), by handle
- * with its @; undefined until the server answers, and with nothing to ask
- * (no task, no agent). An agent the server does not know is left out.
+ * with its @; undefined until the server answers, with nothing to ask (no
+ * task, no agent), and while the read fails: an earlier answer may no
+ * longer hold, and what it promised is not said. An agent the server does
+ * not know is left out.
  */
 export function useRunOutlook(
   taskKey: string | undefined,
@@ -39,5 +41,5 @@ export function useRunOutlook(
     () => (live.data ? Object.fromEntries(live.data.outlooks.map((o) => [o.agent, o])) : undefined),
     [live.data],
   );
-  return { outlooks: path ? outlooks : undefined, error: live.error };
+  return { outlooks: path && !live.error ? outlooks : undefined, error: live.error };
 }

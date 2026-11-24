@@ -70,8 +70,9 @@ function Reach({ agents, members, task }: { agents: Member[]; members: Member[];
     run.map((agent) => agent.handle),
     "comment",
   );
-  // Until the server says what will happen, an agent a computer runs is not spoken of at all, rather than as listening.
-  if (run.length > 0 && !outlook.outlooks && !outlook.error) return null;
+  // An agent a computer runs is spoken of only from the server's present answer: not as listening, which would promise
+  // an answer, while it is asked or while asking fails.
+  const told = outlook.outlooks ? agents : agents.filter((agent) => !run.includes(agent));
   const runs = (agent: Member) => {
     const o = outlook.outlooks?.[`@${agent.handle}`];
     return o && o.outcome !== "none" && o.outcome !== "in_chat" ? o : undefined;
@@ -79,8 +80,9 @@ function Reach({ agents, members, task }: { agents: Member[]; members: Member[];
   // The run the computer works on may be another agent's: only a run of this agent's own on this task takes the comment next.
   const ownRunHere = (agent: Member) =>
     sessions.some((s) => s.agent_id === agent.user_id && s.task_id === task.id && !!s.machine_id && isOpenSession(s));
-  const [only, ...more] = agents;
-  if (only && more.length === 0) {
+  const [only, ...more] = told;
+  if (!only) return null;
+  if (more.length === 0) {
     const o = runs(only);
     return o ? (
       <RunReach outlook={o} members={members} here={ownRunHere(only)} />
@@ -90,8 +92,8 @@ function Reach({ agents, members, task }: { agents: Member[]; members: Member[];
   }
   return (
     <AgentsReach
-      agents={agents.filter((agent) => !runs(agent))}
-      outlooks={agents.flatMap((agent) => runs(agent) ?? [])}
+      agents={told.filter((agent) => !runs(agent))}
+      outlooks={told.flatMap((agent) => runs(agent) ?? [])}
       members={members}
       task={task}
     />

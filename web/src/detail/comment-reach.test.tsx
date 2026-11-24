@@ -6,7 +6,7 @@
 // never has: the app's Connect in the desktop app, its page in Settings in
 // a browser.
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/data/api";
@@ -446,6 +446,29 @@ describe("the line under the comment box, for an agent a computer runs", () => {
       expect(await screen.findByText("Queued for @codex on Aram's MacBook Pro.")).toBeTruthy();
       cleanup();
     }
+  });
+
+  it("says nothing of an agent a computer runs while the outlook cannot be read, and goes on about the others", async () => {
+    vi.spyOn(api, "get").mockImplementation((path: string) => {
+      if (path.includes("/run-outlook")) return Promise.reject(new Error("the server is away"));
+      return Promise.resolve({
+        agents: [
+          { user_id: "a1", handle: "@codex", listening: true, listening_projects: ["p1"], listeners: [runner] },
+          { user_id: "a3", handle: "@gemini", listening: false, listening_projects: [], listeners: [] },
+        ],
+      });
+    });
+    show({ ...base, assignee_id: "a1" });
+    await waitFor(() =>
+      expect(vi.mocked(api.get).mock.calls.some(([path]) => path.includes("/run-outlook"))).toBe(true),
+    );
+    await act(() => new Promise((done) => setTimeout(done, 0)));
+    expect(screen.queryByText(/codex/)).toBeNull();
+    cleanup();
+    editDraft("t1", () => ({ ...EMPTY_DRAFT, body: "@codex and @gemini: who has the boss?" }));
+    show({ ...base, assignee_id: "u1" });
+    expect(await screen.findByText("@gemini has not connected yet.")).toBeTruthy();
+    expect(screen.queryByText(/codex/)).toBeNull();
   });
 
   it("says a comment is queued in a few words among several agents", async () => {
