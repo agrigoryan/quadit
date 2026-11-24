@@ -6,7 +6,8 @@ import { Check, Minus, MoreHorizontal, Pencil, Trash2, Undo2 } from "lucide-reac
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
 import { exact } from "@/lib/time";
-import type { Decision, Outcome } from "@/types/core";
+import { useTaskEvents } from "@/data/task-detail";
+import type { Decision, FeedEvent, Outcome } from "@/types/core";
 import { Badge } from "@/ui/badge";
 import { Button, IconButton } from "@/ui/button";
 import { Input } from "@/ui/input";
@@ -157,8 +158,35 @@ export function DecisionResult({ decision, viewer, onUnclear }: ResultProps) {
   );
 }
 
-/** A question closed without an answer: who said it is no longer needed, when, and why. History, quietly. */
+/**
+ * Whether a closed question's note is the words it was sent back with
+ * rather than a reason given when it was closed: a close without a note
+ * keeps them. Told by its history: the note it carried just before its
+ * close. Without the history (not loaded yet), false: the note is shown
+ * as it is, attributed to no one.
+ */
+export function noteSaidBefore(events: FeedEvent[], decision: Pick<Decision, "id" | "outcome_note">): boolean {
+  if (!decision.outcome_note) return false;
+  const mine = events.filter((ev) => ev.entity_id === decision.id);
+  const closed = mine.findLast((ev) => ev.type === "decision.closed");
+  if (!closed) return false;
+  let before: unknown;
+  for (const ev of mine) {
+    if (ev.seq >= closed.seq) continue;
+    const row = ev.data.row as { outcome_note?: string } | undefined;
+    if (row) before = row.outcome_note ?? "";
+    if (ev.data.changes?.outcome_note) before = ev.data.changes.outcome_note.to ?? "";
+  }
+  return before === decision.outcome_note;
+}
+
+/**
+ * A question closed without an answer: who said it is no longer needed and
+ * when (a question settled by an upgrade names nobody), and the note: the
+ * reason given, or what was said before it was closed.
+ */
 function NotNeeded({ decision }: { decision: Decision }) {
+  const before = noteSaidBefore(useTaskEvents(decision.task_id), decision);
   return (
     <div className="mt-2 flex gap-2.5">
       <span
@@ -169,16 +197,23 @@ function NotNeeded({ decision }: { decision: Decision }) {
       </span>
       <div className="min-w-0 flex-1 text-xs text-ink-2">
         <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-          {rich(t("decision.closedBy"), { name: <Who userId={decision.decided_by} capital /> })}
+          {decision.decided_by
+            ? rich(t("decision.closedBy"), { name: <Who userId={decision.decided_by} capital /> })
+            : t("decision.state.notNeeded")}
           {decision.decided_at && (
             <time className="text-ink-3" title={exact(decision.decided_at)}>
               <Ago ms={decision.decided_at} />
             </time>
           )}
         </p>
-        {decision.outcome_note && (
-          <p className="mt-1 text-sm whitespace-pre-line text-ink-2">{decision.outcome_note}</p>
-        )}
+        {decision.outcome_note &&
+          (before ? (
+            <p className="mt-1 whitespace-pre-line text-ink-3">
+              {t("decision.closedSaidBefore", { note: decision.outcome_note })}
+            </p>
+          ) : (
+            <p className="mt-1 text-sm whitespace-pre-line text-ink-2">{decision.outcome_note}</p>
+          ))}
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
 
 import type { Changes } from "@/types/changes.gen";
 import { newId } from "@/lib/ids";
-import { type ChangeSpec, mutate, send } from "@/data/mutate";
+import { mutate, send } from "@/data/mutate";
 import { after } from "@/lib/rank";
 import type { FileRole } from "@/decisions/data";
 import { getRows } from "@/data/selectors";
@@ -57,14 +57,15 @@ export function pick(decision: Decision, answer: Answer) {
  */
 export function closeDecision(decision: Decision, note: string) {
   const said = note.trim();
-  const args: { id: string; note?: string } = { id: decision.id };
+  const args: Changes["decision.close"] = { id: decision.id };
   if (said) args.note = said;
-  // decision.close comes with the server's commit that adds it; until types/changes.gen.ts has it, it is named here.
-  const change = { type: "decision.close", args } as unknown as ChangeSpec;
-  send(change, (tx) =>
+  // As the server keeps it: no outcome; a note replaces the words it was sent back with, none keeps them.
+  send({ type: "decision.close", args }, (tx) =>
     tx.patch("decisions", decision.id, {
       state: "not_needed",
-      outcome_note: said || null,
+      outcome: null,
+      ...(said ? { outcome_note: said } : {}),
+      unclear_note: null,
       decided_by: meId(),
       decided_at: Date.now(),
     }),

@@ -41,6 +41,16 @@ describe("applyEvent", () => {
     expect(next.tasks.t1).toEqual({ id: "t1", title: "new" });
   });
 
+  it("puts the question a decision.closed event carries, as for one picked", () => {
+    const c = withRows({ decisions: [{ id: "d1", state: "sent_back", outcome: "none", outcome_note: "Neither" }] });
+    const row = { id: "d1", state: "not_needed", outcome_note: "Neither", decided_by: "u2", updated_seq: 9 };
+    const next = apply(
+      c,
+      event(9, { type: "decision.closed", entity_type: "decision", entity_id: "d1", data: { row } }),
+    );
+    expect(next.decisions.d1).toEqual(row);
+  });
+
   it("puts a member under its user id", () => {
     const next = apply(
       emptyCollections(),

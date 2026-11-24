@@ -67,6 +67,7 @@ export const decisions = {
   "decision.close.label": "Why, in a line (optional)",
   "decision.close.submit": "Mark no longer needed",
   "decision.closedBy": "{name} marked it no longer needed",
+  "decision.closedSaidBefore": "Said before it was closed: {note}",
   "decision.unclear": "This is unclear…",
   "decision.unclearNote": "{name} says the answer is unclear",
   "decision.unclearNoteMine": "You said the answer is unclear",

@@ -105,7 +105,8 @@ export type NotificationType =
   | "replied"
   | "comment"
   | "result"
-  | "status";
+  | "status"
+  | "not_needed";
 
 export type Notification = {
   id: string;

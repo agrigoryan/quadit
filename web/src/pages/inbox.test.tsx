@@ -122,6 +122,12 @@ describe("the inbox's two tabs", () => {
     expect(rows()).toHaveLength(2);
   });
 
+  it("says a question of mine was closed as no longer needed, with the closer's note alone", () => {
+    show([item("n7", { type: "not_needed", addressed: true, snippet: "no longer needed: We cut the double jump." })]);
+    expect(rows()).toEqual([expect.stringMatching(/^@bea marked your question no longer needed\./)]);
+    expect(screen.getAllByText("We cut the double jump.").length).toBeGreaterThan(0);
+  });
+
   it("opens again on the tab last shown, for this session", () => {
     show([item("n3", {})]);
     fireEvent.click(screen.getByRole("button", { name: "Show 1 unread update" }));

@@ -4,6 +4,7 @@ import {
   AtSign,
   CircleCheck,
   CircleDot,
+  CircleSlash,
   ClipboardCheck,
   Hourglass,
   type LucideIcon,
@@ -38,7 +39,16 @@ const icons: Record<NotificationType, LucideIcon | null> = {
   comment: MessageSquare,
   result: ClipboardCheck,
   status: CircleDot,
+  not_needed: CircleSlash,
 };
+
+/**
+ * What an item quotes. A question closed as no longer needed comes with the
+ * server's "no longer needed: <note>": the row's sentence says the first
+ * part, so only the note is shown.
+ */
+const snippetOf = (item: Notification) =>
+  item.type === "not_needed" ? (item.snippet ?? "").replace(/^no longer needed:?\s*/, "") : (item.snippet ?? "");
 
 /** A snippet is the start of a Markdown text; shown on one line, its bold and code marks are only noise. */
 const plain = (snippet: string) => snippet.replace(/(\*\*|~~|`)(.+?)\1/g, "$2");
@@ -62,7 +72,7 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen, readOnly
   const Icon = icons[item.type] ?? MessageSquare;
   const who = actor ? `@${actor.handle}` : t("common.someone");
   const sentence = sentenceOf(item, who);
-  const snippet = item.snippet ? plain(item.snippet) : "";
+  const snippet = item.snippet ? plain(snippetOf(item)) : "";
   // The row is a link to its task, so it opens in a new tab like any link; one about no task is a plain button.
   // A task in the trash too: its page shows it as trashed.
   const taskKey = useRowEvenIfGone("tasks", item.task_id)?.key ?? key;

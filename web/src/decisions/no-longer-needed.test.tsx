@@ -12,6 +12,7 @@ import { api } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
 import { clearStore, loadBootstrap } from "@/data/store";
 import { standingOf } from "@/decisions/data";
+import { noteSaidBefore } from "@/decisions/decision-meta";
 import { DecisionSection } from "@/decisions/decision-section";
 import { WithQuery } from "@/test/query";
 import type { Decision, Member, Task, User, Workspace } from "@/types/core";
@@ -148,6 +149,41 @@ describe("No longer needed", () => {
   it("says a question sent back waits on whoever asked it", () => {
     show(bea, question({ state: "sent_back", decided_by: "u2", outcome: "none", outcome_note: "Neither" }));
     expect(within(card()).getByText(/^Waiting on/).textContent).toBe("Waiting on C@coder to ask again or carry on.");
+  });
+});
+
+describe("a question closed, read true", () => {
+  it("names nobody when nobody is known to have closed it, only that it is no longer needed and when", () => {
+    show(bea, question({ state: "not_needed", decided_at: 5 }));
+    expect(within(card()).getAllByText("No longer needed")).toHaveLength(2);
+    expect(within(card()).queryByText(/marked it no longer needed/)).toBeNull();
+  });
+
+  it("tells the words it was sent back with from a reason given when it was closed", () => {
+    const row = (state: string, note: string, seq: number) => ({
+      seq,
+      at: seq,
+      actor_id: "u2",
+      change_id: `c${seq}`,
+      type: `decision.${state}`,
+      entity_type: "decision",
+      entity_id: "d1",
+      scope_type: "",
+      scope_id: "",
+      data: { row: { id: "d1", outcome_note: note } },
+    });
+    const kept = { id: "d1", outcome_note: "Neither of these" };
+    expect(noteSaidBefore([row("picked", "Neither of these", 3), row("closed", "Neither of these", 5)], kept)).toBe(
+      true,
+    );
+    expect(
+      noteSaidBefore([row("picked", "Neither of these", 3), row("closed", "Cut it", 5)], {
+        ...kept,
+        outcome_note: "Cut it",
+      }),
+    ).toBe(false);
+    // Without its history the note is shown as it is.
+    expect(noteSaidBefore([], kept)).toBe(false);
   });
 });
 
