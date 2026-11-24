@@ -30,6 +30,7 @@ const claude = {
   responsible_id: "u1",
 } as Member;
 const task = { id: "t1", key: "SVA-1", project_id: "p1", status_id: "s1", title: "Boss fight" } as Task;
+const other = { id: "t2", key: "SVA-2", project_id: "p1", status_id: "s1", title: "Menu music" } as Task;
 
 const runner: ListenerShown = {
   project_id: "p1",
@@ -91,7 +92,7 @@ function show(
     workspace: { id: "w", slug: "acme" } as Workspace,
     projects: [{ id: "p1", key: "SVA", name: "Game", rank: "a" }],
     members: [ann, bea, claude],
-    tasks: [task],
+    tasks: [task, other],
   });
   render(
     <MemoryRouter>
@@ -208,6 +209,24 @@ describe("the card in the app, in the app's card's words", () => {
     );
     expect(within(card()).getAllByRole("button", { name: "Stop @claude's run on SVA-1" })).toHaveLength(1);
     expect(within(card()).queryByRole("button", { name: /^Stop running/ })).toBeNull();
+  });
+
+  it("offers Stop on each open run: the one in hand above, any other on its own row", () => {
+    const run = (id: string, taskId: string, started: number): AgentSession => ({
+      id,
+      agent_id: "a1",
+      task_id: taskId,
+      title: "",
+      state: "running",
+      machine_id: "0123456789abcdef",
+      machine_name: "Aram's Mac",
+      started_at: started,
+      updated_seq: 1,
+    });
+    // Newest first, as the server gives them: the card has SVA-2's in hand, and SVA-1's is still open.
+    show(listening(runner), { a1: here({ runs: ["p1"] }) }, { sessions: [run("s2", "t2", 2), run("s1", "t1", 1)] });
+    expect(within(card()).getAllByRole("button", { name: "Stop @claude's run on SVA-2" })).toHaveLength(1);
+    expect(within(card()).getAllByRole("button", { name: "Stop @claude's run on SVA-1" })).toHaveLength(1);
   });
 
   it("offers Connect only to whoever may make the agent a connect code", () => {

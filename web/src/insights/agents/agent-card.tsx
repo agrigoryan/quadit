@@ -353,7 +353,8 @@ export function AgentCard({ member, state, helpers, helperNote, work, sessions, 
         ) : (
           <ul>
             {shown.map((s) => (
-              <SessionRow key={s.id} session={s} now={now} showTask noStop />
+              // The run in hand has its Stop above; any other open run keeps its own here.
+              <SessionRow key={s.id} session={s} now={now} showTask noStop={s.id === running?.id} />
             ))}
           </ul>
         )}
