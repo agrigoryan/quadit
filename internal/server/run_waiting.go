@@ -13,6 +13,7 @@ package server
 import (
 	"cmp"
 	"context"
+	"math"
 	"slices"
 	"time"
 
@@ -190,7 +191,8 @@ func (who *viewer) eachWaiting(ctx context.Context, db store.DB, agentID, projec
 		for _, ev := range evs {
 			note, isNote := noteOf[ev.EntityID]
 			t, isTask := taskOf[note.TaskID]
-			if !isNote || !isTask || !asks(note, t, statusOf[t.StatusID], agentID, projectID) {
+			// A runner begins now: every read so far was before it.
+			if !isNote || !isTask || !asks(note, t, statusOf[t.StatusID], agentID, projectID, math.MaxInt64) {
 				continue
 			}
 			done, err := who.settled(ctx, db, agentID, note, began)
@@ -225,7 +227,15 @@ func (who *viewer) waits(ctx context.Context, db store.DB, agentID string, note 
 	if _, err := store.Find(ctx, db, &status, store.Eq("id", t.StatusID)); err != nil {
 		return false, err
 	}
-	if !asks(note, t, status, agentID, projectID) {
+	// A read counts when it was before the runner began: every read is an
+	// event, so one at or before the time of the feed's position began
+	// was. What the agent's own writing marked read since (a run's
+	// comment, markInbox) the runner has not handled for that.
+	var at core.Event
+	if _, err := store.Find(ctx, db, &at, store.Eq("seq", began)); err != nil {
+		return false, err
+	}
+	if !asks(note, t, status, agentID, projectID, at.At) {
 		return false, nil
 	}
 	done, err := who.settled(ctx, db, agentID, note, began)
@@ -233,14 +243,14 @@ func (who *viewer) waits(ctx context.Context, db store.DB, agentID string, note 
 }
 
 // asks reports whether an item still asks something of the agent, by its
-// own row, its task t and the task's status: it is unread and not
-// archived; addressed to the agent; on a task of the project projectID that
+// own row, its task t and the task's status: it was not read by readBy
+// (Unix ms) and is not archived; addressed to the agent; on a task of the project projectID that
 // is not in the trash, done or canceled; for an assignment, the task is
 // still assigned to the agent, and for a hand-off it still waits on the
 // agent (a resource's turn asks nothing of the task).
-func asks(note core.Notification, t core.Task, status core.Status, agentID, projectID string) bool {
+func asks(note core.Notification, t core.Task, status core.Status, agentID, projectID string, readBy int64) bool {
 	switch {
-	case note.ReadAt != 0 || note.ArchivedAt != 0 || !note.Addressed || note.TaskID == "" || note.TaskID != t.ID:
+	case note.ReadAt != 0 && note.ReadAt <= readBy || note.ArchivedAt != 0 || !note.Addressed || note.TaskID == "" || note.TaskID != t.ID:
 		return false
 	case t.DeletedAt != 0 || t.ProjectID != projectID || !core.OpenCategory(status.Category):
 		return false
