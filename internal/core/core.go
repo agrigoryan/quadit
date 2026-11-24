@@ -283,6 +283,18 @@ type Listener struct {
 	RunnerHolds bool `json:"-" db:"runner_holds"`
 }
 
+// LeaseLives reports whether the listener's lease lives at now (Unix ms):
+// while it does, its session holds the listener and another is refused.
+func (l Listener) LeaseLives(now int64) bool {
+	return l.Lease != "" && l.LeaseUntil > now
+}
+
+// HeldByRunner reports whether Quadit's runner holds the listener at now
+// (Unix ms): its lease lives and was last taken by the runner, not a chat.
+func (l Listener) HeldByRunner(now int64) bool {
+	return l.LeaseLives(now) && l.RunnerHolds
+}
+
 // ListenerLabel is the form of what a listener says it is (by=, "the
 // Quadit app"): a few plain words, at most 40 letters, digits, spaces, -
 // and '. The server keeps only such a label, and the command prints only

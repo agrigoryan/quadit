@@ -262,6 +262,17 @@ func missingScenario(t *testing.T, st store.Store) *probes {
 	as(artist, "notification.read", M{"all": true})
 	sess := do("session.start", M{"title": "Thinking"}).Ref
 	do("session.update", M{"id": sess, "summary": "thought"})
+	// A run Quadit's runner started, whose runner is away: a stop ends it.
+	var sva core.Project
+	get(&sva, store.Eq("key", "SVA"))
+	var first core.Task
+	get(&first, store.Eq("key", "SVA-1"))
+	run := core.AgentSession{ID: id.New(), WorkspaceID: ws.ID, AgentID: artist, TaskID: first.ID, State: core.AgentSessionRunning, StartedAt: e.Now(),
+		Program: core.ProgramClaude, MachineID: "3f9c0a7d5e21b864", MachineName: "Studio", Folder: "~/game"}
+	if err := st.Write(ctx, ws.ID, func(tx store.Tx) error { return tx.Insert(ctx, run) }); err != nil {
+		t.Fatal(err)
+	}
+	do("session.stop", M{"id": run.ID})
 	do("task.move", M{"id": "SVA-3", "project": "OPS"})
 	do("task.delete", M{"id": "SVA-2"})
 	do("task.restore", M{"id": "SVA-2"})

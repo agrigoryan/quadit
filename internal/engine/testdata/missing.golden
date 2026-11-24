@@ -212,6 +212,9 @@ session.update {}: invalid [id] id is required
 session.update -id: invalid [id] id is required
 session.update -id others wrong: invalid [id] id is required
 session.update -summary: ok
+session.stop {}: invalid [id] id is required
+session.stop -id: invalid [id] id is required
+session.stop -id others wrong: invalid [id] id is required
 task.move {}: invalid [id] a task is required: give its key (SVA-12) or id
 task.move -id: invalid [id] a task is required: give its key (SVA-12) or id
 task.move -id others wrong: invalid [id] a task is required: give its key (SVA-12) or id

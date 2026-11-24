@@ -34,6 +34,11 @@ const (
 	// ReasonNumberTaken: the task number asked for is another task's, or
 	// was one's before it moved.
 	ReasonNumberTaken = "number_taken"
+	// ReasonLeaseStale: the listener's lease given is no longer its own:
+	// another session took the listener over.
+	ReasonLeaseStale = "lease_stale"
+	// ReasonRunOpen: the agent already has a run open on that task.
+	ReasonRunOpen = "run_open"
 )
 
 // Error is a refusal that tells the caller how to fix the change.

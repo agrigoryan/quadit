@@ -4,6 +4,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -13,18 +14,32 @@ import (
 )
 
 // patch collects the columns an update writes and, for the event, each
-// field's old and new value. A field already at the value asked for is left
-// out, so an update that changes nothing writes nothing.
+// field's old and new value, or for a list the items added to its end. A
+// field already at the value asked for is left out, so an update that
+// changes nothing writes nothing.
 type patch struct {
-	set     map[string]any
-	changes map[string]core.FieldChange
+	set      map[string]any
+	changes  map[string]core.FieldChange
+	appended map[string][]json.RawMessage
 }
 
 func newPatch() *patch {
-	return &patch{set: map[string]any{}, changes: map[string]core.FieldChange{}}
+	return &patch{set: map[string]any{}, changes: map[string]core.FieldChange{}, appended: map[string][]json.RawMessage{}}
 }
 
-func (p *patch) empty() bool { return len(p.changes) == 0 }
+func (p *patch) empty() bool { return len(p.changes) == 0 && len(p.appended) == 0 }
+
+// appendTo writes a list column as all, which is its old items, with any
+// dropped from the front, followed by added: the event carries only added
+// (EventData.Appended), and a reader appends them to its copy, so a long
+// list is not sent again with each item. Adding nothing changes nothing.
+func (p *patch) appendTo(col string, all json.RawMessage, added []json.RawMessage) {
+	if len(added) == 0 {
+		return
+	}
+	p.set[col] = all
+	p.appended[col] = added
+}
 
 // put records one change when to differs from from.
 func (p *patch) put(col string, from, to any) {
@@ -144,6 +159,9 @@ func (c *cx) save(p *patch, row target) error {
 	}
 	data := row.extra
 	data.ID, data.Changes = row.id, p.changes
+	if len(p.appended) > 0 {
+		data.Appended = p.appended
+	}
 	return c.emit(event{seq: seq, typ: row.entity + ".updated", entity: row.entity, entityID: row.id, place: row.place, audience: row.audience, data: data})
 }
 

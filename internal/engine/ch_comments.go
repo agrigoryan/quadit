@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
+	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 )
 
@@ -45,6 +46,11 @@ type commentCreateArgs struct {
 	// no waiting_on goes back to whoever answered the last decision.
 	WaitingOn     Opt[string] `json:"waiting_on"`
 	WaitingOnNote string      `json:"waiting_on_note"`
+	// Session is the run of the actor's on the same task whose program's
+	// last message this is: Quadit's runner posts it when the agent wrote
+	// nothing on the task itself. It only informs: the @handles in it make
+	// no mentions.
+	Session string `json:"session"`
 }
 
 // commentCreate adds a comment: to a page or one of its blocks, or to a
@@ -68,9 +74,34 @@ func commentCreate(c *cx, a commentCreateArgs) error {
 		}
 	}
 	if a.Doc != "" || (a.Block != "" && a.Task == "") {
+		if a.Session != "" {
+			return invalid("session", "a run's last message is posted on the run's task")
+		}
 		return c.docComment(cm, a)
 	}
 	return c.taskComment(cm, a)
+}
+
+// fromRun marks a comment as the last message of the run named, which must
+// be the actor's own on the comment's task t.
+func (c *cx) fromRun(cm *core.Comment, run string, t core.Task) error {
+	if run == "" {
+		return nil
+	}
+	refused := invalid("session", "session names a run of your own on %s", t.Key)
+	if !id.Valid(run) {
+		return refused
+	}
+	var s core.AgentSession
+	ok, err := store.Find(c.ctx, c.tx, &s, store.Eq("id", run), store.Eq("agent_id", c.actor.UserID), store.Eq("task_id", t.ID))
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return refused
+	}
+	cm.SessionID = s.ID
+	return nil
 }
 
 // commentKind is the kind of a new comment: the one given, or else a result
@@ -146,6 +177,9 @@ func (c *cx) taskComment(cm core.Comment, a commentCreateArgs) error {
 		return err
 	}
 	if err := inThread(thread, t.ID, ""); err != nil {
+		return err
+	}
+	if err := c.fromRun(&cm, a.Session, t); err != nil {
 		return err
 	}
 	seq := c.tx.NextSeq()
@@ -248,7 +282,8 @@ func (c *cx) commentSubject(cm *core.Comment, a commentCreateArgs) (core.Task, e
 
 // commentReaches makes the author a follower of the task (a person; see
 // watch), and those it mentions, and tells them and the ones it replies
-// to. It returns the members it mentions.
+// to. It returns the members it mentions. A run's last message mentions
+// nobody: its words are the program's, said to no one in particular.
 func (c *cx) commentReaches(cm core.Comment, t core.Task) ([]core.Member, error) {
 	if err := c.watch(c.actor.UserID, "task", t.ID); err != nil {
 		return nil, err
@@ -256,6 +291,9 @@ func (c *cx) commentReaches(cm core.Comment, t core.Task) ([]core.Member, error)
 	mentioned, err := c.link("comment", cm.ID, "task", t.ID, cm.Body)
 	if err != nil {
 		return nil, err
+	}
+	if cm.SessionID != "" {
+		mentioned = nil
 	}
 	for _, m := range mentioned {
 		if err := c.watch(m.UserID, "task", t.ID); err != nil {

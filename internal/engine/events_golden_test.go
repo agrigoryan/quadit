@@ -232,7 +232,28 @@ func eventScenario(t *testing.T, st store.Store, quiet bool) (evs []core.Event, 
 	as(artist, "notification.read", M{"all": true})
 	do("session.start", M{"task": "SVA-1", "title": "Drawing"})
 	sess := do("session.start", M{"title": "Thinking"}).Ref
+	do("session.update", M{"id": sess, "add_steps": []any{"read the brief", M{"any": "form"}}})
 	do("session.update", M{"id": sess, "summary": "thought", "state": "done"})
+	// A run Quadit's runner starts for the artist, holding its listener of
+	// SVA: its steps are appended, it posts the program's last message, and
+	// a member asks it to stop.
+	var sva core.Project
+	if err := st.In(ws.ID).Get(ctx, &sva, store.Eq("key", "SVA")); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Write(ctx, ws.ID, func(tx store.Tx) error {
+		return tx.Insert(ctx, core.Listener{WorkspaceID: ws.ID, AgentID: artist, ProjectID: sva.ID, Lease: "KQ7MX4PA", LeaseUntil: e.Now() + 3_600_000,
+			HeardAt: e.Now(), MachineID: "3f9c0a7d5e21b864", MachineName: "Studio", RunnerFolder: "~/game", RunnerProgram: core.ProgramClaude, RunnerHolds: true})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	run := as(artist, "session.start", M{"task": "SVA-1", "state": "waiting", "reason": "folder_busy", "program": "claude", "machine_id": "3f9c0a7d5e21b864",
+		"machine_name": "Studio", "folder": "~/game", "lease": "KQ7MX4PA", "item_seq": 1, "instructions": "#1 comment"}).Ref
+	as(artist, "session.update", M{"id": run, "state": "running", "items_through": 1, "program_session": id.New(),
+		"add_steps": []M{{"tool": "Bash", "text": "Run the tests", "at": 1767603600000}}})
+	as(artist, "comment.create", M{"task": "SVA-1", "body": "It explodes now.", "session": run})
+	do("session.stop", M{"id": run})
+	as(artist, "session.update", M{"id": run, "state": "stopped", "summary": "It explodes now."})
 	do("task.move", M{"id": "SVA-3", "project": "OPS"})
 	do("task.delete", M{"id": "SVA-2"})
 	do("task.restore", M{"id": "SVA-2"})
