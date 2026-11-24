@@ -68,6 +68,7 @@ export interface Changes {
     attachments?: AttachArgs[];
     waiting_on?: string | null;
     waiting_on_note?: string;
+    session?: string;
   };
   "comment.delete": {
     id: string;
@@ -474,6 +475,18 @@ export interface Changes {
     task?: string;
     title?: string;
     instructions?: string;
+    state?: string;
+    reason?: string;
+    program?: string;
+    program_session?: string;
+    machine_id?: string;
+    machine_name?: string;
+    folder?: string;
+    lease?: string;
+    item_seq?: number;
+  };
+  "session.stop": {
+    id: string;
   };
   "session.update": {
     id: string;
@@ -482,6 +495,11 @@ export interface Changes {
     state?: string | null;
     add_steps?: unknown[];
     add_links?: unknown[];
+    reason?: string | null;
+    program_session?: string | null;
+    fresh?: boolean;
+    items_through?: number | null;
+    resets_at?: number | null;
   };
   "source.create": {
     id?: string;
