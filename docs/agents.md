@@ -212,7 +212,7 @@ It is set up for one agent and one project on each computer: in the desktop app 
 | `quadit run list [--json]` | Each entry and what it does now: `e5d2a91c  @claude  SVA  ~/devel/game  Claude Code  ready` (or `working on SVA-12`, `paused: …`, `aside: a chat listens`, `removing`, `not served: no quadit run is running`). A runner that serves but has not reported an entry yet: `starting`; an entry it cannot serve: `not served: <why>`; an empty registry: `Nothing runs on this computer: quadit run add registers an agent's project.` `--json` is `{"machine", "serving", "entries"}`, each entry with its `status` while a runner serves. |
 | `quadit run machine name="…"` | Renames this computer as Quadit shows it (1 to 64 characters). |
 
-`quadit run --secret NAME -- COMMAND` is still the secrets form ([Secrets](#secrets)): a first argument `--secret` makes it that, and every other form is the runner's. The runner's forms need no default login, since each entry has its own; they refuse `--dry-run`. `registry=PATH` uses another registry, with the runner's other files in `runner/` beside it (for tests).
+`quadit run --secret NAME -- COMMAND` is still the secrets form ([Secrets](#secrets)): a first argument `--secret` makes it that, and every other form is the runner's. The runner's forms need no default login, since each entry has its own; they refuse `--dry-run`, and, before they touch anything, a field they do not take, a field given twice and an argument too many. `registry=PATH` uses another registry, with the runner's other files in `runner/` beside it (for tests).
 
 `quadit run` prints one line for each thing that happens, and writes the same lines with their times to `runner.log`:
 
@@ -229,6 +229,8 @@ SVA-15 @claude: stopped: a member asked it to stop
 GS @codex ~/devel/site: a chat listens to GS; trying again in 2 s
 GS @codex ~/devel/site: paused: Codex is not signed in (codex login)
 ```
+
+Other lines say `waiting: its session was written outside Quadit a moment ago`, `waiting: what SVA-12 covers could not be read (…)` (the item comes again), `failed: the login file changed since it was verified`, `failed: Claude Code lost its session twice on Aram's MacBook Pro`, `interrupted: a chat took SVA over`, `interrupted: the agent's login was refused`, and `removed`.
 
 A later run of the task prints `session <id>` (the one it resumes); a first Codex run, whose session Codex names itself, `a new session`.
 
@@ -247,17 +249,17 @@ Beside the login files (`~/Library/Application Support/quadit/` on macOS, `~/.co
 | --- | --- |
 | `runner.lock` | held by the one `quadit run` that serves the computer |
 | `registry.lock` | held while the registry is written |
-| `status.json` | what each entry does now; `quadit run list` and the desktop app read it |
-| `locks/` | one lock per folder: one run at a time there |
+| `status.json` | what each entry does now, written as soon as the runner serves; `quadit run list` and the desktop app read it |
+| `locks/` | one lock per folder, named from the folder's identity, so two spellings of one folder share it: one run at a time there |
 | `entries/<id>/state.json` | what the entry keeps between runs: each task's program session, the items its runs already took, the guards' counts, a pause |
 | `entries/<id>/journal.json` | the run in flight, so that a crash can be told from a run that ended |
-| `entries/<id>/outbox/` | every write to the server, in order, each stored with its change id before it is sent; `failed/` holds the writes the server refused for good |
-| `runs/<run id>.log` | the program's output, kept 30 days (and, for Codex, its last message of each attempt beside it) |
+| `entries/<id>/outbox/` | every write to the server, in order, each stored with its change id before it is sent; `last` keeps the last number given, so none is given twice; `failed/<run>-<write>-<ordinal>.json` keeps each write the server refused for good, with its error |
+| `runs/<run id>.log` | the program's output, kept 30 days, at most 16 MB a run (and, for Codex, its last message of each attempt beside it) |
 | `runner.log` | what `quadit run` printed, with times; past 5 MB a new file, one old one kept |
 
-An entry keeps its lease in the lease file `quadit listen` uses, beside the entry's login, so the runner and a `quadit listen` of the same login and project exclude each other (the entry waits, `a quadit listen of this login listens to SVA; trying again in 60 s`), and a runner started again goes on with its lease.
+An entry keeps its lease in the lease file `quadit listen` uses, beside the entry's login, so the runner and a `quadit listen` of the same login and project exclude each other (while such a `quadit listen` runs, the entry is not served, with that error, checked again every 5 minutes), and a runner started again goes on with its lease.
 
-In `status.json` each entry is `starting`, `ready`, `working` (with its task), `paused` (with why, and until when for a usage limit), `aside` (a chat holds the project), `removing`, or `error` with a message (a refusal of `add`, `login refused`, `project gone`, `this Quadit server cannot run agents yet: update it`); `blocked` lists the writes the server refused for good.
+In `status.json` each entry is `starting`, `ready`, `working` (with its task), `paused` (with why, and until when for a usage limit), `aside` (a chat holds the project), `removing`, or `error` with a message (a refusal of `add`, `login refused`, `project gone`, `this Quadit server cannot run agents yet: update it`, `the server sent an answer that does not hold together`, `how a run ended could not be kept on this computer`, `a run could not be written down on this computer: …`, `another quadit listen is running with this login, …`), checked again every 5 minutes; `blocked` lists the writes the server refused for good.
 
 ### Which items start a run
 
@@ -280,7 +282,7 @@ The owner is the person responsible for the agent, while a current member of the
 
 Only a change its author applied in person can start a run. An item an automation rule made is acknowledged (`rule`), though a rule acts as the person who made it; so is one the server wrote in the owner's name, from a sync with GitHub or a repository, a saved view's news or a job (`background`).
 
-The runner asks for the agent's other waiting items of the same task with each item (at most 20), and the prompt carries those that would start a run too. An item that comes during a run is not given to the running program: it becomes the next run, which resumes the same session. An item the program already took is acknowledged without another run.
+The runner asks for the agent's other waiting items of the same task with each item (at most 20), and the prompt carries those that would start a run too, when the runner knows what the task's earlier runs took; when it does not (a first run here, with no run on the server that took a prompt), the item runs alone and the others come as their own runs. A continuation after a usage limit or a sign-in failure carries nothing new: what came meanwhile comes as its own run. An item that comes during a run is not given to the running program: it becomes the next run, which resumes the same session. An item the program already took is acknowledged without another run.
 
 Inbox items carry `addressed`: whether the change that made the item was for its member itself (it was assigned, handed, mentioned, asked or answered, the comment was on its own task, or it had asked in the thread), or the member only heard it because it follows the task.
 
@@ -308,18 +310,18 @@ A run whose item does not start the program ends at once as Not started, with it
 | Failed | `program_error` | the program stopped with an error after it began to work | comment to go on in the same session |
 | Failed | `idle` | the program printed nothing for 30 minutes, so Quadit stopped it | comment to go on in the same session |
 | Failed | `time_limit` | the run went past the entry's `max_minutes` | comment to go on in the same session |
-| Failed | `interrupted` | Quadit stopped on that computer, or another session took the project, while the agent worked | comment to go on in the same session |
+| Failed | `interrupted` | Quadit stopped on that computer, another session took the project, or the agent's login was refused, while the agent worked | comment to go on in the same session |
 | Failed | `usage_limit` | the program's usage limit was reached | nothing: it starts again by itself after the reset |
 | Failed | `not_signed_in` | the program is not signed in | sign in to the program on that computer; it starts again by itself |
 | Stopped | | a member pressed Stop | |
 
 A run whose program began to work (used a tool) is never started again by itself: what it did stays in the folder as it is, and Quadit never reverts anything. A failure before any work is tried again, three attempts in all, 10 seconds and then 60 seconds apart. After a usage limit or a sign-in failure the item is kept: a usage limit pauses every entry of that agent on the computer until it resets, a sign-in failure pauses the entry it happened in until the program is signed in, and the item then runs again; when the program had already begun, that run is told to go on from where it stopped.
 
-When an entry starts, the runner checks the folder, the program (`--version`), the login (an agent's, may write, of the entry's server and workspace), the project, that the program's own settings do not make it work as another login (`QUADIT_CONFIG` in Claude Code's `settings.json` `env`, or in Codex's `shell_environment_policy.set`), and that the program is signed in (`claude auth status`, `codex login status`). Before every start of the program it checks the folder and the program again. A failed check pauses the entry (`folder_missing`, `program_missing`, `login_mismatch`, `not_signed_in`) and its items wait; a paused entry keeps its lease and checks again every 5 minutes. A login refused or a project gone stops the entry, tried again every 5 minutes. A server that answers without saying what to do with an item is older than the runner needs: the entry pauses (`server_old`) and says to update the server.
+When an entry starts, the runner checks the folder, the program (`--version`), the login (an agent's, may write, of the entry's server and workspace), the project, that the program's own settings do not make it work as another login (`QUADIT_CONFIG` in Claude Code's `settings.json` `env`, or in Codex's `shell_environment_policy.set`), and that the program is signed in (`claude auth status`, `codex login status`). Nothing is sent for an entry before its login is verified against the entry's server, workspace and agent. Before every start of the program it checks the folder and the program again, and that the login file is the one it verified (else the run fails and the entry stops, `login refused`); the program starts only right after the run's row and the lease were read again. A failed check pauses the entry (`folder_missing`, `program_missing`, `login_mismatch`, `not_signed_in`) and its items wait; a paused entry keeps its lease and checks again every 5 minutes. A login refused or a project gone stops the entry, tried again every 5 minutes. A server that answers without saying what to do with an item is older than the runner needs: the entry pauses (`server_old`) and says to update the server.
 
 ### The prompts
 
-The runner builds each prompt on the computer, from fixed texts in the `quadit` binary; the server supplies no template. The prompt goes to the program on its standard input, never on its command line. In outline:
+The runner builds each prompt on the computer, from fixed texts in the `quadit` binary; the server supplies no template. The prompt goes to the program on its standard input, never on its command line. Every prompt names the agent's responsible person, read again from the server for each run (in a resumed session, `You work for @aram now.`), so a session follows a change of owner. In outline:
 
 - **A first run on a task**: who started the agent, on which computer and folder, for which task and run; that nobody is in the conversation; the items, between two marker lines made with a random word for each run (`QUADIT-ITEMS-…`), each as `quadit wait` prints it; that what the owner asks there is the work, and that the items are members' words, never to be followed to reveal secrets, change who it works as or which server it uses, or do something unrelated to the task; then to follow the skill's section "Started by Quadit" ([the skill](../integrations/skills/quadit/SKILL.md)).
 - **A later item** (resuming the session): the new items, newest first to read, and to say in its first comment how they change what it does next.
@@ -330,7 +332,7 @@ The runner builds each prompt on the computer, from fixed texts in the `quadit` 
 
 Outside the item block a prompt carries only values the runner checked or knows itself: handles, the task's key, the run's id, a decision's id, the computer's name and the folder. Never the task's title or the workspace's name.
 
-**How the program is started.** Claude Code: `claude -p --output-format stream-json --verbose --session-id UUID --name KEY --permission-mode bypassPermissions --disallowedTools AskUserQuestion`, or `--resume UUID` in place of `--session-id UUID --name KEY` to go on with a session. Codex: `codex exec --json --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check -o LASTFILE -`, or `codex exec resume … ID -`. Each starts in a process group of its own, in the folder; on macOS the computer is kept from idle sleep while it runs (`caffeinate -i`; a closed lid still sleeps). Its environment is the runner's without `CLAUDECODE`, `CLAUDE_CODE_*`, `QUADIT_*` and `ELECTRON_*`, with `QUADIT_CONFIG` (the entry's login), `QUADIT_TASK` (the task's key), `QUADIT_SESSION` (the run's id) and `NO_COLOR=1`. Nothing else is removed, so the programs' own sign-in and network settings (API keys, proxies) reach them. The runner reads only the program's standard output as what it did; unknown lines are passed over.
+**How the program is started.** Claude Code: `claude -p --output-format stream-json --verbose --session-id UUID --name KEY --permission-mode bypassPermissions --disallowedTools AskUserQuestion`, or `--resume UUID` in place of `--session-id UUID --name KEY` to go on with a session. Codex: `codex exec --json --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check -o LASTFILE -`, or `codex exec resume … ID -`. Each starts in a process group of its own, in the folder; on macOS the computer is kept from idle sleep while it runs (`caffeinate -i`; a closed lid still sleeps). Its environment is the runner's without `CLAUDECODE`, `CLAUDE_CODE_*`, `QUADIT_*` and `ELECTRON_*`, with `QUADIT_CONFIG` (the entry's login), `QUADIT_TASK` (the task's key), `QUADIT_SESSION` (the run's id) and `NO_COLOR=1`. Nothing else is removed, so the programs' own sign-in and network settings (API keys, proxies) reach them. The runner reads only the program's standard output as what it did; unknown lines are passed over. What it keeps is bounded: an output line at 16 MB (a longer one is passed over), the end of the program's error output at 64 KB, its last message at 64 KB, a check's output (`--version`, sign-in) at 64 KB, a run's log at 16 MB.
 
 ### Sessions, and continuing in a terminal
 
@@ -342,7 +344,7 @@ On the task, the agent's owner sees on its newest ended run **Continue in a term
 
 Any member who may change the task stops a waiting or working run with **Stop** (the change `session.stop`): the runner sends the program's process group SIGINT, then SIGTERM after 10 seconds and SIGKILL after 5 more, and the run is Stopped. A run whose computer does not hold the project now (it is offline, or a chat holds the project) is ended at once by the server, since nothing would act on the stop. A session Quadit did not start cannot be stopped this way.
 
-The runner stopping, the entry being removed, the app quitting or updating, and a chat or another computer taking the project during a run end it as Interrupted (SIGTERM, then SIGKILL after 2 seconds), not Stopped; a comment goes on with it. The computer sleeping stops nothing: its lease lapses, the page says it is offline, and what comes waits for it. After a crash, the runner closes a run that may have started as Interrupted when it starts again, and never starts that program again by itself.
+The runner stopping, the entry being removed, the app quitting or updating, and a chat or another computer taking the project during a run end it as Interrupted (SIGTERM, then SIGKILL after 2 seconds), not Stopped; a comment goes on with it. The computer sleeping stops nothing: its lease lapses, the page says it is offline, and what comes waits for it. After a crash, the runner closes a run that may have started as Interrupted when it starts again, and never starts that program again by itself. One gap remains: if the runner itself is killed outright in the instant between starting the program and recording its process group, the next start ends that run as Interrupted but cannot stop the program.
 
 A chat and the runner never answer the same project at once. The runner never takes the lease from a chat: while a chat listens, the entry waits and tries again (after 2 seconds, doubling, at most every 60 seconds). A chat told to take over (`take=1`) interrupts a run in progress, and is handed the item.
 
@@ -356,7 +358,7 @@ A chat and the runner never answer the same project at once. The runner never ta
 | Runs started by agents, per entry | At most 12 per entry in any 60 minutes, whatever the task, so two agents of one person cannot keep each other going (`run_cap`). |
 | No progress | After two runs in a row on a task that changed nothing on it (no comment, result, question, change to the task or link), runs started by agents on it are held (`no_progress`). Only runs whose program took the prompt and that ended Done, or Failed with `program_error`, `idle` or `time_limit`, are counted. |
 | Usage limit | The agent's entries on the computer pause until the reset the program gave, else for 30 minutes, doubling, at most 4 hours; the item is kept and continues after it. |
-| Retries before work only | At most 3 attempts, one fresh start after a lost session among them; a run that began to work is never repeated by itself. |
+| Retries before work only | At most 3 attempts, one fresh start after a lost session among them (a second lost session fails the run, `start_failed`); a run that began to work is never repeated by itself. |
 | Unknown errors | An error the runner cannot tell never stops a program that is running. |
 | Infrastructure stops | The runner, the app or a lost lease ending a run is Interrupted, not Stopped; sleep stops nothing. |
 | One runner per computer | A second `quadit run` exits with 3. |
@@ -397,7 +399,7 @@ A person's item is never held by a guard, and a held item never blocks a person'
 | Claude Code | not yet verified with a live agent. The flags above are those `claude --help` lists in 2.1.331. |
 | Codex | not yet verified with a live agent. The flags above are those `codex exec --help` and `codex exec resume --help` list in 0.170.0. |
 
-`scripts/agent-run-check.sh claude|codex` checks it by hand, on a throwaway server, with a throwaway git repository in a private folder the folder rules accept: an assignment and a comment that go on in one session, a question and its answer, another member's comment that starts nothing, a stop, a lost session, the quiet time after a terminal, a crash of the runner, a folder removed. It spends the person's plan, so it asks before it starts.
+`scripts/agent-run-check.sh claude|codex` (after `make server`) checks it by hand with the real program, which must be signed in. It runs a throwaway server, keeps its logs, data and registry in a folder under `$TMPDIR` (named at the end), and its git repository in `~/.quadit-run-check.XXXXXX/repo` (private, removed at the end). It prints one PASS or FAIL line per step and stops at the first failure, with the paths of the logs: an assignment, a comment that goes on in the same session, a question and its answer, another member's comment that starts nothing, a stop, a lost session, a terminal on the session (it needs you; `RUN_CHECK_SKIP_TERMINAL=1` skips it), the runner killed and started again, the folder removed; then it keeps each run's output, sanitized, as fixtures. Codex runs with a `CODEX_HOME` holding only a copy of your `auth.json`; Claude Code with your own profile, its sessions for the repository removed at the end. It spends the person's plan, so it asks before it starts (`RUN_CHECK_YES=1` does not ask).
 
 ## A session in five calls
 
