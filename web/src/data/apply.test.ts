@@ -216,3 +216,72 @@ describe("applyEvent on a restore from the trash", () => {
     expect(Object.keys(next.docs).sort()).toEqual(["d1", "d2"]);
   });
 });
+
+describe("applyEvent on steps appended to a run", () => {
+  const run = (over: AnyRow = {}): AnyRow => ({
+    id: "s1",
+    state: "running",
+    steps: [{ tool: "Read" }],
+    updated_seq: 10,
+    ...over,
+  });
+  const appended = (seq: number, data: FeedEvent["data"]) =>
+    event(seq, { type: "session.updated", entity_type: "session", entity_id: "s1", data });
+
+  it("adds the new steps and links to the end of the run's lists, and stamps the row with the event's seq", () => {
+    const next = apply(
+      withRows({ sessions: [run()] }),
+      appended(11, { appended: { steps: [{ tool: "Bash" }], links: ["https://example.com/pr/1"] } }),
+    );
+    expect(next.sessions.s1).toEqual(
+      run({ steps: [{ tool: "Read" }, { tool: "Bash" }], links: ["https://example.com/pr/1"], updated_seq: 11 }),
+    );
+  });
+
+  it("changes nothing more when the same event is applied twice", () => {
+    const ev = appended(11, {
+      appended: { steps: [{ tool: "Bash" }] },
+      changes: { state: { from: "waiting", to: "running" } },
+    });
+    const once = apply(withRows({ sessions: [run()] }), ev);
+    expect(apply(once, ev).sessions.s1).toEqual(once.sessions.s1);
+    expect((once.sessions.s1 as AnyRow).steps).toEqual([{ tool: "Read" }, { tool: "Bash" }]);
+  });
+
+  it("ignores an event no newer than the row, which already holds what it added", () => {
+    const c = withRows({ sessions: [run({ steps: [{ tool: "Read" }, { tool: "Bash" }], updated_seq: 12 })] });
+    expect(apply(c, appended(11, { appended: { steps: [{ tool: "Bash" }] } })).sessions.s1).toEqual(c.sessions.s1);
+  });
+
+  it("ignores an event for a run the copy does not hold", () => {
+    expect(apply(emptyCollections(), appended(11, { appended: { steps: [{ tool: "Bash" }] } })).sessions).toEqual({});
+  });
+
+  it("drops from the front as many steps as the cap dropped", () => {
+    const c = withRows({ sessions: [run({ steps: [{ tool: "A" }, { tool: "B" }, { tool: "C" }], steps_dropped: 4 })] });
+    const next = apply(
+      c,
+      appended(11, {
+        appended: { steps: [{ tool: "D" }, { tool: "E" }] },
+        changes: { steps_dropped: { from: 4, to: 6 } },
+      }),
+    );
+    expect(next.sessions.s1).toMatchObject({ steps: [{ tool: "C" }, { tool: "D" }, { tool: "E" }], steps_dropped: 6 });
+  });
+
+  it("starts a list the row did not have", () => {
+    const next = apply(
+      withRows({ sessions: [run({ steps: undefined })] }),
+      appended(11, { appended: { steps: ["Read the code"] } }),
+    );
+    expect((next.sessions.s1 as AnyRow).steps).toEqual(["Read the code"]);
+  });
+
+  it("keeps applying an older event that carries the whole list in its changes", () => {
+    const next = apply(
+      withRows({ sessions: [run()] }),
+      appended(11, { changes: { steps: { from: [{ tool: "Read" }], to: [{ tool: "Read" }, "Ran the tests"] } } }),
+    );
+    expect((next.sessions.s1 as AnyRow).steps).toEqual([{ tool: "Read" }, "Ran the tests"]);
+  });
+});

@@ -1,6 +1,7 @@
 // Agent sessions as these pages read them. The store has the sessions of
 // the last days from the start, and the feed keeps each one whole: an update
-// carries the new list of steps and links. Older sessions a page asks for
+// carries the steps and links it added, which the copy appends (data/apply.ts).
+// Older sessions a page asks for
 // are fetched once and put into the store, where the feed keeps them current
 // like the rest. The key those fetches are cached under is here.
 

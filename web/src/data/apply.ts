@@ -88,6 +88,11 @@ export function applyEvent(d: CopyOnWrite, ev: FeedEvent, only?: (collection: Co
     if (wanted(name, id)) d.drop(name, id);
     return;
   }
+  if (data.appended) {
+    for (const target of data.ids ?? [id]) {
+      if (wanted(name, target)) appendTo(d, name, target, ev);
+    }
+  }
   if (data.changes) {
     const fields: AnyRow = {};
     for (const [field, change] of Object.entries(data.changes)) fields[field] = change.to;
@@ -100,6 +105,30 @@ export function applyEvent(d: CopyOnWrite, ev: FeedEvent, only?: (collection: Co
       if (wanted(name, target)) d.patch(name, target, fields);
     }
   }
+}
+
+/**
+ * Adds an event's appended items to the end of the row's lists (a run's
+ * steps and links). The event carries only what is new, so it is applied
+ * only to a row older than it: applied twice, or over a copy of the row
+ * fetched after it, it changes nothing. When the server's cap dropped
+ * steps from the front (the event's `steps_dropped` change), the copy drops
+ * as many. The row is stamped with the event's seq here, before the
+ * event's changes are patched in, for an event that carries none.
+ */
+function appendTo(d: CopyOnWrite, name: CollectionName, id: string, ev: FeedEvent) {
+  const row = d.peek(name)[id];
+  const appended = ev.data.appended ?? {};
+  if (!row || ev.seq <= Number(row.updated_seq ?? 0)) return;
+  const fields: AnyRow = { updated_seq: ev.seq };
+  for (const [field, items] of Object.entries(appended)) {
+    const held = Array.isArray(row[field]) ? (row[field] as unknown[]) : [];
+    fields[field] = [...held, ...items];
+  }
+  const before = Number(row.steps_dropped ?? 0);
+  const after = Number(ev.data.changes?.steps_dropped?.to ?? before);
+  if (after > before && Array.isArray(fields.steps)) fields.steps = fields.steps.slice(after - before);
+  d.patch(name, id, fields);
 }
 
 /**

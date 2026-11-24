@@ -26,6 +26,12 @@ export interface FieldChange {
 interface EventData {
   row?: Record<string, unknown>;
   changes?: Record<string, FieldChange>;
+  /**
+   * Items added to the end of a list field of the row, by field ("steps",
+   * "links"): only the new ones, never the whole list again. A reader adds
+   * them to its copy when the event is newer than the row.
+   */
+  appended?: Record<string, unknown[]>;
   ids?: string[];
   gone?: boolean;
   attachments?: Attachment[];
