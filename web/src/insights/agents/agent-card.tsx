@@ -158,11 +158,14 @@ function Reach({ member, state, now }: { member: Member; state: AgentState; now:
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
       {connection === "listening" ? (
         <span
-          className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-ink-2"
+          className="inline-flex min-w-0 items-start gap-1.5 text-ink-2"
           title={t("agents.connection.listeningHint")}
         >
-          <Ear className="size-3" aria-hidden />
-          <ListenerLines reading={state} />
+          {/* Beside the first line: a runner's line is long and wraps. */}
+          <Ear className="mt-0.5 size-3 shrink-0" aria-hidden />
+          <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-0.5">
+            <ListenerLines reading={state} />
+          </span>
         </span>
       ) : connection === "connected" ? (
         <NotListening urgent={isStranded(state)} />

@@ -285,12 +285,13 @@ export function SessionRow({ session, now, showAgent, showTask, question, newest
           aria-expanded={open}
           aria-label={t(open ? "agents.session.collapse" : "agents.session.expand", { title })}
           onClick={() => setOpen(!open)}
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent"
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-left md:min-w-auto outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent"
         >
           <ChevronRight className={cx("size-3.5 shrink-0 text-ink-3", open && "rotate-90")} aria-hidden />
           <StateMark shown={shown} />
           {showAgent && agent && <Avatar member={agent} size="xs" />}
-          <span className="min-w-0 truncate">{title}</span>
+          {/* Past phone width the title keeps a few words: the computer's name gives way first. */}
+          <span className="min-w-0 truncate md:min-w-24">{title}</span>
         </button>
         {runner && session.machine_name && (
           <span className="max-w-40 min-w-0 shrink truncate text-xs text-ink-3" title={session.folder}>
