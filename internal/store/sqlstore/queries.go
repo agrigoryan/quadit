@@ -305,7 +305,7 @@ func (c conn) eventWhere(filter store.EventFilter) *clause {
 		where.add(`e.seq < ?`, filter.Before)
 	}
 	// One object's timeline, or the events of some projects (and with
-	// AllowNoProject those of no project).
+	// AllowNoProject those of no project), or not of others.
 	if filter.ScopeID != "" {
 		where.add(`e.scope_id = ?`, idOrNone(filter.ScopeID))
 		if filter.ScopeType != "" {
@@ -314,6 +314,10 @@ func (c conn) eventWhere(filter store.EventFilter) *clause {
 	}
 	if len(filter.ProjectIDs) > 0 {
 		where.inOrNone(`e.project_id`, filter.ProjectIDs, filter.AllowNoProject)
+	}
+	if leave := onlyIDs(filter.NotProjectIDs); len(leave) > 0 {
+		list, args := placeholdersFor(leave)
+		where.add(`(e.project_id IS NULL OR e.project_id NOT IN (`+list+`))`, args...)
 	}
 	// Of some types, or by (or not by) an actor.
 	if len(filter.Types) > 0 {

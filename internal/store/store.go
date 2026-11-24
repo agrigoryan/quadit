@@ -340,9 +340,12 @@ type EventFilter struct {
 	// AllowNoProject also keeps events that belong to no project (members,
 	// shared labels) when ProjectIDs is set.
 	AllowNoProject bool
-	Types          []string
-	ActorID        string
-	NotActorID     string
+	// NotProjectIDs leaves out the events of these projects; those of no
+	// project stay.
+	NotProjectIDs []string
+	Types         []string
+	ActorID       string
+	NotActorID    string
 	// Viewer hides events addressed to someone else. Empty shows all.
 	Viewer string
 	// OnlyAudience keeps only events addressed to this member.
