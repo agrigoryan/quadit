@@ -274,9 +274,10 @@ For each inbox item it hands the runner, the server says whether it starts a run
 | `assigned` | always | |
 | `mentioned` | on a task | on a page |
 | `waiting_on` | the task was handed to the agent | a shared resource's turn |
-| `decision_asked` | the decision is still open and asked of the agent | answered or withdrawn since |
+| `decision_asked` | the decision is still open and asked of the agent | answered, withdrawn or closed as no longer needed since |
 | `picked` | an answer to the agent's own question | |
 | `unclear` | its answer was found unclear, and the decision is open and asked of it | answered again since |
+| `not_needed` | the closer wrote a note for it (the item is addressed) | closed without a note |
 | `replied` | an answer in a thread it wrote in | |
 | `comment`, `result` | the comment was for the agent: on its own task, mentioning it, or handing it the task | heard only because it follows the task, or made before this version |
 | `status` | never | always |
@@ -493,6 +494,10 @@ When they answer, the task waits on you again and the answer is in your inbox an
 ```
 
 If the answer does not settle the question, say so in one line with `decision.unclear` instead of guessing; the question goes back to them.
+
+A question that is no longer needed is closed, not deleted: `decision.close {id, note}` (`quadit close DECISION_ID "…"`), from open or sent back, by the member who asked it, the member asked, the person responsible for the agent that asked, or an admin. It stays in the history as `not_needed`, with who closed it and when (`decided_by`, `decided_at`), the note (`outcome_note`; with none, what an answer that sent it back said stays as the reason) and no answer; the items that asked it are read, a task that waited on the one asked for it alone waits on nobody, and the asker, when someone else closed it, gets an inbox item `not_needed`, addressed only when the closer wrote a note. A closed question cannot be answered or found unclear, and is not opened again. The events say `decision.closed`. Questions settle by themselves too: a task moved to a done or canceled status closes its open and sent-back questions (by whoever closed it, without a note) and waits on nobody, which opening it again does not undo; a question sent back is closed when its asker asks again on the task or posts a result there, not by a plain comment. A hand-off on a closed task (an answer, a result handing it back) leaves it waiting on nobody. `GET /decisions?state=not_needed` lists them; `answered`, the default, is every state but open.
+
+What waits on whom: an `open` question waits on the member asked; a `sent_back` one on its asker, through the task (the answer handed it back to them), never on the member asked; a `not_needed` one on nobody. Questions asked of you (`quadit work`, the dashboard, `has_open_decision`) are the open ones; the recent answers that guide later work leave the closed ones out.
 
 For a plain yes or no, `quadit approval SVA-12 "Merge this?"`.
 
