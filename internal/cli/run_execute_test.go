@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -731,4 +732,130 @@ func TestAnUnreadableRecordMeansTheAttemptIsNotRepeated(t *testing.T) {
 		t.Fatalf("%v after %d starts", row, len(rt.records()))
 	}
 	rt.acked(head)
+}
+
+func TestALaunchThatCannotBeWrittenDownDoesNotHappen(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
+	srv := newServing(rt.files, rt.host(), testMachine, &syncBuffer{}, "")
+	lock, err := srv.takeFolder(rt.folder, "@someone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	rt.eventually("waiting for the folder", func() bool { return len(rt.f.allRuns()) > 0 && rt.f.allRuns()[0]["reason"] == core.RunFolderBusy })
+	dir := rt.files.entry(rt.entry.ID)
+	if err := os.Chmod(dir, 0o500); err != nil { // the journal cannot be written from now on
+		t.Fatal(err)
+	}
+	defer os.Chmod(dir, 0o700)
+	srv.releaseFolder(rt.folder, lock)
+	rt.eventually("the entry's error", func() bool {
+		return strings.HasPrefix(readStatus(rt.files.status()).Entries[rt.entry.ID].Message, "a run could not be written down")
+	})
+	if len(rt.records()) != 0 {
+		t.Fatal("a program started whose launch could not be written down")
+	}
+}
+
+func TestAnEndThatCannotBeKeptHoldsTheEntry(t *testing.T) {
+	slow := []fakeagent.Step{claudeInit(), claudeSays("On it."), {SleepMS: 300}, claudeEnds("done")}
+	rt := newRunTest(t, core.ProgramClaude, slow, claudeDone("the next"))
+	head := rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	rt.running(0)
+	outbox := filepath.Join(rt.files.entry(rt.entry.ID), "outbox")
+	if err := os.Chmod(outbox, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(outbox, 0o700)
+	rt.eventually("the entry held", func() bool {
+		return readStatus(rt.files.status()).Entries[rt.entry.ID].Message == string(errEndNotKept)
+	})
+	rt.f.addItem(fakeItem{Task: "SVA-13"})
+	time.Sleep(50 * time.Millisecond) // a few rounds of the entry's loop: nothing may happen in them
+	if len(rt.f.ackList()) != 0 || len(rt.records()) != 1 {
+		t.Fatalf("while its end was not kept the entry acknowledged %v and started %d programs", rt.f.ackList(), len(rt.records()))
+	}
+	_ = os.Chmod(outbox, 0o700)
+	rt.acked(head)
+	rt.eventually("the next item run", func() bool { return len(rt.records()) == 2 })
+}
+
+func TestTheEndIsKeptBeforeAnyWriteAfterTheProgramExits(t *testing.T) {
+	script := []fakeagent.Step{claudeInit(), claudeRunsBash("Run the tests"), {SleepMS: 50}, claudeEnds("done")}
+	rt := newRunTest(t, core.ProgramClaude, script)
+	outbox := filepath.Join(rt.files.entry(rt.entry.ID), "outbox")
+	var mu sync.Mutex
+	checked, missing := 0, 0
+	rt.f.set(func(f *fakeQuadit) {
+		f.beforeWrite = func() {
+			recs := rt.records()
+			if len(recs) == 0 || alive(recs[0].PID) {
+				return // the barrier is the program's exit
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			checked++
+			if !terminalOnDisk(outbox) {
+				missing++
+			}
+		}
+	})
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	rt.ended(0)
+	mu.Lock()
+	defer mu.Unlock()
+	if checked == 0 || missing > 0 {
+		t.Fatalf("%d writes after the exit, %d of them before the end was on disk", checked, missing)
+	}
+}
+
+// terminalOnDisk reports whether the outbox holds a run's end: its
+// terminal record, or a write it was resolved into.
+func terminalOnDisk(outbox string) bool {
+	files, _ := filepath.Glob(filepath.Join(outbox, "*.json"))
+	for _, f := range files {
+		raw, _ := os.ReadFile(f)
+		var w outboxWrite
+		if json.Unmarshal(raw, &w) == nil && (w.Terminal != nil || w.Write == writeEnd || w.Write == writeAck) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestAProgramMovedBetweenItsCheckAndItsStartIsNotStarted(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
+	link := filepath.Join(rt.dir, "bin", "claude")
+	_ = os.MkdirAll(filepath.Dir(link), 0o700)
+	if err := os.Symlink(rt.entry.ProgramPath, link); err != nil {
+		t.Fatal(err)
+	}
+	entry := rt.entry
+	entry.ProgramPath = link
+	rt.writeRegistry(entry)
+	rt.serve()
+	rt.eventually("listening", func() bool { return strings.Contains(rt.out.String(), ": listening") })
+	gate, open := rt.gateVersion()
+	defer open()
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.eventually("the check before the start held", func() bool { _, err := os.Stat(gate + ".waiting"); return err == nil })
+	// Another program at the path, after it was checked: a copy of the
+	// fake, which would record its start.
+	other := filepath.Join(rt.dir, "bin", "other")
+	raw, err := os.ReadFile(rt.entry.ProgramPath)
+	if err != nil || os.WriteFile(other, raw, 0o700) != nil {
+		t.Fatal(err)
+	}
+	_ = os.Remove(link)
+	if err := os.Symlink(other, link); err != nil {
+		t.Fatal(err)
+	}
+	open()
+	rt.eventually("the run ended", func() bool { return ended(rt.runState(0)) })
+	if len(rt.records()) != 0 {
+		t.Fatal("a program not the one checked was started")
+	}
 }

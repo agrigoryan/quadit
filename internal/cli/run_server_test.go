@@ -71,6 +71,7 @@ type fakeQuadit struct {
 	stopOnStart    bool
 	refuseEnds     bool
 	writeOnRunning string
+	beforeWrite    func() // called as each write (a change, an acknowledgment) arrives
 	members        map[string]fakeMember
 }
 
@@ -448,6 +449,12 @@ func (f *fakeQuadit) listen(w http.ResponseWriter, r *http.Request, who fakeMemb
 }
 
 func (f *fakeQuadit) ack(w http.ResponseWriter, r *http.Request, who fakeMember, cursor string) {
+	f.mu.Lock()
+	hook := f.beforeWrite
+	f.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
 	var body struct {
 		Seq   int64
 		Lease string
@@ -467,6 +474,12 @@ func (f *fakeQuadit) ack(w http.ResponseWriter, r *http.Request, who fakeMember,
 }
 
 func (f *fakeQuadit) applyChanges(w http.ResponseWriter, r *http.Request, who fakeMember) {
+	f.mu.Lock()
+	hook := f.beforeWrite
+	f.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
 	var body struct {
 		Changes []fakeChange `json:"changes"`
 	}

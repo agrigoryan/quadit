@@ -668,3 +668,27 @@ func TestTheFolderIsLetGoBeforeTheEndIsSent(t *testing.T) {
 		t.Fatalf("@claude's end reached the server: %v", rt.f.allRuns()[0])
 	}
 }
+
+func TestRunRefusesWhatItDoesNotKnowBeforeTouchingAnything(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	for _, args := range [][]string{
+		{"remove", "login=" + rt.login, "projcet=SVA"},
+		{"remove", "login=" + rt.login, "project=SVA", "project=GS"},
+		{"remove", rt.entry.ID, "extra"},
+		{"remove", rt.entry.ID, "login=" + rt.login},
+		{"add", "login=" + rt.login, "project=SVA", "folder=" + rt.folder, "program=claude", "progam_path=/x"},
+		{"list", "extra"},
+		{"machine", "name=A", "name=B"},
+		{"unknown=1"},
+	} {
+		var out bytes.Buffer
+		code := runnerFormOn(context.Background(), rt.host(), append(args, "registry="+rt.files.registry), switches{}, &out, &out)
+		if code != 1 {
+			t.Fatalf("%v: exit %d, %s", args, code, out.String())
+		}
+		reg, _ := readRegistry(rt.files.registry)
+		if len(reg.Entries) != 1 || reg.Entries[0].Removing {
+			t.Fatalf("%v changed the registry: %+v", args, reg.Entries)
+		}
+	}
+}

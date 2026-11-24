@@ -69,6 +69,7 @@ const (
 	endedLeaseLost  // a chat or another machine took the project, or the login lost its access
 	endedNotStarted // the program was not started: its launch could not be written down
 	endedUnrecorded // the program started, but what recognizes it could not be written down: it was stopped at once
+	endedMoved      // not started: the folder or the program is no longer the one checked (Detail: the pause)
 )
 
 // errStartBlocked is a run's start the server refused for good.
@@ -356,6 +357,9 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 			e.halt(entryError(err.Error()))
 			return runEnding{state: core.AgentSessionFailed, reason: core.RunInterrupted, ack: true, line: "interrupted: " + err.Error(),
 				summary: "Quadit stopped the program on " + e.srv.machineNow().Name + " at once: it could not keep what recognizes it."}
+		case how == endedMoved:
+			e.pauseEntry(out.Detail)
+			return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, line: "failed: " + pauseWords(out.Detail, e.prog.Title(), time.Time{})}
 		case how == endedByStop:
 			return r.stoppedEnd(out.Final)
 		case how == endedInfra:

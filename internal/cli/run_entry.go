@@ -36,11 +36,14 @@ type liveEntry struct {
 	out   *outbox
 
 	// What the last check found; set by the entry's goroutine before its
-	// first hold, read by its runs.
-	me         whoAmI
-	projectKey string
-	version    string
-	label      string // the folder's label
+	// first hold, read by its runs. checkedFolder and checkedProgram are
+	// the identities of the folder and the program last checked.
+	me             whoAmI
+	projectKey     string
+	version        string
+	label          string // the folder's label
+	checkedFolder  string
+	checkedProgram string
 
 	// lease is the listener's lease, kept by the entry's goroutine.
 	lease     string
@@ -326,17 +329,43 @@ func (e *liveEntry) dropLease() {
 // of the program: the folder passes the folder rules and is still the one
 // registered, and the program is the file registered and answers
 // --version. It gives the pause a failure sets, "" when both pass.
+//
+// What it checked is kept by identity, so a start can be made only in the
+// folder and with the file checked (stillAsChecked).
 func (e *liveEntry) checkFolderAndProgram(ctx context.Context) string {
 	if canon, _, err := e.srv.host.rules().check(e.reg.Folder); err != nil || canon != e.reg.Folder {
 		return core.PauseFolderMissing
+	}
+	folder, err := fileIdentity(e.reg.Folder)
+	if err != nil {
+		return core.PauseFolderMissing
+	}
+	file, err := fileIdentity(e.reg.ProgramPath)
+	if err != nil {
+		return core.PauseProgramMissing
 	}
 	version, err := programVersionOf(ctx, e.reg.ProgramPath, e.srv.host.times.version)
 	if err != nil {
 		return core.PauseProgramMissing
 	}
 	e.mu.Lock()
-	e.version = version
+	e.version, e.checkedFolder, e.checkedProgram = version, folder, file
 	e.mu.Unlock()
+	return ""
+}
+
+// stillAsChecked gives the pause to set when the folder or the program is
+// no longer the one checkFolderAndProgram checked, "" when both are.
+func (e *liveEntry) stillAsChecked() string {
+	e.mu.Lock()
+	folder, file := e.checkedFolder, e.checkedProgram
+	e.mu.Unlock()
+	if id, err := fileIdentity(e.reg.Folder); err != nil || id != folder {
+		return core.PauseFolderMissing
+	}
+	if id, err := fileIdentity(e.reg.ProgramPath); err != nil || id != file {
+		return core.PauseProgramMissing
+	}
 	return ""
 }
 
@@ -351,11 +380,9 @@ func programVersionOf(ctx context.Context, path string, within time.Duration) (s
 	if !st.Mode().IsRegular() || st.Mode().Perm()&0o111 == 0 {
 		return "", fmt.Errorf("%s is not a program", path)
 	}
-	ctx, cancel := context.WithTimeout(ctx, within)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, path, "--version").Output()
-	if err != nil {
-		return "", err
+	exit, out, err := probe(ctx, path, []string{"--version"}, os.Environ(), within)
+	if err != nil || exit != 0 {
+		return "", fmt.Errorf("%s --version did not answer: %v", path, err)
 	}
 	v := programVersion(out)
 	if v == "" {
@@ -366,20 +393,65 @@ func programVersionOf(ctx context.Context, path string, within time.Duration) (s
 
 // signedIn asks the program whether it is signed in, the passive way.
 func (e *liveEntry) signedIn(ctx context.Context) (bool, error) {
-	ctx, cancel := context.WithTimeout(ctx, e.srv.host.times.version)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, e.reg.ProgramPath, e.prog.SignedIn()...)
-	cmd.Env = programEnv(os.Environ(), e.reg.Login, "", "")
-	out, err := cmd.CombinedOutput()
-	exit := 0
+	exit, out, err := probe(ctx, e.reg.ProgramPath, e.prog.SignedIn(), programEnv(os.Environ(), e.reg.Login, "", ""), e.srv.host.times.version)
 	if err != nil {
-		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
-			return false, entryError(e.prog.Title() + " could not check its sign-in")
-		}
-		exit = exitErr.ExitCode()
+		return false, entryError(e.prog.Title() + " could not check its sign-in")
 	}
 	return e.prog.ReadSignedIn(exit, out)
+}
+
+// maxProbeOutput is the most of a probe's output kept.
+const maxProbeOutput = 64 << 10
+
+// probe runs a program briefly (its version, its sign-in) in a group of
+// its own, for at most within: it gives the exit status and the start of
+// what it printed. Past within, or when its pipes are still held a moment
+// after it exited, the whole group is stopped.
+func probe(ctx context.Context, path string, args, env []string, within time.Duration) (int, []byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, within)
+	defer cancel()
+	out := &capped{max: maxProbeOutput}
+	cmd := exec.CommandContext(ctx, path, args...)
+	cmd.Env, cmd.Stdout, cmd.Stderr = env, out, out
+	cmd.WaitDelay = time.Second
+	cmd.Cancel = func() error {
+		signalGroup(cmd.Process.Pid, sigKill)
+		return nil
+	}
+	if err := startInGroup(cmd); err != nil {
+		return -1, nil, err
+	}
+	err := cmd.Wait()
+	signalGroup(cmd.Process.Pid, sigKill) // what it left behind goes with it
+	var exitErr *exec.ExitError
+	if err != nil && !errors.As(err, &exitErr) {
+		return -1, out.bytes(), err
+	}
+	if ctx.Err() != nil {
+		return -1, out.bytes(), ctx.Err()
+	}
+	return cmd.ProcessState.ExitCode(), out.bytes(), nil
+}
+
+// capped keeps what is written to it up to max bytes, and takes the rest
+// without keeping it.
+type capped struct {
+	mu  sync.Mutex
+	max int
+	buf []byte
+}
+
+func (c *capped) Write(p []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.buf = append(c.buf, p[:min(len(p), max(c.max-len(c.buf), 0))]...)
+	return len(p), nil
+}
+
+func (c *capped) bytes() []byte {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]byte(nil), c.buf...)
 }
 
 // expandHome is a path a setting gave, with a leading ~ made the home folder.

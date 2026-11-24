@@ -71,25 +71,26 @@ func runnerFormOn(ctx context.Context, host runHost, args []string, sw switches,
 		return exitFailed
 	}
 	pos, fields := splitFields(args)
+	form := ""
+	if len(pos) > 0 {
+		form, pos = pos[0], pos[1:]
+	}
+	if err := formArgs(form, pos, fields); err != nil {
+		fmt.Fprintln(stderr, err)
+		return exitFailed
+	}
 	files, err := runFilesFor(firstValue(fields["registry"]))
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return exitFailed
 	}
 	delete(fields, "registry")
-	form := ""
-	if len(pos) > 0 {
-		form, pos = pos[0], pos[1:]
-	}
 	if err := canServe(); err != nil {
 		fmt.Fprintln(stderr, err)
 		return exitFailed
 	}
 	switch form {
 	case "":
-		if len(fields) > 0 {
-			break
-		}
 		ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 		defer stop()
 		return serve(ctx, files, host, stdout, stderr)
@@ -102,8 +103,49 @@ func runnerFormOn(ctx context.Context, host runHost, args []string, sw switches,
 	case "machine":
 		return runMachine(ctx, files, fields, stdout, stderr)
 	}
-	fmt.Fprintln(stderr, "usage: quadit run [registry=PATH] | run add … | run remove … | run list | run machine name=… | run --secret NAME -- COMMAND (quadit help run)")
-	return exitFailed
+	return exitFailed // formArgs refused every other form
+}
+
+// runUsage is what quadit run says to an argument it does not take.
+const runUsage = "usage: quadit run [registry=PATH] | run add … | run remove … | run list | run machine name=… | run --secret NAME -- COMMAND (quadit help run)"
+
+// runForms are the fields each form of quadit run takes (registry= is
+// every form's), and how many arguments besides its name.
+var runForms = map[string]struct {
+	fields []string
+	args   int
+}{
+	"":        {nil, 0},
+	"add":     {[]string{"login", "project", "folder", "program", "program_path", "max_minutes"}, 0},
+	"remove":  {[]string{"login", "project"}, 1},
+	"list":    {nil, 0},
+	"machine": {[]string{"name"}, 0},
+}
+
+// formArgs refuses, before anything is touched, a form of quadit run that
+// does not exist, a field it does not take, a field given twice, and more
+// arguments than it takes: a typo must never widen what a command does.
+func formArgs(form string, pos []string, fields map[string][]string) error {
+	f, ok := runForms[form]
+	if !ok {
+		return errors.New(runUsage)
+	}
+	name := strings.TrimSpace("quadit run " + form)
+	for key, values := range fields {
+		if key != "registry" && !slices.Contains(f.fields, key) {
+			return fmt.Errorf("%s takes no %s=; %s", name, key, runUsage)
+		}
+		if len(values) > 1 {
+			return fmt.Errorf("%s= is given twice", key)
+		}
+	}
+	if len(pos) > f.args {
+		return fmt.Errorf("%s takes no argument %q; %s", name, pos[f.args], runUsage)
+	}
+	if form == "remove" && fields["project"] != nil && fields["login"] == nil {
+		return errors.New("project= goes with login=: quadit run remove ENTRY_ID | login=PATH [project=KEY]")
+	}
+	return nil
 }
 
 // runClock is the time a runner keeps: the wall clock, for what is written
@@ -412,7 +454,11 @@ func (srv *serving) wait(ctx context.Context, d time.Duration) {
 // takeFolder takes a folder's lock for a run of handle's, or errLocked
 // when another run holds it.
 func (srv *serving) takeFolder(folder, handle string) (*os.File, error) {
-	path := srv.files.folderLock(folder)
+	identity, err := fileIdentity(folder)
+	if err != nil {
+		return nil, err
+	}
+	path := srv.files.folderLock(identity)
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return nil, err
 	}
@@ -425,25 +471,31 @@ func (srv *serving) takeFolder(folder, handle string) (*os.File, error) {
 		return nil, err
 	}
 	srv.foldersMu.Lock()
-	srv.holders[folder] = handle
+	srv.holders[identity] = handle
 	srv.foldersMu.Unlock()
 	return f, nil
 }
 
 // releaseFolder lets a folder's lock go.
 func (srv *serving) releaseFolder(folder string, f *os.File) {
-	srv.foldersMu.Lock()
-	delete(srv.holders, folder)
-	srv.foldersMu.Unlock()
+	if identity, err := fileIdentity(folder); err == nil {
+		srv.foldersMu.Lock()
+		delete(srv.holders, identity)
+		srv.foldersMu.Unlock()
+	}
 	f.Close()
 }
 
 // folderHolder is the agent whose run works in a folder now, when this
 // runner knows.
 func (srv *serving) folderHolder(folder string) string {
+	identity, err := fileIdentity(folder)
+	if err != nil {
+		return ""
+	}
 	srv.foldersMu.Lock()
 	defer srv.foldersMu.Unlock()
-	return srv.holders[folder]
+	return srv.holders[identity]
 }
 
 // pauseAgent pauses every entry of an agent on this computer for its

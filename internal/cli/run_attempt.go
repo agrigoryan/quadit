@@ -112,10 +112,14 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedNotStarted, fmt.Errorf("the run's journal: %w", err)
 	}
 	// The last look before the start: nothing slow lies between it and the
-	// start.
+	// start. The folder and the program are still the ones checked.
 	if end := r.endNow(ctx); end != endedItself {
 		closeAll()
 		return outcome{Kind: outcomeFailed}, end, nil
+	}
+	if pause := e.stillAsChecked(); pause != "" {
+		closeAll()
+		return outcome{Kind: outcomeFailed, Detail: pause}, endedMoved, nil
 	}
 	err = startInGroup(cmd)
 	outWrite.Close() // the program holds its own ends now
@@ -309,9 +313,14 @@ func (t *tail) bytes() []byte {
 // runLog is a run's log, runs/<run id>.log: what its program printed, a
 // line each, marked with the output it came on; kept 30 days.
 type runLog struct {
-	mu sync.Mutex
-	f  *os.File
+	mu      sync.Mutex
+	f       *os.File
+	written int64
 }
+
+// maxRunLog is the most a run's log holds; past it, one line says so and
+// the rest is not kept (it is still read).
+const maxRunLog = 16 << 20
 
 // runLog opens the log of a run, to add to it.
 func (srv *serving) runLog(run string) *runLog {
@@ -320,15 +329,24 @@ func (srv *serving) runLog(run string) *runLog {
 	if err != nil {
 		return &runLog{}
 	}
-	return &runLog{f: f}
+	l := &runLog{f: f}
+	if st, err := f.Stat(); err == nil {
+		l.written = st.Size() // a run's log is one for all its attempts
+	}
+	return l
 }
 
 func (l *runLog) line(mark, text string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.f != nil {
-		_, _ = fmt.Fprintf(l.f, "%s %s\n", mark, text) // a log line lost loses nothing else
+	if l.f == nil || l.written > maxRunLog {
+		return
 	}
+	line := mark + " " + text + "\n"
+	if l.written += int64(len(line)); l.written > maxRunLog {
+		line = "log (the rest of this run's output is not kept: the log is full)\n"
+	}
+	_, _ = io.WriteString(l.f, line) // a log line lost loses nothing else
 }
 
 func (l *runLog) close() {

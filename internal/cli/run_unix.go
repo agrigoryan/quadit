@@ -20,6 +20,21 @@ import (
 // canServe is nil where quadit run can serve agents.
 func canServe() error { return nil }
 
+// fileIdentity is what names a file whatever its spelling: its device and
+// inode, following links. Two paths to one folder have one identity, on a
+// volume that does not tell case apart too.
+func fileIdentity(path string) (string, error) {
+	st, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	sys, ok := st.Sys().(*syscall.Stat_t)
+	if !ok {
+		return "", errors.New("no identity for " + path)
+	}
+	return strconv.FormatUint(uint64(sys.Dev), 10) + ":" + strconv.FormatUint(sys.Ino, 10), nil
+}
+
 // tryLock takes f's lock for this process, or answers errLocked at once
 // when another holder has it. Two opens of one file are two holders, even
 // in one process, so the folder lock keeps two entries of one runner apart.

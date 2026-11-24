@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -100,10 +101,11 @@ func (f runFiles) entry(id string) string {
 	return filepath.Join(f.dir, "entries", id)
 }
 
-// folderLock is the lock of one folder: one run at a time works in it,
-// whichever agent and entry it is of.
-func (f runFiles) folderLock(folder string) string {
-	return filepath.Join(f.dir, "locks", hashOf(folder)[:16]+".lock")
+// folderLock is the lock of one folder, by its identity (fileIdentity):
+// one run at a time works in it, whichever agent, entry or spelling of
+// its path it is of.
+func (f runFiles) folderLock(identity string) string {
+	return filepath.Join(f.dir, "locks", hashOf(identity)[:16]+".lock")
 }
 
 // readRegistry reads the registry; none yet is an empty one.
@@ -292,21 +294,47 @@ func (rules folderRules) check(path string) (canon, label string, err error) {
 	if st, err := os.Stat(canon); err != nil || !st.IsDir() {
 		return "", "", fmt.Errorf("%s is not a folder", shown)
 	}
-	home := resolved(rules.home)
+	// Folders are compared by identity, never by spelling: on a volume that
+	// does not tell case apart, /LIBRARY is /Library.
+	self, err := fileIdentity(canon)
+	if err != nil {
+		return "", "", fmt.Errorf("%s: %w", shown, err)
+	}
+	homes := identitiesUp(resolved(rules.home)) // the home folder, then each folder above it
 	switch {
-	case canon == home:
+	case len(homes) > 0 && self == homes[0]:
 		return "", "", fmt.Errorf("%s is your home folder: pick the project's own folder", shown)
-	case canon == "/" || strings.HasPrefix(home, canon+"/"):
+	case slices.Contains(homes, self):
 		return "", "", fmt.Errorf("%s is above your home folder: pick the project's own folder", shown)
 	}
+	var roots []string
 	for _, root := range rules.roots {
-		for _, r := range []string{root, resolved(root)} {
-			if canon == r || strings.HasPrefix(canon, r+"/") {
-				return "", "", fmt.Errorf("%s is a system folder: pick the project's own folder", shown)
-			}
+		if id, err := fileIdentity(root); err == nil {
+			roots = append(roots, id)
+		}
+	}
+	for _, id := range identitiesUp(canon) {
+		if slices.Contains(roots, id) {
+			return "", "", fmt.Errorf("%s is a system folder: pick the project's own folder", shown)
 		}
 	}
 	return canon, rules.label(canon), nil
+}
+
+// identitiesUp are the identities of a folder and of each folder above
+// it, up to the root.
+func identitiesUp(dir string) []string {
+	var ids []string
+	for {
+		if id, err := fileIdentity(dir); err == nil {
+			ids = append(ids, id)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ids
+		}
+		dir = parent
+	}
 }
 
 // label is a canonical folder as servers see it: the home folder written ~.

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -206,5 +207,51 @@ func TestTheRegistryIsWrittenWhole(t *testing.T) {
 	reg, err := readRegistry(rt.files.registry)
 	if err != nil || len(reg.Entries) != 20 || reg.Machine.ID != testMachine.ID {
 		t.Fatalf("after twenty writers the registry holds %d entries (%v), machine %+v", len(reg.Entries), err, reg.Machine)
+	}
+}
+
+func TestTheFolderLockFollowsTheFoldersIdentity(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	link := filepath.Join(rt.dir, "game-link")
+	if err := os.Symlink(rt.folder, link); err != nil {
+		t.Fatal(err)
+	}
+	srv := newServing(rt.files, rt.host(), testMachine, &syncBuffer{}, "")
+	lock, err := srv.takeFolder(rt.folder, "@claude")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	spellings := []string{link, rt.folder + "/."}
+	if upper := strings.ToUpper(rt.folder); upper != rt.folder {
+		if st, err := os.Stat(upper); err == nil && st.IsDir() { // a volume that does not tell case apart
+			spellings = append(spellings, upper)
+		}
+	}
+	for _, other := range spellings {
+		if f, err := srv.takeFolder(other, "@codex"); !errors.Is(err, errLocked) {
+			if f != nil {
+				f.Close()
+			}
+			t.Fatalf("%s took the folder's lock beside %s (%v)", other, rt.folder, err)
+		}
+	}
+}
+
+func TestAFolderSpelledOtherwiseIsStillRefused(t *testing.T) {
+	dir, _ := filepath.EvalSymlinks(t.TempDir())
+	home := filepath.Join(dir, "home")
+	_ = os.MkdirAll(home, 0o700)
+	if st, err := os.Stat(strings.ToUpper(home)); err != nil || !st.IsDir() {
+		t.Skip("this volume tells case apart: no other spelling names the same folder")
+	}
+	rules := folderRules{home: home, roots: append(testRoots(), "/Library")}
+	for _, path := range []string{strings.ToUpper(home), strings.ToUpper(dir), "/LIBRARY"} {
+		if _, err := os.Stat(path); err != nil {
+			continue
+		}
+		if _, _, err := rules.check(path); err == nil {
+			t.Fatalf("%s passed the folder rules", path)
+		}
 	}
 }

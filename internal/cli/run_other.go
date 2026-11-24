@@ -22,6 +22,8 @@ var errNoServing = errors.New("quadit run serves agents on macOS and Linux only"
 
 func tryLock(*os.File) error { return errNoServing }
 
+func fileIdentity(string) (string, error) { return "", errNoServing }
+
 func waitLock(*os.File) error { return errNoServing }
 
 func startInGroup(*exec.Cmd) error { return errNoServing }
