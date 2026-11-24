@@ -54,11 +54,8 @@ function Line({
   return (
     // What ends the line (a button, a link) goes under it when the card is too narrow for both.
     <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-      <p className="flex min-w-0 flex-1 basis-56 items-baseline gap-2">
-        <span
-          className={cx("size-2 shrink-0 translate-y-[-1px] self-center rounded-full bg-current", color)}
-          aria-hidden
-        />
+      <p className="flex min-w-0 flex-1 basis-64 items-start gap-2">
+        <span className={cx("mt-1.5 size-2 shrink-0 rounded-full bg-current", color)} aria-hidden />
         <span className="min-w-0 flex-1 text-sm">{children}</span>
       </p>
       {after}
@@ -157,9 +154,8 @@ export function Hearing({
   if (lines.length === 0)
     lines.push(
       <Line key="not" tone="wait" after={offer}>
-        <span className="inline-flex flex-wrap items-center gap-x-0.5">
-          <span className="text-ink">{t("agents.card.notListening")}</span>
-          <CopyListen />
+        <span className="text-ink">
+          {t("agents.card.notListening")} <CopyListen />
         </span>
       </Line>,
     );
@@ -237,7 +233,12 @@ function CopyListen() {
     setTimeout(() => setDone(false), 1500);
   }
   return (
-    <IconButton label={done ? t("common.copied") : t("agents.card.copyListen")} size="sm" onClick={() => void copy()}>
+    <IconButton
+      label={done ? t("common.copied") : t("agents.card.copyListen")}
+      size="sm"
+      className="-my-1 align-middle"
+      onClick={() => void copy()}
+    >
       {done ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />}
     </IconButton>
   );
