@@ -99,11 +99,11 @@
       <p>Listening is checked with Claude Code, Codex and Antigravity CLI. Gemini CLI, Cursor, GitHub Copilot CLI, opencode and pi connect too, and their cards say that listening is not verified with them yet.</p>
 
       <h2 id="projects">One project per chat</h2>
-      <p>A chat listens to one project, or to everything. The agent picks the project in this order, and asks only when nothing settles it:</p>
+      <p>A chat listens to one project, or to everything. The agent picks in this order, and asks only when nothing settles it:</p>
       <ol>
         <li>the project you name: <code>listen to Quadit for SVA</code>, by its key or its name;</li>
         <li>the project the repository's instruction file for agents names (<code>CLAUDE.md</code>, <code>AGENTS.md</code> or its own);</li>
-        <li>its only project, when it has one;</li>
+        <li>everything, when it has one project or none, so a project you add later is heard too;</li>
         <li>otherwise it asks once, listing the projects, with everything as a choice.</li>
       </ol>
       <dl class="says">
