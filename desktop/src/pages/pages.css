@@ -435,6 +435,10 @@ body.panel main {
   margin-top: 12px;
 }
 
+.page.connect .how {
+  margin-top: 18px;
+}
+
 .connect .others {
   margin: 16px 0 0;
 }

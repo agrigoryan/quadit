@@ -428,6 +428,122 @@ button.link-blue:hover {
   font-weight: 550;
 }
 
+/*
+ * Connected and not listening: the person's next step, the line to write in
+ * a chat of the tool, set apart in the colour of the main action so it reads
+ * before "Connected" does.
+ */
+.next-step {
+  justify-self: stretch;
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgb(255 214 10 / 0.07);
+  box-shadow: inset 0 0 0 1px rgb(255 214 10 / 0.45);
+}
+
+.next-lead {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.next-said,
+.listen-said {
+  font-size: 13px;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.listening {
+  display: grid;
+  gap: 4px;
+}
+
+/*
+ * The two steps to an agent that answers (listen-steps.ts), above the cards:
+ * set apart, since "Connected" alone reads as "it will answer me".
+ */
+.how {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #1c2030;
+  box-shadow: inset 0 0 0 1px rgb(163 179 255 / 0.32);
+  color: var(--ink);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.how p {
+  margin: 0;
+}
+
+.how-title {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.how-steps {
+  list-style: none;
+  counter-reset: step;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.how-steps li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  column-gap: 10px;
+  text-wrap: pretty;
+  color: var(--ink-2);
+}
+
+.how-steps li::before {
+  content: counter(step);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--link-soft);
+  color: var(--link);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.how-steps b {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.how code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--rule-strong);
+  font: 600 13px/1.4 var(--mono);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.how .how-else {
+  margin-top: 10px;
+  color: var(--ink-2);
+}
+
+.how .how-other {
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  text-wrap: pretty;
+}
+
 .tool .unverified {
   margin-top: 6px;
   font-size: 12.5px;

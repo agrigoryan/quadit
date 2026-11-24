@@ -8,11 +8,14 @@
 //              say in it (`Connect to Quadit ABC234`) with Copy, a live
 //              "Waiting for Codex…", "New code" when it has none, and Undo;
 //   connected  the server says the agent gave the code back: "Connected",
-//              and whether it listens or how to have it listen; Disconnect;
+//              Disconnect, and whether it listens; when it does not, the
+//              person's next step, the most visible thing on the card: the
+//              line to write in a chat of the tool (`listen to Quadit`)
+//              with Copy, and how that chat listens (CardTool.chatListens);
 // and what the app does by itself (desktop contract §11, third amendment):
 // "Connecting…" while it gives the code back, the reason when it could not
 // (above the line to paste), and whether the tool answers by itself, with
-// Pause and Resume;
+// Pause and Resume (the app never does now: main/self-runs.ts);
 // and, set up but where it stands not known here (it works as another
 // server's login, or no answer came yet), a plain line saying so, never
 // "Connected". A set-up card asks the app where its tool stands every couple
@@ -22,9 +25,10 @@
 // with "Try again". Styled by tools.css.
 
 import { button, lineIcon, make } from "@/pages/dom";
+import { LISTEN_LINE } from "@/pages/listen-steps";
 import { isConnectCode } from "@/shared/bridge";
 import { diskLine, unrevokedWords } from "@/shared/change-words";
-import type { Disconnected, Handshake, PagesApi, Refused, SelfRun } from "@/shared/pages-api";
+import type { ChatListens, Disconnected, Handshake, PagesApi, Refused, SelfRun } from "@/shared/pages-api";
 
 const api = window.quaditPages as PagesApi;
 
@@ -42,6 +46,10 @@ export interface CardTool {
   worksAs: string | null;
   /** Whether an agent in it was seen to listen; if not, the card says so. */
   listenVerified: boolean;
+  /** How a chat of it listens, which its card says; absent where not verified. */
+  chatListens?: ChatListens;
+  /** Connected by MCP alone, without the quadit command, which listening needs: its card says so instead. */
+  mcpOnly?: boolean;
   /** Whether connecting also lets it run quadit without asking each time (its card's line says so). */
   allows: boolean;
 }
@@ -300,7 +308,9 @@ export class ToolCard {
     const where = tool.worksAs ? " using this computer’s login" : " here";
     setText(
       this.gives,
-      `${tool.name} ${stands === "connected" ? "can now" : "will be able to"} take tasks, ask you questions and report back${where}.`,
+      stands === "connected"
+        ? `${tool.name} can now take tasks, ask you questions and report back${where} when you ask it in a chat.`
+        : `${tool.name} will be able to take tasks, ask you questions and report back${where}.`,
     );
     setText(this.diskText, diskLine(tool, this.addsCommand && !setUp, setUp));
 
@@ -432,33 +442,92 @@ export class ToolCard {
       );
       return [lead, why, again];
     }
-    const line = `Connect to Quadit ${code}`;
-    const say = make("p", "", "say");
-    const copy = button(
-      "Copy",
-      () =>
-        void api.copyText(line).then(() => {
-          copy.textContent = "Copied";
-          setTimeout(() => (copy.textContent = "Copy"), 1_500);
-        }),
-      "btn btn-line btn-sm",
-      `Copy the line to say in ${name}`,
-    );
-    say.append(make("code", line), copy);
+    const say = sayLine(`Connect to Quadit ${code}`, `Copy the line to say in ${name}`);
     const wait = make("p", "", "waiting");
     wait.setAttribute("role", "status");
     wait.append(make("span", "", "pulse"), document.createTextNode(`Waiting for ${name}…`));
     return [lead, say, wait];
   }
 
-  /** Whether the connected tool's agent listens, and, when it does not, how to have it listen; null: no answer to tell. */
+  /**
+   * Whether the connected tool's agent listens (null: no answer to tell).
+   * Listening: what it answers, and how to stop it, in the skill's words.
+   * Not: the person's next step, set apart as the card's main thing, with how
+   * a chat of the tool listens where that was verified; or, connected by MCP
+   * alone, that it cannot listen.
+   */
   private listening(listening: boolean | null): HTMLElement {
+    const { name, chatListens, mcpOnly } = this.tool;
     if (listening === null) return make("p", "Cannot tell right now whether it is listening.", "listen");
-    if (!listening) return make("p", `Not listening: in ${this.tool.name}, say “listen to Quadit”`, "listen off");
-    const line = make("p", "", "listen on");
-    line.append(make("span", "", "found-dot"), document.createTextNode("Listening"));
-    return line;
+    if (listening) {
+      const box = make("div", "", "listening");
+      const line = make("p", "", "listen on");
+      line.append(make("span", "", "found-dot"), document.createTextNode("Listening"));
+      box.append(
+        line,
+        make(
+          "p",
+          "It answers what you assign to it or ask it in Quadit while that chat is open. One chat listens at a time. To stop, tell that chat to stop listening.",
+          "listen-said",
+        ),
+      );
+      return box;
+    }
+    const step = make("div", "", "next-step");
+    step.setAttribute("role", "group");
+    step.setAttribute("aria-label", `Next: have ${name} listen`);
+    if (mcpOnly) {
+      step.append(
+        make("p", "Not listening. Connected by MCP only, it cannot listen.", "next-lead"),
+        make(
+          "p",
+          `To have it answer what you write in Quadit, disconnect it and connect it again with the quadit command (More options).`,
+          "next-said",
+        ),
+      );
+      return step;
+    }
+    step.append(
+      make(
+        "p",
+        `Not listening yet. To have it answer what you write in Quadit, open ${name} in your project’s folder and write:`,
+        "next-lead",
+      ),
+      sayLine(LISTEN_LINE, `Copy “${LISTEN_LINE}” for ${name}`),
+    );
+    if (chatListens === "background")
+      step.append(make("p", "It listens in the background, so you can keep using that chat.", "next-said"));
+    else if (chatListens === "busy")
+      step.append(
+        make(
+          "p",
+          `${name} cannot listen in the background yet, so listening keeps that chat busy. Use another chat to work with ${name} meanwhile.`,
+          "next-said",
+        ),
+      );
+    return step;
   }
+}
+
+/**
+ * A line for the person to write in their tool, with its Copy: the card's
+ * own words only (a connect code's line, or the listen line), never text a
+ * server chose.
+ */
+function sayLine(line: string, label: string): HTMLParagraphElement {
+  const say = make("p", "", "say");
+  const copy = button(
+    "Copy",
+    () =>
+      void api.copyText(line).then(() => {
+        copy.textContent = "Copied";
+        setTimeout(() => (copy.textContent = "Copy"), 1_500);
+      }),
+    "btn btn-line btn-sm",
+    label,
+  );
+  say.append(make("code", line), copy);
+  return say;
 }
 
 /** Sets the text of `node`, leaving it alone when it says that already (a selection in it survives). */

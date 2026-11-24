@@ -361,6 +361,11 @@ button {
   text-wrap: pretty;
 }
 
+/* The two steps to an agent that answers (tools.css), between the lead and the cards. */
+.connect .how {
+  margin-top: 18px;
+}
+
 .connect .bar {
   margin-top: 28px;
   display: flex;

@@ -9,7 +9,9 @@
 //      set up, it shows the line to say in the tool and waits for the tool,
 //      which Continue never does), the tools not here in a line, and beside
 //      them the workspace's members, each found tool a place that fills when
-//      it connects, and an example of a task handed to an agent. Continue
+//      it connects, and an example of a task handed to an agent; above the
+//      cards, the two steps to an agent that answers (listen-steps.ts), so
+//      the person leaves knowing the line to write in a chat. Continue
 //      (Enter) or Skip ends it: the sample tasks are made, the workspace
 //      shows on them, and this page goes.
 // Each change of step slides and fades for 200 ms; with reduced motion,
@@ -17,6 +19,7 @@
 
 import { element, make, separated } from "@/pages/dom";
 import { openSheet } from "@/pages/files-sheet";
+import { listenSteps } from "@/pages/listen-steps";
 import { tile, ToolCard } from "@/pages/tool-card";
 import { countWord } from "@/shared/change-words";
 import { lookingPace } from "@/shared/looking";
@@ -155,6 +158,7 @@ const later = element<HTMLSpanElement>("later");
 const cont = element<HTMLButtonElement>("continue");
 const finishError = element<HTMLParagraphElement>("finish-error");
 const foot = element<HTMLElement>("tools-foot");
+element("found-lead").after(listenSteps());
 
 /** Every tool Connect knows, as the last look found them, and the cards of those found, in the order shown. */
 let tools: ToolView[] = [];

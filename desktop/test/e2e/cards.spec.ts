@@ -16,6 +16,8 @@ interface Stand {
   handshake: unknown;
   /** What the app does by itself for the tool (SelfRun); absent: nothing. */
   self?: unknown;
+  /** The last line the page put on the clipboard. */
+  copied?: string;
   /** How long connectState takes, as the app's does while it asks the login shell and quadit. */
   slowMs: number;
   asks: number;
@@ -65,6 +67,7 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
                 mcp: true,
                 cliIdentity: "own",
                 listenVerified: true,
+                chatListens: "background",
                 allows: true,
                 skillChangedByHand: false,
                 connected: state.connected
@@ -88,7 +91,9 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
           return { ok: true, notes: [], unrevoked: null };
         },
         dropPlan: async () => {},
-        copyText: async () => {},
+        copyText: async (text: string) => {
+          state.copied = text;
+        },
         onChanged() {},
         showBackups: async () => {},
         closeConnect: async () => {},
@@ -175,6 +180,44 @@ test("a card says that connecting lets the tool run quadit without asking, and o
   await expect(page.getByText(/without asking each time/)).toHaveCount(0);
 });
 
+test("a connected card that is not listening makes the line to write its main step, and the page says the two steps above the cards", async ({
+  page,
+}) => {
+  await open(page, { connected: true, handshake: { state: "connected", listening: false }, slowMs: 0 });
+  const steps = page.getByRole("region", { name: "To have an agent answer you in Quadit" });
+  await expect(steps.getByText("Connect its tool here.")).toBeVisible();
+  await expect(steps.locator("code")).toHaveText("listen to Quadit");
+  await expect(steps.getByText(/^Other ways: MCP \(under More options\)/)).toBeVisible();
+
+  const card = page.getByRole("article", { name: "Claude Code" });
+  const step = card.getByRole("group", { name: "Next: have Claude Code listen" });
+  await expect(
+    step.getByText(
+      "Not listening yet. To have it answer what you write in Quadit, open Claude Code in your project’s folder and write:",
+    ),
+  ).toBeVisible();
+  await expect(step.locator("code")).toHaveText("listen to Quadit");
+  await expect(step.getByText("It listens in the background, so you can keep using that chat.")).toBeVisible();
+  await step.getByRole("button", { name: "Copy “listen to Quadit” for Claude Code" }).click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { stand: Stand }).stand.copied))
+    .toBe("listen to Quadit");
+
+  // Listening: what it answers, and how to stop it; the step is gone.
+  await page.evaluate(() => {
+    (window as unknown as { stand: Stand }).stand.handshake = { state: "connected", listening: true };
+  });
+  await expect(card.getByText("Listening", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(
+    card.getByText(
+      "It answers what you assign to it or ask it in Quadit while that chat is open. One chat listens at a time. To stop, tell that chat to stop listening.",
+    ),
+  ).toBeVisible();
+  await expect(step).toHaveCount(0);
+});
+
+// The app no longer answers by itself (main/self-runs.ts, answers: false), so it never says "on", "paused" or
+// "guarded" now; the card still shows them as it would were that switched back on.
 test("a card says what the app does by itself: Connecting, why it could not, and answering with Pause and Resume", async ({
   page,
 }) => {
@@ -212,7 +255,8 @@ test("a card says what the app does by itself: Connecting, why it could not, and
   await expect(
     card.getByText("Paused: it was started more than six times in a minute. Resume when you have looked."),
   ).toBeVisible({ timeout: 10_000 });
-  // A tool the app does not run says nothing of answering.
+  // A tool the app does not run says nothing of answering by itself.
   await set({ self: { proving: null, answering: "none" } });
-  await expect(card.getByText(/answer/i)).toHaveCount(0, { timeout: 10_000 });
+  await expect(card.getByText(/by itself|^Paused/)).toHaveCount(0, { timeout: 10_000 });
+  await expect(card.getByRole("button", { name: /answering by itself/ })).toHaveCount(0);
 });

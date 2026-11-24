@@ -186,7 +186,9 @@ test("a card set up from the Agents page turns Connected when the agent gives it
     const tool = asTheTool(run, join(computer.configDir, "claude.json"));
     await tool.run(["connect", code]);
     await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 15_000 });
-    await expect(card.getByText("Not listening: in Claude Code, say “listen to Quadit”")).toBeVisible();
+    // Its next step, the line to write in a chat of the tool.
+    const step = card.getByRole("group", { name: "Next: have Claude Code listen" });
+    await expect(step.locator("code")).toHaveText("listen to Quadit");
     await expect(card.getByRole("button", { name: "Disconnect Claude Code" })).toBeVisible();
     await screen(connect, "13-connect-connected.png");
 
@@ -194,6 +196,7 @@ test("a card set up from the Agents page turns Connected when the agent gives it
     listener = tool.start(["wait", "for=30"]);
     await expect(card.getByText("Listening", { exact: true })).toBeVisible({ timeout: 15_000 });
     await expect(card.getByText(/Not listening/)).toBeHidden();
+    await expect(step).toHaveCount(0);
     await screen(connect, "14-connect-listening.png");
 
     // Escape goes back to the Agents page that was there. Its key down takes the page away, so the key is only

@@ -1,5 +1,6 @@
 // Connect agents (src/main/connect-page.ts; desktop contract §11), laid over
-// a server's window, for the workspace that window shows: the agent tools on
+// a server's window, for the workspace that window shows: the two steps to an
+// agent that answers (listen-steps.ts), with the other ways, then the agent tools on
 // this computer as the same cards and the same sheet as the first run's tools
 // step (tool-card.ts, files-sheet.ts). A card's Connect uses the defaults and
 // asks nothing; "See the files" shows what it changes first; "More options"
@@ -17,6 +18,7 @@
 import { button, element, make, separated } from "@/pages/dom";
 import { openSheet } from "@/pages/files-sheet";
 import { letInputIn } from "@/pages/hold-input";
+import { listenSteps } from "@/pages/listen-steps";
 import { tile, ToolCard } from "@/pages/tool-card";
 import { defaultChoice, handleOf } from "@/shared/default-choice";
 import { defaultLoginWords } from "@/shared/change-words";
@@ -151,7 +153,8 @@ function newCard(h: HarnessView, made: string, addsCommand: boolean, handshake: 
     if (!at) return Promise.resolve(NO_WORKSPACE);
     return api.planConnect(defaultChoice(h, at.serverId, at.summary));
   };
-  const card: ToolCard = new ToolCard({ ...h, ownLogin: h.cliIdentity === "own", worksAs: workingAs(h) }, addsCommand, {
+  const tool = { ...h, ownLogin: h.cliIdentity === "own", worksAs: workingAs(h), mcpOnly: mcpOnly(h) };
+  const card: ToolCard = new ToolCard(tool, addsCommand, {
     connect: async () => {
       const planned = await plainPlan();
       if (!planned.ok) return planned;
@@ -434,7 +437,16 @@ function placeCards(here: HarnessView[], addsCommand: boolean, known: Map<string
     shownCards.delete(id);
   }
   here.forEach((h, i) => {
-    const made = JSON.stringify([h.id, h.name, h.initials, h.cliIdentity, h.listenVerified, workingAs(h)]);
+    const made = JSON.stringify([
+      h.id,
+      h.name,
+      h.initials,
+      h.cliIdentity,
+      h.listenVerified,
+      h.chatListens,
+      workingAs(h),
+      mcpOnly(h),
+    ]);
     const kept = shownCards.get(h.id);
     const handshake = known.get(h.id) ?? null;
     let shown: Shown;
@@ -449,6 +461,11 @@ function placeCards(here: HarnessView[], addsCommand: boolean, known: Map<string
     const at = cardsBox.children[i];
     if (at !== shown.card.element) cardsBox.insertBefore(shown.card.element, at ?? null);
   });
+}
+
+/** Connected by MCP alone: without the quadit command and its skill, which listening needs. */
+function mcpOnly(h: HarnessView): boolean {
+  return !!h.connected && !h.connected.methods.includes("cli");
 }
 
 /** Whom a tool without a login of its own works as: this computer's default login, as the last look found it. */
@@ -468,6 +485,17 @@ async function showTarget() {
   for (const shown of shownCards.values()) shown.fill?.();
 }
 
+// The steps to an agent that answers, and the other ways, named so a person who wants one knows it is there:
+// MCP has no listening (no lease: docs/agents.md), and the rest are set up outside this page.
+const how = listenSteps();
+how.append(
+  make(
+    "p",
+    "Other ways: MCP (under More options) gives a tool Quadit’s tools in its chats, but cannot listen. To answer with no chat open, run a companion command in a terminal or set up a webhook: docs/agents.md in Quadit’s repository says how.",
+    "how-other",
+  ),
+);
+element("tools").prepend(how);
 element("backups").addEventListener("click", () => void api.showBackups());
 element("done").addEventListener("click", () => void api.closeConnect());
 // Escape goes back to the page under this one; with the sheet open, it closes the sheet (files-sheet.ts).

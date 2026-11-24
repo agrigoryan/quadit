@@ -162,7 +162,7 @@ test("the first run sets Quadit up on this computer in one window, connects the 
   }
 });
 
-test("a tool the app can run gives its code back by itself in the first run, and answers a comment on its task with no chat open", async ({
+test("a tool the app can run gives its code back by itself in the first run, and its card then asks the person to have it listen", async ({
   run,
 }) => {
   test.slow();
@@ -174,15 +174,18 @@ test("a tool the app can run gives its code back by itself in the first run, and
     const first = await desktop.firstRun();
     await first.getByLabel("Your name").fill("Lou Local");
     await first.getByRole("button", { name: "Set up on this computer" }).click();
+    // Above the cards, the two steps to an agent that answers.
+    const steps = first.getByRole("region", { name: "To have an agent answer you in Quadit" });
     const card = first.getByRole("article", { name: "Claude Code" });
     await card.getByRole("button", { name: "Connect Claude Code" }).click({ timeout: 30_000 });
+    await expect(steps.locator("code")).toHaveText("listen to Quadit");
     // No line to paste: the app ran the tool, which gave the code back; the server's word turns the card.
     await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 60_000 });
     await expect(card.getByText(/^Connect to Quadit/)).toHaveCount(0);
-    await expect(card.getByText("Answers by itself while Quadit is open")).toBeVisible({ timeout: 20_000 });
-    // The server's word that the app's listener holds the lease: a comment from now on wakes it (a listener is handed
-    // only what comes after it first waits).
-    await expect(card.getByText("Listening", { exact: true })).toBeVisible({ timeout: 60_000 });
+    // The app does not answer by itself: the card's next step is the line to write in a chat of the tool.
+    const step = card.getByRole("group", { name: "Next: have Claude Code listen" });
+    await expect(step.locator("code")).toHaveText("listen to Quadit", { timeout: 20_000 });
+    await expect(card.getByText("Answers by itself while Quadit is open")).toHaveCount(0);
     await screen(first, "07b-connected-by-itself.png");
 
     await first.getByRole("button", { name: "Continue" }).click();
@@ -190,23 +193,10 @@ test("a tool the app can run gives its code back by itself in the first run, and
     const origin = await desktop.localOrigin();
     const page = await desktop.pageOf(origin);
     await expect(page.getByText(/is for Claude Code/)).toBeVisible({ timeout: 20_000 });
-    // A comment on its task is answered with no chat open: the app's listener woke the tool.
+    // Under its task's comment box: nothing listens for it, and the line that has it listen.
     await page.goto(`${origin}/personal/task/GS-3`);
-    // Words of this comment only: the tool may answer other items of the task too (its assignment, made at Continue).
-    // (letters and digits only: they go into a pattern as they are).
-    const words = `Hello are you there ${Date.now().toString(36)}`;
-    // Its answer quotes the item that woke it, the comment's words in it.
-    const answer = page.getByText(new RegExp(`^Answered by the stand-in to: ITEM .*GS-3.*${words}`));
-    await page.getByRole("textbox", { name: "New comment" }).fill(words);
-    await page.getByRole("button", { name: "Send", exact: true }).click();
-    const asked = page.getByText(words, { exact: true });
-    await expect(asked).toBeVisible({ timeout: 20_000 });
-    await expect(answer).toBeVisible({ timeout: 60_000 });
-    // Woken by that comment, once, and below it in the thread.
-    await expect(answer).toHaveCount(1);
-    const [askedAt, answerAt] = await Promise.all([asked.boundingBox(), answer.boundingBox()]);
-    expect(answerAt?.y ?? 0).toBeGreaterThan(askedAt?.y ?? Infinity);
-    await screen(page, "08b-answered-by-itself.png");
+    await expect(page.getByText(/is not listening\..*“listen to Quadit”/)).toBeVisible({ timeout: 20_000 });
+    await screen(page, "08b-not-listening.png");
   } finally {
     await desktop.close();
   }
