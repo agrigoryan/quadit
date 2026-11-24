@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -19,7 +20,9 @@ import (
 // version 27 only adds what a runner records and whether an item was
 // addressed, so the rows of before read as they were, with nothing of a
 // runner on them: a session recorded by hand, a listener no runner holds, a
-// comment no run posted, an inbox item not marked addressed.
+// comment no run posted; and an inbox item is addressed when its type is
+// made only for its member (an assignment, version 28), not when a
+// follower hears it too (a comment).
 func TestUpgradeKeepsSessionsListenersCommentsAndInboxItemsAsTheyWere(t *testing.T) {
 	for _, d := range []sqlstore.Dialect{sqlstore.SQLite, sqlstore.Postgres} {
 		t.Run(d.Name, func(t *testing.T) {
@@ -68,9 +71,17 @@ func TestUpgradeKeepsSessionsListenersCommentsAndInboxItemsAsTheyWere(t *testing
 				t.Fatal("the workspace has no inbox items to upgrade")
 			}
 			// What the engine of now says of them is in a column the database
-			// of before has not: it reads false after the upgrade.
-			for i := range notesBefore {
-				notesBefore[i].Addressed = false
+			// of before has not: after the upgrade it reads true for the
+			// types made only for their member (version 28), false for the
+			// rest, which a follower hears too.
+			byNature := []string{core.NoteAssigned, core.NoteMentioned, core.NoteWaitingOn, core.NoteAsked, core.NotePicked, core.NoteUnclear, core.NoteReplied}
+			kinds := map[bool]int{}
+			for i, n := range notesBefore {
+				notesBefore[i].Addressed = slices.Contains(byNature, n.Type)
+				kinds[notesBefore[i].Addressed]++
+			}
+			if kinds[true] == 0 || kinds[false] == 0 {
+				t.Fatalf("the workspace's inbox items are not of both kinds: %+v", notesBefore)
 			}
 
 			upgrade(t, st)

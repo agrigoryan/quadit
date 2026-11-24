@@ -1362,11 +1362,10 @@ func TestListenAnswersTheOtherItemsOfTheSameTaskWhenAskedForABatch(t *testing.T)
 		if got.Item.Task != key || got.Wake.Do != "run" || len(got.Batch) != 20 {
 			t.Fatalf("the head %+v came with %d more", got.Item, len(got.Batch))
 		}
-		if b := got.Batch[0]; b.Item.Task != key || b.Wake.Do+" "+b.Wake.Why != "ack rule" {
-			t.Errorf("the rule's item is told %+v", b)
-		}
+		// The rule's item, which starts nothing, is not in the batch: it
+		// comes as a head of its own.
 		for i, b := range got.Batch {
-			if b.Item.Task != key || b.Seq != b.Item.Seq || b.Line == "" || b.Wake.Do == "" || (i > 0 && b.Seq <= got.Batch[i-1].Seq) {
+			if b.Item.Task != key || b.Seq != b.Item.Seq || b.Line == "" || b.Wake.Do != "run" || (i > 0 && b.Seq <= got.Batch[i-1].Seq) {
 				t.Fatalf("batch item %d is %+v", i, b)
 			}
 		}
@@ -1564,6 +1563,7 @@ func TestAReleasedLeaseIsDead(t *testing.T) {
 				if refused.Error.Reason != "lease_stale" {
 					t.Errorf("a start with the released lease: %+v", refused)
 				}
+				r.lease = "" // the runner asks again without the lease that was let go
 			})
 		}
 	})

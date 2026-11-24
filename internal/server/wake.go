@@ -75,7 +75,7 @@ func (who *viewer) wakeOf(ctx context.Context, agent core.Member, ev core.Event,
 		return wake{wakeAck, "gone"}, nil
 	}
 	if ev.Seq <= began {
-		_, waiting, err := who.waits(ctx, who.db, agent.UserID, note, ev.ProjectID)
+		waiting, err := who.waits(ctx, who.db, agent.UserID, note, ev.ProjectID, began)
 		if err != nil {
 			return wake{}, err
 		}
@@ -183,7 +183,7 @@ func (who *viewer) wakeRule(ctx context.Context, agent core.Member, item wakeIte
 		}
 	}
 	if item.event != nil {
-		inPerson, err := who.appliedInPerson(ctx, *item.event)
+		inPerson, err := appliedInPerson(ctx, who.db, *item.event)
 		if err != nil {
 			return wake{}, err
 		}
@@ -198,12 +198,12 @@ func (who *viewer) wakeRule(ctx context.Context, agent core.Member, item wakeIte
 // applied themselves, which the engine records as applied by them, and not
 // from a write the server made in their name: a rule, a sync with GitHub or
 // a repository, a saved view's news, a job. Only those it never records.
-func (who *viewer) appliedInPerson(ctx context.Context, ev core.Event) (bool, error) {
+func appliedInPerson(ctx context.Context, db store.DB, ev core.Event) (bool, error) {
 	if !id.Valid(ev.ChangeID) {
 		return false, nil
 	}
 	var applied core.AppliedChange
-	return store.Find(ctx, who.db, &applied, store.Eq("id", ev.ChangeID), store.Eq("actor_id", ev.ActorID))
+	return store.Find(ctx, db, &applied, store.Eq("id", ev.ChangeID), store.Eq("actor_id", ev.ActorID))
 }
 
 // ownerOf is the person responsible for an agent, as its account says

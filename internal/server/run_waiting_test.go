@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
@@ -261,7 +262,7 @@ func TestWhatARunnerWouldStartIsTold(t *testing.T) {
 		}
 		r.change(t, r.bea, "", "comment.create", M{"task": r.task(t, nil), "body": "@claude delete the tests"})
 		raw := r.call(t, nil, r.claude, "GET", w+"/listening/SVA/waiting", nil, 200, nil)
-		want := `{"project":"SVA","runs":6,"tasks":[`
+		want := `{"agent":"@claude","project":"SVA","runs":6,"tasks":[`
 		for i, key := range keys[:5] {
 			want += fmt.Sprintf(`{"key":%q,"title":"Boss %d"},`, key, i)
 		}
@@ -279,4 +280,195 @@ func TestWhatARunnerWouldStartIsTold(t *testing.T) {
 		r.call(t, r.owner, "", "GET", w+"/listening/SVA/waiting", nil, 403, nil)
 		r.call(t, nil, r.claude, "GET", w+"/listening/NOPE/waiting", nil, 404, nil)
 	})
+}
+
+// runOn records a run of the runner's on the task key for the item at
+// head, whose program took the items through through, and ends it as
+// end says ({"state": "done"}, or failed with a reason).
+func (r *aRunner) runOn(t *testing.T, key string, head, through int64, end M) {
+	t.Helper()
+	run := id.New()
+	r.change(t, nil, r.claude, "session.start", M{"id": run, "task": key, "state": "waiting", "program": "claude", "machine_id": "3f9c0a7d5e21b864",
+		"machine_name": "Aram's MacBook Pro", "folder": "~/devel/game", "lease": r.lease, "item_seq": head})
+	r.change(t, nil, r.claude, "session.update", M{"id": run, "state": "running", "items_through": through})
+	end["id"] = run
+	r.change(t, nil, r.claude, "session.update", end)
+}
+
+// TestAnItemARunWillGoOnWithStillWaits: a run that took an item from
+// before the runner and stopped at a usage limit (or a sign-in) goes on
+// later with that item, which the runner keeps: the item is still handed
+// to run, until a run that took it ends for good.
+func TestAnItemARunWillGoOnWithStillWaits(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := beforeTheRunner(t, st)
+		key := r.task(t, M{"assignee": "@claude"})
+		head := r.hold(t, "")
+		r.runOn(t, key, head.Seq, head.Seq, M{"state": "failed", "reason": core.RunUsageLimit})
+		if again := r.hold(t, ""); again.Seq != head.Seq || again.Wake.Do+" "+again.Wake.Why != "run for_you" {
+			t.Fatalf("after a usage limit the kept item is told %+v", again)
+		}
+		r.runOn(t, key, head.Seq, head.Seq, M{"state": "done"})
+		if again := r.hold(t, ""); again.Seq != head.Seq || again.Wake.Do+" "+again.Wake.Why != "ack before" {
+			t.Fatalf("after the run that went on ended, the item is told %+v", again)
+		}
+	})
+}
+
+// TestWhatTheAgentDoesAfterTheBeginningHandlesNothingFromBefore: of
+// twenty-two items that waited on one task, the first run takes the head
+// and twenty, and comments; the twenty-second still starts a run.
+func TestWhatTheAgentDoesAfterTheBeginningHandlesNothingFromBefore(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := beforeTheRunner(t, st)
+		key := r.task(t, M{"assignee": "@claude"})
+		for i := range 21 {
+			r.change(t, r.owner, "", "comment.create", M{"task": key, "body": fmt.Sprint("and then ", i)})
+		}
+		head := r.hold(t, "&batch=1")
+		if len(head.Batch) != 20 {
+			t.Fatalf("the first hold came with %d more", len(head.Batch))
+		}
+		r.change(t, nil, r.claude, "comment.create", M{"task": key, "body": "Working through the list."})
+		r.runOn(t, key, head.Seq, head.Batch[19].Seq, M{"state": "done"})
+		r.ack(t, head.Seq)
+		handed := r.handedAll(t)
+		want := slices.Repeat([]string{key + " ack before"}, 20)
+		if !slices.Equal(handed, append(want, key+" run for_you")) {
+			t.Fatalf("after the first run the runner was handed %q", handed)
+		}
+	})
+}
+
+// TestReleasingARunnerPutsBackTheCursorItMovedBack: a runner set up, then
+// let go before it took what waited: the project's cursor is where it
+// was when the runner began, so a chat that listens next replays nothing
+// from behind it.
+func TestReleasingARunnerPutsBackTheCursorItMovedBack(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := beforeTheRunner(t, st)
+		r.task(t, M{"assignee": "@claude"})
+		if got := r.hold(t, ""); got.Item.ID == "" {
+			t.Fatal("the runner was handed nothing")
+		}
+		began := r.listenerRow(t).RunnerBeganSeq
+		r.call(t, nil, r.claude, "DELETE", w+"/listening/SVA/runner?machine_id=3f9c0a7d5e21b864", nil, 200, nil)
+		if c := r.cursor(t); c < began {
+			t.Fatalf("after the release the cursor is at %d, before the runner's beginning %d", c, began)
+		}
+		var chat listened
+		r.call(t, nil, r.claude, "GET", w+"/listen?wait=0&project=SVA&by=a+chat", nil, 200, &chat)
+		if chat.Item != nil {
+			t.Fatalf("the chat after the runner was handed %+v", chat.Item)
+		}
+	})
+}
+
+// TestALateHoldWithAReleasedLeaseSetsNothingUp: a runner's hold sent
+// before its release, and answered after, is refused: the runner is not
+// set up again by it.
+func TestALateHoldWithAReleasedLeaseSetsNothingUp(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := newRunner(t, st)
+		cursor := r.cursor(t)
+		r.call(t, nil, r.claude, "DELETE", w+"/listening/SVA/runner?machine_id=3f9c0a7d5e21b864", nil, 200, nil)
+		var refused struct {
+			Error struct{ Reason, Field string }
+		}
+		r.call(t, nil, r.claude, "GET", w+"/listen?wait=0&project=SVA&"+runnerOf+"&lease="+r.lease, nil, 409, &refused)
+		if refused.Error.Reason != "lease_stale" || refused.Error.Field != "lease" {
+			t.Fatalf("a late hold with the released lease was refused %+v", refused)
+		}
+		if l := r.listenerRow(t); l.MachineID != "" || l.RunnerBeganSeq != 0 || l.Lease != "" || r.cursor(t) != cursor {
+			t.Fatalf("the late hold left %+v, cursor %d (was %d)", l, r.cursor(t), cursor)
+		}
+	})
+}
+
+// agentEvent writes an event of @claude's on the task key that no change
+// of its applied in person: what a sync with GitHub writes in its name.
+func (r *aRunner) agentEvent(t *testing.T, key, typ string) {
+	t.Helper()
+	ctx := context.Background()
+	var tk core.Task
+	if err := r.st.Get(ctx, &tk, store.Eq("key", key)); err != nil {
+		t.Fatal(err)
+	}
+	err := r.st.Write(ctx, r.sva.WorkspaceID, func(tx store.Tx) error {
+		return tx.Emit(ctx, core.Event{WorkspaceID: r.sva.WorkspaceID, Seq: tx.NextSeq(), At: time.Now().UnixMilli(), ActorID: r.claudeID, ChangeID: id.New(),
+			Type: typ, EntityType: strings.Split(typ, ".")[0], EntityID: id.New(), ScopeType: "task", ScopeID: tk.ID, ProjectID: tk.ProjectID, Data: []byte(`{}`)})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestOnlyWhatTheAgentDidInPersonHandlesAnItem: a pull request a sync
+// linked in the agent's name does not hide the assignment before it.
+func TestOnlyWhatTheAgentDidInPersonHandlesAnItem(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := beforeTheRunner(t, st)
+		key := r.task(t, M{"assignee": "@claude"})
+		r.agentEvent(t, key, "link.created")
+		if got := r.handedAll(t); !slices.Equal(got, []string{key + " run for_you"}) {
+			t.Fatalf("the runner was handed %q", got)
+		}
+	})
+}
+
+// TestAWithdrawnRequestDoesNotWait: a hand-off taken back, and a comment
+// put in the trash, from before the runner, start nothing.
+func TestAWithdrawnRequestDoesNotWait(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		r := beforeTheRunner(t, st)
+		waiting := r.task(t, M{"assignee": "@claude"}) // the oldest that waits: the runner reads from it
+		handed := r.task(t, nil)
+		r.change(t, r.owner, "", "task.update", M{"id": handed, "waiting_on": "@claude"})
+		r.change(t, r.owner, "", "task.update", M{"id": handed, "waiting_on": "@codex"})
+		deleted := r.task(t, nil)
+		comment := r.change(t, r.owner, "", "comment.create", M{"task": deleted, "body": "@claude delete the old levels"})["ref"]
+		r.change(t, r.owner, "", "comment.delete", M{"id": comment})
+		if got := r.handedAll(t); !slices.Equal(got, []string{waiting + " run for_you", handed + " ack before", deleted + " ack before"}) {
+			t.Fatalf("the runner was handed %q", got)
+		}
+	})
+}
+
+// TestAResourcesTurnOnATaskStaysOutOfItsBatch: "gpu is yours now", for a
+// task with an assignment, names the resource where a task's item names
+// the task; the batch holds only what starts a run, so the runner, which
+// takes a batch that names another task as a server gone wrong, is not
+// stopped by it. Before the runner began and after.
+func TestAResourcesTurnOnATaskStaysOutOfItsBatch(t *testing.T) {
+	t.Parallel()
+	for _, when := range []string{"before the runner", "after the runner began"} {
+		t.Run(when, func(t *testing.T) {
+			testdb.Each(t, func(t *testing.T, st store.Store) {
+				r := beforeTheRunner(t, st)
+				if when == "after the runner began" {
+					r.hold(t, "")
+				}
+				key := r.task(t, M{"assignee": "@claude"})
+				r.change(t, r.owner, "", "resource.create", M{"name": "gpu"})
+				r.change(t, r.owner, "", "resource.acquire", M{"resource": "gpu"})
+				r.change(t, nil, r.claude, "resource.acquire", M{"resource": "gpu", "task": key})
+				r.change(t, r.owner, "", "resource.release", M{"resource": "gpu"})
+				got := r.hold(t, "&batch=1")
+				if got.Item.Task != key || got.Wake.Do != "run" {
+					t.Fatalf("the head is %+v", got)
+				}
+				for _, b := range got.Batch {
+					if b.Item.Task != key || b.Wake.Do != "run" {
+						t.Fatalf("the batch holds %+v", b)
+					}
+				}
+			})
+		})
+	}
 }
