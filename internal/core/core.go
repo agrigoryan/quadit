@@ -267,9 +267,9 @@ type Listener struct {
 	HandedSeq int64 `json:"-" db:"handed_seq"`
 
 	// What a runner says of itself when it holds this listener
-	// (agent-runs-contract.md §4.1); a listener whose MachineID is set is a
-	// runner listener. Set by a hold that names a machine, kept when another
-	// session holds the lease, cleared only by a release.
+	// (agent-runs-contract.md §4.1). Set by a hold that names a machine;
+	// kept when another session holds the lease; cleared only by a release.
+	// A listener whose MachineID is set is a runner listener.
 	MachineID         string `json:"-" db:"machine_id,null"`
 	MachineName       string `json:"-" db:"machine_name"`
 	RunnerFolder      string `json:"-" db:"runner_folder"`
@@ -277,10 +277,9 @@ type Listener struct {
 	RunnerVersion     string `json:"-" db:"runner_version"` // the program's version, "2.1.331"
 	RunnerPaused      string `json:"-" db:"runner_paused"`  // one of the core.Pause* reasons, "" when not paused
 	RunnerPausedUntil int64  `json:"-" db:"runner_paused_until,null"`
-	RunnerSeenAt      int64  `json:"-" db:"runner_seen_at,null"` // the runner's last hold (equals HeardAt while the runner holds)
-	// RunnerHolds: the session holding the lease now is the runner (its
-	// last hold named the machine); false when a chat or a companion holds
-	// it.
+	RunnerSeenAt      int64  `json:"-" db:"runner_seen_at,null"` // the runner's last hold
+	// RunnerHolds is whether the lease is the runner's: set by a hold that
+	// names the machine, cleared by any other hold (a chat taking over).
 	RunnerHolds bool `json:"-" db:"runner_holds"`
 }
 

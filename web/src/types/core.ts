@@ -318,18 +318,18 @@ export type AgentSession = {
   updated_seq: number;
   /** What a run Quadit's runner started adds; absent on a session an agent recorded itself. */
   program?: string;
-  /** The program's own session id. */
+  /** The program's own session id (a UUID): for display and for the line a person copies. */
   program_session?: string;
   machine_id?: string;
   /** The machine's name, as the runner said it. */
-  machine?: string;
+  machine_name?: string;
   /** The folder's label ("~/devel/game"): the path stays on the machine. */
   folder?: string;
   /** Why it waits, did not start or failed (core.Run*). */
   reason?: string;
   /** For a usage limit: when the program said it resets. */
   resets_at?: number;
-  /** The feed position of the item that started it, and of the last item of its task its prompt carried. */
+  /** The feed position of its head item, and of the last item its program took (0 until it runs). */
   item_seq?: number;
   items_through?: number;
   /** When the program took the prompt. */

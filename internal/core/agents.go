@@ -25,7 +25,7 @@ const (
 	AgentSessionRunning    = "running" // working: the program took the prompt (shown "Working")
 	AgentSessionDone       = "done"
 	AgentSessionFailed     = "failed"      // Reason says why
-	AgentSessionStopped    = "stopped"     // a person asked it to stop (StopRequestedBy)
+	AgentSessionStopped    = "stopped"     // a member asked it to stop (StopRequestedBy)
 	AgentSessionNotStarted = "not_started" // a runner received it and will not start the program for it; Reason says why
 )
 
@@ -33,18 +33,19 @@ const (
 const (
 	// waiting
 	RunFolderBusy  = "folder_busy"  // another run works in the same folder on the machine
-	RunSessionOpen = "session_open" // its program session was written outside the runner in the last 5 minutes
+	RunSessionOpen = "session_open" // its program session was written outside the runner a moment ago
 	// not_started
 	RunNotResponsible = "not_responsible" // the item's author is not the agent's owner, nor an agent of the owner
 	RunNoResponsible  = "no_responsible"  // the agent has no responsible person
-	RunCapped         = "run_cap"         // the automatic-run cap of the task was reached (G3)
+	RunCapped         = "run_cap"         // an automatic-run cap was reached (G3, G11)
 	RunNoProgress     = "no_progress"     // two runs in a row changed nothing on the task (G4)
+	RunOpenElsewhere  = "run_open"        // another run of this agent on this task is still open, on another machine
 	// failed
-	RunStartFailed  = "start_failed"  // the program never took the prompt, after the retries (G6)
-	RunProgramError = "program_error" // it took the prompt and ended with an error
+	RunStartFailed  = "start_failed"  // three attempts failed before any work (G6)
+	RunProgramError = "program_error" // it failed after it began to work
 	RunIdle         = "idle"          // no output for the idle limit, awake time (G2)
 	RunTimeLimit    = "time_limit"    // past the entry's optional wall-clock cap
-	RunInterrupted  = "interrupted"   // the runner stopped (quit, crash, update) while it worked
+	RunInterrupted  = "interrupted"   // the runner stopped, or lost the project to another session, while it worked
 	RunUsageLimit   = "usage_limit"   // the program's usage limit (G5); ResetsAt when known
 	RunNotSignedIn  = "not_signed_in" // the program is not signed in
 )
@@ -64,9 +65,10 @@ var Programs = []string{ProgramClaude, ProgramCodex}
 const (
 	PauseUsageLimit     = "usage_limit"
 	PauseNotSignedIn    = "not_signed_in"
-	PauseProgramMissing = "program_missing"
-	PauseFolderMissing  = "folder_missing"
-	PauseLoginMismatch  = "login_mismatch" // the program's own settings make it work as another login
+	PauseProgramMissing = "program_missing" // the recorded program is gone or changed
+	PauseFolderMissing  = "folder_missing"  // the folder is gone or no longer passes the folder rules
+	PauseLoginMismatch  = "login_mismatch"  // the program's own settings make it work as another login
+	PauseServerOld      = "server_old"      // the server's answer lacks what a runner needs (no wake, an unknown one, another project)
 )
 
 // Rule action kinds.
@@ -184,15 +186,15 @@ type AgentSession struct {
 
 	// What a runner adds to a run it started (agent-runs-contract.md §2.1).
 	Program         string `json:"program,omitempty" db:"program"`                 // core.ProgramClaude, core.ProgramCodex; "" for a session an agent recorded itself
-	ProgramSession  string `json:"program_session,omitempty" db:"program_session"` // the program's own session id; Codex's is filled once the program reports it
+	ProgramSession  string `json:"program_session,omitempty" db:"program_session"` // the program's own session id (a UUID): for display and for the line a person copies, never read back by a runner
 	MachineID       string `json:"machine_id,omitempty" db:"machine_id"`           // the runner's machine id (16 lower-case hex)
-	Machine         string `json:"machine,omitempty" db:"machine"`                 // the machine's name, as the runner said it
+	MachineName     string `json:"machine_name,omitempty" db:"machine_name"`       // the machine's name, as the runner said it
 	Folder          string `json:"folder,omitempty" db:"folder"`                   // the folder's display label ("~/devel/game")
 	Reason          string `json:"reason,omitempty" db:"reason"`                   // why it waits, did not start or failed: one of the core.Run* reasons
 	ResetsAt        int64  `json:"resets_at,omitempty" db:"resets_at,null"`        // usage_limit: when the program said its limit resets (ms)
-	ItemSeq         int64  `json:"item_seq,omitempty" db:"item_seq"`               // the feed position of the item that started it
-	ItemsThrough    int64  `json:"items_through,omitempty" db:"items_through"`     // the last item of its task its prompt carried
-	AcceptedAt      int64  `json:"accepted_at,omitempty" db:"accepted_at,null"`    // when the program took the prompt (set by the server when state becomes running)
+	ItemSeq         int64  `json:"item_seq,omitempty" db:"item_seq"`               // the feed position of its head item
+	ItemsThrough    int64  `json:"items_through,omitempty" db:"items_through"`     // the last item its program took; written with the move to running, 0 before
+	AcceptedAt      int64  `json:"accepted_at,omitempty" db:"accepted_at,null"`    // when the program took the prompt (set by the server with the move to running)
 	StopRequestedAt int64  `json:"stop_requested_at,omitempty" db:"stop_requested_at,null"`
 	StopRequestedBy string `json:"stop_requested_by,omitempty" db:"stop_requested_by,null"`
 	StepsDropped    int    `json:"steps_dropped,omitempty" db:"steps_dropped"` // older steps not kept (the cap)

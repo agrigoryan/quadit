@@ -39,7 +39,7 @@ export interface AgentSession {
   program?: string;
   program_session?: string;
   machine_id?: string;
-  machine?: string;
+  machine_name?: string;
   folder?: string;
   reason?: string;
   resets_at?: number;
