@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -20,11 +21,17 @@ import (
 // driven over its debugging pipe, which each system hands it its own way.
 // A browser that cannot run here at all, as the server runs it but without
 // the pipe (browserRuns), is no browser for this test: it says why and
-// stops; one that runs and gives no picture is a failure.
+// stops, unless QUADIT_TEST_PICTURE=1 says this machine must take pictures
+// (as CI does), when that is a failure too; one that runs and gives no
+// picture is always a failure.
 func TestAPictureIsTakenAtTheSizeAsked(t *testing.T) {
+	noBrowser := t.Skipf
+	if os.Getenv("QUADIT_TEST_PICTURE") == "1" {
+		noBrowser = t.Fatalf
+	}
 	chrome := findChrome()
 	if chrome == "" {
-		t.Skip("no Chrome or Chromium on this machine")
+		noBrowser("no Chrome or Chromium on this machine (QUADIT_CHROME names one)")
 	}
 	page := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, `<!doctype html><title>t</title><body style="background:#123456">A page</body>`)
@@ -35,7 +42,7 @@ func TestAPictureIsTakenAtTheSizeAsked(t *testing.T) {
 	shot, _, err := Take(ctx, Request{Target: page.URL, Width: 800, Height: 600})
 	if err != nil {
 		if why := browserRuns(t, chrome); why != nil {
-			t.Skipf("no usable browser here: %s does not run headless (%v); taking the picture said: %v", chrome, why, err)
+			noBrowser("no usable browser here: %s does not run headless (%v); taking the picture said: %v", chrome, why, err)
 		}
 		t.Fatalf("%s runs here, and gave no picture: %v", chrome, err)
 	}

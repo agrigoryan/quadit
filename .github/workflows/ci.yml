@@ -35,6 +35,8 @@ jobs:
       - name: Test on SQLite and Postgres
         env:
           QUADIT_TEST_POSTGRES: postgres://postgres:quadit@127.0.0.1:5432/quadit
+          # The runner has Chrome: a picture of a page must be taken here, not skipped.
+          QUADIT_TEST_PICTURE: "1"
         # The server's tests run every read on both databases under the race detector: longer than go test's ten minutes on a hosted runner.
         run: go test -race -timeout 30m ./...
       - uses: pnpm/action-setup@v4
@@ -83,6 +85,9 @@ jobs:
         run: go vet ./...
       - name: Test on SQLite
         if: ${{ !cancelled() }}
+        env:
+          # The runner has Chrome and Edge: a picture of a page must be taken here, not skipped.
+          QUADIT_TEST_PICTURE: "1"
         run: go test -timeout 30m ./...
 
   # The end-to-end suite (web/e2e): Chromium against the binary built here.
