@@ -1030,8 +1030,9 @@ func (n *normaliser) replacePath(path, to string) {
 // (<data>\backups, or <data>\\backups in JSON).
 var windowsTailRE = regexp.MustCompile(`(<[a-z]+>)((?:\\{1,2}[^"\\\s]+)+)`)
 
-// cutShortRE finds what may be a path cut short: from a slash to the mark of the cut.
-var cutShortRE = regexp.MustCompile(`/[^"\\\s…]*…`)
+// cutShortRE finds what may be a path cut short: from a slash, or a
+// Windows drive (its backslashes doubled when quoted), to the mark of the cut.
+var cutShortRE = regexp.MustCompile(`/[^"\\\s…]*…|[A-Za-z]:\\[^"\s…]*…`)
 
 var (
 	uuidRE    = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
@@ -1060,7 +1061,7 @@ func (n *normaliser) text(s string) string {
 	}
 	s = cutShortRE.ReplaceAllStringFunc(s, func(cut string) string {
 		for path, to := range n.paths {
-			if strings.HasPrefix(path, strings.TrimSuffix(cut, "…")) {
+			if strings.HasPrefix(path, strings.ReplaceAll(strings.TrimSuffix(cut, "…"), `\\`, `\`)) {
 				return to
 			}
 		}
