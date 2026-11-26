@@ -29,6 +29,13 @@ describe("tallyOf", () => {
     expect(tallyOf(tasks, statuses, projects({ estimates: true }))).toMatchObject({ points: 9, pointsDone: 3 });
   });
 
+  it("says whether a counted task is in a project that estimates, an empty tally not", () => {
+    expect(tallyOf(tasks, statuses, projects({ estimates: true })).estimated).toBe(true);
+    expect(tallyOf(tasks, statuses, projects()).estimated).toBe(false);
+    expect(tallyOf([], statuses, projects({ estimates: true })).estimated).toBe(false);
+    expect(tallyOf([task("gone", 3)], statuses, projects({ estimates: true })).estimated).toBe(false);
+  });
+
   it("counts a task without an estimate as nothing where the project says so", () => {
     const tally = tallyOf(tasks, statuses, projects({ estimates: true, estimate_ignore_unestimated: true }));
     expect(tally).toMatchObject({ points: 8, pointsDone: 3 });
@@ -46,13 +53,13 @@ describe("capacityOf", () => {
     cycle("now", "2026-10-27", "2026-11-09"),
   ];
 
-  it("is the mean done in the three latest cycles that have ended, rounded", () => {
+  it("is the mean done in the three latest cycles that have ended, not rounded", () => {
     const tallies = { c1: done(100), c2: done(10), c3: done(20), c4: done(31), now: done(50) };
-    expect(capacityOf(cycles, tallies, "2026-11-01")).toEqual({ points: 20, cycles: 3 });
+    expect(capacityOf(cycles, tallies, "2026-11-01")).toEqual({ points: 61 / 3, cycles: 3 });
   });
 
   it("counts a cycle that ended with nothing done as 0, and uses fewer cycles where fewer have ended", () => {
-    expect(capacityOf(cycles.slice(0, 2), { c1: done(9) }, "2026-11-01")).toEqual({ points: 5, cycles: 2 });
+    expect(capacityOf(cycles.slice(0, 2), { c1: done(9) }, "2026-11-01")).toEqual({ points: 4.5, cycles: 2 });
   });
 
   it("is nothing while no cycle has ended", () => {

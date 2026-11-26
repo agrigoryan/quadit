@@ -192,7 +192,8 @@ function BurnPanel({ cycle, hasPoints }: { cycle: Cycle; hasPoints: boolean }) {
   const [unit, setUnit] = useState<"tasks" | "points">("tasks");
   const [table, setTable] = useState(false);
   const { data, error, loading, refreshing } = useLive<CycleChart>(`/cycles/${cycle.id}/chart`, {
-    only: ["task", "cycle"],
+    // The project's settings decide what a task counts for.
+    only: ["task", "cycle", "project"],
   });
   const shown = hasPoints ? unit : "tasks";
   const units = ["tasks", "points"] as const;

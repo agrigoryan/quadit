@@ -41,4 +41,13 @@ describe("EpicsPanel", () => {
     expect(rows[0]).toMatch(/, 1\/4 points/);
     expect(rows[1]).not.toMatch(/points/);
   });
+
+  it("shows points of 0 where the server sends them", () => {
+    render(
+      <MemoryRouter>
+        <EpicsPanel epics={[epic("e1", "SVA", { points: 0, points_done: 0 })]} showProject />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("listitem")).toHaveTextContent(", 0/0 points");
+  });
 });

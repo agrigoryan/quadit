@@ -160,8 +160,12 @@ function Capacity({
   capacity: NonNullable<MetaProps["capacity"]>;
   estimates: boolean;
 }) {
+  // Compared with the mean itself, shown rounded: 3 is over a mean of 2.5, which reads "about 3".
   const over = scope > capacity.points;
-  const text = t(estimates ? "cycles.capacity.points" : "cycles.capacity.tasks", { scope, n: capacity.points });
+  const text = t(estimates ? "cycles.capacity.points" : "cycles.capacity.tasks", {
+    scope,
+    n: Math.round(capacity.points),
+  });
   const hint = t("cycles.capacity.hint", { n: capacity.cycles });
   const told = over ? [text, t("cycles.capacity.over"), hint] : [text, hint];
   return (

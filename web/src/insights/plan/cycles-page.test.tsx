@@ -19,7 +19,10 @@ const day = (n: number) => addDays(today, n);
 const task = (n: number, cycle: string, status: string, estimate?: number) =>
   ({ id: `t${n}`, key: `SVA-${n}`, project_id: "p1", cycle_id: cycle, status_id: status, estimate, rank: "a" }) as Task;
 
-function show(settings: ProjectSettings | undefined, { ended = true, restComing = false } = {}) {
+const TASKS = [task(1, "c1", "done", 5), task(2, "c1", "done", 3), task(3, "c2", "todo", 5), task(4, "c2", "todo", 5)];
+
+/** `ended`: how many cycles have ended, the latest last. */
+function show(settings: ProjectSettings | undefined, { ended = 1, restComing = false, tasks = TASKS } = {}) {
   const me = { user_id: "u1", role: "member", name: "Me", kind: "person", handle: "me" } as Member;
   clearStore();
   loadBootstrap("acme", {
@@ -34,11 +37,14 @@ function show(settings: ProjectSettings | undefined, { ended = true, restComing 
       { id: "done", project_id: "p1", name: "Done", category: "done", rank: "b" },
     ],
     cycles: [
-      ...(ended ? [{ id: "c1", project_id: "p1", number: 1, starts_on: day(-20), ends_on: day(-7) }] : []),
+      ...[
+        { id: "c0", project_id: "p1", number: 0, starts_on: day(-34), ends_on: day(-21) },
+        { id: "c1", project_id: "p1", number: 1, starts_on: day(-20), ends_on: day(-7) },
+      ].slice(2 - ended),
       { id: "c2", project_id: "p1", number: 2, starts_on: day(-6), ends_on: day(7) },
       { id: "c3", project_id: "p1", number: 3, starts_on: day(8), ends_on: day(21) },
     ],
-    tasks: [task(1, "c1", "done", 5), task(2, "c1", "done", 3), task(3, "c2", "todo", 5), task(4, "c2", "todo", 5)],
+    tasks,
     ...(restComing ? { part: "open", rest: 4 } : {}),
   });
   render(
@@ -65,6 +71,17 @@ describe("a cycle's capacity", () => {
     expect(screen.getByText("8 of 8 points")).toBeInTheDocument();
   });
 
+  it("is compared before it is rounded: a scope of 3 is over a mean of 2.5", () => {
+    show(
+      { estimates: true },
+      {
+        ended: 2,
+        tasks: [task(1, "c1", "done", 2), task(2, "c0", "done", 3), task(3, "c2", "todo", 3)],
+      },
+    );
+    expect(screen.getByLabelText(/^3 of about 3 points/)).toHaveClass("text-wait");
+  });
+
   it("is in tasks where the project does not estimate", () => {
     show(undefined);
     expect(screen.getByLabelText(/^2 of about 2 tasks\. About/)).toBeInTheDocument();
@@ -72,7 +89,7 @@ describe("a cycle's capacity", () => {
   });
 
   it("is not shown while no cycle has ended", () => {
-    show({ estimates: true }, { ended: false });
+    show({ estimates: true }, { ended: 0 });
     expect(screen.queryByText(/of about/)).toBeNull();
   });
 

@@ -28,16 +28,28 @@ export interface Tally {
   /** Every task's points (tasks/estimates.ts pointsOf): a task of a project that does not estimate counts 1. */
   points: number;
   pointsDone: number;
+  /** One of the tasks counted is in a project that estimates: its points are worth showing. */
+  estimated: boolean;
   /** When any of its tasks last changed. */
   lastMove: number;
 }
 
-export const emptyTally = (): Tally => ({ total: 0, done: 0, started: 0, points: 0, pointsDone: 0, lastMove: 0 });
+export const emptyTally = (): Tally => ({
+  total: 0,
+  done: 0,
+  started: 0,
+  points: 0,
+  pointsDone: 0,
+  estimated: false,
+  lastMove: 0,
+});
 
 function addTo(tally: Tally, task: Task, statuses: Dict<Status>, projects: Dict<Project>) {
   const category = statuses[task.status_id]?.category;
   if (isCanceledCategory(category)) return;
-  const points = pointsOf(task, projects[task.project_id]);
+  const project = projects[task.project_id];
+  const points = pointsOf(task, project);
+  tally.estimated ||= !!project?.settings?.estimates;
   tally.total++;
   tally.points += points;
   if (isDoneCategory(category)) {
@@ -79,8 +91,8 @@ const CAPACITY_CYCLES = 3;
 /**
  * What a project's cycle can hold, about: the mean of the points done (or,
  * where it does not estimate, the tasks done) in its up to three latest
- * cycles that have ended before `today`, rounded, with how many cycles that
- * was. Undefined while none has ended. `cycles` are the project's; `tallies`
+ * cycles that have ended before `today`, not rounded, with how many cycles
+ * that was. Undefined while none has ended. `cycles` are the project's; `tallies`
  * are by cycle, from useTallies, and need the finished tasks to have arrived.
  */
 export function capacityOf(
@@ -94,7 +106,7 @@ export function capacityOf(
     .slice(0, CAPACITY_CYCLES);
   if (ended.length === 0) return undefined;
   const done = ended.reduce((sum, c) => sum + (tallies[c.id]?.pointsDone ?? 0), 0);
-  return { points: Math.round(done / ended.length), cycles: ended.length };
+  return { points: done / ended.length, cycles: ended.length };
 }
 
 export type Risk = "" | "past" | "soon" | "stale";
