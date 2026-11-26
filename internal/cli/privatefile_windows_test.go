@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"regexp"
 	"testing"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -35,10 +35,18 @@ func openToOthers(t *testing.T, path string) {
 
 // readableByOthers reports whether the file's access list lets in anyone
 // but the person running the test, SYSTEM and Administrators, or takes
-// what its folder lets in.
+// what its folder lets in. When it does, the list is logged.
 func readableByOthers(t *testing.T, path string) bool {
 	t.Helper()
 	user, err := windows.GetCurrentProcessToken().GetTokenUser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	system, err := windows.CreateWellKnownSid(windows.WinLocalSystemSid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admins, err := windows.CreateWellKnownSid(windows.WinBuiltinAdministratorsSid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,15 +58,27 @@ func readableByOthers(t *testing.T, path string) bool {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if control&windows.SE_DACL_PROTECTED == 0 {
-		return true
+	dacl, _, err := sd.DACL()
+	if err != nil {
+		t.Fatal(err)
 	}
-	// Each entry of the list in SDDL ends in the account it is for.
-	allowed := map[string]bool{"SY": true, "BA": true, user.User.Sid.String(): true}
-	for _, entry := range regexp.MustCompile(`\(A;[^)]*;([^;)]+)\)`).FindAllStringSubmatch(sd.String(), -1) {
-		if !allowed[entry[1]] {
-			return true
+	others := control&windows.SE_DACL_PROTECTED == 0
+	for i := range uint32(dacl.AceCount) {
+		var ace *windows.ACCESS_ALLOWED_ACE
+		if err := windows.GetAce(dacl, i, &ace); err != nil {
+			t.Fatal(err)
+		}
+		if ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE {
+			continue // an entry that denies lets nobody in
+		}
+		// The account an entry is for begins where SidStart is.
+		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
+		if !sid.Equals(user.User.Sid) && !sid.Equals(system) && !sid.Equals(admins) {
+			others = true
 		}
 	}
-	return false
+	if others {
+		t.Logf("the access list of %s: %s", path, sd.String())
+	}
+	return others
 }
