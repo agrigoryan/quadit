@@ -102,6 +102,7 @@ var helpTopics = map[string]string{
                                reports each run as a JSON line to a file or named pipe you made.
                                Stop it with Ctrl-C, or by closing its terminal.
                                quadit listen --exec sh -c 'codex exec "Quadit woke you for this inbox item: $QUADIT_ITEM Handle it with the quadit skill: answer where you were asked, and write nothing when it asks nothing of you."'
+                               On Windows the skill has this line for PowerShell (quadit skill).
   Where an agent's tool cannot hand it a background command's result (it can only wait in
   the foreground), listening from a chat keeps that chat busy; a companion keeps it free.
 `,
@@ -114,7 +115,7 @@ var helpTopics = map[string]string{
   The desktop app does this for you ("Run by Quadit" on Claude Code's and Codex's cards).
 
   run [registry=PATH]          serve every entry until Ctrl-C (or SIGTERM); one per computer
-                               (exit 3 when another serves). macOS and Linux only
+                               (exit 3 when another serves)
   run add login=PATH project=KEY folder=PATH program=claude|codex [program_path=PATH] [max_minutes=N]
                                register a project: the agent's own login file (one Connect wrote),
                                the project's own folder (not your home folder, nothing above it,
