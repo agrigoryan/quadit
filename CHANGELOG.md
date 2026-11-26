@@ -4,18 +4,20 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+The server upgrades its database when it starts (migration 0031), copying it first; `quadit upgrade --undo` goes back ([upgrades](docs/install.md#upgrades)). It changes the feed's older events: an estimate cleared, or set where there was none, said that none as 0, and now says it as `null`, as the feed does from this version on.
+
 ### Added
 
 - Estimates as Linear has them. A project that estimates picks a scale in its settings: Fibonacci (1, 2, 3, 5, 8), Exponential (1, 2, 4, 8, 16), Linear (1 to 5), T-shirt sizes (XS, S, M, L, XL, which count 1, 2, 3, 5 and 8 points) or any whole number; the extended scale adds two more values (13 and 21, 32 and 64, 6 and 7, XXL and XXXL). Turning estimates on starts on Fibonacci. A task's estimate is then one of the scale's values, and anything else is refused with the values in the project's words ("this project estimates in 1, 2, 3, 5 or 8 points"); estimates already stored stay when the scale changes. The project settings are `estimate_scale`, `estimate_extended`, `estimate_zero` and `estimate_ignore_unestimated`.
-- Zero estimates: where a project allows them, 0 is an estimate of its own, apart from none (`"estimate": 0` on the task; no `estimate` is none, and `null` clears it). Elsewhere a 0 sent clears the estimate, as before.
-- An estimate may be given as a T-shirt size in any change (`"estimate": "M"`, `quadit update SVA-12 estimate=M`); it stands for its number of points on every project, and answers always carry the number. `quadit … estimate=none` clears one.
+- Zero estimates: where a project allows them, 0 is an estimate of its own, apart from none (`"estimate": 0` on the task; no `estimate` is none, and `null` clears it). Elsewhere a 0 sent clears the estimate, as before. On `task.create`, an estimate left out is the template's, applied as it is (a template may keep an explicit 0), or none without one; `null` is none, whatever the template says.
+- An estimate may be given as a T-shirt size in any change (`"estimate": "M"`, `quadit update SVA-12 estimate=M`); it stands for its number of points on every project, and answers always carry the number. A number written as text is digits only (`"5"`, not `"+5"`). `quadit … estimate=none` clears one.
 - Tasks are asked for by estimate: `estimate=5,8`, `estimate=M` or `estimate=none`, in the task list, the feed, saved views, `quadit tasks` and the MCP `tasks` tool.
-- `quadit layout KEY` (and `GET /projects/{key}/layout`) says what estimates the project takes, and the text for agents says a task's estimate with its unit: `estimate: 3 points`, `estimate: M (3 points)` on a T-shirt project, and `estimate: 0 points` for a zero estimate.
-- The Linear import reads an estimate that is a T-shirt size, and an import keeps every estimate as it was there, on the project's scale or not (`task.create`'s `keep_estimate`).
+- `quadit layout KEY` (and `GET /projects/{key}/layout`) says what estimates the project takes and what a 0 does there, and the text for agents says a task's estimate with its unit: `estimate: 3 points`, `estimate: M (3 points)` on a T-shirt project, and `estimate: 0 points` for a zero estimate.
+- The Linear import reads an estimate that is a T-shirt size, and an import keeps every estimate as it was there, on the project's scale or not (`task.create`'s `keep_estimate`, for admins, who alone import).
 
 ### Changed
 
-- Points follow Linear's rule everywhere they are added up (a cycle's chart, an epic's progress): a task counts its estimate, and a task without one counts 1 point, or 0 where the project's settings say so. In a project that already had estimates on, its tasks without an estimate now count 1 each, so its cycles' and epics' points go up. A project that does not estimate counts each task as 1, and its epics show no points.
+- Points follow Linear's rule everywhere they are added up (a cycle's chart, an epic's progress): a task counts its estimate, and a task without one counts 1 point, or 0 where the project's settings say so. In a project that already had estimates on, its tasks without an estimate now count 1 each, so its cycles' and epics' points go up. A project that does not estimate counts each task as 1. An epic's progress has `points` and `points_done`, 0 included, when one of its tasks is in a project that estimates, and neither otherwise.
 
 ## [0.8.0] - 2026-11-26
 
