@@ -171,7 +171,8 @@ function Capacity({
         tabIndex={0}
         aria-label={told.join(". ")}
         className={cx(
-          "flex shrink-0 items-center gap-1 rounded-sm text-xs tnum outline-offset-2",
+          // A phone's row has room for the name and the progress only, as for the dates.
+          "flex shrink-0 items-center gap-1 rounded-sm text-xs tnum outline-offset-2 max-sm:hidden",
           over ? "font-medium text-wait" : "text-ink-3",
         )}
       >
