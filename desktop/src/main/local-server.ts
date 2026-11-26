@@ -18,7 +18,10 @@
 //     before it beside as server.log.1.
 //   - The app holds its standard input, and it runs with
 //     --stop-on-stdin-close: if the app dies without stopping it, the input
-//     closes and the server shuts down, so it never outlives the app.
+//     closes and the server shuts down, so it never outlives the app. That
+//     is also how the app stops it, on every system: Windows has no signal
+//     the app can send that a program may answer (kill ends it without a
+//     word). One that has not exited in time is ended outright.
 //   - Its first line of input is the app key (--app-key-stdin), made anew at
 //     every start and kept only here, in memory: it is never logged, put in
 //     settings or given to a page. A request carrying it is the app that runs
@@ -44,6 +47,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { closeSync, mkdirSync, openSync, readSync, renameSync, statSync, writeSync } from "node:fs";
 import { createConnection, createServer } from "node:net";
 import { join } from "node:path";
+import { withoutQuadit, withPath } from "@/main/child-guard";
 import type { Fetch } from "@/main/probe";
 import type { Settings } from "@/main/settings";
 import type { StoppedMark } from "@/main/stopped-mark";
@@ -51,9 +55,14 @@ import type { LocalState } from "@/shared/pages-api";
 
 /** What the app needs of a started quadit serve (Node's ChildProcess has it). */
 export interface ServerProcess {
-  /** Its standard input; null only when it was not started with a pipe there. */
-  stdin: { write(data: string): boolean; on(event: "error", listener: (err: Error) => void): unknown } | null;
-  kill(signal: NodeJS.Signals): boolean;
+  /** Its standard input; null only when it was not started with a pipe there. Ended, it tells the server to stop. */
+  stdin: {
+    write(data: string): boolean;
+    end(): unknown;
+    on(event: "error", listener: (err: Error) => void): unknown;
+  } | null;
+  /** Ends it outright. */
+  kill(signal: "SIGKILL"): boolean;
   /** "exit" when it ended; "error" when it could not be run at all. */
   once(event: "exit", listener: (code: number | null, signal: NodeJS.Signals | null) => void): this;
   once(event: "error", listener: (err: Error) => void): this;
@@ -63,7 +72,7 @@ export interface ServerProcess {
 export type Spawn = (
   binary: string,
   args: string[],
-  options: { env: NodeJS.ProcessEnv; stdio: ["pipe", number, number] },
+  options: { env: NodeJS.ProcessEnv; stdio: ["pipe", number, number]; windowsHide: true },
 ) => ServerProcess;
 
 /** The time, and waiting for it to pass. */
@@ -81,7 +90,7 @@ export interface Ports {
 }
 
 export interface LocalServerParts {
-  /** The bundled quadit, built with the web app; null where this build has none (Windows, a run from source). */
+  /** The bundled quadit, built with the web app; null where this build has none (a run from source). */
   binary: string | null;
   /** The server's data folder: its database, files and log. */
   dataDir: string;
@@ -228,7 +237,7 @@ export class LocalServer {
     await this.stop();
   }
 
-  /** Stops the server and waits for it: SIGTERM, then SIGKILL if it has not exited in time. Never starts it again. */
+  /** Stops the server and waits for it: its input closed, then ended outright if it has not exited in time. Never starts it again. */
   async stop(): Promise<void> {
     const generation = ++this.generation;
     if (this.child) await this.terminate(this.child, this.exited);
@@ -237,13 +246,12 @@ export class LocalServer {
   }
 
   /**
-   * Tells the server to stop (SIGTERM) and does not wait: for the app's
-   * quitting, which must not be held up. The server finishes on its own, and
-   * would anyway once the app is gone and its input closes.
+   * Tells the server to stop (its input closed) and does not wait: for the
+   * app's quitting, which must not be held up. The server finishes on its own.
    */
   stopWithoutWaiting() {
     this.generation++;
-    this.child?.kill("SIGTERM");
+    this.child?.stdin?.end();
   }
 
   /** Stops the server and starts it again, unless something else was asked of it meanwhile. */
@@ -413,9 +421,9 @@ export class LocalServer {
     }
   }
 
-  /** SIGTERM, then SIGKILL when the server has not exited in time; resolves once it has. */
+  /** Closes the server's input, then ends it outright when it has not exited in time; resolves once it has. */
   private async terminate(child: ServerProcess, exited: Promise<void>) {
-    child.kill("SIGTERM");
+    child.stdin?.end();
     const inTime = await Promise.race([
       exited.then(() => true),
       this.parts.clock.sleep(STOP_LIMIT_MS).then(() => false),
@@ -480,8 +488,10 @@ export class LocalServer {
         ],
         {
           // Set after the person's own QUADIT_ settings are taken out, on purpose.
-          env: { ...withoutQuaditSettings(this.parts.env), PATH: path, QUADIT_SETTING_AUTH_PASSKEYS: "false" },
+          env: { ...withPath(withoutQuadit(this.parts.env), path), QUADIT_SETTING_AUTH_PASSKEYS: "false" },
           stdio: ["pipe", log, log],
+          // No console window: the app is a window program, and the server would get one of its own.
+          windowsHide: true,
         },
       );
     } finally {
@@ -630,11 +640,6 @@ function sizeOf(file: string): number | null {
   } catch {
     return null;
   }
-}
-
-/** `env` without QUADIT_ variables: the person's own servers' settings (QUADIT_DB, QUADIT_SECRET…) are not this server's. */
-function withoutQuaditSettings(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return Object.fromEntries(Object.entries(env).filter(([name]) => !name.startsWith("QUADIT_")));
 }
 
 /** The ports of 127.0.0.1, as the system has them. */

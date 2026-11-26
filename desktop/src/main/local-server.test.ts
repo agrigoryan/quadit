@@ -16,9 +16,10 @@ import {
 import type { Fetch } from "@/main/probe";
 import type { AppSettings } from "@/main/settings";
 
-/** A quadit serve as the app sees it: told signals, given its input, and made to exit by the test. */
+/** A quadit serve as the app sees it: given its input, told to stop, and made to exit by the test. */
 class FakeProcess extends EventEmitter implements ServerProcess {
-  signals: string[] = [];
+  /** How it was told to stop, in order: its input closed ("input closed"), or ended outright ("SIGKILL"). */
+  told: string[] = [];
   /** What the app wrote to its standard input. */
   input: string[] = [];
   stdin = Object.assign(new EventEmitter(), {
@@ -26,14 +27,18 @@ class FakeProcess extends EventEmitter implements ServerProcess {
       this.input.push(data);
       return true;
     },
+    end: () => {
+      this.told.push("input closed");
+      if (this.obeys) queueMicrotask(() => this.emit("exit", 0, null));
+    },
   });
-  /** Whether it exits when told SIGTERM, as a quadit serve does. */
+  /** Whether it exits when its input closes, as a quadit serve --stop-on-stdin-close does. */
   constructor(private obeys = true) {
     super();
   }
-  kill(signal: NodeJS.Signals) {
-    this.signals.push(signal);
-    if (this.obeys || signal === "SIGKILL") queueMicrotask(() => this.emit("exit", null, signal));
+  kill(signal: "SIGKILL") {
+    this.told.push(signal);
+    queueMicrotask(() => this.emit("exit", null, signal));
     return true;
   }
 }
@@ -156,7 +161,7 @@ function setUp(
     shellPath: async () => "/opt/homebrew/bin:/usr/bin:/bin",
     stopped: {
       set: async () => {
-        mark.said.push(`mark set (${spawned.at(-1)?.process.signals.length ? "stopping" : "running"})`);
+        mark.said.push(`mark set (${spawned.at(-1)?.process.told.length ? "stopping" : "running"})`);
         mark.set = true;
       },
       clear: async () => {
@@ -270,7 +275,7 @@ describe("LocalServer", () => {
       reason: expect.stringContaining("did not start"),
       log: [expect.stringMatching(/^Started by the Quadit app at /)],
     });
-    expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
+    expect(spawned[0]?.process.told).toEqual(["input closed"]);
   });
 
   it("waits a few seconds for its port, as the server before it lets go of it, and then starts", async () => {
@@ -339,12 +344,12 @@ describe("LocalServer", () => {
     expect(spawned).toHaveLength(6);
   });
 
-  it("stops with SIGTERM and waits for the server, without starting it again", async () => {
+  it("stops by closing the server's input and waits for it, without starting it again", async () => {
     const { server, clock, spawned, states } = setUp();
     await server.setUp();
     await clock.advance(0);
     await server.stop();
-    expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
+    expect(spawned[0]?.process.told).toEqual(["input closed"]);
     expect(server.state()).toEqual({ kind: "stopped" });
     await clock.advance(60_000);
     expect(spawned).toHaveLength(1);
@@ -356,11 +361,11 @@ describe("LocalServer", () => {
     await server.setUp();
     await clock.advance(0);
     server.stopWithoutWaiting();
-    expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
+    expect(spawned[0]?.process.told).toEqual(["input closed"]);
     spawned[0]?.process.emit("exit", 0, null);
     await clock.advance(60_000);
     expect(spawned).toHaveLength(1);
-    expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
+    expect(spawned[0]?.process.told).toEqual(["input closed"]);
   });
 
   it("kills a server that does not stop in time", async () => {
@@ -369,10 +374,10 @@ describe("LocalServer", () => {
     await clock.advance(0);
     const stopped = server.stop();
     await clock.advance(9_999);
-    expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
+    expect(spawned[0]?.process.told).toEqual(["input closed"]);
     await clock.advance(1);
     await stopped;
-    expect(spawned[0]?.process.signals).toEqual(["SIGTERM", "SIGKILL"]);
+    expect(spawned[0]?.process.told).toEqual(["input closed", "SIGKILL"]);
     expect(server.state().kind).toBe("stopped");
   });
 
@@ -397,7 +402,7 @@ describe("LocalServer", () => {
     await restarted;
     await clock.advance(0);
     expect(spawned).toHaveLength(2);
-    expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
+    expect(spawned[0]?.process.told).toEqual(["input closed"]);
     expect(server.state().kind).toBe("running");
   });
 
@@ -483,10 +488,10 @@ describe("LocalServer", () => {
     const { server, clock, spawned } = setUp({ ready: false, obeys: false });
     await server.setUp();
     await clock.advance(120_000);
-    expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
+    expect(spawned[0]?.process.told).toEqual(["input closed"]);
     expect(server.state().kind).toBe("starting");
     await clock.advance(10_000);
-    expect(spawned[0]?.process.signals).toEqual(["SIGTERM", "SIGKILL"]);
+    expect(spawned[0]?.process.told).toEqual(["input closed", "SIGKILL"]);
     expect(server.state()).toMatchObject({ kind: "failed", reason: "The server did not start within two minutes." });
   });
 
@@ -626,7 +631,7 @@ describe("LocalServer's proof", () => {
           "Quit that program, then start the server again.",
       });
       // Its own server is stopped, and not started again by itself.
-      expect(spawned[0]?.process.signals).toEqual(["SIGTERM"]);
+      expect(spawned[0]?.process.told).toEqual(["input closed"]);
       await clock.advance(60_000);
       expect(spawned).toHaveLength(1);
       // Nothing with the key or cookies went there, and the owner's calls ask nothing.
