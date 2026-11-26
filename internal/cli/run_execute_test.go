@@ -833,6 +833,47 @@ func TestAnUnreadableRecordMeansTheAttemptIsNotRepeated(t *testing.T) {
 	rt.acked(head)
 }
 
+// TestEverythingTheProgramWroteIsReadHoweverSlowlyItIsActedOn: acting on
+// a line (writing the journal through to a slow disk) takes longer than
+// the drain after the program ended; the lines it wrote after are read
+// all the same, the one that shows work began among them, so the attempt
+// is not repeated.
+func TestEverythingTheProgramWroteIsReadHoweverSlowlyItIsActedOn(t *testing.T) {
+	// The first line is read alone; the rest come while it is acted on.
+	rt := newRunTest(t, core.ProgramClaude, []fakeagent.Step{claudeInit(), {SleepMS: 100}, claudeSays("On it."),
+		{Out: `{"type":"assistant","message":{"content":[{"type":"tool_use"`}, exit(1)})
+	rt.times.drain = 50 * time.Millisecond
+	was := programs[core.ProgramClaude]
+	programs[core.ProgramClaude] = slowToAct{was}
+	t.Cleanup(func() { programs[core.ProgramClaude] = was })
+	rt.f.addItem(fakeItem{Task: "SVA-12"})
+	rt.serve()
+	if row := rt.ended(0); row["reason"] != core.RunProgramError || len(rt.records()) != 1 {
+		t.Fatalf("%v after %d starts", row, len(rt.records()))
+	}
+}
+
+// slowToAct is a program whose first output line takes half a second to
+// act on.
+type slowToAct struct{ program }
+
+func (p slowToAct) Reader(spec runSpec) streamReader {
+	return &slowFirstLine{streamReader: p.program.Reader(spec)}
+}
+
+type slowFirstLine struct {
+	streamReader
+	seen bool
+}
+
+func (r *slowFirstLine) Line(line []byte) []programEvent {
+	if !r.seen {
+		r.seen = true
+		time.Sleep(500 * time.Millisecond)
+	}
+	return r.streamReader.Line(line)
+}
+
 func TestALaunchThatCannotBeWrittenDownDoesNotHappen(t *testing.T) {
 	rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
 	srv := newServing(rt.files, rt.host(), testMachine, &syncBuffer{}, "")

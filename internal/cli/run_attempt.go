@@ -164,19 +164,38 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 	var lastOutput atomic.Int64
 	lastOutput.Store(int64(clock.Awake()))
 	var stderr tail
-	var readers sync.WaitGroup
-	readers.Go(func() {
-		eachLine(outRead, func(line []byte, discarded bool) {
-			lastOutput.Store(int64(clock.Awake()))
-			if discarded {
+	// The protocol's lines are read off the pipe by one goroutine and acted
+	// on by another, in order: what a line leads to (the journal and the
+	// state written through to the disk) never holds the reading back, so
+	// everything the program wrote before it ended is read before the pipe
+	// is let go, however slow the disk. A line lost there could be the one
+	// that showed work began, and the attempt would be repeated.
+	lines := newLineQueue()
+	acted := make(chan struct{})
+	go func() {
+		defer close(acted)
+		for {
+			line, ok := lines.next()
+			if !ok {
+				return
+			}
+			if line.discarded {
 				// A record that could not be read may have been a tool's:
 				// the attempt is not safe to repeat.
 				log.line("out", "(a line too long to read, passed over)")
 				r.sawEvents([]programEvent{{Kind: evUnreadable}}, clock.Now())
-				return
+				continue
 			}
-			log.line("out", string(line))
-			r.sawEvents(reader.Line(line), clock.Now())
+			log.line("out", string(line.text))
+			r.sawEvents(reader.Line(line.text), clock.Now())
+		}
+	}()
+	var readers sync.WaitGroup
+	readers.Go(func() {
+		defer lines.end()
+		eachLine(outRead, func(line []byte, discarded bool) {
+			lastOutput.Store(int64(clock.Awake()))
+			lines.add(outputLine{text: line, discarded: discarded})
 		})
 	})
 	readers.Go(func() {
@@ -258,6 +277,7 @@ watch:
 	outRead.Close()
 	errRead.Close()
 	<-drained
+	<-acted
 	awake()
 
 	exit := cmd.ProcessState.ExitCode()
@@ -292,6 +312,60 @@ func eachLine(rd io.Reader, each func(line []byte, discarded bool)) {
 			return
 		}
 	}
+}
+
+// outputLine is one line of the protocol's output as read: its text, or,
+// discarded, a line too long to read.
+type outputLine struct {
+	text      []byte
+	discarded bool
+}
+
+// lineQueue holds the lines read and not yet acted on, as many as come.
+type lineQueue struct {
+	mu    sync.Mutex
+	more  *sync.Cond // on mu: a line was added, or the queue ended
+	lines []outputLine
+	ended bool
+}
+
+func newLineQueue() *lineQueue {
+	q := &lineQueue{}
+	q.more = sync.NewCond(&q.mu)
+	return q
+}
+
+// add queues a line.
+func (q *lineQueue) add(line outputLine) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.lines = append(q.lines, line)
+	q.more.Signal()
+}
+
+// end says no line comes after those queued.
+func (q *lineQueue) end() {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.ended = true
+	q.more.Signal()
+}
+
+// next waits for the next line; false once every line was taken and the
+// queue ended.
+func (q *lineQueue) next() (outputLine, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for len(q.lines) == 0 && !q.ended {
+		q.more.Wait()
+	}
+	if len(q.lines) == 0 {
+		return outputLine{}, false
+	}
+	line := q.lines[0]
+	q.lines[0] = outputLine{} // let the queue's array go of it
+	q.lines = q.lines[1:]
+	return line, true
 }
 
 // tail keeps the end of what is added, up to keptStderr bytes.
