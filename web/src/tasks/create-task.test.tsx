@@ -276,6 +276,13 @@ describe("CreateTaskDialog, the estimate", () => {
     expect(sent()).not.toHaveProperty("estimate");
   });
 
+  it("shows a template's stored 0 as an estimate where the project allows zero", () => {
+    estimating({ ...FIB, estimate_zero: true }, [{ ...SPIKE, preset: { estimate: 0 } }]);
+    open();
+    fromTemplate();
+    expect(screen.getByRole("button", { name: "0 points" })).toBeInTheDocument();
+  });
+
   it("sends No estimate as null, over the template's", async () => {
     estimating(FIB, [SPIKE]);
     open();

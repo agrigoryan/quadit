@@ -155,7 +155,7 @@ export type Template = {
   name: string;
   title?: string;
   description?: string;
-  preset?: { status?: string; priority?: number; labels?: string[]; assignee?: string; estimate?: number };
+  preset?: { status?: string; priority?: number; labels?: string[]; assignee?: string; estimate?: number | null };
   created_at: number;
   updated_seq: number;
   deleted_at?: number;
