@@ -1,12 +1,14 @@
 // Builds the quadit command (cmd/quadit) with the web app inside, as
 // `make build` does, for each architecture the app is packaged for on this
-// system, into cli/<os>-<arch>/quadit, where electron-builder.config.cjs
-// takes it into the app's resources. The app uses it twice: Connect
-// (src/main/connections.ts) links it onto the PATH as the command-line
-// client when the person has no quadit of their own, and "Run Quadit on
-// this computer" (src/main/local-server.ts) runs it as a server, which
-// needs the web app. Needs Go and pnpm. There is no Windows build of the
-// command, so on Windows this builds nothing.
+// system, into cli/<os>-<arch>/quadit (quadit.exe on Windows, <os> being
+// Go's name for it: windows), where electron-builder.config.cjs takes it
+// into the app's resources. The app uses it three ways: Connect
+// (src/main/connections.ts) puts it on the PATH as the command-line client
+// when the person has no quadit of their own, "Set up on this computer"
+// (src/main/local-server.ts) runs it as a server, which needs the web app,
+// and Run by Quadit runs `quadit run` with it (on Windows every program the
+// app holds starts under its `quadit guard`: src/main/child-guard.ts).
+// Needs Go and pnpm.
 //
 // Run: node scripts/cli.mjs (pnpm dist runs it).
 
@@ -14,7 +16,13 @@ import { execFileSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
 
-const GOOS = { darwin: "darwin", linux: "linux" }[process.platform];
+const GOOS = { darwin: "darwin", linux: "linux", win32: "windows" }[process.platform];
+const EXE = process.platform === "win32" ? ".exe" : "";
+
+/** Runs pnpm with `args` in `cwd`: on Windows it is pnpm.cmd, which only a shell starts (the arguments are the script's own). */
+function pnpm(args, cwd) {
+  execFileSync("pnpm", args, { cwd, stdio: "inherit", shell: process.platform === "win32" });
+}
 /** electron-builder's names for the architectures, and Go's. */
 const ARCHES = { x64: "amd64", arm64: "arm64" };
 
@@ -33,10 +41,10 @@ if (GOOS) {
   }
   // The web app first: the build embeds web/dist.
   const web = join(root, "web");
-  execFileSync("pnpm", ["install", "--frozen-lockfile"], { cwd: web, stdio: "inherit" });
-  execFileSync("pnpm", ["build"], { cwd: web, stdio: "inherit" });
+  pnpm(["install", "--frozen-lockfile"], web);
+  pnpm(["build"], web);
   for (const [arch, goarch] of Object.entries(ARCHES)) {
-    const out = join(import.meta.dirname, "..", "cli", `${GOOS}-${arch}`, "quadit");
+    const out = join(import.meta.dirname, "..", "cli", `${GOOS}-${arch}`, `quadit${EXE}`);
     execFileSync(
       "go",
       ["build", "-tags", "web", "-trimpath", "-ldflags", `-s -w -X main.version=${version}`, "-o", out, "./cmd/quadit"],

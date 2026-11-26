@@ -19,9 +19,13 @@
 // (src/main/main.ts, enablePasskeys). Never without the profile: macOS kills
 // an app at its start when it claims that group and no profile grants it.
 //
-// The quadit command goes into the app's resources as bin/quadit, built for
-// each architecture by scripts/cli.mjs into cli/ (pnpm dist runs it first);
-// macOS signs it with the app. Windows has no build of the command.
+// The quadit command goes into the app's resources as bin/quadit
+// (bin/quadit.exe on Windows), built for each architecture by
+// scripts/cli.mjs into cli/ (pnpm dist runs it first); macOS signs it with
+// the app. On Windows the per-user installer puts the app in
+// %LOCALAPPDATA%\Programs\Quadit, and an update goes where the first
+// install went (its InstallLocation, which the installer reads back), so
+// the folder Connect adds to the person's PATH keeps its quadit.exe.
 //
 // Windows is signed only with a certificate of its own, WIN_CSC_LINK +
 // WIN_CSC_KEY_PASSWORD, and not at all without one: electron-builder would
@@ -119,6 +123,7 @@ module.exports = {
     // An empty link is "no certificate": it stops the fallback to CSC_LINK.
     cscLink: env.WIN_CSC_LINK ?? "",
     cscKeyPassword: env.WIN_CSC_KEY_PASSWORD ?? "",
+    extraResources: [{ from: "cli/windows-${arch}/quadit.exe", to: "bin/quadit.exe" }],
   },
   nsis: { oneClick: false, perMachine: false, allowToChangeInstallationDirectory: true },
 

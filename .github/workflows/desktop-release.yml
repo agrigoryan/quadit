@@ -29,9 +29,9 @@ name: desktop-release
 # a notarized one its stapled ticket and Gatekeeper's verdict. Windows is signed when WIN_CSC_LINK and
 # WIN_CSC_KEY_PASSWORD are set, and unsigned otherwise. The Homebrew cask is
 # not pushed from here: desktop/packaging/quadit-desktop.rb is its template.
-# The macOS and Linux apps carry the quadit command with the web app inside
-# (the server "Run Quadit on this computer" runs), built here with pnpm and
-# Go (desktop/scripts/cli.mjs) and signed with the app on macOS.
+# Every app carries the quadit command with the web app inside (the server
+# "Set up on this computer" runs; quadit.exe on Windows), built here with
+# pnpm and Go (desktop/scripts/cli.mjs) and signed with the app on macOS.
 on:
   push:
     tags: ["desktop-v*"]
@@ -87,7 +87,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          # web/: cli.mjs builds the web app into the quadit the macOS and Linux apps carry.
+          # web/: cli.mjs builds the web app into the quadit each app carries.
           cache-dependency-path: |
             web/pnpm-lock.yaml
             desktop/pnpm-lock.yaml
@@ -170,8 +170,13 @@ jobs:
         env:
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-        # No quadit command here: it has no Windows build, and the Windows app has no Connect.
-        run: pnpm build && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
+        # The app carries quadit.exe (cli.mjs builds it for x64 and arm64): its server, Connect's command, and the
+        # guard every program the app holds starts under. Each package's unpacked app is checked for it.
+        run: |
+          pnpm build && node scripts/cli.mjs && pnpm exec electron-builder --config electron-builder.config.cjs ${{ matrix.target }} --publish never
+          for app in dist/win-unpacked dist/win-arm64-unpacked; do
+            test -f "$app/resources/bin/quadit.exe" || { echo "::error::$app has no resources/bin/quadit.exe"; exit 1; }
+          done
       - name: Package (Linux)
         if: runner.os == 'Linux'
         shell: bash
