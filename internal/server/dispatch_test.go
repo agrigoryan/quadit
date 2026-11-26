@@ -31,9 +31,18 @@ type receiver struct {
 	srv  *httptest.Server
 }
 
+// newReceiver starts a receiver at an address of its own: a path nobody
+// else knows. Tests run side by side, and a port one test's receiver gave
+// up may be handed to the next: a server still sending to the old receiver
+// then reaches this one, which hears only what is sent to its own path.
 func newReceiver(t *testing.T, secret string) *receiver {
 	r := &receiver{}
+	path := "/" + id.New()
 	r.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != path {
+			http.NotFound(w, req)
+			return
+		}
 		body, _ := io.ReadAll(req.Body)
 		r.mu.Lock()
 		defer r.mu.Unlock()
@@ -49,6 +58,7 @@ func newReceiver(t *testing.T, secret string) *receiver {
 		json.Unmarshal(body, &m)
 		r.got = append(r.got, m)
 	}))
+	r.srv.URL += path
 	t.Cleanup(r.srv.Close)
 	return r
 }
