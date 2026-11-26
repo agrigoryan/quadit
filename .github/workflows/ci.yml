@@ -68,6 +68,23 @@ jobs:
           shellcheck install.sh scripts/install-test.sh scripts/agent-listen-check.sh
           sh scripts/install-test.sh
 
+  # The server and the quadit command on Windows, on SQLite (no Postgres
+  # service runs there). Windows support is being built: until this passes,
+  # its failure does not fail the run.
+  windows:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Vet
+        run: go vet ./...
+      - name: Test on SQLite
+        if: ${{ !cancelled() }}
+        run: go test -timeout 30m ./...
+
   # The end-to-end suite (web/e2e): Chromium against the binary built here.
   e2e:
     runs-on: ubuntu-latest
