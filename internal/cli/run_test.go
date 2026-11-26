@@ -554,7 +554,9 @@ func TestAChatTakingOverDuringARunInterruptsItWithoutAcknowledging(t *testing.T)
 	rt.f.addItem(fakeItem{Task: "SVA-12"})
 	rt.serve()
 	rt.running(0)
-	rt.f.set(func(f *fakeQuadit) { f.lease = "ZZZZ2222" }) // a chat took the lease (take=1)
+	// A chat took the lease (take=1) and holds it. Were the lease only changed, the runner
+	// would be handed the new one at its next ask and acknowledge the head with it.
+	rt.f.set(func(f *fakeQuadit) { f.lease, f.chat = "ZZZZ2222", true })
 	row := rt.ended(0)
 	if row["state"] != core.AgentSessionFailed || row["reason"] != core.RunInterrupted {
 		t.Fatalf("the run ended %v", row)
