@@ -28,6 +28,7 @@ func TestTheSkillIsPrinted(t *testing.T) {
 func TestTheSkillIsInstalledWhereAgentsLook(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home) // the home folder on Windows
 	var out, errs bytes.Buffer
 	if code := Run([]string{"skill", "install"}, &out, &errs); code != 0 {
 		t.Fatalf("exit %d: %s", code, errs.String())
