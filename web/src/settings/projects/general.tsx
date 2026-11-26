@@ -1,12 +1,13 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router";
 import { errorMessage } from "@/data/api";
-import { t } from "@/lib/i18n";
+import { joinPhrases, t } from "@/lib/i18n";
 import { daysFrom } from "@/lib/days";
 import { weekdayName } from "@/lib/time";
 import { mutate, send } from "@/data/mutate";
 import { toast } from "@/lib/toast";
-import type { Project } from "@/types/core";
+import type { Project, ProjectSettings } from "@/types/core";
+import { extendedValues, SCALES, scaleValues, sizeOf } from "@/tasks/estimates";
 import { useSettingsBase } from "@/settings/base";
 import { KEY_RE, PROJECT_FIELDS, type ProjectDraft, ProjectFields } from "@/settings/projects/project-form";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
@@ -15,11 +16,71 @@ import { Card, Section } from "@/ui/page-layout";
 import { Button } from "@/ui/button";
 import { Input } from "@/ui/input";
 
-type Settings = { cycles?: boolean; cycle_days?: number; cycle_start?: number; estimates?: boolean };
-
 /** Weekday names in the person's language; 0 is Sunday, as the server counts. 7 January 2024 was a Sunday. */
 const WEEKDAYS = daysFrom("2024-01-07", 7).map((day, i) => ({ value: String(i), label: weekdayName(day, "long") }));
 const WEEKS = [1, 2, 3, 4, 6];
+
+/** A scale's values as the settings list them: the numbers, or the sizes "XS", "S"… */
+const valueWords = (values: number[], sizes: boolean) => values.map((v) => (sizes && sizeOf(v)) || String(v));
+
+/** How the project estimates: its scale, and the three choices that go with it. */
+function EstimateOptions({
+  settings,
+  disabled,
+  onChange,
+}: {
+  settings: ProjectSettings;
+  disabled: boolean;
+  onChange: (patch: ProjectSettings) => void;
+}) {
+  const scale = settings.estimate_scale || "points";
+  const sizes = scale === "tshirt";
+  return (
+    <div className="flex flex-col gap-3 pb-1">
+      <FormField label={t("project.estimateScale")} htmlFor="project-estimate-scale" className="max-w-md">
+        <NativeSelect
+          id="project-estimate-scale"
+          value={scale}
+          disabled={disabled}
+          onChange={(v) => onChange({ estimate_scale: v as typeof scale })}
+          options={SCALES.map((name) => ({
+            value: name,
+            label:
+              name === "points"
+                ? t("project.scale.points")
+                : t("project.scale.withValues", {
+                    name: t(`project.scale.${name}`),
+                    values: valueWords(scaleValues(name, false), name === "tshirt").join(", "),
+                  }),
+          }))}
+        />
+      </FormField>
+      {scale !== "points" && (
+        <SwitchRow
+          title={t("project.estimateExtended")}
+          hint={t("project.estimateExtendedHint", { values: joinPhrases(valueWords(extendedValues(scale), sizes)) })}
+          checked={!!settings.estimate_extended}
+          disabled={disabled}
+          onChange={(estimate_extended) => onChange({ estimate_extended })}
+        />
+      )}
+      <SwitchRow
+        title={t("project.estimateZero")}
+        hint={t("project.estimateZeroHint")}
+        checked={!!settings.estimate_zero}
+        disabled={disabled}
+        onChange={(estimate_zero) => onChange({ estimate_zero })}
+      />
+      <SwitchRow
+        title={t("project.estimateCountUnestimated")}
+        hint={t("project.estimateCountUnestimatedHint")}
+        checked={!settings.estimate_ignore_unestimated}
+        disabled={disabled}
+        onChange={(count) => onChange({ estimate_ignore_unestimated: !count })}
+      />
+    </div>
+  );
+}
 
 /** A project's name, key and colour, its switches, and archiving or deleting it. */
 export function ProjectGeneral({ project, admin }: { project: Project; admin: boolean }) {
@@ -37,7 +98,7 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
   const errors = useFieldErrors(PROJECT_FIELDS);
   const { busy, run } = useSubmit(errors);
   const set = (patch: Partial<ProjectDraft>) => setDraft((d) => ({ ...d, ...patch }));
-  const settings: Settings = project.settings ?? {};
+  const settings: ProjectSettings = project.settings ?? {};
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -66,7 +127,7 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
   }
 
   /** Switches save as they are flipped. */
-  function setOption(patch: Settings) {
+  function setOption(patch: ProjectSettings) {
     const next = { ...settings, ...patch };
     send({ type: "project.update", args: { id: project.id, settings: next } }, (tx) =>
       tx.patch("projects", project.id, { settings: next }),
@@ -129,9 +190,15 @@ export function ProjectGeneral({ project, admin }: { project: Project; admin: bo
               hint={t("project.estimatesHint")}
               checked={!!settings.estimates}
               disabled={!admin}
-              onChange={(estimates) => setOption({ estimates })}
+              // Turned on with no scale named, the server names Fibonacci; named here, the scale shows at once.
+              onChange={(estimates) =>
+                setOption(
+                  estimates && !settings.estimate_scale ? { estimates, estimate_scale: "fibonacci" } : { estimates },
+                )
+              }
             />
           </div>
+          {settings.estimates && <EstimateOptions settings={settings} disabled={!admin} onChange={setOption} />}
         </Card>
       </Section>
 
