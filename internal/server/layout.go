@@ -41,12 +41,14 @@ func (s *Server) handleShowProjectLayout(x *c) error {
 // send one without being refused first: the scale, its values in points (0
 // among them where allowed; none on points, which takes any whole number),
 // its sizes on the T-shirt scale (which the API takes as well as the
-// numbers), and all of it in words.
+// numbers), all of it in words, and what a 0 sent does: true, it is an
+// estimate of its own; false, it clears the estimate.
 type layoutEstimates struct {
 	Scale  string   `json:"scale"`
 	Values []int    `json:"values,omitempty"`
 	Sizes  []string `json:"sizes,omitempty"`
 	Words  string   `json:"words"`
+	Zero   bool     `json:"zero"`
 }
 
 // layoutEstimatesOf is a project's layoutEstimates; nil when it does not
@@ -55,7 +57,7 @@ func layoutEstimatesOf(s *core.ProjectSettings) *layoutEstimates {
 	if !s.Estimating() {
 		return nil
 	}
-	out := &layoutEstimates{Scale: s.Scale(), Values: s.EstimateValues(), Words: s.EstimateWords()}
+	out := &layoutEstimates{Scale: s.Scale(), Values: s.EstimateValues(), Words: s.EstimateWords(), Zero: s.ZeroEstimates()}
 	if out.Scale == core.ScaleTShirt {
 		for _, n := range out.Values {
 			if n > 0 { // 0 is a number of points, not a size
@@ -187,7 +189,11 @@ func layoutText(project core.Project, out map[string][]layoutItem) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "project %s  %s\n", project.Key, project.Name)
 	if estimates := layoutEstimatesOf(project.Settings); estimates != nil {
-		fmt.Fprintf(&b, "estimates: %s (%s scale)\n", estimates.Words, estimates.Scale)
+		zero := "0 clears an estimate"
+		if estimates.Zero {
+			zero = "0 is an estimate of its own"
+		}
+		fmt.Fprintf(&b, "estimates: %s (%s scale); %s\n", estimates.Words, estimates.Scale, zero)
 	}
 	for _, k := range []string{"statuses", "labels", "members", "epics", "cycles", "templates"} {
 		var parts []string

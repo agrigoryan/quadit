@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,6 +44,19 @@ func TestTasksAreAskedForByEstimate(t *testing.T) {
 		feed := s.call(t, s.owner, "", "GET", w+"/events?format=text&limit=500&estimate=none", nil, 200, nil)
 		if !strings.Contains(feed, "TEE-3") || strings.Contains(feed, "TEE-1") {
 			t.Errorf("the feed of tasks without an estimate:\n%s", feed)
+		}
+
+		// The API's description lists the filter for both.
+		var spec struct {
+			Paths map[string]map[string]struct {
+				Parameters []struct{ Name string }
+			}
+		}
+		s.call(t, nil, "", "GET", "/api/v1/openapi.json", nil, 200, &spec)
+		for _, path := range []string{"/api/v1/w/{workspace}/tasks", "/api/v1/w/{workspace}/events"} {
+			if !slices.ContainsFunc(spec.Paths[path]["get"].Parameters, func(p struct{ Name string }) bool { return p.Name == "estimate" }) {
+				t.Errorf("GET %s does not list estimate among its parameters", path)
+			}
 		}
 	})
 }

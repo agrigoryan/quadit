@@ -86,7 +86,7 @@ func (s *Server) routes() {
 // taskFilters are the query parameters that narrow a list of tasks, and
 // the feed to the events of matching tasks.
 const taskFilters = "project: key; assignee: me, @handle or none; status: name or category; open: true; waiting_on: me or @handle; label: name; " +
-	"epic: name or none; cycle: current, next, number or none; priority: 1-4; has_open_decision: true; asked: member; changed_since: feed position; " +
+	"epic: name or none; cycle: current, next, number or none; priority: 1-4; estimate: points, a T-shirt size or none, comma-separated; has_open_decision: true; asked: member; changed_since: feed position; " +
 	"mentions: member; watching: true; q: text in the title; parent: task key; sort: created, -created, rank, priority, due, -activity, -updated, key; limit; offset"
 
 // coreRoutes are monitoring, signing in and the account, and the core of a

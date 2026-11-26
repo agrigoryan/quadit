@@ -932,7 +932,8 @@ seq: 286
     5,
     8
    ],
-   "words": "1, 2, 3, 5 or 8 points"
+   "words": "1, 2, 3, 5 or 8 points",
+   "zero": false
   },
   "key": "SVA",
   "name": "Samurai vs Alien"
@@ -942,7 +943,7 @@ seq: 286
 === GET /api/v1/w/games/projects/SVA/layout?format=text
 200
 project SVA  Samurai vs Alien
-estimates: 1, 2, 3, 5 or 8 points (fibonacci scale)
+estimates: 1, 2, 3, 5 or 8 points (fibonacci scale); 0 clears an estimate
 statuses: Backlog (backlog), Todo (unstarted), In Progress (started), Review (started), Waiting (waiting), Done (done), Canceled (canceled)
 labels: art, bug, last
 members: @aram, @artist (agent), @bea, @cy, @ops (agent)
