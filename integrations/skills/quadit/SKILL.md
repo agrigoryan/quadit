@@ -188,11 +188,12 @@ If a change is refused with `needs_approval`, ask with `quadit approval KEY "…
 ```bash
 quadit tasks assignee=me open=1 sort=priority
 quadit tasks status=todo label=art project=SVA        # filters combine; count=1 gives only the number
+quadit tasks estimate=none project=SVA                # also estimate=5,8 or estimate=M; set one with update SVA-12 estimate=M (none clears)
 quadit show SVA-12                 # description, decisions with numbered options, comments, files
 quadit show SVA-12 since=1042      # only what changed after that feed position
 quadit search "explosion"
 quadit decisions                   # the decision log: what was asked, what was picked, why
-quadit layout SVA                  # the project's statuses, labels, members, epics
+quadit layout SVA                  # the project's statuses, labels, members, epics, and the estimates it takes
 ```
 
 ## Docs and memory

@@ -7,11 +7,12 @@ const help = `quadit: tasks, decisions and docs for people and agents
 
 orient    me                         who am I: role, scope, hand-off limit, cursors
           work                       what waits on me, what is assigned, unread inbox
-          layout PROJECT             statuses, labels, members, epics
+          layout PROJECT             statuses, labels, members, epics, the estimates it takes
           dashboard | agents         where everything stands; what each agent is doing
           connect [CODE]             an agent gives back the code a person made for it, proving it is connected
 find      tasks [filter=value ...]   assignee=me status=todo label=art open=1 q=text sort=priority
                                      count=1 for a number, view=SLUG for a saved view
+                                     estimate=5,8 or estimate=M (a T-shirt size) or estimate=none
           show KEY [since=SEQ]       one task with decisions and comments
           context KEY                everything needed to work on a task
           search TEXT | decisions [state=open] | inbox [all=1]
@@ -28,6 +29,7 @@ follow    events [after=SEQ] [wait=50] [cursor=NAME] [mine=1] [others=1] [task=K
           listen --exec CMD          run CMD for each inbox item, again until it succeeds (quadit help listen)
 act       new PROJECT TITLE [field=value ...]      description=- reads it from stdin
           update KEY field=value ... status=done assignee=@ann priority=high add_labels=a,b
+                                     estimate=5, estimate=M (a size) or estimate=none, on the project's scale
           status KEY NAME | assign KEY @WHO|none | take KEY | release KEY
           delete KEY | restore KEY   to the trash, and back from it
           comment KEY TEXT [waiting_on=@WHO] [decision=ID | option=ID] [file=PATH ...]

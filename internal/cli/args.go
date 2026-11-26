@@ -117,7 +117,8 @@ func fieldsInOrder(args []string) []field {
 	return out
 }
 
-// nobody are the words that name no member, where a member is asked for.
+// nobody are the words that name no member, where a member is asked for,
+// and no estimate.
 var nobody = map[string]bool{"": true, "none": true, "nobody": true, "-": true}
 
 // apiValue turns a command-line value into what the API takes.
@@ -125,7 +126,7 @@ func apiValue(key, v string) any {
 	switch {
 	case v == "null":
 		return nil
-	case key == "assignee" && nobody[strings.ToLower(v)]:
+	case (key == "assignee" || key == "estimate") && nobody[strings.ToLower(v)]:
 		return nil
 	case key == "priority":
 		if n, ok := priorities[strings.ToLower(v)]; ok {
