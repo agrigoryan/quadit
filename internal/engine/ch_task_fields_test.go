@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -118,17 +119,25 @@ func TestZeroIsAnEstimateOnlyWhereTheProjectAllowsIt(t *testing.T) {
 		if err := w.db().List(context.Background(), &events, store.Q{Where: []store.Cond{store.Eq("type", "task.updated"), store.Eq("entity_id", w.task("ZERO-1").ID)}, Order: "seq"}); err != nil {
 			t.Fatal(err)
 		}
+		// Read, not compared as text: Postgres keeps an event's JSON with its keys in an order of its own.
+		said := func(n *int) string {
+			if n == nil {
+				return "none"
+			}
+			return strconv.Itoa(*n)
+		}
 		var changes []string
 		for _, ev := range events {
 			var data struct {
-				Changes map[string]json.RawMessage `json:"changes"`
+				Changes map[string]struct{ From, To *int } `json:"changes"`
 			}
 			if err := json.Unmarshal(ev.Data, &data); err != nil {
 				t.Fatal(err)
 			}
-			changes = append(changes, string(data.Changes["estimate"]))
+			change := data.Changes["estimate"]
+			changes = append(changes, said(change.From)+" to "+said(change.To))
 		}
-		if want := []string{`{"from":0,"to":null}`, `{"from":null,"to":0}`}; !slices.Equal(changes, want) {
+		if want := []string{"0 to none", "none to 0"}; !slices.Equal(changes, want) {
 			t.Fatalf("the feed says %v, want %v", changes, want)
 		}
 	})
