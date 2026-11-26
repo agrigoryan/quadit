@@ -89,29 +89,24 @@ if (typeof origin === "string" && origin && window.location.origin === origin) {
         ipcRenderer.send(BRIDGE_LISTENING, false);
       };
     },
-    // Connect needs the quadit command, which has no Windows build: there the page offers nothing.
-    ...(process.platform === "win32"
-      ? {}
-      : {
-          // The app checks what it is sent (focusOf); a page's object is never handed on as it is.
-          openConnect(focus?: unknown) {
-            const { agent, intent, program } = (typeof focus === "object" && focus !== null ? focus : {}) as Record<
-              string,
-              unknown
-            >;
-            ipcRenderer.send(
-              BRIDGE_OPEN_CONNECT,
-              typeof agent === "string"
-                ? {
-                    agent,
-                    ...(typeof intent === "string" ? { intent } : {}),
-                    ...(typeof program === "string" ? { program } : {}),
-                  }
-                : null,
-            );
-          },
-          localAgents: () => ipcRenderer.invoke(BRIDGE_LOCAL_AGENTS) as Promise<LocalAgent[]>,
-        }),
+    // The app checks what it is sent (focusOf); a page's object is never handed on as it is.
+    openConnect(focus?: unknown) {
+      const { agent, intent, program } = (typeof focus === "object" && focus !== null ? focus : {}) as Record<
+        string,
+        unknown
+      >;
+      ipcRenderer.send(
+        BRIDGE_OPEN_CONNECT,
+        typeof agent === "string"
+          ? {
+              agent,
+              ...(typeof intent === "string" ? { intent } : {}),
+              ...(typeof program === "string" ? { program } : {}),
+            }
+          : null,
+      );
+    },
+    localAgents: () => ipcRenderer.invoke(BRIDGE_LOCAL_AGENTS) as Promise<LocalAgent[]>,
   };
   contextBridge.exposeInMainWorld("quaditDesktop", Object.freeze(bridge));
 }

@@ -177,8 +177,8 @@ export interface QuaditDesktop {
    * Opens the app's Connect agents page over this page's window, for its
    * server and workspace; with `focus`, at the tool that works as that agent
    * of the workspace, ready for what the person meant (ConnectFocus): the
-   * person still does it there. Present only where the app can connect tools
-   * (not on Windows).
+   * person still does it there. Missing in an app that cannot connect tools
+   * (one older than this, on Windows).
    */
   openConnect?(focus?: ConnectFocus): void;
   /**

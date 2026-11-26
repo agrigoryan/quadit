@@ -104,6 +104,11 @@ function roleWords(role: FileRole, tool: string): Omit<FileWords, "chip"> {
       return { title: "A folder for the quadit command", what: "Made in your home folder to hold it." };
     case "profile":
       return { title: "Your terminal’s start-up file", what: "Adds the quadit command’s folder to your PATH." };
+    case "path":
+      return {
+        title: "Your PATH",
+        what: "Adds the folder of Quadit’s own quadit command, so your agents and terminals find it.",
+      };
     case "rules":
       return { title: `${tool}’s command rules`, what: `Lets ${tool} run quadit without asking you each time.` };
     case "rules-folder":
@@ -114,10 +119,11 @@ function roleWords(role: FileRole, tool: string): Omit<FileWords, "chip"> {
 function chipOf(role: FileRole, change: FileChange): string {
   switch (change) {
     case "new":
+      if (role === "path") return "One folder added";
       return role === "folder" || role === "rules-folder" ? "New folder" : role === "command" ? "New link" : "New file";
     // Connecting only ever adds to a file there already: a line, a setting, a table.
     case "edited":
-      return role === "profile" ? "One line added" : "Added to";
+      return role === "profile" ? "One line added" : role === "path" ? "One folder added" : "Added to";
     case "removed":
       return "Taken away";
     case "restored":

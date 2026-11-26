@@ -93,9 +93,15 @@ function harness({
         {
           connections: {
             state: async () => ({
-              supported: true,
               harnesses: [],
-              cli: { found: "/bin/quadit", version: "1", linkInto: null, profile: null, manual: null },
+              cli: {
+                found: "/bin/quadit",
+                version: "1",
+                linkInto: null,
+                profile: null,
+                pathFolder: null,
+                manual: null,
+              },
               defaultLogin: null,
               claudePlugin: false,
             }),

@@ -99,6 +99,8 @@ function describeCli(view: ConnectView): string {
     return `quadit is not on your PATH: connecting puts the app's own copy in ${view.cli.linkInto} and adds that folder to your PATH in ${view.cli.profile}.`;
   if (view.cli.linkInto)
     return `quadit is not on your PATH: connecting links the app's own copy into ${view.cli.linkInto}.`;
+  if (view.cli.pathFolder)
+    return `quadit is not on your PATH: connecting adds the folder of the app's own copy, ${view.cli.pathFolder}, to your PATH.`;
   return `quadit is not on your PATH, and the app cannot put it there. Install it first: ${view.cli.manual ?? ""}`;
 }
 
@@ -393,10 +395,7 @@ function optionsForm(h: HarnessView): { form: HTMLFormElement; fill: () => void 
 async function render() {
   const view = await api.connectState();
   defaultLogin = view.defaultLogin;
-  element("unsupported").hidden = view.supported;
-  // Nothing to connect, nor anything to look back at, where Connect does not run.
-  element("tools").hidden = !view.supported;
-  element("cli").textContent = view.supported ? describeCli(view) : "";
+  element("cli").textContent = describeCli(view);
   element("notices").replaceChildren(
     ...(view.defaultLogin
       ? [
@@ -420,7 +419,7 @@ async function render() {
   harnesses = view.harnesses;
   const here = view.harnesses.filter((h) => h.installed || h.connected);
   const away = view.harnesses.filter((h) => !h.installed && !h.connected);
-  const addsCommand = !view.cli.found && view.cli.linkInto !== null;
+  const addsCommand = !view.cli.found && (view.cli.linkInto !== null || view.cli.pathFolder !== null);
   // Where the tools newly set up stand, as far as known in a moment; a card not answered by then asks itself, and
   // one set up already asks on its own.
   const known = new Map<string, Handshake | null>();
@@ -436,7 +435,7 @@ async function render() {
     letInputIn(element("connect"), target?.openedByPage ?? false);
   }
   // With none found here, the list of tools that are not waits, folded.
-  const noneFound = view.supported && here.length === 0;
+  const noneFound = here.length === 0;
   element("none-found").hidden = !noneFound;
   element("all-tools").hidden = !noneFound;
   element("all-harnesses").replaceChildren(

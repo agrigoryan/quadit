@@ -27,7 +27,7 @@ export type LocalControl = "start" | "stop" | "restart";
 
 /** The server the app can run on this computer. */
 export interface LocalServerView {
-  /** Whether this build can run one: macOS and Linux, with the server inside the app. */
+  /** Whether this build can run one: it carries a Quadit server (not a run from source without one). */
   available: boolean;
   /** Its id in the server list; null when it is not in the list (never set up, or removed). */
   serverId: string | null;
@@ -126,6 +126,8 @@ export interface HarnessView {
   initials: string;
   /** Its config folder or its command is on this computer. */
   installed: boolean;
+  /** Why it cannot be connected on this computer, in a sentence (its places on this system are not known); null when it can. */
+  unavailable: string | null;
   /** Whether it can connect through MCP. */
   mcp: boolean;
   /**
@@ -146,8 +148,6 @@ export interface HarnessView {
 }
 
 export interface ConnectView {
-  /** Connect needs the quadit command, which exists for macOS and Linux only. */
-  supported: boolean;
   harnesses: HarnessView[];
   cli: {
     /** The quadit command on the login shell's PATH, and its version; null when there is none. */
@@ -157,6 +157,8 @@ export interface ConnectView {
     linkInto: string | null;
     /** The profile of the login shell that connecting adds the line putting `linkInto` on the PATH to; null when none is needed. */
     profile: string | null;
+    /** Without one, on Windows: the folder of the app's own quadit.exe, which connecting adds to the person's PATH. */
+    pathFolder: string | null;
     manual: string | null;
   };
   /**
@@ -318,7 +320,17 @@ export interface ConnectChoice {
  * the shell's profile, the tool's command rules and the folder made for them.
  */
 export type FileRole =
-  "skill" | "login" | "shared-login" | "settings" | "command" | "folder" | "profile" | "rules" | "rules-folder";
+  | "skill"
+  | "login"
+  | "shared-login"
+  | "settings"
+  | "command"
+  | "folder"
+  | "profile"
+  /** The person's PATH itself (Windows). */
+  | "path"
+  | "rules"
+  | "rules-folder";
 
 /**
  * What a plan does to a file: makes it, edits it, takes it away, or puts it

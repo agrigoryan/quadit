@@ -18,6 +18,7 @@ function harness(id: string, name: string, extra: Partial<HarnessView> = {}): Ha
     name,
     initials: name.slice(0, 2),
     installed: false,
+    unavailable: null,
     mcp: true,
     cliIdentity: "own",
     listenVerified: true,
@@ -104,11 +105,17 @@ function setUp({
   const parts: FirstConnectParts = {
     connections: {
       state: async () => ({
-        supported: true,
         harnesses,
         cli: cliFound
-          ? { found: "/usr/local/bin/quadit", version: "1.0.0", linkInto: null, profile: null, manual: null }
-          : { found: null, version: "", linkInto: "~/.local/bin", profile: null, manual: null },
+          ? {
+              found: "/usr/local/bin/quadit",
+              version: "1.0.0",
+              linkInto: null,
+              profile: null,
+              pathFolder: null,
+              manual: null,
+            }
+          : { found: null, version: "", linkInto: "~/.local/bin", profile: null, pathFolder: null, manual: null },
         defaultLogin,
         claudePlugin: false,
       }),

@@ -14,7 +14,7 @@
 import { execFile, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, hostname, userInfo } from "node:os";
-import { dirname, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import {
@@ -149,7 +149,11 @@ function start() {
   // Every program the app holds besides its server starts this way: on Windows under the guard of the quadit it carries.
   const startChild = childStarter(process.platform, localServerBinary);
   const checks = new ServerChecks(store, fetcher, (words) => quiet.say(() => void warn(words)));
-  const cli = new QuaditCli(bundledCli(), loginShellPath, { home: homedir(), shell: process.env.SHELL || "/bin/sh" });
+  const cli = new QuaditCli(bundledCli(), loginShellPath, {
+    home: homedir(),
+    shell: process.env.SHELL || "/bin/sh",
+    platform: process.platform,
+  });
   // The folder of the quadit logins, as the quadit the person's agents run says (else the app's own).
   const loginsFolder = async () => {
     const look = await cli.look();
@@ -201,7 +205,9 @@ function start() {
     },
   );
   const menuBar = new MenuBar(store, {
-    trayIcon: join(app.getAppPath(), "assets", "trayTemplate.png"),
+    // A template image is drawn in the bar's own colour on macOS only; elsewhere it would stay black, unseen on a dark
+    // taskbar, so Windows shows the app's own icon.
+    trayIcon: join(app.getAppPath(), "assets", process.platform === "win32" ? "icon.png" : "trayTemplate.png"),
     openServer: (id) => windows.show(id),
     showServerList: () => list.show(),
     togglePanel: (tray) => panel.toggle(tray),
@@ -280,6 +286,7 @@ function start() {
     home: homedir(),
     path,
     applications: ["/Applications", join(homedir(), "Applications")],
+    platform: process.platform,
   });
   const selfRuns = new SelfRuns({
     look: async () => {
@@ -301,7 +308,7 @@ function start() {
           },
         ];
       });
-      return { tools, path: look.path.join(":") };
+      return { tools, path: look.path.join(delimiter) };
     },
     start: startChild,
     codeGivenBack: async (id) => (await connections.handshake(id))?.state === "connected",
@@ -399,7 +406,7 @@ function start() {
       ),
     accountName: () =>
       accountName(process.platform, userInfo().username, async (command, args) => {
-        const { stdout } = await run(command, args, { timeout: 5_000 });
+        const { stdout } = await run(command, args, { timeout: 5_000, windowsHide: true });
         return stdout;
       }),
   });
@@ -586,26 +593,33 @@ async function offerToAdd(origin: string): Promise<boolean> {
 }
 
 /**
- * The quadit command packaged in the app's resources (macOS and Linux), or
- * null without one: run from source, on Windows, and run as an AppImage,
- * whose files are mounted only while it runs, so a link to them would
- * break when the app quits.
+ * The quadit command packaged in the app's resources, or null without one:
+ * run from source, and run as an AppImage, whose files are mounted only
+ * while it runs, so a link to them would break when the app quits. On
+ * Windows the installer keeps the resources in the same folder across
+ * updates (the place of the first install, which it reads back), so the
+ * folder Connect adds to the PATH still holds quadit.exe after one.
  */
 function bundledCli(): string | null {
-  const path = join(process.resourcesPath, "bin", "quadit");
+  const path = packagedQuadit();
   return app.isPackaged && !process.env.APPIMAGE && existsSync(path) ? path : null;
 }
 
 /**
  * The quadit the app runs as the server on this computer: the one packaged
- * in its resources (macOS and Linux, built with the web app), or null
- * without one (Windows). Run from source, QUADIT_DESKTOP_QUADIT names one
- * (a binary `make build` made), for tests and for trying it out.
+ * in its resources (built with the web app), or null without one. Run from
+ * source, QUADIT_DESKTOP_QUADIT names one (a binary `make build` made), for
+ * tests and for trying it out.
  */
 function localServerBinary(): string | null {
   if (!app.isPackaged) return process.env.QUADIT_DESKTOP_QUADIT || null;
-  const path = join(process.resourcesPath, "bin", "quadit");
+  const path = packagedQuadit();
   return existsSync(path) ? path : null;
+}
+
+/** Where the packaging puts quadit in the app's resources (electron-builder.config.cjs). */
+function packagedQuadit(): string {
+  return join(process.resourcesPath, "bin", process.platform === "win32" ? "quadit.exe" : "quadit");
 }
 
 /** Tells the person something that went wrong or needs them, in a dialog of its own. */

@@ -81,10 +81,16 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
         connectState: async () => {
           await wait(state.slowMs);
           return {
-            supported: true,
             defaultLogin: null,
             claudePlugin: false,
-            cli: { found: "/usr/local/bin/quadit", version: "9.9.9", linkInto: null, profile: null, manual: null },
+            cli: {
+              found: "/usr/local/bin/quadit",
+              version: "9.9.9",
+              linkInto: null,
+              profile: null,
+              pathFolder: null,
+              manual: null,
+            },
             harnesses: [
               {
                 id: "claude",

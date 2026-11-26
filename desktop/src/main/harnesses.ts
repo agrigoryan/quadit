@@ -4,10 +4,14 @@
 // asking, and its entry for Quadit's MCP server, which signs in through the
 // harness's own OAuth and so holds only the address, never a token.
 //
-// Paths are those of macOS and Linux, under the home folder; the
-// variables some harnesses read to move their config (CLAUDE_CONFIG_DIR,
-// CODEX_HOME, XDG_CONFIG_HOME) are not followed: an app started from the
-// Dock does not see them, and the plan shows every path it touches.
+// Paths are under the home folder, the same on every system (on Windows
+// the home folder is %USERPROFILE%: each harness's documentation, or its
+// source, says so; checked 2026-11-26). A harness whose places on Windows
+// could not be confirmed is not offered there (notOnWindows), rather than
+// guessed. The variables some harnesses read to move their config
+// (CLAUDE_CONFIG_DIR, CODEX_HOME, XDG_CONFIG_HOME) are not followed: an app
+// started from the Dock does not see them, and the plan shows every path it
+// touches.
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -19,8 +23,13 @@ export interface Harness {
   name: string;
   /** The letters on its tile, where the app shows tools as neutral tiles rather than their logos. */
   initials: string;
-  /** Its command, looked for on the login shell's PATH. */
+  /** Its command, looked for on the login shell's PATH (on Windows with the extensions programs have there). */
   command: string;
+  /**
+   * Why it is not offered on Windows, in a sentence for its card: where it
+   * keeps its settings there is not confirmed. Absent where it is.
+   */
+  notOnWindows?: string;
   /**
    * A folder or file of its own under the home folder, there when it is
    * installed. Never one another harness makes: Antigravity CLI lives in
@@ -57,9 +66,9 @@ export interface Harness {
    * owner's "max permissive by default"), and `said`, the plain statement of
    * what they let it do, shown with the files. `quadit` is the absolute path
    * of the quadit command on the PATH, as an agent may call it; null when
-   * there is none.
+   * there is none. `platform` is the system it runs on.
    */
-  allowCli?: { changes(home: string, quadit: string | null): Change[]; said: string }[];
+  allowCli?: { changes(home: string, quadit: string | null, platform: NodeJS.Platform): Change[]; said: string }[];
   /** Said with the files when the app runs it by itself (to give its code back) with its permission checks off (its one-prompt form needs that). */
   selfRunSaid?: string;
   mcp?: {
@@ -78,12 +87,13 @@ export interface Harness {
    */
   oneShot?: (prompt: string) => string[];
   /**
-   * Where its desktop app carries a copy of its program, for when it is not
-   * on the login shell's PATH: under an applications folder (`apps`) or the
-   * home folder (`home`), `*` standing for any one folder's name. Found
-   * there in 2026 and documented nowhere, so looked for, never assumed.
+   * Where its desktop app carries a copy of its program on the system `on`,
+   * for when it is not on the login shell's PATH: under an applications
+   * folder (`apps`) or the home folder (`home`), `*` standing for any one
+   * folder's name. Found there in 2026 and documented nowhere, so looked
+   * for, never assumed.
    */
-  appCopies?: { apps?: string; home?: string }[];
+  appCopies?: { on: NodeJS.Platform; apps?: string; home?: string }[];
   /** Where it keeps command rules the app adds to (allowCli), under the home folder: so a plan names them plainly. */
   rules?: { folder: string; file: string };
 }
@@ -96,7 +106,11 @@ export const HARNESSES: readonly Harness[] = [
     command: "claude",
     trace: ".claude",
     oneShot: (prompt) => ["-p", prompt],
-    appCopies: [{ home: "Library/Application Support/Claude/claude-code/*/*/claude.app/Contents/MacOS/claude" }],
+    appCopies: [
+      { on: "darwin", home: "Library/Application Support/Claude/claude-code/*/*/claude.app/Contents/MacOS/claude" },
+      // Reported by people using the Claude app on Windows (anthropics/claude-code issue 58421), not documented.
+      { on: "win32", home: "AppData/Roaming/Claude/claude-code/*/claude.exe" },
+    ],
     skills: ".claude/skills",
     listenVerified: true,
     chatListens: "background",
@@ -105,14 +119,15 @@ export const HARNESSES: readonly Harness[] = [
     ],
     allowCli: [
       {
-        changes: (home) => [
-          {
-            kind: "json-item",
+        // On Windows its PowerShell tool runs commands too, whose rules are its own: a Bash rule does not reach it
+        // (code.claude.com/docs/en/permissions and tools-reference, 2026-11-26).
+        changes: (home, _quadit, platform) =>
+          ["Bash(quadit:*)", ...(platform === "win32" ? ["PowerShell(quadit *)"] : [])].map((value) => ({
+            kind: "json-item" as const,
             path: join(home, ".claude", "settings.json"),
             keyPath: ["permissions", "allow"],
-            value: "Bash(quadit:*)",
-          },
-        ],
+            value,
+          })),
         said: "Claude Code may run quadit commands without asking.",
       },
     ],
@@ -146,7 +161,7 @@ export const HARNESSES: readonly Harness[] = [
     command: "codex",
     trace: ".codex",
     oneShot: (prompt) => ["exec", "--skip-git-repo-check", prompt],
-    appCopies: [{ apps: "ChatGPT.app/Contents/Resources/codex-cli/bin/codex" }],
+    appCopies: [{ on: "darwin", apps: "ChatGPT.app/Contents/Resources/codex-cli/bin/codex" }],
     skills: ".agents/skills",
     listenVerified: true,
     chatListens: "busy",
@@ -161,7 +176,9 @@ export const HARNESSES: readonly Harness[] = [
     // Two settings: its sandbox may reach the network (quadit cannot reach the server from inside it otherwise), and
     // a command rule per way an agent calls quadit, which Codex runs outside the sandbox without asking
     // (`codex execpolicy check --rules FILE -- quadit me` says "allow" for each). A command wrapped in a shell
-    // (`zsh -lc "quadit …"`) matches no rule: there the sandbox's network is what lets quadit work.
+    // (`zsh -lc "quadit …"`) matches no rule: there the sandbox's network is what lets quadit work. On Windows its
+    // commands run in PowerShell, which it unwraps before the rules, and a rule's program matches in any case and
+    // without .exe (codex-rs exec_policy.rs, execpolicy executable_name.rs, 2026-11-26).
     allowCli: [
       {
         changes: (home) => [
@@ -236,6 +253,10 @@ export const HARNESSES: readonly Harness[] = [
     initials: "AG",
     name: "Antigravity CLI",
     command: "agy",
+    // Its Windows build exists, but the folders of its skills and its MCP settings there are named differently by
+    // Google's own pages (2026-11-26).
+    notOnWindows:
+      "Where Antigravity CLI keeps its settings on Windows is not confirmed yet, so Quadit does not connect it here.",
     trace: ".gemini/antigravity-cli",
     oneShot: (prompt) => ["-p", prompt, "--dangerously-skip-permissions"],
     selfRunSaid:
@@ -277,6 +298,10 @@ export const HARNESSES: readonly Harness[] = [
     initials: "oc",
     name: "opencode",
     command: "opencode",
+    // Its folder on Windows is ~/.config/opencode in its newer source; the opencode a person installs today was not
+    // seen to agree (2026-11-26).
+    notOnWindows:
+      "Where opencode keeps its settings on Windows is not confirmed yet, so Quadit does not connect it here.",
     trace: ".config/opencode",
     skills: ".agents/skills",
     listenVerified: false,

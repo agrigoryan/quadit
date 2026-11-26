@@ -18,14 +18,28 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { USER_PATH } from "@/main/config-edits";
 import { Connections } from "@/main/connections";
 import { QuaditCli } from "@/main/quadit-cli";
 import type { DesktopRequest } from "@/shared/bridge";
 import type { ConnectChoice } from "@/shared/pages-api";
 
-/** Connect runs only on macOS and Linux (no Windows build of quadit); these tests need a POSIX shell, links and file modes. */
+/**
+ * These tests need a POSIX shell (the stand-in quadit is a script), links
+ * and file modes. The Windows plans are played here too, with the stand-in
+ * as quadit.exe and the person's variables kept below.
+ */
 const posixOnly = describe.skipIf(process.platform === "win32");
+
+/** The person's own variables, as Windows keeps them in the registry, for the Windows plans (windows-environment.ts). */
+const registry = vi.hoisted(() => new Map<string, { value: string; expand: boolean }>());
+vi.mock("@/main/windows-environment", () => ({
+  readUserVariable: (name: string) => registry.get(name) ?? null,
+  writeUserVariable: (name: string, variable: { value: string; expand: boolean } | null) =>
+    variable ? registry.set(name, variable) : registry.delete(name),
+  systemPath: async () => "",
+}));
 
 const ORIGIN = "https://q.example";
 
@@ -104,9 +118,11 @@ function setUp({
   mkdirSync(home);
   mkdirSync(bin);
   const configDir = join(home, "Library", "Application Support", "quadit");
-  const script = join(root, "quadit-bundled");
+  // On Windows the command is quadit.exe, the app's copy among them.
+  const exe = platform === "win32" ? "quadit.exe" : "quadit";
+  const script = join(root, platform === "win32" ? exe : "quadit-bundled");
   standIn(script, join(configDir, "config.json"));
-  if (quaditOnPath) copyFileSync(script, join(bin, "quadit"));
+  if (quaditOnPath) copyFileSync(script, join(bin, exe));
   // The quadit the app carries, when a test gives it one (`carry`): its skill is in quadit-own.skill.
   const own = join(root, "quadit-own");
   standIn(own, join(configDir, "config.json"));
@@ -142,8 +158,8 @@ function setUp({
           "relative-folder",
           writableOnPath ? bin : join(root, "not-a-folder"),
           ...(ownBinOnPath ? [join(home, ".local", "bin")] : []),
-        ].join(":"),
-      { home, shell },
+        ].join(platform === "win32" ? ";" : ":"),
+      { home, shell, platform },
     ),
     summaries: () => [
       {
@@ -1298,16 +1314,68 @@ posixOnly("plans", () => {
   });
 });
 
-describe("on Windows", () => {
-  it("says Connect is not available, and plans nothing", async () => {
-    const { connections, choice, home } = setUp({ platform: "win32" });
-    expect(await connections.state()).toMatchObject({ supported: false, defaultLogin: null });
-    expect(await connections.planConnect(choice("claude"))).toEqual({
-      ok: false,
-      error:
-        "Connecting agents is not available on Windows yet: it needs the quadit command, which has no Windows build.",
+posixOnly("on Windows", () => {
+  const PATH = { value: "%USERPROFILE%\\AppData\\Local\\Microsoft\\WindowsApps;;C:\\Tools", expand: true };
+
+  it("adds the folder of the app's quadit.exe to the person's PATH, shown first, its type and the rest kept, and takes out only that folder with the last tool", async () => {
+    registry.set("Path", { ...PATH });
+    const { connections, connect, disconnect, root, choice } = setUp({ platform: "win32", quaditOnPath: false });
+    expect((await connections.state()).cli).toMatchObject({
+      found: null,
+      linkInto: null,
+      profile: null,
+      pathFolder: root,
+      manual: null,
     });
-    expect(existsSync(join(home, ".claude"))).toBe(false);
+    const planned = await connections.planConnect(choice("codex"));
+    if (!planned.ok) throw new Error(planned.error);
+    expect(planned.plan.files.find((file) => file.path === USER_PATH)).toMatchObject({
+      role: "path",
+      change: "edited",
+      diff: expect.stringContaining(`+${root}`),
+    });
+    connections.dropPlans();
+
+    const hint = await connect(choice("codex"));
+    expect(hint).toContain("Terminals opened from now on find quadit; reopen any that are open now.");
+    expect(registry.get("Path")).toEqual({ value: `${PATH.value};${root}`, expand: true });
+    // Found where the app put it, whatever the PATH this session read: the next tool shares it.
+    expect((await connections.state()).cli.found).toBe(join(root, "quadit.exe"));
+    await connect(choice("pi"));
+    expect(registry.get("Path")).toEqual({ value: `${PATH.value};${root}`, expand: true });
+
+    await disconnect("codex");
+    expect(registry.get("Path")?.value).toBe(`${PATH.value};${root}`);
+    await disconnect("pi");
+    expect(registry.get("Path")).toEqual(PATH);
+  });
+
+  it("makes the person's PATH when they had none, and takes it away again", async () => {
+    registry.clear();
+    const { connect, disconnect, root, choice } = setUp({ platform: "win32", quaditOnPath: false });
+    await connect(choice("codex"));
+    expect(registry.get("Path")).toEqual({ value: root, expand: true });
+    await disconnect("codex");
+    expect(registry.has("Path")).toBe(false);
+  });
+
+  it("lets Claude Code's PowerShell run quadit without asking too, besides its Bash", async () => {
+    registry.set("Path", { ...PATH });
+    const { connect, json, choice } = setUp({ platform: "win32" });
+    await connect(choice("claude"));
+    expect((json(".claude/settings.json").permissions as { allow: string[] }).allow).toEqual([
+      "Bash(quadit:*)",
+      "PowerShell(quadit *)",
+    ]);
+  });
+
+  it("does not offer a tool whose places on Windows are not known, and says why", async () => {
+    const { connections, choice, home } = setUp({ platform: "win32" });
+    const why =
+      "Where Antigravity CLI keeps its settings on Windows is not confirmed yet, so Quadit does not connect it here.";
+    expect((await connections.state()).harnesses.find((h) => h.id === "antigravity")?.unavailable).toBe(why);
+    expect(await connections.planConnect(choice("antigravity"))).toEqual({ ok: false, error: why });
+    expect(existsSync(join(home, ".gemini"))).toBe(false);
   });
 });
 

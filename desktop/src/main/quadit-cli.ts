@@ -3,15 +3,20 @@
 // (bundled in its resources) linked into the first folder on that PATH the
 // person may write to; without one, into a folder of their own,
 // ~/.local/bin, which one marked line in the profile their login shell
-// reads puts on the PATH. No step needs an administrator. The app runs only `quadit version`, `quadit skill`,
+// reads puts on the PATH. Windows has no login shell, and a link there
+// needs a privilege: its PATH is the one the registry gives a program
+// started now (windows-environment.ts), and the folder the app's quadit.exe
+// is in is added to the person's own PATH. No step needs an administrator.
+// The app runs only `quadit version`, `quadit skill`,
 // `quadit me`, `quadit login --path` and `quadit login URL -` (with
 // `--app PATH` for its own server's logins) with the token on standard
 // input, so that it never shows on a command line.
 
 import { execFile } from "node:child_process";
 import { accessSync, constants, existsSync, statSync } from "node:fs";
-import { basename, dirname, isAbsolute, join } from "node:path";
+import { join, posix, win32 } from "node:path";
 import { withoutQuadit } from "@/main/child-guard";
+import { systemPath } from "@/main/windows-environment";
 
 const RUN_TIMEOUT_MS = 20_000;
 
@@ -20,25 +25,26 @@ export interface CliLook {
   path: string[];
   /** The quadit command on it, and what `quadit version` says. */
   found: { path: string; version: string } | null;
-  /**
-   * Without one, where the app's copy can be linked: the first folder on
-   * PATH the person may write to; else ~/.local/bin, made when missing, with
-   * the line that puts it on the PATH in the login shell's profile
-   * (`profile`, null when it is on the PATH already). Null where neither
-   * can be done: no such folder and a shell whose profile is not known.
-   */
-  linkInto: { folder: string; profile: { path: string; line: string } | null } | null;
+  /** Without one, how the app's copy can be put on the PATH (Install); null where it cannot be. */
+  install: Install | null;
 }
+
+/**
+ * How the app's copy of quadit is put on the PATH. "link": linked into
+ * `folder`, the first folder on PATH the person may write to, else
+ * ~/.local/bin, made when missing, with the line that puts it on the PATH
+ * in the login shell's profile (`profile`, null when it is on the PATH
+ * already). "path" (Windows): `folder`, where the app's quadit.exe is, added
+ * to the person's PATH.
+ */
+export type Install =
+  { way: "link"; folder: string; profile: { path: string; line: string } | null } | { way: "path"; folder: string };
 
 /** Where the person's own commands go, under their home folder (the XDG convention). */
 const OWN_BIN = [".local", "bin"];
 const MARK = "# Added by the Quadit app: Disconnect in the app takes it out.";
 
 export class QuaditCli {
-  /**
-   * `bundled` is the app's own copy, null when this build has none (run from
-   * source); `shellPath` gives the login shell's PATH.
-   */
   /** The link the app made this session: found even where the login PATH the app sees does not show it yet. */
   private linkedNow: string | null = null;
 
@@ -46,23 +52,28 @@ export class QuaditCli {
    * `bundled` is the app's own copy, null when this build has none (run from
    * source); `shellPath` gives the login shell's PATH; `home` and `shell`
    * (its path, as $SHELL says) are where the app's copy goes without a
-   * folder on the PATH to write to.
+   * folder on the PATH to write to; `platform` how paths are written and
+   * programs found.
    */
   constructor(
     readonly bundled: string | null,
     private shellPath: () => Promise<string>,
-    private where: { home: string; shell: string },
+    private where: { home: string; shell: string; platform: NodeJS.Platform },
   ) {}
 
-  /** Looks at the login shell's PATH for the quadit command and for a place to link one. */
+  /** Looks at the login shell's PATH for the quadit command and for a way to put one there. */
   async look(): Promise<CliLook> {
-    const path = (await this.shellPath()).split(":").filter((dir) => isAbsolute(dir));
-    const binary = findCommand("quadit", path) ?? (this.linkedNow && findCommand("quadit", [dirname(this.linkedNow)]));
-    if (binary) return { path, found: { path: binary, version: await this.version(binary) }, linkInto: null };
-    return { path, found: null, linkInto: this.linkInto(path) };
+    const { platform } = this.where;
+    const paths = platform === "win32" ? win32 : posix;
+    const path = (await this.shellPath()).split(paths.delimiter).filter((dir) => paths.isAbsolute(dir));
+    const binary =
+      findCommand("quadit", path, platform) ??
+      (this.linkedNow && findCommand("quadit", [paths.dirname(this.linkedNow)], platform));
+    if (binary) return { path, found: { path: binary, version: await this.version(binary) }, install: null };
+    return { path, found: null, install: this.install(path) };
   }
 
-  /** The app linked its copy at `link`: this session's calls use it (look finds it), whatever the PATH the app sees says. */
+  /** The app put its copy on the PATH at `link`: this session's calls use it (look finds it), whatever the PATH the app sees says. */
   linked(link: string) {
     this.linkedNow = link;
   }
@@ -112,15 +123,17 @@ export class QuaditCli {
     await run(binary, ["login", origin, "-"], env, token);
   }
 
-  private linkInto(path: string[]): CliLook["linkInto"] {
+  private install(path: string[]): Install | null {
+    if (this.where.platform === "win32")
+      return this.bundled ? { way: "path", folder: win32.dirname(this.bundled) } : null;
     const onPath = path.find(writableFolder);
-    if (onPath) return { folder: onPath, profile: null };
+    if (onPath) return { way: "link", folder: onPath, profile: null };
     const { home, shell } = this.where;
-    const own = join(home, ...OWN_BIN);
+    const own = posix.join(home, ...OWN_BIN);
     // On the PATH already, but not there yet (Linux distributions add it at login when it exists): made, it is enough.
-    if (path.includes(own)) return { folder: own, profile: null };
+    if (path.includes(own)) return { way: "link", folder: own, profile: null };
     const profile = loginProfile(home, shell);
-    return profile ? { folder: own, profile } : null;
+    return profile ? { way: "link", folder: own, profile } : null;
   }
 
   private async version(binary: string): Promise<string> {
@@ -129,20 +142,36 @@ export class QuaditCli {
   }
 }
 
-/** The first `name` on `path` that is an executable file, or null. */
-export function findCommand(name: string, path: string[]): string | null {
+/**
+ * The program `name` stands for on `path`, as `platform` finds it: the first
+ * folder that has it. On Windows a program is a file with one of the
+ * extensions PATHEXT lists, tried in its order in each folder (quadit is
+ * quadit.exe there); elsewhere a file its owner may run. Null without one.
+ */
+export function findCommand(name: string, path: string[], platform: NodeJS.Platform): string | null {
+  const windows = platform === "win32";
+  const names = windows ? programExtensions().map((extension) => name + extension) : [name];
   for (const dir of path) {
-    const candidate = join(dir, name);
-    try {
-      if (statSync(candidate).isFile()) {
-        accessSync(candidate, constants.X_OK);
+    for (const file of names) {
+      const candidate = join(dir, file);
+      try {
+        if (!statSync(candidate).isFile()) continue;
+        if (!windows) accessSync(candidate, constants.X_OK);
         return candidate;
+      } catch {
+        // Not here.
       }
-    } catch {
-      // Not here.
     }
   }
   return null;
+}
+
+/** The extensions of programs on Windows, in the order Windows tries them (PATHEXT), written lower-case. */
+function programExtensions(): string[] {
+  const listed = (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .filter((extension) => extension.startsWith("."));
+  return listed.map((extension) => extension.toLowerCase());
 }
 
 /**
@@ -153,16 +182,16 @@ export function findCommand(name: string, path: string[]): string | null {
  */
 function loginProfile(home: string, shell: string): { path: string; line: string } | null {
   const sh = `export PATH="$HOME/${OWN_BIN.join("/")}:$PATH" ${MARK}`;
-  switch (basename(shell)) {
+  switch (posix.basename(shell)) {
     case "zsh":
-      return { path: join(home, ".zprofile"), line: sh };
+      return { path: posix.join(home, ".zprofile"), line: sh };
     case "bash": {
-      const bashProfile = join(home, ".bash_profile");
-      return { path: existsSync(bashProfile) ? bashProfile : join(home, ".profile"), line: sh };
+      const bashProfile = posix.join(home, ".bash_profile");
+      return { path: existsSync(bashProfile) ? bashProfile : posix.join(home, ".profile"), line: sh };
     }
     case "fish":
       return {
-        path: join(home, ".config", "fish", "conf.d", "quadit.fish"),
+        path: posix.join(home, ".config", "fish", "conf.d", "quadit.fish"),
         line: `fish_add_path --global --path $HOME/${OWN_BIN.join("/")} ${MARK}`,
       };
     default:
@@ -194,10 +223,15 @@ function run(
   const merged = { ...withoutQuadit(process.env), ...env };
   for (const [key, value] of Object.entries(env)) if (value === undefined) delete merged[key];
   return new Promise((resolve, reject) => {
-    const child = execFile(binary, args, { env: merged, timeout: RUN_TIMEOUT_MS }, (err, stdout, stderr) => {
-      if (err) reject(new Error(`quadit ${args[0]}: ${(stderr || stdout || err.message).trim()}`));
-      else resolve(stdout);
-    });
+    const child = execFile(
+      binary,
+      args,
+      { env: merged, timeout: RUN_TIMEOUT_MS, windowsHide: true },
+      (err, stdout, stderr) => {
+        if (err) reject(new Error(`quadit ${args[0]}: ${(stderr || stdout || err.message).trim()}`));
+        else resolve(stdout);
+      },
+    );
     // A quadit that stops before reading its input (a usage error, an older
     // one) breaks the pipe: its exit code and its words say what happened.
     child.stdin?.on("error", () => {});
@@ -209,8 +243,11 @@ function run(
  * The PATH of the person's login shell: what a harness started from a
  * terminal sees. An app started from the Dock has a much shorter one. Asked
  * once per look, of an interactive login shell (where most people set PATH).
+ * On Windows, the PATH the registry gives a program started now: the app's
+ * own is the one it was started with, which a change since does not reach.
  */
 export function loginShellPath(): Promise<string> {
+  if (process.platform === "win32") return systemPath();
   const shell = process.env.SHELL || "/bin/sh";
   return new Promise((resolve) => {
     execFile(shell, ["-ilc", "env"], { timeout: RUN_TIMEOUT_MS }, (err, stdout) => {

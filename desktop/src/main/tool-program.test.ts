@@ -33,6 +33,7 @@ posixOnly("toolProgram", () => {
       toolProgram(harness("codex"), {
         home: join(dir, "home"),
         path: [join(dir, "none"), join(dir, "bin")],
+        platform: "darwin",
         applications: [join(dir, "Applications")],
       }),
     ).toBe(join(dir, "bin", "codex"));
@@ -43,7 +44,12 @@ posixOnly("toolProgram", () => {
     const copy = join(dir, "Applications", "ChatGPT.app", "Contents", "Resources", "codex-cli", "bin", "codex");
     program(copy);
     expect(
-      toolProgram(harness("codex"), { home: join(dir, "home"), path: [], applications: [join(dir, "Applications")] }),
+      toolProgram(harness("codex"), {
+        home: join(dir, "home"),
+        path: [],
+        platform: "darwin",
+        applications: [join(dir, "Applications")],
+      }),
     ).toBe(copy);
   });
 
@@ -57,13 +63,69 @@ posixOnly("toolProgram", () => {
     program(at("2.3.0", "c3"), { executable: false });
     mkdirSync(dirname(at("2.4.0", "d4")), { recursive: true });
     symlinkSync(join(dir, "nowhere"), at("2.4.0", "d4"));
-    expect(toolProgram(harness("claude"), { home, path: [], applications: [] })).toBe(at("2.2.0", "b2"));
+    expect(toolProgram(harness("claude"), { home, path: [], platform: "darwin", applications: [] })).toBe(
+      at("2.2.0", "b2"),
+    );
   });
 
   it("is none when the tool is nowhere, and for a tool without a one-prompt command", () => {
     const dir = root();
-    expect(toolProgram(harness("codex"), { home: dir, path: [dir], applications: [dir] })).toBeNull();
+    expect(
+      toolProgram(harness("codex"), { home: dir, path: [dir], platform: "darwin", applications: [dir] }),
+    ).toBeNull();
     program(join(dir, "pi"));
-    expect(toolProgram(harness("pi"), { home: dir, path: [dir], applications: [] })).toBeNull();
+    expect(toolProgram(harness("pi"), { home: dir, path: [dir], platform: "darwin", applications: [] })).toBeNull();
+  });
+});
+
+describe("toolProgram on Windows", () => {
+  const root = () => realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-tool-")));
+  /** A file at `path`: on Windows a program is a file whose extension says so, whatever its mode. */
+  function file(path: string, age = 0) {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "");
+    const when = Date.now() / 1000 - age;
+    utimesSync(path, when, when);
+  }
+
+  it("is the first program PATHEXT names on the PATH, folder by folder: a real program before an npm shim beside it", () => {
+    const dir = root();
+    file(join(dir, "npm", "codex.cmd"));
+    file(join(dir, "npm", "codex.ps1"));
+    file(join(dir, "Codex", "codex.exe"));
+    file(join(dir, "Codex", "codex.cmd"));
+    const where = { home: join(dir, "home"), applications: [], platform: "win32" as const };
+    expect(toolProgram(harness("codex"), { ...where, path: [join(dir, "none"), join(dir, "Codex")] })).toBe(
+      join(dir, "Codex", "codex.exe"),
+    );
+    // An npm install is a shim only: it is the program, which the guard, not the app, knows how to start.
+    expect(toolProgram(harness("codex"), { ...where, path: [join(dir, "npm"), join(dir, "Codex")] })).toBe(
+      join(dir, "npm", "codex.cmd"),
+    );
+  });
+
+  it("else the newest copy the Claude app carries for Claude Code there, never the Mac's", () => {
+    const dir = root();
+    const home = join(dir, "home");
+    const at = (version: string) => join(home, "AppData", "Roaming", "Claude", "claude-code", version, "claude.exe");
+    file(at("2.1.0"), 300);
+    file(at("2.2.0"), 10);
+    program(
+      join(
+        home,
+        "Library",
+        "Application Support",
+        "Claude",
+        "claude-code",
+        "2.3.0",
+        "c3",
+        "claude.app",
+        "Contents",
+        "MacOS",
+        "claude",
+      ),
+    );
+    expect(toolProgram(harness("claude"), { home, path: [], applications: [], platform: "win32" })).toBe(at("2.2.0"));
+    expect(toolProgram(harness("codex"), { home, path: [], applications: [], platform: "win32" })).toBeNull();
   });
 });

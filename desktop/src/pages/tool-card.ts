@@ -25,7 +25,9 @@
 // of seconds while it is on the page (main/handshake.ts says how the
 // server's answer is read; no answer changes nothing). A tool whose
 // listening was not verified says so, quietly. A failure shows on the card
-// with "Try again". Styled by tools.css.
+// with "Try again". A tool the app cannot connect on this system (its places
+// there are not known) says why where its Connect would be. Styled by
+// tools.css.
 
 import { button, lineIcon, make } from "@/pages/dom";
 import { LISTEN_LINE } from "@/pages/listen-steps";
@@ -58,6 +60,8 @@ export interface CardTool {
   mcpOnly?: boolean;
   /** Whether connecting also lets it run quadit without asking each time (its card's line says so). */
   allows: boolean;
+  /** Why it cannot be connected on this computer, in a sentence, said instead of Connect; absent or null when it can. */
+  unavailable?: string | null;
 }
 
 export interface CardActions {
@@ -113,6 +117,7 @@ export class ToolCard {
   /** Under Run by Quadit's lines: how a chat adds another project, while Quadit runs some (they come first). */
   private afterRuns: HTMLDivElement;
   private gives: HTMLParagraphElement;
+  private disk: HTMLParagraphElement;
   private diskText: Text;
   private error: HTMLParagraphElement;
   private note: HTMLParagraphElement;
@@ -153,6 +158,7 @@ export class ToolCard {
     this.runs = new RunByQuadit(tool, HERE);
     this.gives = make("p", "", "gives");
     const disk = make("p", "", "disk");
+    this.disk = disk;
     this.diskText = document.createTextNode("");
     const see = button(
       "See the files",
@@ -375,13 +381,16 @@ export class ToolCard {
     this.element.classList.toggle("set-up", stands === "waiting" || stands === "unknown");
     this.tileEl.classList.toggle("member", setUp);
     const where = tool.worksAs ? " using this computer’s login" : " here";
+    const unavailable = stands === "found" ? (tool.unavailable ?? null) : null;
+    this.disk.hidden = unavailable !== null;
     setText(
       this.gives,
-      stands === "connected"
-        ? `${tool.name} can now take tasks, ask you questions and report back${where} when you ask it in a chat.`
-        : this.connectAs && !setUp
-          ? `${tool.name} will work as @${this.connectAs}, and be able to take tasks, ask you questions and report back${where}.`
-          : `${tool.name} will be able to take tasks, ask you questions and report back${where}.`,
+      unavailable ??
+        (stands === "connected"
+          ? `${tool.name} can now take tasks, ask you questions and report back${where} when you ask it in a chat.`
+          : this.connectAs && !setUp
+            ? `${tool.name} will work as @${this.connectAs}, and be able to take tasks, ask you questions and report back${where}.`
+            : `${tool.name} will be able to take tasks, ask you questions and report back${where}.`),
     );
     setText(this.diskText, diskLine(tool, this.addsCommand && !setUp, setUp));
 
@@ -404,7 +413,8 @@ export class ToolCard {
       const badge = make("span", "", "connected");
       badge.setAttribute("role", "status");
       badge.append(lineIcon(["M20 6 9 17l-5-5"]), document.createTextNode("Connected"));
-      if (stands === "found") {
+      if (stands === "found" && unavailable) this.act.replaceChildren();
+      else if (stands === "found") {
         this.connectButton.textContent = "Connect";
         this.connectButton.setAttribute("aria-label", `Connect ${tool.name}`);
         this.act.replaceChildren(this.connectButton);

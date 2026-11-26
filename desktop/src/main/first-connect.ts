@@ -63,12 +63,14 @@ export class FirstConnect {
   /**
    * Looks for the agent tools on this computer: every tool Connect knows,
    * found or not, but those connected before the step (to whatever server),
-   * which it leaves alone; and whether connecting puts the quadit command here.
+   * which it leaves alone, and those it cannot connect on this system (its
+   * card in Connect agents says why); and whether connecting puts the quadit
+   * command here.
    */
   async look(): Promise<FoundTools> {
     const { harnesses, cli, defaultLogin } = await this.parts.connections.state();
     const tools = harnesses
-      .filter((h) => !h.connected || this.done.has(h.id))
+      .filter((h) => (!h.connected || this.done.has(h.id)) && !h.unavailable)
       .map((h) => ({
         id: h.id,
         name: h.name,
@@ -81,7 +83,7 @@ export class FirstConnect {
         allows: h.allows,
       }));
     this.offered = tools.filter((t) => t.found);
-    return { tools, addsCommand: !cli.found && cli.linkInto !== null };
+    return { tools, addsCommand: !cli.found && (cli.linkInto !== null || cli.pathFolder !== null) };
   }
 
   /**

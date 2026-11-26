@@ -3,7 +3,9 @@
 //   CLI + skill  the quadit command on the login shell's PATH (the app's
 //                own copy linked there when there is none, in a folder of
 //                the person's own put on the PATH by a line in their shell's
-//                profile when no folder on it is theirs: quadit-cli.ts),
+//                profile when no folder on it is theirs; on Windows the
+//                folder of the app's quadit.exe added to the person's PATH:
+//                quadit-cli.ts),
 //                the skill where
 //                the harness reads skills, and a quadit login for an agent
 //                of the workspace: its own login, which the harness's
@@ -21,7 +23,8 @@
 // Disconnect takes back exactly that where the file still says what was
 // written. A change several connections need (the shared skill file, the
 // default login, the link with its folder and profile line) is made once,
-// shared, and taken back with the last of them.
+// shared, and taken back with the last of them. A harness whose Windows
+// places are not known (harnesses.ts, notOnWindows) is not offered there.
 //
 // Written is not connected (desktop contract §11): a tool connected through
 // the quadit command, as an agent of the workspace, gets a connect code
@@ -48,10 +51,11 @@
 
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, win32 } from "node:path";
 import {
   type Applied,
   backUp,
+  USER_PATH,
   type Change,
   changedSince,
   diffOf,
@@ -67,7 +71,7 @@ import {
 } from "@/main/config-edits";
 import { CODE_LIFE_MS, handshakeOf, type OpenCode } from "@/main/handshake";
 import { HARNESSES, type Harness } from "@/main/harnesses";
-import type { QuaditCli } from "@/main/quadit-cli";
+import { findCommand, type QuaditCli } from "@/main/quadit-cli";
 import { type DesktopOutcome, type DesktopRequest, type DesktopSummary, isConnectCode } from "@/shared/bridge";
 import type {
   ConnectChoice,
@@ -219,12 +223,11 @@ export class Connections {
   /** The harnesses, what each has connected, and where the quadit command stands. */
   async state(): Promise<ConnectView> {
     const { home, cli } = this.parts;
-    const supported = this.parts.platform !== "win32";
-    const look = supported ? await cli.look() : { path: [], found: null, linkInto: null };
+    const look = await cli.look();
     const binary = look.found?.path ?? cli.bundled;
-    const defaultConfig = supported && binary ? await cli.defaultConfig(binary).catch(() => null) : null;
+    const defaultConfig = binary ? await cli.defaultConfig(binary).catch(() => null) : null;
     const ledger = this.ledger();
-    const skill = supported && Object.keys(ledger.harnesses).length > 0 ? await this.currentSkill() : null;
+    const skill = Object.keys(ledger.harnesses).length > 0 ? await this.currentSkill() : null;
     const defaultLogin =
       defaultConfig && binary && existsSync(defaultConfig)
         ? {
@@ -235,8 +238,8 @@ export class Connections {
             ),
           }
         : null;
+    const install = look.found || !cli.bundled ? null : look.install;
     return {
-      supported,
       harnesses: HARNESSES.map((harness) => {
         const connection = ledger.harnesses[harness.id];
         return {
@@ -244,6 +247,7 @@ export class Connections {
           name: harness.name,
           initials: harness.initials,
           installed: this.installed(harness, look.path),
+          unavailable: this.unavailable(harness),
           mcp: !!harness.mcp,
           cliIdentity: harness.env ? "own" : "default",
           listenVerified: harness.listenVerified,
@@ -263,10 +267,10 @@ export class Connections {
       cli: {
         found: look.found?.path ?? null,
         version: look.found?.version ?? "",
-        linkInto: look.found || !cli.bundled || !look.linkInto ? null : homely(home, look.linkInto.folder),
-        profile:
-          look.found || !cli.bundled || !look.linkInto?.profile ? null : homely(home, look.linkInto.profile.path),
-        manual: look.found || (cli.bundled && look.linkInto) ? null : manualInstall(cli.bundled),
+        linkInto: install?.way === "link" ? homely(home, install.folder) : null,
+        profile: install?.way === "link" && install.profile ? homely(home, install.profile.path) : null,
+        pathFolder: install?.way === "path" ? install.folder : null,
+        manual: look.found || install ? null : manualInstall(cli.bundled, this.parts.platform),
       },
       defaultLogin,
       claudePlugin: claudePluginInstalled(home),
@@ -298,7 +302,7 @@ export class Connections {
   private async allowConnected(): Promise<string[]> {
     const ledger = this.ledger();
     const owed = Object.entries(ledger.harnesses).filter(([, connection]) => !connection.allowed);
-    if (this.parts.platform === "win32" || owed.length === 0) return [];
+    if (owed.length === 0) return [];
     const { home } = this.parts;
     const look = await this.parts.cli.look();
     const done: string[] = [];
@@ -308,7 +312,10 @@ export class Connections {
       const groups: AllowGroup[] = [];
       if (connection.methods.includes("cli"))
         for (const group of harness.allowCli ?? [])
-          groups.push({ changes: group.changes(home, look.found?.path ?? null), said: group.said });
+          groups.push({
+            changes: group.changes(home, look.found?.path ?? null, this.parts.platform),
+            said: group.said,
+          });
       const origin = this.parts.server(connection.serverId)?.origin;
       const mcpAllow = harness.mcp?.allow;
       if (connection.methods.includes("mcp") && mcpAllow && origin)
@@ -342,7 +349,7 @@ export class Connections {
   private async refreshSkills(): Promise<{ updated: string[]; changedByHand: string[] }> {
     const done = { updated: [] as string[], changedByHand: [] as string[] };
     const ledger = this.ledger();
-    if (this.parts.platform === "win32" || Object.keys(ledger.harnesses).length === 0) return done;
+    if (Object.keys(ledger.harnesses).length === 0) return done;
     const skill = await this.currentSkill();
     if (skill === null) return done;
     const seen = new Set<string>();
@@ -466,11 +473,17 @@ export class Connections {
     return true;
   }
 
-  /** Whether `harness` is on this computer: its trace in the home folder, or its command in a folder of `path`. */
+  /** Whether `harness` is on this computer: its trace in the home folder, or its command on `path`. */
   private installed(harness: Harness, path: string[]): boolean {
     return (
-      existsSync(join(this.parts.home, harness.trace)) || path.some((dir) => existsSync(join(dir, harness.command)))
+      existsSync(join(this.parts.home, harness.trace)) ||
+      findCommand(harness.command, path, this.parts.platform) !== null
     );
+  }
+
+  /** Why `harness` cannot be connected on this computer, in a sentence; null when it can. */
+  private unavailable(harness: Harness): string | null {
+    return this.parts.platform === "win32" ? (harness.notOnWindows ?? null) : null;
   }
 
   /** Plans connecting a harness as the person chose; nothing is written. */
@@ -484,13 +497,11 @@ export class Connections {
   }
 
   private async makeConnectPlan(choice: ConnectChoice): Promise<Plan> {
-    const { home, cli } = this.parts;
-    if (this.parts.platform === "win32")
-      throw new EditRefused(
-        "Connecting agents is not available on Windows yet: it needs the quadit command, which has no Windows build.",
-      );
+    const { home, cli, platform } = this.parts;
     const harness = HARNESSES.find((h) => h.id === choice.harness);
     if (!harness) throw new EditRefused("There is no such harness.");
+    const unavailable = this.unavailable(harness);
+    if (unavailable) throw new EditRefused(unavailable);
     const ledger = this.ledger();
     if (ledger.harnesses[harness.id])
       throw new EditRefused(`${harness.name} is connected already: disconnect it first.`);
@@ -515,15 +526,22 @@ export class Connections {
     if (methods.includes("cli")) {
       const look = await cli.look();
       const binary = look.found?.path ?? cli.bundled;
-      if (!binary || (!look.found && !look.linkInto)) {
+      const install = look.found || !cli.bundled ? null : look.install;
+      if (!binary || (!look.found && !install)) {
         throw new EditRefused(
-          `The quadit command is not on your PATH. Put it there, then try again: ${manualInstall(cli.bundled)}`,
+          `The quadit command is not on your PATH. Put it there, then try again: ${manualInstall(cli.bundled, platform)}`,
         );
       }
       // The command on PATH may be the link another connection made: this one needs it too, with the folder and
-      // the profile line that came with it.
+      // the profile line that came with it. On Windows, its folder another connection added to the PATH.
       const linked = look.found && others.get(targetOf({ kind: "link", path: look.found.path, target: "" }));
-      if (linked && linked.kind === "link") {
+      const pathAdded =
+        look.found &&
+        platform === "win32" &&
+        others.get(targetOf({ kind: "path", path: USER_PATH, folder: win32.dirname(look.found.path) }));
+      if (pathAdded && pathAdded.kind === "path") {
+        changes.push({ kind: "path", path: USER_PATH, folder: pathAdded.folder });
+      } else if (linked && linked.kind === "link") {
         changes.push({ kind: "link", path: linked.path, target: linked.target });
         for (const record of others.values()) {
           if (record.kind === "folder" && record.path === dirname(linked.path)) changes.push(record);
@@ -531,8 +549,10 @@ export class Connections {
           if (record.kind === "line" && !HARNESSES.some((h) => h.rules && record.path === join(home, h.rules.file)))
             changes.push({ kind: "line", path: record.path, line: record.line });
         }
-      } else if (!look.found && look.linkInto && cli.bundled) {
-        const { folder, profile } = look.linkInto;
+      } else if (install?.way === "path") {
+        changes.push({ kind: "path", path: USER_PATH, folder: install.folder });
+      } else if (install?.way === "link" && cli.bundled) {
+        const { folder, profile } = install;
         changes.push({ kind: "folder", path: folder });
         changes.push({ kind: "link", path: join(folder, "quadit"), target: cli.bundled });
         if (profile) changes.push({ kind: "line", path: profile.path, line: profile.line });
@@ -546,10 +566,11 @@ export class Connections {
         path: join(home, harness.skills, "quadit", "SKILL.md"),
         content: (await this.currentSkill()) ?? (await cli.skill(binary).catch(tooOld)),
       });
-      // The command as an agent may call it by its path: the one on the PATH, or the app's copy linked there now.
-      const command = look.found?.path ?? (look.linkInto && cli.bundled ? join(look.linkInto.folder, "quadit") : null);
+      // The command as an agent may call it by its path: the one on the PATH, or the app's copy put there now.
+      const command =
+        look.found?.path ?? (install?.way === "path" ? cli.bundled : install ? join(install.folder, "quadit") : null);
       for (const group of harness.allowCli ?? [])
-        allow.push({ changes: group.changes(home, command), said: group.said });
+        allow.push({ changes: group.changes(home, command, platform), said: group.said });
       if (harness.selfRunSaid) warnings.push(harness.selfRunSaid);
       const defaultConfig = await cli.defaultConfig(binary).catch(tooOld);
       const shown = `${JSON.stringify({ url: origin, token: MASKED_TOKEN }, null, 2)}\n`;
@@ -726,6 +747,9 @@ export class Connections {
       }
       const link = plan.applied.find((record) => record.kind === "link");
       if (link) this.parts.cli.linked(link.path);
+      // On Windows its folder is on the PATH now, which this session's look reads anew; said all the same.
+      if (plan.applied.some((record) => record.kind === "path") && this.parts.cli.bundled)
+        this.parts.cli.linked(this.parts.cli.bundled);
 
       // The agent of this workspace the tool works as can prove the connection from inside it, given a code.
       const member = choiceHolds ? agent && { id: agent.id, handle: agent.handle } : this.memberOf(plan, worksAs);
@@ -752,8 +776,11 @@ export class Connections {
       if (code && !code.ok) this.codeRefused.set(harness.id, code.error);
       else this.codeRefused.delete(harness.id);
       const hint = connectedHint(harness, choice.methods, worksAs.handle, agent?.handle ?? worksAs.handle);
-      // The login PATH changed (a folder of the person's own, or the line that puts it there): open terminals keep the old one.
-      const newPath = plan.applied.some((record) => record.kind === "line" || record.kind === "folder");
+      // The login PATH changed (a folder of the person's own, the line that puts it there, or the PATH itself): open
+      // terminals keep the old one.
+      const newPath = plan.applied.some(
+        (record) => record.kind === "line" || record.kind === "folder" || record.kind === "path",
+      );
       this.parts.connected(harness.id, code?.ok ? code.code.code : null);
       return {
         ok: true,
@@ -1185,6 +1212,8 @@ function roleOf(
       return "folder";
     case "line":
       return "profile";
+    case "path":
+      return "path";
   }
 }
 
@@ -1205,17 +1234,26 @@ function connectedHint(harness: Harness, methods: ConnectMethod[], cliAs: string
 /**
  * How to put the quadit command on PATH by hand: the app's copy linked into
  * a folder of the person's own (a shell whose profile the app does not
- * know), or, without one, the install script. Neither needs an administrator.
+ * know), or, without one, the install script; on Windows, where an app of
+ * this build always has its copy, the release's zip. None needs an
+ * administrator.
  */
-function manualInstall(bundled: string | null): string {
+function manualInstall(bundled: string | null, platform: NodeJS.Platform): string {
+  if (platform === "win32")
+    return bundled
+      ? `add ${win32.dirname(bundled)} to your PATH`
+      : "download quadit_windows_amd64.zip (or arm64) from https://github.com/agrigoryan/quadit/releases, and add the folder of its quadit.exe to your PATH";
   return bundled
     ? `mkdir -p ~/.local/bin && ln -s '${bundled}' ~/.local/bin/quadit, then add ~/.local/bin to your PATH`
     : "curl -fsSL https://raw.githubusercontent.com/agrigoryan/quadit/main/install.sh | sh";
 }
 
-/** `path` as a person writes it: ~ for the home folder. */
+/** `path` as a person writes it: ~ for the home folder, whichever separator the path has after it (Windows: \\). */
 export function homely(home: string, path: string): string {
-  return path === home || path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
+  const after = path.slice(home.length, home.length + 1);
+  return path.startsWith(home) && (after === "" || after === "/" || after === "\\")
+    ? `~${path.slice(home.length)}`
+    : path;
 }
 
 /** The server a quadit config file is for (never its token), or null when it says none. */

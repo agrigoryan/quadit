@@ -193,6 +193,7 @@ function fileIcon(role: PlanFile["role"]): SVGSVGElement {
         "M14 2v4a2 2 0 0 0 2 2h4M13.4 12.6a2 2 0 1 1 3 3L11 21l-4 1 1-4Z",
       ]);
     case "command":
+    case "path":
       return lineIcon(["m4 17 6-6-6-6", "M12 19h8"]);
     case "folder":
     case "rules-folder":

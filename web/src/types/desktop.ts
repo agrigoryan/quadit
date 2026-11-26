@@ -157,8 +157,8 @@ export interface QuaditDesktop {
   /**
    * Opens the app's Connect agents over this window, for its server and workspace; with `focus`, at the tool that
    * works as that agent (a user id), ready for what the person meant, which they still do there. Without an agent, or
-   * with anything the app does not take, it opens as without a focus. Present only where the app can connect tools
-   * (not on Windows).
+   * with anything the app does not take, it opens as without a focus. Missing in an app that cannot connect tools
+   * (one older than this, on Windows).
    */
   openConnect?(focus?: ConnectFocus): void;
   /** The tools on this computer that work as agents of this window's server and workspace. Present only where openConnect is. */
