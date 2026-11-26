@@ -6,10 +6,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { readUserVariable, systemPath, writeUserVariable } from "@/main/windows-environment";
 
 const onWindows = describe.runIf(process.platform === "win32");
+/** Each step starts Windows PowerShell, which takes a moment, more the first time. */
+const SLOW = { timeout: 60_000 };
 
-onWindows("the person's variables in the registry", () => {
+onWindows("the person's variables in the registry", SLOW, () => {
   const name = `QuaditAppTest${randomBytes(4).toString("hex")}`;
-  afterEach(() => writeUserVariable(name, null));
+  afterEach(() => writeUserVariable(name, null), SLOW.timeout);
 
   it("is none for a variable that is not there", () => {
     expect(readUserVariable(name)).toBeNull();
@@ -30,7 +32,7 @@ onWindows("the person's variables in the registry", () => {
   });
 });
 
-onWindows("the PATH a program started now gets", () => {
+onWindows("the PATH a program started now gets", SLOW, () => {
   it("is the machine's and the person's, expanded", async () => {
     const path = (await systemPath()).toLowerCase().split(";");
     const system32 = `${process.env.SystemRoot ?? "C:\\Windows"}\\system32`.toLowerCase();
