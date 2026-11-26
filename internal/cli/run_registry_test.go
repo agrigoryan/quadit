@@ -31,26 +31,30 @@ func TestTheRegistryRefusesAFolderOutsideTheRules(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		system, root = filepath.Join(cmp.Or(os.Getenv("SystemRoot"), `C:\Windows`), "System32"), filepath.VolumeName(dir)+`\`
 	}
-	symlink(t, home, filepath.Join(dir, "to-home"))
-	symlink(t, system, filepath.Join(project, "to-system"))
 	strict := folderRules{home: home, roots: systemRoots()} // the computer's own system folders
 	lenient := folderRules{home: home, roots: testRoots()}
+	// A link is made in its own case, so a computer that makes none skips
+	// that case alone.
 	for _, c := range []struct {
 		name, path string
+		link       string // the path is a link to this, made first
 		rules      folderRules
 		want       string
 	}{
-		{"a relative path", filepath.FromSlash("devel/game"), lenient, "folder= must be an absolute path"},
-		{"a folder that does not exist", filepath.Join(home, "nope"), lenient, filepath.FromSlash("~/nope does not exist")},
-		{"a file", file, lenient, filepath.FromSlash("~/devel/game/README is not a folder")},
-		{"the home folder", home, lenient, "~ is your home folder: pick the project's own folder"},
-		{"a link to the home folder", filepath.Join(dir, "to-home"), lenient, "is your home folder"},
-		{"above the home folder", dir, lenient, dir + " is above your home folder: pick the project's own folder"},
-		{"the root", root, lenient, root + " is above your home folder"},
-		{"a system folder", system, strict, system + " is a system folder: pick the project's own folder"},
-		{"a link to a system folder", filepath.Join(project, "to-system"), lenient, filepath.FromSlash("~/devel/game/to-system is a system folder")},
+		{"a relative path", filepath.FromSlash("devel/game"), "", lenient, "folder= must be an absolute path"},
+		{"a folder that does not exist", filepath.Join(home, "nope"), "", lenient, filepath.FromSlash("~/nope does not exist")},
+		{"a file", file, "", lenient, filepath.FromSlash("~/devel/game/README is not a folder")},
+		{"the home folder", home, "", lenient, "~ is your home folder: pick the project's own folder"},
+		{"a link to the home folder", filepath.Join(dir, "to-home"), home, lenient, "is your home folder"},
+		{"above the home folder", dir, "", lenient, dir + " is above your home folder: pick the project's own folder"},
+		{"the root", root, "", lenient, root + " is above your home folder"},
+		{"a system folder", system, "", strict, system + " is a system folder: pick the project's own folder"},
+		{"a link to a system folder", filepath.Join(project, "to-system"), system, lenient, filepath.FromSlash("~/devel/game/to-system is a system folder")},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			if c.link != "" {
+				symlink(t, c.link, c.path)
+			}
 			_, _, err := c.rules.check(c.path)
 			if err == nil || !strings.Contains(err.Error(), c.want) {
 				t.Fatalf("check(%s) = %v, want %q", c.path, err, c.want)
