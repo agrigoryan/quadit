@@ -37,6 +37,9 @@ jobs:
           QUADIT_TEST_POSTGRES: postgres://postgres:quadit@127.0.0.1:5432/quadit
           # The runner has Chrome: a picture of a page must be taken here, not skipped.
           QUADIT_TEST_PICTURE: "1"
+          # Ubuntu 24.04 keeps Chrome from making its own sandbox ("No usable sandbox!"): the server's
+          # setting for a machine like that, as docs/install.md tells its administrator.
+          QUADIT_CHROME_ARGS: --no-sandbox
         # The server's tests run every read on both databases under the race detector: longer than go test's ten minutes on a hosted runner.
         run: go test -race -timeout 30m ./...
       - uses: pnpm/action-setup@v4
