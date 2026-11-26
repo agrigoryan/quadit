@@ -52,7 +52,7 @@ test("a removal being asked about stays asked, its button in focus, while the li
 }) => {
   await desktop.addServer(run.server, "Work");
   const list = await desktop.serverList();
-  await list.getByRole("button", { name: "Remove Work" }).click();
+  await list.getByRole("button", { name: "Remove Work", exact: true }).click();
   await expect(list.getByRole("button", { name: "Keep Work" })).toBeFocused();
   // What the app shows changed meanwhile (a window's page published, a server answered): every page is told, and
   // the list is drawn again (the row marked now is gone once it is).
@@ -64,7 +64,8 @@ test("a removal being asked about stays asked, its button in focus, while the li
   }, PAGES_CHANGED);
   await expect(list.locator("[data-drawn-before]")).toHaveCount(0);
   await expect(list.getByRole("button", { name: "Keep Work" })).toBeFocused();
-  await expect(list.getByRole("button", { name: "Remove Work" })).toBeHidden();
+  // Exactly "Remove Work": a role's name is otherwise matched in part, and "Yes, remove Work" holds it.
+  await expect(list.getByRole("button", { name: "Remove Work", exact: true })).toBeHidden();
   await list.getByRole("button", { name: "Yes, remove Work" }).click();
   await expect(list.getByText("No servers yet.")).toBeVisible();
 });
