@@ -411,10 +411,7 @@ func TestRepositorySyncDecides(t *testing.T) {
 			source(r, nil)
 			r.syncAnswering(200)
 			sub := filepath.Join(s.dir, "repos", r.src, "docs", "sub")
-			if err := os.Chmod(sub, 0o300); err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() { os.Chmod(sub, 0o755) })
+			denyReading(t, sub)
 			r.syncAnswering(500) // the server's own disk, not the source's setup
 			s.pageID(t, "b")
 		}},

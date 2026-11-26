@@ -385,10 +385,7 @@ func TestADestinationThatCannotBeUsedIsRefused(t *testing.T) {
 	t.Parallel()
 	s := newSite(t, testdb.SQLite(t))
 	locked := t.TempDir()
-	if err := os.Chmod(locked, 0o500); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(locked, 0o700) }) // so the test's folder can be removed
+	denyWriting(t, locked)
 	for name, c := range map[string]struct {
 		copyTo M
 		says   string

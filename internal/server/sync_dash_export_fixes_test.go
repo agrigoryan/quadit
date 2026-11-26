@@ -66,16 +66,13 @@ func TestSyncKeepsEveryNote(t *testing.T) {
 	// The working copy may not be written to: the folder cannot be made, so
 	// the page is held back, and the folder is still missing.
 	copyDir := filepath.Join(s.dir, "repos", src)
-	if err := os.Chmod(copyDir, 0o555); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { os.Chmod(copyDir, 0o755) })
+	allow := denyWriting(t, copyDir)
 	out := sync()
 	if !strings.Contains(out, "stands in the way") || !strings.Contains(out, "no folder docs") {
 		t.Fatalf("a sync that held a page back lost what it said before: %s", out)
 	}
 	// Once a sync has made the folder, it no longer says it is missing.
-	os.Chmod(copyDir, 0o755)
+	allow()
 	if out := sync(); !strings.Contains(out, `"files_written":1`) || strings.Contains(out, "no folder") || strings.Contains(out, "stands in the way") {
 		t.Fatalf("the sync that made the folder: %s", out)
 	}
