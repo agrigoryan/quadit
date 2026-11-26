@@ -1007,7 +1007,15 @@ func newNormaliser(baseURL string) *normaliser {
 
 func (n *normaliser) name(id, name string) { n.names[id] = "<" + name + ">" }
 
-func (n *normaliser) replace(from, to string) { n.replaces = append(n.replaces, from, to) }
+// replace has every from in a text become to. A Windows path's backslashes
+// are doubled in JSON: that form is replaced too, and first, so that it is
+// found before the plain one could be inside it.
+func (n *normaliser) replace(from, to string) {
+	if escaped := strings.ReplaceAll(from, `\`, `\\`); escaped != from {
+		n.replaces = append(n.replaces, escaped, to)
+	}
+	n.replaces = append(n.replaces, from, to)
+}
 
 // replacePath is replace for a path of this machine. A line of text cuts a
 // long one short ("/var/folders/…/T/TestEvery…"), and how much of it is
@@ -1017,6 +1025,10 @@ func (n *normaliser) replacePath(path, to string) {
 	n.replace(path, to)
 	n.paths[path] = to
 }
+
+// windowsTailRE finds the rest of a Windows path after the part replaced
+// (<data>\backups, or <data>\\backups in JSON).
+var windowsTailRE = regexp.MustCompile(`(<[a-z]+>)((?:\\{1,2}[^"\\\s]+)+)`)
 
 // cutShortRE finds what may be a path cut short: from a slash to the mark of the cut.
 var cutShortRE = regexp.MustCompile(`/[^"\\\s…]*…`)
@@ -1040,6 +1052,12 @@ var (
 // text makes one piece of text the same on every run.
 func (n *normaliser) text(s string) string {
 	s = strings.NewReplacer(n.replaces...).Replace(s)
+	if filepath.Separator == '\\' {
+		// The rest of a path replaced is written as on every other system.
+		s = windowsTailRE.ReplaceAllStringFunc(s, func(path string) string {
+			return strings.ReplaceAll(strings.ReplaceAll(path, `\\`, `/`), `\`, `/`)
+		})
+	}
 	s = cutShortRE.ReplaceAllStringFunc(s, func(cut string) string {
 		for path, to := range n.paths {
 			if strings.HasPrefix(path, strings.TrimSuffix(cut, "…")) {
