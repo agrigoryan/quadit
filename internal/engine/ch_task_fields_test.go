@@ -77,6 +77,14 @@ func TestATShirtSizeStandsForItsNumberOnEveryProject(t *testing.T) {
 		if e.Field != "estimate" || !slices.Equal(e.Allowed, core.TShirtSizes) {
 			t.Fatalf("a word that is not a size: %+v", e)
 		}
+		// A number written as text is digits only, as the web app reads it.
+		w.do(w.owner.ID, "task.update", M{"id": "SVA-1", "estimate": "5"})
+		if got := w.estimateOf("SVA-1"); got != "5" {
+			t.Fatalf("\"5\" is %s, want 5", got)
+		}
+		for _, signed := range []string{"+3", "-0"} {
+			w.refused(engine.CodeInvalid, w.owner.ID, "task.update", M{"id": "SVA-1", "estimate": signed})
+		}
 	})
 }
 

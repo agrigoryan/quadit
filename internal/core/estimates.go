@@ -41,13 +41,14 @@ const scaleLength = 5
 var TShirtSizes = []string{"XS", "S", "M", "L", "XL", "XXL", "XXXL"}
 
 // EstimatePoints reads an estimate written as a word: a whole number of
-// points, 0 or more, or a T-shirt size, read without regard to case, which
-// stands for its number of points on every project. ok is false for
-// anything else.
+// points in digits only (no sign), or a T-shirt size, read without regard
+// to case, which stands for its number of points on every project. ok is
+// false for anything else. The web app reads the same words.
 func EstimatePoints(word string) (points int, ok bool) {
 	word = strings.TrimSpace(word)
-	if n, err := strconv.Atoi(word); err == nil {
-		return n, n >= 0
+	if word != "" && strings.Trim(word, "0123456789") == "" {
+		n, err := strconv.Atoi(word)
+		return n, err == nil
 	}
 	i := slices.IndexFunc(TShirtSizes, func(size string) bool { return strings.EqualFold(size, word) })
 	if i < 0 {

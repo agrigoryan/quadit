@@ -72,7 +72,7 @@ func TestAnEstimateIsReadAsANumberOrATShirtSizeOfAnyCase(t *testing.T) {
 			t.Errorf("%q: %d %v, want %d", word, got, ok, want)
 		}
 	}
-	for _, notAnEstimate := range []string{"", "XXXXL", "-1", "2.5", "medium"} {
+	for _, notAnEstimate := range []string{"", "XXXXL", "-1", "-0", "+3", "2.5", "medium"} {
 		if got, ok := EstimatePoints(notAnEstimate); ok {
 			t.Errorf("%q was read as %d", notAnEstimate, got)
 		}

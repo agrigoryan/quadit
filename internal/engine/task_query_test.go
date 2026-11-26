@@ -34,6 +34,7 @@ func TestViewQueryIsReadByTheEngine(t *testing.T) {
 			{"a label nearly right", "SVA", M{"label": []string{"arts"}}, "query.label", `no label "arts"`},
 			{"a sort there is none of", "", M{"sort": "nope"}, "query.sort", "unknown sort"},
 			{"an estimate that is no number, size or none", "", M{"estimate": []string{"5", "huge"}}, "query.estimate", `unknown estimate "huge"`},
+			{"an estimate with a sign", "", M{"estimate": []string{"+3"}}, "query.estimate", `unknown estimate "+3"`},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w.t = t
