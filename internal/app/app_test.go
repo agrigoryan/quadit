@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -31,55 +32,76 @@ func TestMain(m *testing.M) {
 }
 
 // TestServeStopsWhenItsInputCloses: with --stop-on-stdin-close the server
-// shuts down cleanly once its standard input closes, which is how a program
-// that started it (the desktop app) ends it even when that program dies;
-// without the flag standard input is none of its business, and a server
-// whose input is closed from the start (under a service manager) runs on
-// until it is asked to stop as the system asks (askToStop). Each server is
-// a process of its own, as the app and a service manager see it.
+// shuts down once its standard input closes, which is how the desktop app
+// stops it on every system, and how it ends with the app however the app
+// ends; without the flag standard input is none of its business, and a
+// server whose input is closed from the start (under a service manager)
+// runs on until it is asked to stop as the system asks (askToStop). Either
+// way the shutdown is the whole one (stoppedCleanly). Each server is a
+// process of its own, as the app and a service manager see it.
 func TestServeStopsWhenItsInputCloses(t *testing.T) {
 	t.Run("with the flag", func(t *testing.T) {
 		input, held := pipe(t)
-		server := serveApart(t, input, "--stop-on-stdin-close")
+		server := serveApart(t, apart{input: input}, "--stop-on-stdin-close")
 		held.Close()
-		if code := server.exit(t); code != 0 {
-			t.Fatalf("quadit serve exited %d, want 0", code)
-		}
-		if _, err := http.Get(server.url + "/readyz"); err == nil {
-			t.Fatal("the server still answers after it stopped")
-		}
+		server.stoppedCleanly(t)
 	})
 
 	t.Run("without it", func(t *testing.T) {
-		server := serveApart(t, nil) // the null device: its input ends at once
+		server := serveApart(t, apart{}) // the null device: its input ends at once
 		res, err := http.Get(server.url + "/readyz")
 		if err != nil {
 			t.Fatalf("the server does not answer: %v", err)
 		}
 		res.Body.Close()
 		askToStop(t, server.cmd)
-		if code := server.exit(t); code != 0 {
-			t.Fatalf("quadit serve exited %d, want 0", code)
-		}
+		server.stoppedCleanly(t)
 	})
+}
+
+// TestServeStartsWithABareEnvironment: the server starts and stops with
+// little more than PATH in its environment (and on Windows the system's
+// own folder, SystemRoot), as a program that starts it may give it; on
+// Windows its temporary files then go in its data directory.
+func TestServeStartsWithABareEnvironment(t *testing.T) {
+	env := []string{"PATH=" + os.Getenv("PATH")}
+	if runtime.GOOS == "windows" {
+		env = append(env, "SystemRoot="+os.Getenv("SystemRoot"))
+	}
+	input, held := pipe(t)
+	server := serveApart(t, apart{input: input, env: env}, "--stop-on-stdin-close")
+	// Windows would give it the Windows folder for its temporary files.
+	if info, err := os.Stat(filepath.Join(server.data, "tmp")); runtime.GOOS == "windows" && (err != nil || !info.IsDir()) {
+		t.Errorf("the server has no temporary folder of its own: %v", err)
+	}
+	held.Close()
+	server.stoppedCleanly(t)
 }
 
 // servedApart is quadit serve running in a process of its own.
 type servedApart struct {
 	url  string
+	data string // its data directory
 	cmd  *exec.Cmd
 	done chan int // what it exits with, once it has
+	log  func() string
+}
+
+// apart is how a server is started in a process of its own: what its
+// standard input reads (nil: the null device), and its environment (nil:
+// the test's, without its QUADIT_ settings).
+type apart struct {
+	input io.Reader
+	env   []string
 }
 
 // serveApart runs quadit serve with extra flags in a process of its own (this
-// test binary, by TestMain) on a new data directory and a free port, its
-// standard input read from input (nil: the null device), and waits until it
-// is ready. None of the QUADIT_ settings of the environment the tests run
-// in reach it.
-func serveApart(t *testing.T, input io.Reader, flags ...string) *servedApart {
+// test binary, by TestMain) on a new data directory and a free port, and
+// waits until it is ready.
+func serveApart(t *testing.T, how apart, flags ...string) *servedApart {
 	t.Helper()
-	listen := freeAddress(t)
-	spec, err := json.Marshal(append([]string{"--data", t.TempDir(), "--listen", listen, "--url", "http://" + listen}, flags...))
+	listen, data := freeAddress(t), t.TempDir()
+	spec, err := json.Marshal(append([]string{"--data", data, "--listen", listen, "--url", "http://" + listen}, flags...))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,15 +110,20 @@ func serveApart(t *testing.T, input io.Reader, flags ...string) *servedApart {
 		t.Fatal(err)
 	}
 	cmd := exec.Command(exe, "-test.run=^$")
-	cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "QUADIT_") }), "QUADIT_TEST_SERVE="+string(spec))
+	env := how.env
+	if env == nil {
+		env = slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "QUADIT_") })
+	}
+	cmd.Env = append(env, "QUADIT_TEST_SERVE="+string(spec))
 	cmd.SysProcAttr = stoppableProcess()
 	var log strings.Builder
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = input, &log, &log
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = how.input, &log, &log
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
-	server := &servedApart{url: "http://" + listen, cmd: cmd, done: make(chan int, 1)}
+	server := &servedApart{url: "http://" + listen, data: data, cmd: cmd, done: make(chan int, 1)}
 	waited := make(chan struct{})
+	server.log = func() string { <-waited; return log.String() } // written until the process is gone
 	go func() {
 		defer close(waited)
 		_ = cmd.Wait() // its exit code is what counts, read below
@@ -132,10 +159,30 @@ func serveApart(t *testing.T, input io.Reader, flags ...string) *servedApart {
 	}
 }
 
-// exit gives what the server exited with, failing when it runs on.
-func (s *servedApart) exit(t *testing.T) int {
+// stoppedCleanly checks that the server, told to stop, stopped as it
+// should: exited 0 having shut down within its time, its address no longer
+// answering, its data directory free for the next server, and its database
+// and files closed (on Windows an open file cannot be removed).
+func (s *servedApart) stoppedCleanly(t *testing.T) {
 	t.Helper()
-	return waitForExit(t, s.done)
+	if code := waitForExit(t, s.done); code != 0 {
+		t.Fatalf("quadit serve exited %d, want 0", code)
+	}
+	said := s.log()
+	if !strings.Contains(said, "shutting down") || strings.Contains(said, "did not end in time") || strings.Contains(said, "cut off") {
+		t.Fatalf("the shutdown was not the whole one:\n%s", said)
+	}
+	if _, err := http.Get(s.url + "/readyz"); err == nil {
+		t.Fatal("the server still answers after it stopped")
+	}
+	release, err := lockData(s.data)
+	if err != nil {
+		t.Fatalf("the data directory is still held: %v", err)
+	}
+	release()
+	if err := os.RemoveAll(s.data); err != nil {
+		t.Fatalf("the server left its files open: %v", err)
+	}
 }
 
 // pipe is a pipe whose reading end is to be a server's input and whose

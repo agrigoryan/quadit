@@ -29,6 +29,7 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -139,6 +140,26 @@ func (o *Options) secret() ([]byte, error) {
 	return raw, nil
 }
 
+// ownTempFolder gives the server a temporary folder of its own, in the
+// data directory, where the system would give it none it can write to:
+// Windows finds the temporary folder in the environment alone (TMP, TEMP,
+// then USERPROFILE), and without them falls back to the Windows folder,
+// which a person may not write in. Backups, imports and pictures need one.
+// Elsewhere the system's own (/tmp) is always there.
+func (o *Options) ownTempFolder() error {
+	if runtime.GOOS != "windows" || os.Getenv("TMP") != "" || os.Getenv("TEMP") != "" || os.Getenv("USERPROFILE") != "" {
+		return nil
+	}
+	dir, err := filepath.Abs(filepath.Join(o.Data, "tmp"))
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return err
+	}
+	return os.Setenv("TMP", dir)
+}
+
 // Serve runs the server until it is told to stop.
 func Serve(args []string, version string) int {
 	run := &serveRun{}
@@ -197,6 +218,10 @@ func Serve(args []string, version string) int {
 			return 1
 		}
 		defer release()
+	}
+	if err := o.ownTempFolder(); err != nil {
+		log.Error("cannot start", "err", err)
+		return 1
 	}
 	st, sealer, err := o.Open(ctx)
 	if err != nil {
