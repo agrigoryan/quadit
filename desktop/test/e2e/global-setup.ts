@@ -17,7 +17,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startHandoffFake } from "./handoff-fake";
-import { AGENT, BINARY, OWNER, quadit, type Run, WORKSPACE } from "./run";
+import { AGENT, BINARY, bareEnv, OWNER, quadit, type Run, WORKSPACE } from "./run";
 
 export default async function globalSetup() {
   const binary = process.env.QUADIT_BINARY || BINARY;
@@ -35,7 +35,7 @@ export default async function globalSetup() {
     {
       stdio: ["ignore", "ignore", "pipe"],
       // Nothing from the shell that started the run may point it elsewhere.
-      env: { PATH: process.env.PATH ?? "", HOME: dir, QUADIT_CONFIG: join(dir, "cli.json") },
+      env: { ...bareEnv(), HOME: dir, QUADIT_CONFIG: join(dir, "cli.json") },
     },
   );
   let log = "";

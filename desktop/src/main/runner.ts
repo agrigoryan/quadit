@@ -15,8 +15,9 @@
 // once it ran a minute; ended because another quadit run serves this
 // computer (exit 3, one started by hand), it is not, and the app tries
 // again every 5 minutes. It is stopped when the last entry goes and at quit,
-// never waited for: the runner ends its programs on the guard's SIGTERM,
-// within the guard's grace.
+// never waited for: the runner ends its programs when the guard asks it to
+// stop (SIGTERM; on Windows quadit guard's own way, which quadit run takes
+// as it takes SIGTERM), within the guard's grace.
 
 import { execFile } from "node:child_process";
 import { realpathSync } from "node:fs";
@@ -440,7 +441,7 @@ export class Runner {
     if (list.entries.length > 0) await this.begin();
   }
 
-  /** At quit: the guard's stop (SIGTERM to its group, killed 5 s later), never waited for; nothing starts again. */
+  /** At quit: the guard's stop (asked to stop, ended 5 s later), never waited for; nothing starts again. */
   quit() {
     this.quitting = true;
     clearTimeout(this.recheck);

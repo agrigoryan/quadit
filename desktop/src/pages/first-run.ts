@@ -2,8 +2,9 @@
 // over the window it ends in. Two steps:
 //   1. Welcome: the person's name and "Set up on this computer", which turns
 //      into its own progress and, failing, into "Try again" with the reason;
-//      or "Connect to a server instead", the address form (on Windows, the
-//      only way). A server added there takes the window: the first run is over.
+//      or "Connect to a server instead", the address form (the only way in a
+//      copy of the app without a server to run, one run from source). A
+//      server added there takes the window: the first run is over.
 //   2. Connect your AI tools: looking (at least about a second:
 //      shared/looking.ts), then a card per tool found (tool-card.ts: once
 //      set up, it shows the line to say in the tool and waits for the tool,

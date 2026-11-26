@@ -30,13 +30,7 @@ export function describeLocal(state: LocalState): { text: string; warn: boolean 
 export function runLocalChoice(view: LocalServerView): HTMLElement[] {
   if (view.serverId) return [];
   if (!view.available)
-    return [
-      make(
-        "p",
-        "Not available in this copy of the app: only the macOS and Linux apps carry a Quadit server to run.",
-        "hint",
-      ),
-    ];
+    return [make("p", "Not available in this copy of the app: it carries no Quadit server to run.", "hint")];
   const hint = make(
     "p",
     view.dataKept

@@ -4,8 +4,17 @@ import { execFile } from "node:child_process";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-/** The server binary `make build` makes in the repository root, with the web app inside. */
-export const BINARY = join(__dirname, "../../../bin/quadit");
+/** The server binary `make build` makes in the repository root, with the web app inside (quadit.exe on Windows). */
+export const BINARY = join(__dirname, "../../../bin", process.platform === "win32" ? "quadit.exe" : "quadit");
+
+/**
+ * The little of the suite's own environment a program it starts gets: the
+ * PATH, and on Windows SystemRoot, without which a Windows program cannot
+ * reach the network.
+ */
+export function bareEnv(): Record<string, string> {
+  return { PATH: process.env.PATH ?? "", ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}) };
+}
 
 /** The owner the first-run API makes, and their workspace (its address is /e2e). */
 export const OWNER = {
@@ -54,7 +63,7 @@ export async function quadit(
   try {
     const { stdout } = await exec(run.binary, args, {
       env: {
-        PATH: process.env.PATH ?? "",
+        ...bareEnv(),
         QUADIT_URL: run.direct,
         QUADIT_TOKEN: token,
         QUADIT_CONFIG: join(run.dir, "cli.json"),

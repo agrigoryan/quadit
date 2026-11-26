@@ -22,6 +22,11 @@ name: desktop-ci
 # took (test/e2e/onboarding.spec.ts), and of a window without a title bar with
 # the numbers macOS gave it (test/e2e/window-frame.spec.ts), as the artifact
 # desktop-onboarding-screens.
+#
+# On Windows the suite's own part for it (test/e2e/windows.spec.ts) runs too:
+# set up on this computer, Connect with a stand-in Claude Code, and a run
+# Quadit starts with it (internal/fakeagent), its pictures kept as
+# desktop-onboarding-screens-windows.
 on:
   push:
     branches: [main]
@@ -37,6 +42,7 @@ on:
       - "internal/settings/settings.go"
       - "internal/app/web.go"
       - "internal/cli/**"
+      - "internal/fakeagent/**"
       - "internal/app/app.go"
       - "web/src/auth/setup.tsx"
       - "web/src/auth/login.tsx"
@@ -128,5 +134,57 @@ jobs:
         if: failure()
         with:
           name: desktop-e2e-results
+          path: desktop/test-results
+          if-no-files-found: ignore
+
+  # Not failing the run yet, on purpose: nobody has a Windows machine, so CI is the only place the app is seen to work
+  # there, and its parts land one at a time (the guard every program the app holds starts under is quadit's own,
+  # `quadit guard`, built in internal/cli). Once it passes, continue-on-error goes.
+  e2e-windows:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: |
+            web/pnpm-lock.yaml
+            desktop/pnpm-lock.yaml
+      # What make build makes (no make here), and the stand-in agent program: the command's test binary, which is
+      # Claude Code or Codex when FAKEAGENT says which (internal/fakeagent).
+      - name: The server, with the web app inside, and the stand-in agent
+        shell: bash
+        run: |
+          (cd web && pnpm install --frozen-lockfile && pnpm build)
+          go build -tags web -o bin/quadit.exe ./cmd/quadit
+          go test -c -o bin/fake-claude.exe ./internal/cli
+      - name: The app
+        working-directory: desktop
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+      - name: End-to-end, the part for Windows
+        working-directory: desktop
+        run: pnpm exec playwright test test/e2e/windows.spec.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-onboarding-screens-windows
+          path: desktop/onboarding-screens
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: desktop-e2e-results-windows
           path: desktop/test-results
           if-no-files-found: ignore
