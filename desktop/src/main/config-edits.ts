@@ -107,6 +107,8 @@ export interface FileEdit {
   after: string | null;
   /** Written by another program (quadit login): `after` is only what the plan shows. */
   writtenBy?: true;
+  /** The person's PATH: where backUp keeps it, which is written again with the value the edit really replaces. */
+  backup?: string;
 }
 
 /** A plan that cannot be made, with what the person should know. */
@@ -436,8 +438,10 @@ export function backUp(edits: FileEdit[], backupDir: string): Map<string, string
     if (edit.before === null || edit.link || edit.folder) continue;
     mkdirSync(backupDir, { recursive: true, mode: 0o700 });
     const backup = join(backupDir, edit.path.replace(/^[\\/]+/, "").replaceAll(/:?[\\/]+/g, "__"));
-    if (edit.kind === "path") writeFileSync(backup, edit.before, { mode: 0o600 });
-    else copyFileSync(edit.path, backup);
+    if (edit.kind === "path") {
+      writeFileSync(backup, edit.before, { mode: 0o600 });
+      edit.backup = backup;
+    } else copyFileSync(edit.path, backup);
     chmodSync(backup, 0o600);
     backups.set(edit.path, backup);
   }
@@ -448,11 +452,8 @@ export function backUp(edits: FileEdit[], backupDir: string): Map<string, string
 export function writeEdits(edits: FileEdit[]) {
   for (const edit of edits) {
     if (edit.writtenBy) continue;
-    if (edit.kind === "path") {
-      // Its type kept: a PATH that names %USERPROFILE% must stay one Windows expands.
-      const expand = readUserVariable(PATH_VARIABLE)?.expand ?? true;
-      writeUserVariable(PATH_VARIABLE, edit.after === null ? null : { value: edit.after, expand });
-    } else if (edit.folder) {
+    if (edit.kind === "path") writePath(edit);
+    else if (edit.folder) {
       if (edit.after === null) rmdirSync(edit.path);
       else mkdirSync(edit.path, { recursive: true });
     } else if (edit.after === null) rmSync(edit.path, { force: true });
@@ -461,6 +462,33 @@ export function writeEdits(edits: FileEdit[]) {
       symlinkSync(edit.after, edit.path);
     } else writeText(edit.path, edit.after);
   }
+}
+
+/**
+ * Makes the person's PATH what `edit` makes of it, from the value it has
+ * now: the plan was made from the value then, and something else (an
+ * installer) may have changed it while Connect waited for a token and a
+ * login. The folders the edit adds are added to it where missing, those it
+ * takes out are taken out, and the rest is kept as it is now, its type too
+ * (a PATH that names %USERPROFILE% stays one Windows expands). The value
+ * really replaced is what the backup keeps.
+ */
+function writePath(edit: FileEdit) {
+  const now = readUserVariable(PATH_VARIABLE);
+  const planned = pathEntries(edit.before);
+  const wanted = pathEntries(edit.after);
+  const added = wanted.filter((entry) => !planned.some((was) => sameFolder(was, entry)));
+  const removed = planned.filter((was) => !wanted.some((entry) => sameFolder(was, entry)));
+  let text = (now?.value ?? "")
+    .split(";")
+    .filter((entry) => !removed.some((gone) => sameFolder(entry, gone)))
+    .join(";");
+  for (const folder of added)
+    if (!pathEntries(text).some((entry) => sameFolder(entry, folder)))
+      text = `${text}${text === "" || text.endsWith(";") ? "" : ";"}${folder}`;
+  if (edit.backup && now) writeFileSync(edit.backup, now.value, { mode: 0o600 });
+  const gone = edit.after === null && pathEntries(text).length === 0;
+  writeUserVariable(PATH_VARIABLE, gone ? null : { value: text, expand: now?.expand ?? true });
 }
 
 /** Writes beside and renames over, keeping the file's mode, so a reader never sees half a file. */

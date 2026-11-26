@@ -447,6 +447,23 @@ describe("the person's PATH on Windows", () => {
     expect(registry.get("Path")).toEqual({ value: `C:\\Tools;${folder}`, expand: false });
   });
 
+  it("adds to, and takes from, the PATH as it is when written, keeping what an installer put there since the plan, and backs up that", () => {
+    registry.set("Path", { value: "C:\\Tools", expand: true });
+    const { edits, applied } = planChanges([{ kind: "path", path: USER_PATH, folder }]);
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-edits-")));
+    const backup = backUp(edits, join(dir, "backups")).get(USER_PATH);
+    // An installer adds its folder while Connect waits for the agent's token and login.
+    registry.set("Path", { value: "C:\\Tools;C:\\Installed", expand: true });
+    writeEdits(edits);
+    expect(registry.get("Path")?.value).toBe(`C:\\Tools;C:\\Installed;${folder}`);
+    expect(backup && readFileSync(backup, "utf8")).toBe("C:\\Tools;C:\\Installed");
+
+    const back = planReverts(applied).edits;
+    registry.set("Path", { value: `C:\\Tools;C:\\Installed;${folder};C:\\Later`, expand: true });
+    writeEdits(back);
+    expect(registry.get("Path")?.value).toBe("C:\\Tools;C:\\Installed;C:\\Later");
+  });
+
   it("makes the person's PATH when there is none, and takes it away with the folder", () => {
     registry.clear();
     const applied = apply([{ kind: "path", path: USER_PATH, folder }]);
