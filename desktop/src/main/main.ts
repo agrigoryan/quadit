@@ -593,16 +593,19 @@ async function offerToAdd(origin: string): Promise<boolean> {
 }
 
 /**
- * The quadit command packaged in the app's resources, or null without one:
- * run from source, and run as an AppImage, whose files are mounted only
- * while it runs, so a link to them would break when the app quits. On
+ * The quadit command the app carries, which Connect puts on the PATH when
+ * the person has none: the one packaged in its resources, or null without
+ * one, and run as an AppImage, whose files are mounted only while it runs,
+ * so a link to them would break when the app quits. Run from source,
+ * QUADIT_DESKTOP_QUADIT's, as for its server (for tests and trying out). On
  * Windows the installer keeps the resources in the same folder across
  * updates (the place of the first install, which it reads back), so the
  * folder Connect adds to the PATH still holds quadit.exe after one.
  */
 function bundledCli(): string | null {
+  if (!app.isPackaged) return process.env.QUADIT_DESKTOP_QUADIT || null;
   const path = packagedQuadit();
-  return app.isPackaged && !process.env.APPIMAGE && existsSync(path) ? path : null;
+  return !process.env.APPIMAGE && existsSync(path) ? path : null;
 }
 
 /**
