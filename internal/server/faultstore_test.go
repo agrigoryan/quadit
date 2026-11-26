@@ -153,6 +153,13 @@ func (d *faultyDB) Upsert(ctx context.Context, row any, key ...string) error {
 	return d.DB.Upsert(ctx, row, key...)
 }
 
+func (d *faultyDB) Ensure(ctx context.Context, row any, key ...string) error {
+	if err := d.faults.check("upsert", tableOf(row), nil, nil); err != nil {
+		return err
+	}
+	return d.DB.Ensure(ctx, row, key...)
+}
+
 func (d *faultyDB) Advance(ctx context.Context, row any, col string, key ...string) error {
 	if err := d.faults.check("upsert", tableOf(row), nil, nil); err != nil {
 		return err
@@ -233,6 +240,10 @@ func (s *faultyStore) Insert(ctx context.Context, row any) error {
 
 func (s *faultyStore) Upsert(ctx context.Context, row any, key ...string) error {
 	return s.db().Upsert(ctx, row, key...)
+}
+
+func (s *faultyStore) Ensure(ctx context.Context, row any, key ...string) error {
+	return s.db().Ensure(ctx, row, key...)
 }
 
 func (s *faultyStore) Advance(ctx context.Context, row any, col string, key ...string) error {

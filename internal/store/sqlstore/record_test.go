@@ -144,6 +144,49 @@ func TestAdvanceOnlyMovesForward(t *testing.T) {
 	})
 }
 
+// TestEnsureLeavesARowThatIsThere: Ensure makes a row that is not there,
+// and leaves one with the same key columns exactly as it is, inside a
+// transaction too, which goes on (a refused insert would end it on
+// Postgres).
+func TestEnsureLeavesARowThatIsThere(t *testing.T) {
+	eachDB(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		ws := fillTasks(t, s, 1)
+		var project core.Project
+		if err := s.In(ws).Get(ctx, &project); err != nil {
+			t.Fatal(err)
+		}
+		key := []string{"workspace_id", "user_id", "name"}
+		cursor := func(seq int64) core.Cursor {
+			return core.Cursor{WorkspaceID: ws, UserID: project.CreatedBy, Name: "main", Seq: seq, UpdatedAt: seq}
+		}
+		at := func() int64 {
+			t.Helper()
+			var cur core.Cursor
+			if err := s.In(ws).Get(ctx, &cur, store.Eq("user_id", project.CreatedBy), store.Eq("name", "main")); err != nil {
+				t.Fatal(err)
+			}
+			return cur.Seq
+		}
+		if err := s.In(ws).Ensure(ctx, cursor(5), key...); err != nil || at() != 5 {
+			t.Fatalf("a row that was not there: %v, at %d", err, at())
+		}
+		err := s.Atomic(ctx, func(db store.DB) error {
+			if err := db.Ensure(ctx, cursor(9), key...); err != nil {
+				return err
+			}
+			return db.Ensure(ctx, core.Cursor{WorkspaceID: ws, UserID: project.CreatedBy, Name: "other", Seq: 1, UpdatedAt: 1}, key...)
+		})
+		if err != nil || at() != 5 {
+			t.Fatalf("a row that was there: %v, at %d, want 5", err, at())
+		}
+		var other core.Cursor
+		if err := s.In(ws).Get(ctx, &other, store.Eq("name", "other")); err != nil {
+			t.Fatalf("the transaction did not go on after a row that was there: %v", err)
+		}
+	})
+}
+
 // TestIncrStartsACounterThatIsNotThere: Incr on a counter with no row makes
 // the row, once, however many callers start it at the same time.
 func TestIncrStartsACounterThatIsNotThere(t *testing.T) {

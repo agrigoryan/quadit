@@ -600,7 +600,13 @@ func (c conn) Insert(ctx context.Context, row any) error {
 // Upsert inserts row, or updates every non-key column if a row with the
 // same key columns exists.
 func (c conn) Upsert(ctx context.Context, row any, key ...string) error {
-	return c.upsert(ctx, row, "", key)
+	return c.upsert(ctx, row, onConflict{update: true}, key)
+}
+
+// Ensure inserts row unless a row with the same key columns is there, which
+// is left as it is (see store.DB).
+func (c conn) Ensure(ctx context.Context, row any, key ...string) error {
+	return c.upsert(ctx, row, onConflict{}, key)
 }
 
 // Advance inserts row, or updates the row with the same key columns when
@@ -609,13 +615,21 @@ func (c conn) Advance(ctx context.Context, row any, col string, key ...string) e
 	if col == "" {
 		return errors.New("store: Advance needs the column that only moves forward")
 	}
-	return c.upsert(ctx, row, col, key)
+	return c.upsert(ctx, row, onConflict{update: true, forward: col}, key)
 }
 
-// upsert is Upsert and Advance: one INSERT … ON CONFLICT, whose update,
-// when forward names a column, applies only if it moves that column
-// forward. Both databases spell the conditional update alike.
-func (c conn) upsert(ctx context.Context, row any, forward string, key []string) error {
+// onConflict is what an insert does with a row whose key columns are taken:
+// nothing, or update it, only when that moves the column forward names
+// forward.
+type onConflict struct {
+	update  bool
+	forward string
+}
+
+// upsert is Upsert, Ensure and Advance: one INSERT … ON CONFLICT, which
+// leaves the row there or updates it as onConflict says. Both databases
+// spell the conditional update alike.
+func (c conn) upsert(ctx context.Context, row any, then onConflict, key []string) error {
 	v, m, err := structOf(row)
 	if err != nil {
 		return err
@@ -641,10 +655,10 @@ func (c conn) upsert(ctx context.Context, row any, forward string, key []string)
 		}
 	}
 	action := "DO NOTHING"
-	if len(sets) > 0 {
+	if then.update && len(sets) > 0 {
 		action = "DO UPDATE SET " + strings.Join(sets, ", ")
-		if forward != "" {
-			col, err := m.column(forward)
+		if then.forward != "" {
+			col, err := m.column(then.forward)
 			if err != nil {
 				return err
 			}

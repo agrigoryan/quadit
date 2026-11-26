@@ -162,6 +162,10 @@ type DB interface {
 	// Upsert inserts row, or updates every non-key column if a row with the
 	// same key columns exists.
 	Upsert(ctx context.Context, row any, key ...string) error
+	// Ensure inserts row unless a row with the same key columns is there,
+	// which is then left exactly as it is; either way it is no error, and
+	// a transaction it is part of goes on.
+	Ensure(ctx context.Context, row any, key ...string) error
 	// Advance is Upsert for a position that only moves forward: a row with
 	// the same key columns is updated only when row's col is greater than
 	// the stored one, and is otherwise left as it is. It is one statement,

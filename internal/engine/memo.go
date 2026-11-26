@@ -149,6 +149,12 @@ func (m *memoTx) Upsert(ctx context.Context, row any, key ...string) error {
 	return m.Tx.Upsert(ctx, row, key...)
 }
 
+// Ensure writes a row and forgets what was remembered of its table.
+func (m *memoTx) Ensure(ctx context.Context, row any, key ...string) error {
+	m.forgetRow(row)
+	return m.Tx.Ensure(ctx, row, key...)
+}
+
 // Advance writes a row and forgets what was remembered of its table.
 func (m *memoTx) Advance(ctx context.Context, row any, col string, key ...string) error {
 	m.forgetRow(row)
