@@ -19,11 +19,16 @@ import (
 type Runner struct {
 	MachineID   string // 16 lower-case hex, made once per machine
 	MachineName string // what a person calls the machine: 1 to 64 characters
-	Folder      string // the folder's label: 1 to 200 characters, from / or ~
+	Folder      string // the folder's label: 1 to 200 characters, a path from /, ~, a drive (C:\) or \\
 	Program     string // one of core.Programs
 }
 
 var machineIDForm = regexp.MustCompile(`^[0-9a-f]{16}$`)
+
+// folderLabelStart is how a folder's label starts, as the runner writes it
+// on each system: from the root (/) or the home folder (~, then / or \\),
+// or on Windows from a drive (C:\) or a network share (\\server\share).
+var folderLabelStart = regexp.MustCompile(`^(/|~|[A-Za-z]:\\|\\\\)`)
 
 // CheckMachineID refuses what is not a runner's machine id.
 func CheckMachineID(machineID string) error {
@@ -44,8 +49,8 @@ func (r *Runner) Check() error {
 	switch {
 	case !plainText(r.MachineName, 64):
 		return invalid("machine_name", "machine_name is the machine's name: 1 to 64 characters, none of them a control character")
-	case !plainText(r.Folder, 200) || !strings.HasPrefix(r.Folder, "/") && !strings.HasPrefix(r.Folder, "~"):
-		return invalid("folder", "folder is the folder's label: 1 to 200 characters starting with / or ~, none of them a control character")
+	case !plainText(r.Folder, 200) || !folderLabelStart.MatchString(r.Folder):
+		return invalid("folder", `folder is the folder's label: 1 to 200 characters starting with /, ~, a drive (C:\) or \\, none of them a control character`)
 	case !slices.Contains(core.Programs, r.Program):
 		return oneOf("program", "program", r.Program, core.Programs)
 	}
