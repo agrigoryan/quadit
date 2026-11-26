@@ -7,9 +7,10 @@
 // Run by Quadit's states on a connected card (agent-runs-contract.md §8.2).
 
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { expect, type Page, test } from "@playwright/test";
 
-const PAGE = `file://${join(__dirname, "../../out/pages/connect.html")}`;
+const PAGE = pathToFileURL(join(__dirname, "../../out/pages/connect.html")).href;
 /** What the page calls this computer: it goes by the browser's platform, the one the test runs on. */
 const HERE = process.platform === "darwin" ? "this Mac" : "this computer";
 /** Who answers for the agent: the person signed in here. */

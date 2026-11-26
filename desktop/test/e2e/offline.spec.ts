@@ -46,7 +46,7 @@ test("a server that cannot be reached says so with a retry, and loads once it is
   const desktop = await Desktop.launch(data, run);
   let proxy: Server | undefined;
   try {
-    const error = await desktop.pageOf("file://", join(__dirname, "../../out/pages/connection-error.html"));
+    const error = await desktop.appPage("connection-error.html");
     await expect(error.getByRole("heading", { name: "Away cannot be reached" })).toBeVisible();
     await expect(error.getByText(origin)).toBeVisible();
     // Retrying while it is still away: still the same page.

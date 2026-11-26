@@ -8,6 +8,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { _electron as electron, type ElectronApplication, expect, type Page, test as base } from "@playwright/test";
 import { currentRun, OWNER, type Run } from "./run";
 
@@ -119,7 +120,8 @@ export class Desktop {
 
   /** One of the app's own pages (`file` in out/pages), waiting for it to appear. */
   async appPage(file: string): Promise<Page> {
-    return this.pageOf("file://", join(APP_DIR, "out/pages", file));
+    // Its address as the app makes it: file:///D:/… on Windows, not file:// and the path.
+    return this.pageOf(pathToFileURL(join(APP_DIR, "out/pages", file)).href);
   }
 
   /** Has the app's next folder picker answer with `folder`, as a person choosing it (by default, cancelled). */

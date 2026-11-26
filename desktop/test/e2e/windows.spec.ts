@@ -129,7 +129,7 @@ async function firstRun(
   await first.getByRole("button", { name: "Set up on this computer" }).click();
   if (connect) {
     const card = first.getByRole("article", { name: "Claude Code" });
-    await card.getByRole("button", { name: "Connect Claude Code" }).click({ timeout: 30_000 });
+    await card.getByRole("button", { name: "Connect Claude Code" }).click({ timeout: 90_000 });
     const line = card.getByText(/^Connect to Quadit \S{6}$/);
     await expect(line).toBeVisible({ timeout: 60_000 });
     await screen(first, "windows-01-first-run-waiting.png");
@@ -137,7 +137,8 @@ async function firstRun(
     await asTheAgent(run, join(computer.configDir, "claude.json"), ["connect", code]);
     await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 20_000 });
   }
-  await first.getByRole("button", { name: "Continue" }).click({ timeout: 30_000 });
+  // Its first start on a fresh data folder, which Windows may scan first, can take a while.
+  await first.getByRole("button", { name: "Continue" }).click({ timeout: 90_000 });
   await expect.poll(() => desktop.firstRunShown(), { timeout: 20_000 }).toBe(false);
   const origin = await desktop.localOrigin();
   const page = await desktop.pageOf(origin);
@@ -174,7 +175,7 @@ test("set up on this computer, the app runs quadit.exe as its server, signs its 
 test("Connect sets a stand-in Claude Code up with Windows paths, it gives its code back, and Disconnect takes it all back", async ({
   run,
 }) => {
-  test.slow();
+  test.setTimeout(300_000);
   const computer = windowsComputer(run, { claudeCode: true });
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   try {
@@ -214,7 +215,7 @@ test("Connect sets a stand-in Claude Code up with Windows paths, it gives its co
 test("Run by Quadit starts the stand-in Claude Code for the task waiting on it, in the project's folder, through quadit guard", async ({
   run,
 }, testInfo) => {
-  test.slow();
+  test.setTimeout(300_000);
   const computer = windowsComputer(run, { claudeCode: true });
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   const folder = testInfo.outputPath("game");
