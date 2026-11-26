@@ -36,6 +36,6 @@ func TestAPictureIsTakenAtTheSizeAsked(t *testing.T) {
 		t.Fatalf("the picture is %dx%d, want 800x600", size.X, size.Y)
 	}
 	if r, g, b, _ := img.At(400, 300).RGBA(); r>>8 != 0x12 || g>>8 != 0x34 || b>>8 != 0x56 {
-		t.Fatalf("the page's colour is not in the picture: %x %x %x", r>>8, g>>8, b>>8)
+		t.Fatalf("the page's color is not in the picture: %x %x %x", r>>8, g>>8, b>>8)
 	}
 }
