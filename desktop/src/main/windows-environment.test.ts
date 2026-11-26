@@ -25,6 +25,12 @@ onWindows("the person's variables in the registry", SLOW, () => {
     expect(readUserVariable(name)).toEqual({ value: "C:\\Tools", expand: false });
   });
 
+  it("writes and reads back a value as long as Windows lets a variable be, whatever its letters", () => {
+    const value = "C:\\Tools Ünïcode 名前;".repeat(1_800).slice(0, 32_767);
+    writeUserVariable(name, { value, expand: false });
+    expect(readUserVariable(name)).toEqual({ value, expand: false });
+  });
+
   it("takes a variable away", () => {
     writeUserVariable(name, { value: "x", expand: false });
     writeUserVariable(name, null);

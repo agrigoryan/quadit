@@ -15,7 +15,7 @@
 // through as it is.
 
 import { execFile, execFileSync } from "node:child_process";
-import { powershell, textIn, textOut, writeOut } from "@/main/powershell";
+import { powershell, textOut, writeOut } from "@/main/powershell";
 
 /** A variable of the person's own, unexpanded: `expand` when it is kept as REG_EXPAND_SZ (else REG_SZ). */
 export interface UserVariable {
@@ -46,14 +46,22 @@ ${writeOut("$parts -join ';'")}`);
  * is none. Throws when it cannot be read, or is of a type other than text.
  */
 export function readUserVariable(name: string): UserVariable | null {
-  const { program, args } = powershell(`$ErrorActionPreference = 'Stop'
-$name = ${textIn(name)}
+  const { program, args, input } = powershell(
+    `$ErrorActionPreference = 'Stop'
+$name = $given[0]
 $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment')
 if ($key -ne $null -and ($key.GetValueNames() -contains $name)) {
   [Console]::Out.Write($key.GetValueKind($name).ToString() + ':')
   ${writeOut("$key.GetValue($name, '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)")}
-}`);
-  const said = execFileSync(program, args, { encoding: "utf8", timeout: RUN_TIMEOUT_MS, windowsHide: true }).trim();
+}`,
+    [name],
+  );
+  const said = execFileSync(program, args, {
+    input,
+    encoding: "utf8",
+    timeout: RUN_TIMEOUT_MS,
+    windowsHide: true,
+  }).trim();
   if (said === "") return null;
   const [kind, value = ""] = said.split(":");
   if (kind !== "String" && kind !== "ExpandString")
@@ -67,14 +75,17 @@ if ($key -ne $null -and ($key.GetValueNames() -contains $name)) {
  */
 export function writeUserVariable(name: string, variable: UserVariable | null) {
   const set = variable
-    ? `$key.SetValue($name, ${textIn(variable.value)}, [Microsoft.Win32.RegistryValueKind]::${variable.expand ? "ExpandString" : "String"})`
+    ? `$key.SetValue($name, $given[1], [Microsoft.Win32.RegistryValueKind]::${variable.expand ? "ExpandString" : "String"})`
     : "$key.DeleteValue($name, $false)";
-  const write = powershell(`$ErrorActionPreference = 'Stop'
-$name = ${textIn(name)}
+  const write = powershell(
+    `$ErrorActionPreference = 'Stop'
+$name = $given[0]
 $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Environment')
 ${set}
-$key.Close()`);
-  execFileSync(write.program, write.args, { timeout: RUN_TIMEOUT_MS, windowsHide: true });
+$key.Close()`,
+    [name, variable?.value ?? ""],
+  );
+  execFileSync(write.program, write.args, { input: write.input, timeout: RUN_TIMEOUT_MS, windowsHide: true });
   // Windows' own message for it (WM_SETTINGCHANGE "Environment"), to every window, as the system's settings send it.
   const tell = `Add-Type -Namespace QuaditApp -Name Native -MemberDefinition '[DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern System.IntPtr SendMessageTimeout(System.IntPtr hWnd, uint msg, System.UIntPtr wParam, string lParam, uint flags, uint timeout, out System.UIntPtr result);'
 $result = [System.UIntPtr]::Zero
