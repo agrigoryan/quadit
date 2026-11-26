@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/agrigoryan/quadit/internal/plainjson"
@@ -56,7 +57,7 @@ func (c *cdp) read(ctx context.Context) (cdpMsg, error) {
 	select {
 	case m, ok := <-c.in:
 		if !ok {
-			return m, errors.New("the browser went away")
+			return m, errBrowserGone
 		}
 		return m, nil
 	case <-ctx.Done():
@@ -206,7 +207,13 @@ func Take(ctx context.Context, p Request) (png []byte, whole int, err error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	defer b.stop()
+	defer func() {
+		b.stop()
+		if errors.Is(err, errBrowserGone) {
+			// Why it went away is what it last wrote, now that it is gone.
+			err = fmt.Errorf("%w; it said: %s", err, strings.TrimSpace(b.said.String()))
+		}
+	}()
 	devtools := b.cdp
 	s, err := openPage(ctx, devtools, p)
 	if err != nil {
@@ -238,13 +245,44 @@ func Take(ctx context.Context, p Request) (png []byte, whole int, err error) {
 	return png, whole, nil
 }
 
+// errBrowserGone is the browser ending, or closing its pipe, before the
+// picture was taken.
+var errBrowserGone = errors.New("the browser went away")
+
 // browser is a headless browser running for one picture, and the pipe it
 // is driven over.
 type browser struct {
-	cmd *exec.Cmd
-	out *os.File // commands to the browser
-	in  *os.File // its answers
-	cdp *cdp
+	cmd  *exec.Cmd
+	out  *os.File // commands to the browser
+	in   *os.File // its answers
+	cdp  *cdp
+	said *lastWords // the end of its error output
+}
+
+// lastWords keeps the end of what a program writes: why it stopped, when
+// it does.
+type lastWords struct {
+	mu   sync.Mutex
+	text []byte
+}
+
+// lastWordsKept is how much of the end lastWords keeps, in bytes.
+const lastWordsKept = 2048
+
+func (w *lastWords) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.text = append(w.text, p...)
+	if over := len(w.text) - lastWordsKept; over > 0 {
+		w.text = w.text[over:]
+	}
+	return len(p), nil
+}
+
+func (w *lastWords) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return string(w.text)
 }
 
 // startBrowser runs the browser at path chrome, with its profile in the
@@ -260,12 +298,17 @@ func startBrowser(ctx context.Context, chrome, profile string) (*browser, error)
 		out.Close()
 		return nil, err
 	}
-	args := append([]string{"--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-first-run",
-		"--no-default-browser-check", "--user-data-dir=" + profile}, chromeSwitches()...)
-	cmd := exec.CommandContext(ctx, chrome, args...)
+	cmd := exec.CommandContext(ctx, chrome)
+	said := &lastWords{}
+	cmd.Stderr = said
+	// Its helper processes may hold its error output past its end: what
+	// they write after a second is not waited for.
+	cmd.WaitDelay = time.Second
 	pipeSwitches, err := passPipes(cmd, toBrowser, fromBrowser)
 	if err == nil {
-		cmd.Args = append(append(cmd.Args, pipeSwitches...), "about:blank")
+		cmd.Args = append(append(append(cmd.Args, "--headless=new"), pipeSwitches...), "--disable-gpu", "--hide-scrollbars", "--no-first-run",
+			"--no-default-browser-check", "--user-data-dir="+profile)
+		cmd.Args = append(append(cmd.Args, chromeSwitches()...), "about:blank")
 		err = cmd.Start()
 	}
 	toBrowser.Close()
@@ -275,7 +318,7 @@ func startBrowser(ctx context.Context, chrome, profile string) (*browser, error)
 		in.Close()
 		return nil, err
 	}
-	b := &browser{cmd: cmd, out: out, in: in, cdp: &cdp{out: out, in: make(chan cdpMsg, 64)}}
+	b := &browser{cmd: cmd, out: out, in: in, cdp: &cdp{out: out, in: make(chan cdpMsg, 64)}, said: said}
 	go b.readAnswers(ctx)
 	return b, nil
 }
