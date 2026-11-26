@@ -230,9 +230,9 @@ func TestWritable(t *testing.T) {
 }
 
 // TestAFileBeingReadCanBeRemovedOrReplaced: a file opened with OpenFile may
-// be replaced by another, or removed, while it is read, and the reader
-// reads on what it opened: as on Unix, so on Windows. A file served from
-// the disk store is opened so.
+// be replaced by another (Replace), or removed, while it is read, and the
+// reader reads on what it opened: as on Unix, so on Windows. A file served
+// from the disk store is opened so, and stored so.
 func TestAFileBeingReadCanBeRemovedOrReplaced(t *testing.T) {
 	dir := t.TempDir()
 	path, other := filepath.Join(dir, "file"), filepath.Join(dir, "other")
@@ -246,7 +246,7 @@ func TestAFileBeingReadCanBeRemovedOrReplaced(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer f.Close()
-	if err := os.Rename(other, path); err != nil {
+	if err := Replace(other, path); err != nil {
 		t.Fatalf("replacing a file being read: %v", err)
 	}
 	if raw, err := io.ReadAll(f); err != nil || string(raw) != "what was opened" {

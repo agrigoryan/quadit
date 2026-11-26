@@ -285,7 +285,7 @@ func (s *Server) receiveFirstPart(ctx context.Context, db store.DB, f *core.File
 	received := core.File{ID: f.ID}
 	switch {
 	case n == f.Size:
-		err = os.Rename(out.Name(), s.partPath(f.ID))
+		err = blob.Replace(out.Name(), s.partPath(f.ID))
 	case n > 0:
 		received.Parts = []string{partKey(*f, 0)}
 		set["parts"] = received.Parts

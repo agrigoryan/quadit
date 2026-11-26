@@ -2,7 +2,7 @@
 // stores implement the same interface.
 //
 //	blob.go          the Store interface, and Disk
-//	open_<system>.go opening a file others may remove while it is read
+//	open_<system>.go opening a file others may remove or replace while it is read
 //	cloud.go         the Config, the cloud stores, Layered, Unusable and Move
 //	cloud_<kind>.go  opening each cloud: s3, gcs, azure
 package blob
@@ -115,7 +115,25 @@ func (d *Disk) Put(_ context.Context, key string, r io.Reader, _ string) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), p)
+	return Replace(tmp.Name(), p)
+}
+
+// Replace moves the file at from to the path to, in the same folder, in one
+// step: whatever was at to is replaced even while it is being read (opened
+// with OpenFile), and its readers read on what they opened. A plain rename
+// on Windows refuses to replace a file that is open; a rename within a
+// folder opened as an os.Root replaces it as on Unix.
+func Replace(from, to string) error {
+	dir := filepath.Dir(to)
+	if filepath.Dir(from) != dir {
+		return fmt.Errorf("blob: %s is not beside %s", from, to)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	return root.Rename(filepath.Base(from), filepath.Base(to))
 }
 
 // Open opens the file kept under key, with the time it was last written.
