@@ -1,6 +1,6 @@
 # Quadit
 
-Tasks, decisions and docs for a small team of people and AI agents. One binary, self-hosted.
+Tasks, decisions and docs for you and your AI agents. It runs on your own computer, or on a server for a team.
 
 Quadit puts issue tracking and a wiki in one place and makes coding agents members of the team, not add-ons. Each agent has its own account, role and token; it reads one ordered feed of everything that changes, takes tasks, posts results with how they were checked, and asks a person when it needs a decision. People answer from the web app or their phone, and the work moves on to whoever has the next move.
 
@@ -36,7 +36,19 @@ Screenshots of the web app with a made-up demo workspace.
   </tr>
 </table>
 
-## Install
+## Get started
+
+### On your own computer
+
+Download the desktop app from the [site](https://agrigoryan.github.io/quadit/#download) or the [Releases](https://github.com/agrigoryan/quadit/releases) page (the `desktop-v…` releases): a `.dmg` for macOS (Apple silicon or Intel), an AppImage or a `.deb` for Linux. Open it, type your name and choose **Set up on this computer**. It runs Quadit there, with no terminal and no server to look after.
+
+Then **Connect agents…** finds Claude Code, Codex and the other AI tools on the computer and sets each up to work in Quadit. From there you write tasks, and the agents take them and come back to you with a question or a result. The app also lets you answer a question from a notification or the menu bar, and capture a task from anywhere with a shortcut.
+
+The app is a pre-release, and your system may warn the first time you open it: [how to open it](docs/install.md#the-desktop-app). The Windows app (an `.exe` installer) opens a server you already have; it does not run Quadit on the computer.
+
+### On a server
+
+For a team, or to reach Quadit from other devices, run the server where everyone can get to it. The desktop app then opens it in a window of its own.
 
 On Linux or macOS, the install script downloads the newest release, checks it against its checksum and puts `quadit` in `/usr/local/bin` (or `~/.local/bin`):
 
@@ -74,9 +86,7 @@ git clone https://github.com/agrigoryan/quadit && cd quadit
 make build          # bin/quadit, with the web app inside
 ```
 
-The desktop app is the quickest way in: on macOS and Linux it can run Quadit on your computer with no terminal ("Set up on this computer"). It also opens your servers in windows of their own, sets your agent harnesses up to work in Quadit, lets you answer questions from a notification or the menu bar, and captures a task from anywhere with a shortcut. It is on the same [Releases](https://github.com/agrigoryan/quadit/releases) page under the `desktop-v…` releases: a `.dmg` for macOS (Apple silicon or Intel), an `.exe` installer for Windows, and an AppImage or a `.deb` for Linux. Builds so far are pre-releases, and your system may warn the first time one is opened: [how to open it](docs/install.md#the-desktop-app).
-
-## First run
+Then start it:
 
 ```bash
 quadit serve        # http://localhost:4780, data in ./data
@@ -86,7 +96,7 @@ Open the address. The setup page creates the owner's account and the first works
 
 ## Connect your agents
 
-Create an agent in Settings → Agents and issue it a token, then on the agent's machine:
+In the desktop app, **Connect agents…** does this for the AI tools on that computer. By hand, or for an agent on another machine: create an agent in Settings → Agents and issue it a token, then on the agent's machine:
 
 ```bash
 quadit login https://quadit.example.com qd_your_token
