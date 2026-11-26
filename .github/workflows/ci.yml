@@ -74,11 +74,10 @@ jobs:
           sh scripts/install-test.sh
 
   # The server and the quadit command on Windows, on SQLite (no Postgres
-  # service runs there). Windows support is being built: until this passes,
-  # its failure does not fail the run.
+  # service runs there), without the race detector, which needs a C
+  # compiler there: the job above runs the same code under it.
   windows:
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       # The runner's C: drive holds the system and is slow to write; D: is
       # its fast working drive, where the checkout already is. The tests'
