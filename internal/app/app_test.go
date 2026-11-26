@@ -3,58 +3,165 @@ package app
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
 	"net/netip"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 )
+
+// TestMain is the test binary, unless a test started it as quadit serve
+// (serveApart): then it is that, with the arguments it was given.
+func TestMain(m *testing.M) {
+	if spec := os.Getenv("QUADIT_TEST_SERVE"); spec != "" {
+		var args []string
+		if err := json.Unmarshal([]byte(spec), &args); err != nil {
+			os.Exit(2)
+		}
+		os.Exit(Serve(args, "test"))
+	}
+	os.Exit(m.Run())
+}
 
 // TestServeStopsWhenItsInputCloses: with --stop-on-stdin-close the server
 // shuts down cleanly once its standard input closes, which is how a program
 // that started it (the desktop app) ends it even when that program dies;
 // without the flag standard input is none of its business, and a server
-// whose input is closed from the start (under a service manager) runs on.
+// whose input is closed from the start (under a service manager) runs on
+// until it is asked to stop as the system asks (askToStop). Each server is
+// a process of its own, as the app and a service manager see it.
 func TestServeStopsWhenItsInputCloses(t *testing.T) {
 	t.Run("with the flag", func(t *testing.T) {
-		input := pipeAsStdin(t)
-		url, done := startServe(t, "--stop-on-stdin-close")
-		input.Close()
-		if code := waitForExit(t, done); code != 0 {
+		input, held := pipe(t)
+		server := serveApart(t, input, "--stop-on-stdin-close")
+		held.Close()
+		if code := server.exit(t); code != 0 {
 			t.Fatalf("quadit serve exited %d, want 0", code)
 		}
-		if _, err := http.Get(url + "/readyz"); err == nil {
+		if _, err := http.Get(server.url + "/readyz"); err == nil {
 			t.Fatal("the server still answers after it stopped")
 		}
 	})
 
 	t.Run("without it", func(t *testing.T) {
-		pipeAsStdin(t).Close()
-		url, done := startServe(t)
-		select {
-		case code := <-done:
-			t.Fatalf("quadit serve stopped (%d) because its input was closed", code)
-		default:
-		}
-		res, err := http.Get(url + "/readyz")
+		server := serveApart(t, nil) // the null device: its input ends at once
+		res, err := http.Get(server.url + "/readyz")
 		if err != nil {
 			t.Fatalf("the server does not answer: %v", err)
 		}
 		res.Body.Close()
-		// As a service manager stops it.
-		if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
-			t.Fatal(err)
-		}
-		if code := waitForExit(t, done); code != 0 {
+		askToStop(t, server.cmd)
+		if code := server.exit(t); code != 0 {
 			t.Fatalf("quadit serve exited %d, want 0", code)
 		}
 	})
+}
+
+// servedApart is quadit serve running in a process of its own.
+type servedApart struct {
+	url  string
+	cmd  *exec.Cmd
+	done chan int // what it exits with, once it has
+}
+
+// serveApart runs quadit serve with extra flags in a process of its own (this
+// test binary, by TestMain) on a new data directory and a free port, its
+// standard input read from input (nil: the null device), and waits until it
+// is ready. None of the QUADIT_ settings of the environment the tests run
+// in reach it.
+func serveApart(t *testing.T, input io.Reader, flags ...string) *servedApart {
+	t.Helper()
+	listen := freeAddress(t)
+	spec, err := json.Marshal(append([]string{"--data", t.TempDir(), "--listen", listen, "--url", "http://" + listen}, flags...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(exe, "-test.run=^$")
+	cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "QUADIT_") }), "QUADIT_TEST_SERVE="+string(spec))
+	cmd.SysProcAttr = stoppableProcess()
+	var log strings.Builder
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = input, &log, &log
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	server := &servedApart{url: "http://" + listen, cmd: cmd, done: make(chan int, 1)}
+	waited := make(chan struct{})
+	go func() {
+		defer close(waited)
+		_ = cmd.Wait() // its exit code is what counts, read below
+		server.done <- cmd.ProcessState.ExitCode()
+	}()
+	// The data directory is removed after the server is gone: Windows does
+	// not remove files a running process holds open.
+	t.Cleanup(func() {
+		_ = cmd.Process.Kill() // gone already when the test stopped it
+		<-waited
+		if t.Failed() {
+			t.Logf("quadit serve said:\n%s", log.String())
+		}
+	})
+	deadline := time.Now().Add(20 * time.Second)
+	for {
+		res, err := http.Get(server.url + "/readyz")
+		if err == nil {
+			res.Body.Close()
+			if res.StatusCode == http.StatusOK {
+				return server
+			}
+		}
+		select {
+		case <-waited:
+			t.Fatalf("quadit serve exited %d before it was ready:\n%s", cmd.ProcessState.ExitCode(), log.String())
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("quadit serve was not ready on %s within 20 s", server.url)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// exit gives what the server exited with, failing when it runs on.
+func (s *servedApart) exit(t *testing.T) int {
+	t.Helper()
+	return waitForExit(t, s.done)
+}
+
+// pipe is a pipe whose reading end is to be a server's input and whose
+// writing end the test holds; both are closed after the test.
+func pipe(t *testing.T) (input, held *os.File) {
+	t.Helper()
+	input, held, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		input.Close()
+		held.Close()
+	})
+	return input, held
+}
+
+// freeAddress is an address on this computer that nothing listens at.
+func freeAddress(t *testing.T) string {
+	t.Helper()
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer probe.Close()
+	return probe.Addr().String()
 }
 
 // TestServeTakesTheAppKeyFromItsInput: with --app-key-stdin the server
@@ -203,12 +310,7 @@ func pipeAsStdin(t *testing.T) *os.File {
 func startServe(t *testing.T, flags ...string) (string, <-chan int) {
 	t.Helper()
 	withoutQuaditEnv(t)
-	probe, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	listen := probe.Addr().String()
-	probe.Close()
+	listen := freeAddress(t)
 	url := "http://" + listen
 	done := make(chan int, 1)
 	go func() {
