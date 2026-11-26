@@ -198,12 +198,7 @@ function WaitingNote({ task, below }: { task: Task; below?: boolean }) {
 export const waiting = {
   name: "waiting",
   title: () => t("prop.waitingOn"),
-  picker: {
-    title: () => t("prop.set.waitingOn"),
-    useItems,
-    pick,
-    List: WaitingList,
-  },
+  picker: { title: () => t("prop.set.waitingOn"), List: WaitingList },
   Panel: WaitingRow,
   timeline: [
     {

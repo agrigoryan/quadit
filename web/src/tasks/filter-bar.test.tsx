@@ -31,6 +31,7 @@ beforeEach(() => {
     projects: [
       { id: "p1", key: "SVA", name: "Game", settings: { cycles: true } },
       { id: "p2", key: "OPS", name: "Ops" },
+      { id: "p3", key: "TDW", name: "Tides", settings: { estimates: true, estimate_scale: "fibonacci" } },
     ],
     statuses: [
       { id: "s1", project_id: "p1", name: "Todo", category: "unstarted", rank: "a" },
@@ -156,5 +157,14 @@ describe("FilterBar", () => {
     expect(screen.getByRole("button", { name: /^Label\s*bug$/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Remove filter: Label" }));
     expect(toQuery(onChange.mock.lastCall?.[0] as Filters, undefined, "manual")).toEqual({ sort: "rank" });
+  });
+
+  it("shows an estimate saved off the project's scale by its points, and offers it to take off", () => {
+    const onChange = renderBar({ ...emptyFilters, estimate: ["4"] }, project("p3"));
+    const chip = screen.getByRole("button", { name: /^Estimate\s*4 points$/ });
+    fireEvent.click(chip);
+    expect(options()).toEqual(["No estimate", "1 point", "2 points", "3 points", "4 points", "5 points", "8 points"]);
+    choose("4 points");
+    expect(onChange.mock.lastCall?.[0]).toMatchObject({ estimate: [] });
   });
 });

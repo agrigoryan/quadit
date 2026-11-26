@@ -59,7 +59,7 @@ interface ChipProps {
 /** An active filter: what it is set to, a click to change it, a cross to drop it. */
 function FilterChip({ property, filters, onChange, project }: ChipProps) {
   const { name, filter } = property;
-  const items = filter.useOptions(project);
+  const items = filter.useOptions(project, filters[name]);
   const extras = useExtras(property, filters, onChange, project);
   const values = filters[name];
   const first = items.find((i) => i.id === values[0]);
@@ -124,7 +124,7 @@ function StageList({ property, filters, onChange, project, close }: ChipProps & 
     <PickerList
       label={title}
       placeholder={title}
-      items={filter.useOptions(project)}
+      items={filter.useOptions(project, filters[property.name])}
       value={filters[property.name]}
       onPick={(id) => {
         onChange(toggle(filters, property, id));

@@ -1,6 +1,7 @@
 // What a task template fills in when it is picked in the create dialog: its
-// status, priority, estimate, labels and assignee, which the template stores
-// by name.
+// status, priority, labels and assignee, which the template stores by name.
+// Its estimate is not filled in: the server applies it as it is stored, and
+// the create dialog's pill shows it until the person picks another.
 
 import { getRows } from "@/data/selectors";
 import type { Project, Template } from "@/types/core";
@@ -13,7 +14,6 @@ export function presetOf(template: Template | undefined, project: Project): Part
   const low = (s: string) => s.toLowerCase();
   const out: Partial<TaskFields> = {};
   if (preset.priority) out.priority = preset.priority;
-  if (preset.estimate !== undefined) out.estimate = preset.estimate;
   if (preset.status) {
     const status = getRows("statuses").find(
       (s) => s.project_id === project.id && low(s.name) === low(preset.status as string),

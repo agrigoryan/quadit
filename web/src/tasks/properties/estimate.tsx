@@ -9,7 +9,7 @@ import { useCan } from "@/data/access";
 import { isTyping, useHotkeys } from "@/hooks/hotkeys";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { getRowEvenIfGone, useLookupEvenIfGone, useRowEvenIfGone, useRows } from "@/data/selectors";
+import { getRowEvenIfGone, useLookupEvenIfGone, useRow, useRowEvenIfGone, useRows } from "@/data/selectors";
 import type { Project, Task } from "@/types/core";
 import { setEstimate } from "@/tasks/actions";
 import { estimateFromWord, estimateWords, type Scale, scaleOf, sharedScale, sizeOf } from "@/tasks/estimates";
@@ -93,6 +93,9 @@ function TypedEstimate({ scale, value, onPick, label }: ChooserProps) {
       className="flex w-60 flex-col gap-2 p-3"
       onSubmit={(e) => {
         e.preventDefault();
+        // The popover is drawn apart from the page, but React hands its events up the tree it was made in:
+        // in the create dialog the submit would reach the dialog's own form, and make the task.
+        e.stopPropagation();
         if (next !== undefined) onPick(next);
       }}
     >
@@ -139,14 +142,14 @@ function EstimateList({ tasks, close }: PickerListProps) {
   );
 }
 
-/** Typed in place, for a project of any whole number; saved on Enter or on leaving the box. Nothing is no estimate. */
+/** Typed in place, for a project of any whole number; saved on Enter or on leaving the box. An empty box is no estimate. */
 function EstimateField({ task, scale, ref }: { task: Task; scale: Scale; ref: PanelProps["takeControl"] }) {
   const [draft, setDraft] = useState<string | null>(null);
   const can = useCan();
 
   function save() {
     if (draft === null) return;
-    const next = typed(draft, scale);
+    const next = draft.trim() === "" ? null : typed(draft, scale);
     if (next !== undefined && next !== (task.estimate ?? null)) setEstimate([task], next);
     setDraft(null);
   }
@@ -196,9 +199,14 @@ function EstimateRow(panel: PanelProps) {
   );
 }
 
-/** The create dialog's pill, which Shift+E opens there too (while the caret is in no box). */
+/**
+ * The create dialog's pill, which Shift+E opens there too (while the caret
+ * is in no box). Until the person picks one, it shows the template's
+ * estimate, which the server applies as it is stored.
+ */
 function EstimatePill({ project, value, onChange }: CreateProps) {
   const [open, setOpen] = useState(false);
+  const template = useRow("templates", value.templateId || undefined);
   const scale = scaleOf(project);
   useHotkeys(
     {
@@ -211,20 +219,20 @@ function EstimatePill({ project, value, onChange }: CreateProps) {
     { enabled: !!scale, always: true, layer: "global" },
   );
   if (!scale) return null;
-  const set = value.estimate !== null;
+  const shown = value.estimate === undefined ? (template?.preset?.estimate ?? null) : value.estimate;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button type="button" className={pill}>
-          <Pill icon={<Gauge className="size-3.5" aria-hidden />} set={set}>
-            {value.estimate === null ? t("prop.estimate") : estimateWords(value.estimate, scale)}
+          <Pill icon={<Gauge className="size-3.5" aria-hidden />} set={shown !== null}>
+            {shown === null ? t("prop.estimate") : estimateWords(shown, scale)}
           </Pill>
         </button>
       </PopoverTrigger>
       <PopoverContent aria-label={t("prop.set.estimate")} className="p-0">
         <Chooser
           scale={scale}
-          value={value.estimate}
+          value={shown}
           label={t("prop.estimate.points")}
           onPick={(estimate) => {
             onChange({ estimate });
@@ -261,17 +269,27 @@ function useChoices(task: Task, query: string): Choice[] {
   ];
 }
 
-/** The values a filter offers: the scale's, or, for any whole number, those the project's tasks have. */
-function useFilterOptions(project: Project | undefined): PickerItem[] {
+/**
+ * The values a filter offers: the scale's, or, for any whole number, those
+ * the project's tasks have; and any picked that is neither (a view saved
+ * before the scale changed), so it is named and can be taken off.
+ */
+function useFilterOptions(project: Project | undefined, picked: string[]): PickerItem[] {
   const tasks = useRows("tasks");
+  const words = picked.join(",");
   return useMemo(() => {
     const scale = scaleOf(project);
     if (!scale) return [];
     const had = tasks.flatMap((task) =>
-      task.project_id === project?.id && typeof task.estimate === "number" && task.estimate > 0 ? [task.estimate] : [],
+      task.project_id === project?.id && typeof task.estimate === "number" ? [task.estimate] : [],
     );
-    return scaleItems(scale, scale.values ?? [...new Set(had)].sort((a, b) => a - b));
-  }, [project, tasks]);
+    const named = words.split(",").flatMap((word) => (/^\d+$/.test(word) ? [Number(word)] : []));
+    const values = [...new Set([...(scale.values ?? had), ...named])].filter((v) => v > 0 || !scale.zero);
+    return scaleItems(
+      scale,
+      values.sort((a, b) => a - b),
+    );
+  }, [project, tasks, words]);
 }
 
 export const estimate = {
@@ -280,18 +298,7 @@ export const estimate = {
   // Where the project counts them. The server leaves out a switch that is off, so off is "not said".
   appliesTo: (_task, project) => !!project?.settings?.estimates,
   key: { key: "shift+e", shortcut: "shortcuts.estimate" },
-  picker: {
-    title: () => t("prop.set.estimate"),
-    useItems: (tasks) => {
-      const scale = useScaleOf(tasks);
-      return {
-        items: scale?.values ? scaleItems(scale, scale.values) : [],
-        value: shared(tasks, (task) => idOf(task.estimate)),
-      };
-    },
-    pick: (tasks, id) => setEstimate(tasks, valueOf(id)),
-    List: EstimateList,
-  },
+  picker: { title: () => t("prop.set.estimate"), List: EstimateList },
   Panel: EstimateRow,
   Create: EstimatePill,
   palette: {

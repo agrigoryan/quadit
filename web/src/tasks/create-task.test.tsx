@@ -10,7 +10,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { api, ApiError } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
 import { clearStore, loadBootstrap } from "@/data/store";
-import type { Member, Project, User, Workspace } from "@/types/core";
+import type { Member, Project, Template, User, Workspace } from "@/types/core";
 import { useToasts } from "@/lib/toast";
 import { ui, useUi } from "@/lib/ui-state";
 import { CreateTaskDialog } from "@/tasks/create-task";
@@ -178,7 +178,7 @@ describe("CreateTaskDialog, the estimate", () => {
   const create = () => screen.getByRole("button", { name: /^Create task/ });
   const title = () => screen.getByLabelText("Task title");
   /** The project estimates as these settings say. */
-  function estimating(settings: Project["settings"]) {
+  function estimating(settings: Project["settings"], templates: Template[] = []) {
     clearStore();
     loadBootstrap("acme", {
       seq: 1,
@@ -188,8 +188,17 @@ describe("CreateTaskDialog, the estimate", () => {
       projects: [{ id: "p1", key: "SVA", name: "Game", settings }],
       statuses: [{ id: "s1", project_id: "p1", name: "Todo", category: "unstarted", is_default: true, rank: "a" }],
       members: [{ user_id: "u1", handle: "ann", name: "Ann" }],
+      templates,
     });
   }
+  /** A template that stores 4, off the Fibonacci scale. */
+  const SPIKE = { id: "tp1", project_id: "p1", name: "Spike", preset: { estimate: 4 }, created_at: 0, updated_seq: 0 };
+  const FIB = { estimates: true, estimate_scale: "fibonacci" } as const;
+  const fromTemplate = () => {
+    fireEvent.click(screen.getByRole("button", { name: "Template" }));
+    fireEvent.click(screen.getByRole("option", { name: "Spike" }));
+  };
+  const sent = () => calls[0]?.changes[0]?.args ?? {};
 
   it("has no pill where the project does not estimate", () => {
     open();
@@ -225,6 +234,70 @@ describe("CreateTaskDialog, the estimate", () => {
     fireEvent.click(create());
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]?.changes[0]).toMatchObject({ type: "task.create", args: { estimate: 0 } });
+  });
+
+  it("is typed where the project takes any number, and Set keeps the dialog open", async () => {
+    estimating({ estimates: true });
+    open();
+    fireEvent.change(title(), { target: { value: "Fix the menu" } });
+    fireEvent.click(screen.getByRole("button", { name: "Estimate" }));
+    fireEvent.change(screen.getByLabelText("Estimate, in points"), { target: { value: "8" } });
+    fireEvent.click(screen.getByRole("button", { name: "Set" }));
+    expect(isOpen()).toBe(true);
+    expect(calls).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "8 points" })).toBeInTheDocument();
+    fireEvent.click(create());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(sent()).toMatchObject({ estimate: 8 });
+  });
+
+  it("is typed for several tasks at once too, and Set keeps that dialog open", async () => {
+    estimating({ estimates: true });
+    open(true);
+    fireEvent.change(screen.getByLabelText("Task titles, one per line"), { target: { value: "one\ntwo" } });
+    fireEvent.click(screen.getByRole("button", { name: "Estimate" }));
+    fireEvent.change(screen.getByLabelText("Estimate, in points"), { target: { value: "8" } });
+    fireEvent.click(screen.getByRole("button", { name: "Set" }));
+    expect(isOpen()).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /^Create 2 tasks/ }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]?.changes.map((c) => c.args.estimate)).toEqual([8, 8]);
+  });
+
+  it("leaves a template's estimate to the server, shown on the pill, when it is not changed", async () => {
+    estimating(FIB, [SPIKE]);
+    open();
+    fireEvent.change(title(), { target: { value: "Fix the menu" } });
+    fromTemplate();
+    expect(screen.getByRole("button", { name: "4 points" })).toBeInTheDocument();
+    fireEvent.click(create());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(sent()).toMatchObject({ template: "tp1" });
+    expect(sent()).not.toHaveProperty("estimate");
+  });
+
+  it("sends No estimate as null, over the template's", async () => {
+    estimating(FIB, [SPIKE]);
+    open();
+    fireEvent.change(title(), { target: { value: "Fix the menu" } });
+    fromTemplate();
+    fireEvent.click(screen.getByRole("button", { name: "4 points" }));
+    fireEvent.click(screen.getByRole("option", { name: "No estimate" }));
+    fireEvent.click(create());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(sent()).toMatchObject({ template: "tp1", estimate: null });
+  });
+
+  it("sends a value picked over the template's as that value", async () => {
+    estimating(FIB, [SPIKE]);
+    open();
+    fireEvent.change(title(), { target: { value: "Fix the menu" } });
+    fromTemplate();
+    fireEvent.click(screen.getByRole("button", { name: "4 points" }));
+    fireEvent.click(screen.getByRole("option", { name: "5 points" }));
+    fireEvent.click(create());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(sent()).toMatchObject({ template: "tp1", estimate: 5 });
   });
 
   it("leaves the estimate out where none is picked", async () => {

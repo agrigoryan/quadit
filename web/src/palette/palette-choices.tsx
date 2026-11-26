@@ -15,13 +15,15 @@ interface Props {
 
 /** The palette's second page: the values one property of the open task can take (tasks/properties). */
 export function ChoicesPage({ property, task, query, run }: Props) {
-  const { name, palette, make, picker } = property;
+  const { name, palette, make } = property;
+  // A value made from what is typed is picked as the shared list picks it.
+  const pick = property.picker?.pick;
   const q = query.trim();
   const choices = palette.useChoices(task, q);
   const shown = q ? choices.filter((c) => matches(q, `${c.label} ${c.detail ?? ""} ${c.words ?? ""}`)) : choices;
 
   // A value that does not exist yet (a label) can be made here and put on the task in one go.
-  const canCreate = !!make && !!picker && q !== "" && !choices.some((c) => c.label.toLowerCase() === q.toLowerCase());
+  const canCreate = !!make && !!pick && q !== "" && !choices.some((c) => c.label.toLowerCase() === q.toLowerCase());
 
   if (choices.length === 0 && palette.empty && !canCreate) return <Note>{palette.empty()}</Note>;
   if (shown.length === 0 && !canCreate) return <Note>{t("common.noMatches")}</Note>;
@@ -49,11 +51,11 @@ export function ChoicesPage({ property, task, query, run }: Props) {
           {c.label}
         </Item>
       ))}
-      {canCreate && make && picker && (
+      {canCreate && make && pick && (
         <Item
           value={`${name}:create`}
           icon={<Plus />}
-          onSelect={() => run(() => picker.pick([task], make.run(task.project_id, q)))}
+          onSelect={() => run(() => pick([task], make.run(task.project_id, q)))}
         >
           {make.label(q)}
         </Item>

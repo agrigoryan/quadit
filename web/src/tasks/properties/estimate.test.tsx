@@ -168,7 +168,17 @@ describe("the estimate in any number", () => {
     expect(box.value).toBe("0");
   });
 
-  it("clears it for 0 where 0 is not an estimate, and for an empty box", async () => {
+  it("clears it for an empty box, where 0 is an estimate too", async () => {
+    seed({ estimates: true, estimate_zero: true }, { estimate: 3 });
+    renderPanel();
+    const box = within(section()).getByLabelText<HTMLInputElement>("Estimate");
+    fireEvent.change(box, { target: { value: "" } });
+    fireEvent.blur(box);
+    await waitFor(() => expect(sent).toEqual([{ type: "task.update", args: { id: "t1", estimate: null } }]));
+    expect(box.value).toBe("");
+  });
+
+  it("clears it for 0 where 0 is not an estimate", async () => {
     seed({ estimates: true }, { estimate: 3 });
     renderPanel();
     const box = within(section()).getByLabelText<HTMLInputElement>("Estimate");

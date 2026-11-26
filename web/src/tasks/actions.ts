@@ -454,8 +454,8 @@ export interface NewTask {
   parentId?: string;
   cycleId?: string;
   dueOn?: string;
-  /** Left out for none; 0 is an estimate. */
-  estimate?: number;
+  /** Left out: the template's, or none; null: none, whatever the template says; 0 is an estimate. */
+  estimate?: number | null;
   templateId?: string;
   /** Where it goes in manual order; the end of the list when left out. */
   rank?: string;
@@ -527,7 +527,7 @@ function creation(input: NewTask, number: number, rank: string): Creation | null
     parent_id: input.parentId,
     cycle_id: input.cycleId,
     due_on: input.dueOn,
-    estimate: input.estimate,
+    estimate: input.estimate ?? undefined,
     rank: input.rank ?? rank,
     created_by: me.user_id,
     created_at: now,

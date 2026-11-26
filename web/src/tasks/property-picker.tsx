@@ -8,7 +8,14 @@ import type { Member, Project, Task } from "@/types/core";
 import type { RunOutlook } from "@/types/dashboard";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { useManageLinks } from "@/tasks/manage";
-import { type Choice, NONE, type PickerListProps, type PickerProperty } from "@/tasks/properties/property";
+import {
+  type Choice,
+  NONE,
+  type PickerListProps,
+  type PickerPart,
+  type PickerProperty,
+  type RowsPicker,
+} from "@/tasks/properties/property";
 import { Avatar } from "@/ui/avatar";
 import { ListeningDot } from "@/ui/listening-dot";
 import { type PickerItem, PickerList } from "@/ui/picker";
@@ -122,8 +129,13 @@ export const projectItems = (projects: Project[]): PickerItem[] =>
   projects.map((p) => ({ id: p.id, label: p.name, icon: <ProjectGlyph project={p} />, hint: p.key, keywords: p.key }));
 
 /** The list inside the popover. It reads the store only while the picker is open. */
-function Choices({ property, tasks, close }: { property: PickerProperty } & PickerListProps) {
-  const { picker, make, manage } = property;
+function Choices({
+  property,
+  picker,
+  tasks,
+  close,
+}: { property: PickerProperty; picker: PickerPart & RowsPicker } & PickerListProps) {
+  const { make, manage } = property;
   const { items, value } = picker.useItems(tasks);
   const projectId = tasks[0]?.project_id;
   const links = useManageLinks(projectId);
@@ -179,7 +191,7 @@ export function TaskPropertyPicker({ property, tasks, open, onOpenChange, childr
   const [own, setOwn] = useState(false);
   const isOpen = open ?? own;
   const setOpen = onOpenChange ?? setOwn;
-  const List = property.picker.List;
+  const { picker } = property;
   return (
     <Popover open={isOpen} onOpenChange={setOpen}>
       {children && <PopoverTrigger asChild>{children}</PopoverTrigger>}
@@ -187,10 +199,16 @@ export function TaskPropertyPicker({ property, tasks, open, onOpenChange, childr
       {isOpen && (
         <PopoverContent align={align} side={side} aria-label={property.picker.title()} className="p-0">
           {/* Keyed by the property: each kind's list reads different tables. */}
-          {List ? (
-            <List key={property.name} tasks={tasks} close={() => setOpen(false)} />
+          {picker.List ? (
+            <picker.List key={property.name} tasks={tasks} close={() => setOpen(false)} />
           ) : (
-            <Choices key={property.name} property={property} tasks={tasks} close={() => setOpen(false)} />
+            <Choices
+              key={property.name}
+              property={property}
+              picker={picker}
+              tasks={tasks}
+              close={() => setOpen(false)}
+            />
           )}
         </PopoverContent>
       )}

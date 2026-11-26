@@ -128,8 +128,12 @@ export interface FilterPart {
   holds?: "one" | "numbers";
   /** Offered only where it means something: a project's statuses, a project's cycles. */
   offered?: (project: Project | undefined) => boolean;
-  /** The values it can be set to, for the project in view or the whole workspace. A hook. */
-  useOptions: (project: Project | undefined) => PickerItem[];
+  /**
+   * The values it can be set to, for the project in view or the whole
+   * workspace. A hook. It is handed the values picked, for a kind whose
+   * picked value may be one it no longer offers (an estimate off the scale).
+   */
+  useOptions: (project: Project | undefined, picked: string[]) => PickerItem[];
   /** Whether a task passes, for the values picked (never none). */
   matches: (task: Task, picked: string[], c: Pick<Collections, "statuses">) => boolean;
   /**
@@ -210,8 +214,12 @@ export interface TaskFields {
   epicId: string;
   parentId: string;
   dueOn: string;
-  /** null is none; 0 is an estimate where the project allows it. */
-  estimate: number | null;
+  /**
+   * Left out until the person picks one: the template's, or none. null is
+   * none, whatever the template says; 0 is an estimate where the project
+   * allows it.
+   */
+  estimate?: number | null;
   templateId: string;
 }
 
@@ -239,9 +247,14 @@ export interface PanelProps {
   takeControl: (el: HTMLElement | null) => void;
 }
 
-export interface PickerPart {
+/** Changing it by picking: rows to pick from, or a list of its own. */
+export type PickerPart = {
   /** The picker's title and the words in its search box: "Change status…". */
   title: () => string;
+} & (RowsPicker | OwnListPicker);
+
+/** Picked from rows the shared list draws (tasks/property-picker.tsx). */
+export interface RowsPicker {
   /**
    * The rows offered for these tasks, and what they all have now: one value,
    * or, for a kind that holds several (labels), a list, where a pick adds or
@@ -251,8 +264,18 @@ export interface PickerPart {
   useItems: (tasks: Task[]) => { items: PickerItem[]; value: string | string[] | undefined };
   /** Sets the picked value on every one of the tasks. */
   pick: (tasks: Task[], id: string) => void;
-  /** Its own list, where picking a row may do more than set the value (an outside wait asks what it waits for). */
-  List?: ComponentType<PickerListProps>;
+  List?: undefined;
+}
+
+/**
+ * A list of its own, where picking a row may do more than set the value (an
+ * outside wait asks what it waits for), or where there may be no rows at all
+ * (an estimate in any number is typed).
+ */
+export interface OwnListPicker {
+  List: ComponentType<PickerListProps>;
+  useItems?: undefined;
+  pick?: undefined;
 }
 
 export interface PickerListProps {

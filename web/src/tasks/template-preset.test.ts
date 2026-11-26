@@ -43,10 +43,8 @@ describe("presetOf", () => {
     });
   });
 
-  it("fills in the estimate as it is stored, a zero estimate too", () => {
-    expect(preset({ estimate: 5 })).toEqual({ estimate: 5 });
-    expect(preset({ estimate: 0 })).toEqual({ estimate: 0 });
-    expect(preset({ priority: 1 })).toEqual({ priority: 1 });
+  it("leaves the estimate to the server, which applies the template's as it is stored", () => {
+    expect(preset({ estimate: 5, priority: 1 })).toEqual({ priority: 1 });
   });
 
   it("leaves out a deleted status, a deleted label and someone removed from the workspace", () => {
