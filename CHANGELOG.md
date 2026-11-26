@@ -4,6 +4,22 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+Windows support is new in this release. It was checked by automated tests on Windows: the server's and the command's tests, the desktop app's, and the app end to end (set up on this computer, Connect, and a run Quadit starts), with stand-in agents. Nobody has run it on a person's own Windows computer yet, the real Claude Code and Codex were not run on Windows, and the Windows installer is not signed, so SmartScreen warns when it is opened.
+
+### Added
+
+- The server and the `quadit` command run on Windows 10 and 11. Each release has `quadit_windows_amd64.zip` and `quadit_windows_arm64.zip`, with `quadit.exe` inside; there is no install script, Homebrew or package for Windows. Login files are kept in `%APPDATA%\quadit\`, each kept to its owner by its access list. With the app quit, a login the app made starts it by the path the login records, as on Linux. Pictures of pages use Chrome where its installer puts it, else Edge.
+- The desktop app does on Windows what it does on macOS and Linux. Set up on this computer runs the `quadit.exe` the app carries, with its data in `%APPDATA%\Quadit\server`. Connect puts `quadit` on the PATH by adding the folder of the app's `quadit.exe` to the person's own PATH (`HKEY_CURRENT_USER\Environment`), shown in the plan and taken out by Disconnect; a terminal opened afterwards finds it, and nothing needs an administrator. It offers Claude Code, Codex, Gemini CLI, Cursor, pi and GitHub Copilot CLI there, and allows Claude Code `PowerShell(quadit *)` besides `Bash(quadit:*)`. Run by Quadit and `quadit run` work there for Claude Code and Codex.
+- What differs on Windows. Antigravity CLI and opencode are not offered yet, since where they keep their settings there is not confirmed; their cards say so. Only agents installed for Windows are found: an agent inside WSL is not, and someone who works inside WSL installs the Linux `quadit` there and runs everything inside WSL. Stop ends a run at once, with everything the program started, since Windows has no way to ask Claude Code or Codex to stop first. `quadit run` also refuses a whole drive (`D:\`) and Windows' system folders, refuses a program installed as a `.cmd` file (as npm installs Claude Code and Codex) in a network folder (`\\server\share\…`) and says what to do instead (the program's own `.exe`, or a drive letter mapped to the share), and does not start a `.cmd` program whose path, or the path of the runner's files, holds a `%`. The computer is kept from idle sleep during a run, as on macOS. Continue in a terminal on a run on Windows is a line for PowerShell.
+- The skill gives a companion's command for PowerShell on Windows, which hands the item to the agent's program on its standard input, not in its arguments.
+
+### Fixed
+
+- When the disk was slow, the last lines a program wrote before its run ended could be lost; if one of them showed that the agent had begun work, the run could be started again from the beginning.
+- In the desktop app's list of servers, the question that asks before a server is removed could vanish when the list was drawn again, and keyboard focus was lost then; both are kept now.
+- Webhooks: a webhook with many events to receive held up the others, since each delivery was a write of its own; a batch of events handled again (after a wake-up could not be queued, or when the server stopped before it recorded how far it got) sent deliveries already made a second time. Both are fixed, and a webhook hears its events in order.
+- The runner's `status.json` is no longer forced to the disk at every change.
+
 ## [0.7.0] - 2026-11-24
 
 The server upgrades its database when it starts (migrations 0026 to 0030), copying it first; `quadit upgrade --undo` goes back ([upgrades](docs/install.md#upgrades)). What the upgrade changes in your data is said with each change below: agents' follows of tasks, epics and pages end, the inbox items of questions already answered or taken back are read, and the questions and waits left on done and canceled tasks are settled.
