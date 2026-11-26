@@ -10,9 +10,9 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { parse } from "jsonc-parser";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   type Applied,
   backUp,
@@ -22,11 +22,21 @@ import {
   planChanges,
   planReverts,
   sha256,
+  USER_PATH,
   writeEdits,
 } from "@/main/config-edits";
 
-/** Connect runs only on macOS and Linux (no Windows build of quadit); these tests need a POSIX shell, links and file modes. */
+/** For the tests that need symbolic links (a privilege on Windows) or file modes (only read-only there). */
 const posixOnly = describe.skipIf(process.platform === "win32");
+
+/** The person's own variables, as Windows keeps them in the registry (windows-environment.ts). */
+const registry = vi.hoisted(() => new Map<string, { value: string; expand: boolean }>());
+vi.mock("@/main/windows-environment", () => ({
+  readUserVariable: (name: string) => registry.get(name) ?? null,
+  writeUserVariable: (name: string, variable: { value: string; expand: boolean } | null) =>
+    variable ? registry.set(name, variable) : registry.delete(name),
+  systemPath: async () => "",
+}));
 
 /** A new folder, as its real path (the plans name files by theirs). */
 function folder() {
@@ -51,7 +61,7 @@ function revert(applied: Applied[]): string[] {
   return notes;
 }
 
-posixOnly("JSON edits", () => {
+describe("JSON edits", () => {
   it("keeps a JSONC file's comments and formatting, and takes the key back out", () => {
     const path = join(folder(), "opencode.jsonc");
     const original = `{\n  // my models\n  "model": "x", /* keep */\n  "mcp": {\n    "other": { "type": "local" }\n  }\n}\n`;
@@ -110,7 +120,7 @@ posixOnly("JSON edits", () => {
   });
 });
 
-posixOnly("TOML edits", () => {
+describe("TOML edits", () => {
   const original = `model = "gpt"\n\n[mcp_servers.other]\ncommand = "x"\n`;
 
   it("appends a table, and takes it back out to the file as it was", () => {
@@ -200,7 +210,7 @@ posixOnly("TOML edits", () => {
   });
 });
 
-posixOnly("whole files and links", () => {
+describe("whole files", () => {
   it("backs up a file it replaces, puts it back, and leaves alone one changed since", () => {
     const dir = folder();
     const path = join(dir, "skills", "quadit", "SKILL.md");
@@ -212,7 +222,10 @@ posixOnly("whole files and links", () => {
     const replaced = apply([{ kind: "file", path, content: "skill v2\n" }], dir);
     const backup = replaced[0]?.kind === "file" ? replaced[0].backup : null;
     expect(backup && readFileSync(backup, "utf8")).toBe("skill v1\n");
-    expect(backup && statSync(backup).mode & 0o777).toBe(0o600);
+    // Named after the file, in the backups' folder, a drive's colon and every separator made plain (Windows' C:\…).
+    expect(backup && basename(backup)).toMatch(/^[^:\\/]*SKILL\.md$/);
+    // Windows has no modes but read-only: there the folder's owner, the person, is what keeps it theirs.
+    if (process.platform !== "win32") expect(backup && statSync(backup).mode & 0o777).toBe(0o600);
     revert(replaced);
     expect(readFileSync(path, "utf8")).toBe("skill v1\n");
 
@@ -221,7 +234,9 @@ posixOnly("whole files and links", () => {
     expect(revert(edited)).toEqual([`${path}: it changed since the app wrote it; left as it is.`]);
     expect(readFileSync(path, "utf8")).toBe("my own skill\n");
   });
+});
 
+posixOnly("links", () => {
   it("links and unlinks, and refuses to replace a file that is not its link", () => {
     const dir = folder();
     const path = join(dir, "quadit");
@@ -379,7 +394,7 @@ posixOnly("Profile lines and folders", () => {
   });
 });
 
-posixOnly("taking back in turn", () => {
+describe("taking back in turn", () => {
   it("takes back the last change to a key first, so a key changed twice goes back to before both", () => {
     const path = join(folder(), "settings.json");
     const first = apply([{ kind: "json", path, keyPath: ["mcpServers", "quadit"], value: { httpUrl: "u" } }]);
@@ -388,5 +403,55 @@ posixOnly("taking back in turn", () => {
     ]);
     expect(revert([...first, ...second])).toEqual([]);
     expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({});
+  });
+});
+
+describe("the person's PATH on Windows", () => {
+  const folder = "C:\\Users\\ann\\AppData\\Local\\Programs\\Quadit\\resources\\bin";
+
+  it("adds a folder at its end once, keeping how it is kept and what else it holds, and takes only that folder back out", () => {
+    registry.set("Path", { value: "%USERPROFILE%\\.local\\bin;;C:\\Tools", expand: true });
+    const applied = apply([{ kind: "path", path: USER_PATH, folder }]);
+    expect(registry.get("Path")).toEqual({ value: `%USERPROFILE%\\.local\\bin;;C:\\Tools;${folder}`, expand: true });
+    // Never twice, whatever its case or a closing backslash.
+    expect(planChanges([{ kind: "path", path: USER_PATH, folder: `${folder.toUpperCase()}\\` }])).toEqual({
+      edits: [],
+      applied: [],
+    });
+    // The person adds a folder of their own after it, and moves theirs first.
+    registry.set("Path", {
+      value: `C:\\Go\\bin;%USERPROFILE%\\.local\\bin;;C:\\Tools;${folder};C:\\Mine`,
+      expand: true,
+    });
+    expect(revert(applied)).toEqual([]);
+    expect(registry.get("Path")).toEqual({
+      value: "C:\\Go\\bin;%USERPROFILE%\\.local\\bin;;C:\\Tools;C:\\Mine",
+      expand: true,
+    });
+  });
+
+  it("shows the PATH a folder a line, backs it up as it was, and notices it changed since the plan", () => {
+    registry.set("Path", { value: "C:\\Tools", expand: false });
+    const { edits } = planChanges([{ kind: "path", path: USER_PATH, folder }]);
+    const edit = edits[0] as (typeof edits)[0];
+    expect(diffOf(edit)).toContain(` C:\\Tools\n+${folder}\n`);
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-edits-")));
+    const backup = backUp(edits, join(dir, "backups")).get(USER_PATH);
+    expect(backup && readFileSync(backup, "utf8")).toBe("C:\\Tools");
+    expect(changedSince(edits)).toBeNull();
+    registry.set("Path", { value: "C:\\Tools;C:\\Other", expand: false });
+    expect(changedSince(edits)?.path).toBe(USER_PATH);
+    // Written as it is kept: REG_SZ stays REG_SZ.
+    registry.set("Path", { value: "C:\\Tools", expand: false });
+    writeEdits(edits);
+    expect(registry.get("Path")).toEqual({ value: `C:\\Tools;${folder}`, expand: false });
+  });
+
+  it("makes the person's PATH when there is none, and takes it away with the folder", () => {
+    registry.clear();
+    const applied = apply([{ kind: "path", path: USER_PATH, folder }]);
+    expect(registry.get("Path")).toEqual({ value: folder, expand: true });
+    revert(applied);
+    expect(registry.has("Path")).toBe(false);
   });
 });

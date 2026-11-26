@@ -1,8 +1,9 @@
 // Edits to other programs' files (harness settings, skill files, the quadit
 // command's link, its folder and the line in a shell profile that puts that
-// folder on the PATH), planned first and written only once the person has seen
-// them, and each recorded so that it can be taken back later, but only
-// where the file still says what was written.
+// folder on the PATH; on Windows the person's PATH itself, which the
+// registry keeps: windows-environment.ts), planned first and written only
+// once the person has seen them, and each recorded so that it can be taken
+// back later, but only where the file still says what was written.
 //
 // A change is planned against the files as they are now, into the text each
 // file will have (FileEdit) and a record of what was done (Applied). JSON
@@ -14,6 +15,11 @@
 // A path is planned as the file it really is: through a symbolic link in
 // it (dotfiles kept in a repository and linked home, say), the plan shows
 // and edits the file the link leads to, and the link stays a link.
+//
+// On Windows a file's mode is only whether it is read-only: the modes given
+// here (0600 for what may hold a token) then mean nothing more, and what
+// keeps such a file the person's own is where it is, in their profile's
+// folders, which Windows gives to them alone.
 
 import { createHash, randomBytes } from "node:crypto";
 import {
@@ -34,6 +40,7 @@ import {
 } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { createTwoFilesPatch } from "diff";
+import { readUserVariable, writeUserVariable } from "@/main/windows-environment";
 import { applyEdits, type ModificationOptions, modify, type ParseError, parse as parseJsonc } from "jsonc-parser";
 import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
 
@@ -67,7 +74,9 @@ export type Change =
   /** Makes the folder `path`, where there is none. */
   | { kind: "folder"; path: string }
   /** Adds the whole line `line` (which says it was added by the app) to the end of a text file, unless it has it. */
-  | { kind: "line"; path: string; line: string };
+  | { kind: "line"; path: string; line: string }
+  /** Adds `folder` to the end of the person's PATH (Windows; `path` is USER_PATH), unless it is on it. */
+  | { kind: "path"; path: string; folder: string };
 
 /**
  * What a change did, enough to take it back: the value a key had (absent
@@ -83,7 +92,9 @@ export type Applied =
   | { kind: "link"; path: string; target: string }
   | { kind: "folder"; path: string }
   /** `created`: the file was not there before the line. */
-  | { kind: "line"; path: string; line: string; created: boolean };
+  | { kind: "line"; path: string; line: string; created: boolean }
+  /** `created`: the person had no PATH of their own before. */
+  | { kind: "path"; path: string; folder: string; created: boolean };
 
 /** A file as it is and as it will be: text, for a link its target, for a folder ""; null for none. */
 export interface FileEdit {
@@ -101,6 +112,14 @@ export interface FileEdit {
 /** A plan that cannot be made, with what the person should know. */
 export class EditRefused extends Error {}
 
+/**
+ * The person's own PATH on Windows, as the registry names it: what a "path"
+ * change's `path` is, and the name its plan shows.
+ */
+export const USER_PATH = "HKEY_CURRENT_USER\\Environment\\Path";
+/** The variable USER_PATH is, among the person's own. */
+const PATH_VARIABLE = "Path";
+
 const JSON_FORMAT: ModificationOptions = { formattingOptions: { insertSpaces: true, tabSize: 2, eol: "\n" } };
 const TOML_MARK = "# Added by the Quadit app; Disconnect in the app takes it out.";
 
@@ -115,7 +134,7 @@ export function planChanges(changes: Change[]): { edits: FileEdit[]; applied: Ap
   const edits = new Map<string, FileEdit>();
   const applied: Applied[] = [];
   for (const asked of changes) {
-    if (asked.kind !== "link") refuseDanglingLink(asked.path);
+    if (asked.kind !== "link" && asked.kind !== "path") refuseDanglingLink(asked.path);
     const change = { ...asked, path: changedPath(asked) };
     let edit = edits.get(change.path);
     if (!edit) {
@@ -204,7 +223,24 @@ function applyChange(edit: FileEdit, change: Change): Applied | null {
       edit.after = `${text}${text === "" || text.endsWith("\n") ? "" : "\n"}${change.line}\n`;
       return { kind: "line", path, line: change.line, created: edit.before === null };
     }
+    case "path": {
+      const text = edit.after ?? "";
+      if (pathEntries(text).some((entry) => sameFolder(entry, change.folder))) return null;
+      edit.after = `${text}${text === "" || text.endsWith(";") ? "" : ";"}${change.folder}`;
+      return { kind: "path", path: USER_PATH, folder: change.folder, created: edit.before === null };
+    }
   }
+}
+
+/** The folders of a PATH's value, in order; none for no value. Windows passes over an empty one (";;"), and so does the app. */
+function pathEntries(value: string | null): string[] {
+  return (value ?? "").split(";").filter((entry) => entry.trim() !== "");
+}
+
+/** Whether two folders of a PATH are the same: Windows reads them in any case, with or without a closing backslash. */
+function sameFolder(a: string, b: string): boolean {
+  const plain = (folder: string) => folder.trim().replace(/\\+$/, "").toLowerCase();
+  return plain(a) === plain(b);
 }
 
 /**
@@ -337,6 +373,15 @@ function revertOne(edit: FileEdit, record: Applied, edits: Map<string, FileEdit>
       edit.after = record.created && rest.trim() === "" ? null : rest;
       return null;
     }
+    case "path": {
+      // Every folder of the PATH but the one the app added stays as it was written, empty places and all.
+      const entries = text.split(";");
+      const kept = entries.filter((entry) => !sameFolder(entry, record.folder));
+      if (kept.length === entries.length) return null;
+      const rest = kept.join(";");
+      edit.after = record.created && pathEntries(rest).length === 0 ? null : rest;
+      return null;
+    }
   }
 }
 
@@ -358,15 +403,15 @@ function prune(text: string, record: { path: string; keyPath: string[]; existed:
 
 /** The first edit whose file is no longer as it was when planned, or null when none is. */
 export function changedSince(edits: FileEdit[]): FileEdit | null {
-  return (
-    edits.find(
-      (edit) => editOf(edit.path, edit.folder ? "folder" : edit.link ? "link" : "file").before !== edit.before,
-    ) ?? null
-  );
+  return edits.find((edit) => editOf(edit.path, edit.kind).before !== edit.before) ?? null;
 }
 
-/** An edit of `path` that changes nothing yet, as a change of `kind` reads it: a link's target, a folder, or text. */
+/** An edit of `path` that changes nothing yet, as a change of `kind` reads it: a link's target, a folder, the person's PATH, or text. */
 function editOf(path: string, kind: Change["kind"] | Applied["kind"]): FileEdit {
+  if (kind === "path") {
+    const before = readPath();
+    return { path, kind, link: false, before, after: before };
+  }
   if (kind === "link") {
     const before = readLink(path);
     return { path, kind, link: true, before, after: before };
@@ -381,15 +426,18 @@ function editOf(path: string, kind: Change["kind"] | Applied["kind"]): FileEdit 
 
 /**
  * Copies every file `edits` replace into `backupDir` (0600: a backup may
- * hold a token); gives each backed-up path's copy.
+ * hold a token), and the person's PATH as it was into a file there; gives
+ * each backed-up path's copy, named after the path ("Users__ann__.zshrc",
+ * "C__Users__ann__.claude__settings.json").
  */
 export function backUp(edits: FileEdit[], backupDir: string): Map<string, string> {
   const backups = new Map<string, string>();
   for (const edit of edits) {
     if (edit.before === null || edit.link || edit.folder) continue;
     mkdirSync(backupDir, { recursive: true, mode: 0o700 });
-    const backup = join(backupDir, edit.path.replace(/^\/+/, "").replaceAll("/", "__"));
-    copyFileSync(edit.path, backup);
+    const backup = join(backupDir, edit.path.replace(/^[\\/]+/, "").replaceAll(/:?[\\/]+/g, "__"));
+    if (edit.kind === "path") writeFileSync(backup, edit.before, { mode: 0o600 });
+    else copyFileSync(edit.path, backup);
     chmodSync(backup, 0o600);
     backups.set(edit.path, backup);
   }
@@ -400,7 +448,11 @@ export function backUp(edits: FileEdit[], backupDir: string): Map<string, string
 export function writeEdits(edits: FileEdit[]) {
   for (const edit of edits) {
     if (edit.writtenBy) continue;
-    if (edit.folder) {
+    if (edit.kind === "path") {
+      // Its type kept: a PATH that names %USERPROFILE% must stay one Windows expands.
+      const expand = readUserVariable(PATH_VARIABLE)?.expand ?? true;
+      writeUserVariable(PATH_VARIABLE, edit.after === null ? null : { value: edit.after, expand });
+    } else if (edit.folder) {
       if (edit.after === null) rmdirSync(edit.path);
       else mkdirSync(edit.path, { recursive: true });
     } else if (edit.after === null) rmSync(edit.path, { force: true });
@@ -427,12 +479,21 @@ function writeText(path: string, text: string) {
   renameSync(next, path);
 }
 
-/** The unified diff of an edit, as the plan shows it, with every token masked on both sides. */
+/** The unified diff of an edit, as the plan shows it, with every token masked on both sides; a PATH a folder a line. */
 export function diffOf(edit: FileEdit): string {
   if (edit.folder) {
     return edit.after === null ? `-(the folder, empty now)\n` : `+(a new folder)\n`;
   }
-  const show = (side: string | null) => (side === null ? "" : edit.link ? `→ ${side}\n` : masked(side));
+  const show = (side: string | null) =>
+    side === null
+      ? ""
+      : edit.link
+        ? `→ ${side}\n`
+        : edit.kind === "path"
+          ? pathEntries(side)
+              .map((entry) => `${entry}\n`)
+              .join("")
+          : masked(side);
   return createTwoFilesPatch(edit.path, edit.path, show(edit.before), show(edit.after), "", "", { context: 3 })
     .split("\n")
     .slice(2)
@@ -448,8 +509,9 @@ export function sha256(text: string): string {
   return createHash("sha256").update(text).digest("hex");
 }
 
-/** The file a change is to: the one its path really is, or for a link, the link in the folder its path really is. */
+/** The file a change is to: the one its path really is, or for a link, the link in the folder its path really is; the person's PATH is no file. */
 function changedPath(change: { kind: string; path: string }): string {
+  if (change.kind === "path") return change.path;
   return change.kind === "link" ? join(realPath(dirname(change.path)), basename(change.path)) : realPath(change.path);
 }
 
@@ -476,6 +538,8 @@ export function targetOf(item: Change | Applied): string {
       return `folder\n${path}`;
     case "line":
       return `line\n${path}\n${item.line}`;
+    case "path":
+      return `path\n${item.folder.replace(/\\+$/, "").toLowerCase()}`;
   }
 }
 
@@ -486,6 +550,15 @@ export function realPath(path: string): string {
   } catch {
     const parent = dirname(path);
     return parent === path ? path : join(realPath(parent), basename(path));
+  }
+}
+
+/** The person's own PATH as the registry keeps it, unexpanded; null when they have none. */
+function readPath(): string | null {
+  try {
+    return readUserVariable(PATH_VARIABLE)?.value ?? null;
+  } catch (err) {
+    throw new EditRefused(`Your PATH cannot be read: ${(err as Error).message}`);
   }
 }
 
