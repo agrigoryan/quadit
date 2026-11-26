@@ -34,12 +34,13 @@ type receiver struct {
 // newReceiver starts a receiver at an address of its own: a path nobody
 // else knows. Tests run side by side, and a port one test's receiver gave
 // up may be handed to the next: a server still sending to the old receiver
-// then reaches this one, which hears only what is sent to its own path.
+// then reaches this one, which hears only what is sent to its own path
+// (or under it: a test may give each of its webhooks an address there).
 func newReceiver(t *testing.T, secret string) *receiver {
 	r := &receiver{}
 	path := "/" + id.New()
 	r.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if req.URL.Path != path {
+		if req.URL.Path != path && !strings.HasPrefix(req.URL.Path, path+"/") {
 			http.NotFound(w, req)
 			return
 		}
