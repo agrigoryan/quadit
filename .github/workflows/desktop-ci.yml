@@ -137,12 +137,9 @@ jobs:
           path: desktop/test-results
           if-no-files-found: ignore
 
-  # Not failing the run yet, on purpose: nobody has a Windows machine, so CI is the only place the app is seen to work
-  # there, and its parts land one at a time (the guard every program the app holds starts under is quadit's own,
-  # `quadit guard`, built in internal/cli). Once it passes, continue-on-error goes.
+  # Nobody has a Windows machine: CI is the only place the app is seen to work there.
   e2e-windows:
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
