@@ -80,6 +80,16 @@ jobs:
     runs-on: windows-latest
     continue-on-error: true
     steps:
+      # The runner's C: drive holds the system and is slow to write; D: is
+      # its fast working drive, where the checkout already is. The tests'
+      # temporary folders and Go's caches go there too, set before setup-go
+      # so that its cache follows. (Defender's real-time scanning is already
+      # off on these images, with C:\ and D:\ excluded.)
+      - name: Temporary files and Go's caches on the fast drive
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force D:\tmp, D:\gocache, D:\gomodcache | Out-Null
+          "TEMP=D:\tmp", "TMP=D:\tmp", "GOCACHE=D:\gocache", "GOMODCACHE=D:\gomodcache" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
