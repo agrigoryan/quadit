@@ -83,6 +83,14 @@ Handle it with the quadit skill: answer where you were asked, and write nothing 
 
 (For everything, leave `project=KEY` out. For another tool, put its own one-prompt command in place of `codex exec …`, such as `claude -p "…"`.)
 
+On Windows there is no `sh`: give the person this line for PowerShell instead. It hands the item to the agent program on its standard input, never in its arguments: `codex` and `claude` installed with npm are `.cmd` files, and cmd.exe reads words in a `.cmd` file's arguments as commands of its own, so an item's text there could run as one.
+
+```powershell
+quadit listen project=KEY --exec powershell -NoProfile -Command '$OutputEncoding = [Text.Encoding]::UTF8; (''Quadit woke you for this inbox item:'', $env:QUADIT_ITEM, ''Handle it with the quadit skill: answer where you were asked, and write nothing when it asks nothing of you.'') -join [char]10 | codex exec -s workspace-write -c sandbox_workspace_write.network_access=true -'
+```
+
+(With `QUADIT_CONFIG` set, put `$env:QUADIT_CONFIG='<its value>';` in front, on the same line. For Claude Code, `claude -p` in place of `codex exec … -`: it reads the prompt from its standard input too.)
+
 Never search the quadit binary, its strings or its source to find out how to listen: `quadit help listen` says all of it.
 
 **In the background** (case 2):
