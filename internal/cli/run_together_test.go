@@ -242,8 +242,18 @@ func TestQuaditRunsTheAgentForATaskOnARealServer(t *testing.T) {
 		_ = apart.Process.Kill()
 		_ = apart.Wait()
 		killed := rt.records()[3].PID
-		if alive(killed) != programOutlivesRunner {
-			t.Fatalf("the program alive after its runner was killed: %v; on this system: %v", alive(killed), programOutlivesRunner)
+		if programOutlivesRunner && !alive(killed) {
+			t.Fatal("the program died with the runner: the test shows nothing")
+		}
+		if !programOutlivesRunner {
+			// Windows ends the program's job as the killed runner's handles
+			// close, before its end is seen; the job's processes are ended
+			// then, and are gone a moment later: with no runner to end them.
+			for deadline := time.Now().Add(5 * time.Second); alive(killed) || slices.ContainsFunc(rt.children(), alive); time.Sleep(10 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatal("the program or what it started outlived its killed runner")
+				}
+			}
 		}
 		rt.serve()
 		rt.eventually("the run interrupted", func() bool { return q.runs(owner, "RC-1")[4]["reason"] == core.RunInterrupted })

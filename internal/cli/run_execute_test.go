@@ -569,9 +569,8 @@ func TestStepsCarryNoCommandLines(t *testing.T) {
 	script := []fakeagent.Step{claudeInit(), claudeRunsBash("Run the tests"),
 		{Out: fmt.Sprintf(edit, "{folder}/README")}, {Out: fmt.Sprintf(edit, "/etc/passwd")}, {SleepMS: 60}, claudeEnds("done")}
 	rt := newRunTest(t, core.ProgramClaude)
-	inJSON, _ := json.Marshal(rt.folder) // a Windows path's backslashes escaped
 	for i, s := range script {
-		script[i].Out = strings.ReplaceAll(s.Out, "{folder}", strings.Trim(string(inJSON), `"`))
+		script[i].Out = strings.ReplaceAll(s.Out, "{folder}", inJSONString(rt.folder))
 	}
 	rt.setScripts(script)
 	rt.f.addItem(fakeItem{Task: "SVA-12"})
@@ -631,13 +630,20 @@ func TestStepsCarryNoCommandLines(t *testing.T) {
 // recordedRun is a recorded fixture of a program's output as the fake
 // program's script, in folder, with its header and the command lines its
 // tools were given.
+// inJSONString is s as it is written inside a JSON string: a Windows
+// path's backslashes escaped, as the programs write a path.
+func inJSONString(s string) string {
+	raw, _ := json.Marshal(s) // a string always encodes
+	return string(raw[1 : len(raw)-1])
+}
+
 func recordedRun(t *testing.T, file, folder string) ([]fakeagent.Step, fixtureHeader, []string) {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("testdata", "programs", file))
 	if err != nil {
 		t.Fatal(err)
 	}
-	lines := strings.Split(strings.TrimSpace(strings.ReplaceAll(string(raw), "{folder}", folder)), "\n")
+	lines := strings.Split(strings.TrimSpace(strings.ReplaceAll(string(raw), "{folder}", inJSONString(folder))), "\n")
 	var head fixtureHeader
 	if err := json.Unmarshal([]byte(lines[0]), &head); err != nil {
 		t.Fatal(err)
