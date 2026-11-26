@@ -101,6 +101,27 @@ export type Member = {
   removed_at?: number;
 };
 
+/** What a project has switched on (internal/core ProjectSettings). The server leaves out a switch that is off. */
+export type ProjectSettings = {
+  cycles?: boolean;
+  cycle_days?: number;
+  /** The weekday a cycle starts on; 0 is Sunday. */
+  cycle_start?: number;
+  /** The project estimates its tasks. */
+  estimates?: boolean;
+  /** What estimates are picked from (tasks/estimates.ts); left out, any whole number, as before scales. */
+  estimate_scale?: EstimateScale;
+  /** The scale has its two further values; nothing for "points". */
+  estimate_extended?: boolean;
+  /** 0 is an estimate of its own, apart from none. */
+  estimate_zero?: boolean;
+  /** A task without an estimate counts 0 points, not 1. */
+  estimate_ignore_unestimated?: boolean;
+};
+
+/** A project's estimate scale by name; "points" is any whole number. */
+export type EstimateScale = "fibonacci" | "exponential" | "linear" | "tshirt" | "points";
+
 export type Project = {
   id: string;
   workspace_id: string;
@@ -111,7 +132,7 @@ export type Project = {
   color?: string;
   lead_id?: string;
   rank?: string;
-  settings?: { cycles?: boolean; cycle_days?: number; estimates?: boolean };
+  settings?: ProjectSettings;
   /** The ids of the sample tasks the project was made with, in order (tasks/samples.ts). */
   samples?: string[];
   created_by: string;
@@ -161,6 +182,7 @@ export type Task = {
   epic_id?: string;
   milestone_id?: string;
   cycle_id?: string;
+  /** Left out where there is none; 0 is an estimate of its own (tasks/estimates.ts). */
   estimate?: number;
   label_ids?: string[];
   lease_holder_id?: string;

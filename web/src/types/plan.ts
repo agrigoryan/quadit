@@ -75,6 +75,8 @@ export interface TaskQuery {
   epic?: string[];
   cycle?: string[];
   priority?: number[];
+  /** Numbers, T-shirt sizes ("M") or "none", any one of which a task's estimate is. */
+  estimate?: string[];
   has_open_decision?: boolean;
   q?: string;
   sort?: string;
