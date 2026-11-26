@@ -285,11 +285,13 @@ func (w *workingCopy) git(ctx context.Context, args ...string) (string, error) {
 }
 
 // git runs one git command in dir and gives back what it printed. A
-// failure is a *gitFailure.
+// failure is a *gitFailure. The files it checks out and commits are the
+// repository's bytes: no line endings are changed on the way, whatever the
+// server's own git settings say (Git for Windows turns them to CRLF).
 func git(ctx context.Context, dir string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-c", "core.autocrlf=false"}, args...)...)
 	cmd.Dir = dir
 	cmd.Env = append(withoutRepositoryChoice(os.Environ()), "GIT_TERMINAL_PROMPT=0", "GIT_AUTHOR_NAME=Quadit", "GIT_AUTHOR_EMAIL=quadit@localhost",
 		"GIT_COMMITTER_NAME=Quadit", "GIT_COMMITTER_EMAIL=quadit@localhost")

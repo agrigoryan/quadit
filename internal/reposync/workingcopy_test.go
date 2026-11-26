@@ -1,6 +1,7 @@
 package reposync
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,5 +72,40 @@ func TestGitWorksOnTheWorkingCopyWhateverTheEnvironmentSays(t *testing.T) {
 	want, _ := filepath.EvalSymlinks(filepath.Join(own, ".git"))
 	if resolved, _ := filepath.EvalSymlinks(got); resolved != want {
 		t.Fatalf("git worked in %s, not in the working copy's %s", got, want)
+	}
+}
+
+// TestTheWorkingCopyHoldsTheRepositorysBytes: a page's file is read as the
+// repository holds it, whatever line endings the server's own git settings
+// would turn it into (Git for Windows sets core.autocrlf for everyone).
+func TestTheWorkingCopyHoldsTheRepositorysBytes(t *testing.T) {
+	ctx := t.Context()
+	settings := filepath.Join(t.TempDir(), "gitconfig")
+	if err := os.WriteFile(settings, []byte("[core]\n\tautocrlf = true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", settings)
+	origin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(origin, "a.md"), []byte("A.\nB.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"init", "--quiet", "--initial-branch=main"}, {"add", "a.md"}, {"commit", "--quiet", "-m", "a"}} {
+		if _, err := git(ctx, origin, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w, err := openWorkingCopy(ctx, filepath.Join(t.TempDir(), "copy"), origin, "", slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.checkout(ctx, "main", "main"); err != nil {
+		t.Fatal(err)
+	}
+	f, err := w.read()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := f.files["a.md"]; got != "A.\nB.\n" {
+		t.Fatalf("a.md was read as %q", got)
 	}
 }
