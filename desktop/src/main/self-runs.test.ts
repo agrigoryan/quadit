@@ -133,6 +133,8 @@ describe("SelfRuns, giving the code back", () => {
     const cases: [(s: ReturnType<typeof setUp>) => Promise<void>, string][] = [
       [async (s) => s.started[0]?.end(1), "it stopped with an error"],
       [async (s) => s.started[0]?.end(0), "it did not give the code back"],
+      [async (s) => s.started[0]?.end(127), "it was not found on this computer"],
+      [async (s) => s.started[0]?.end(126), "it cannot be started from where it is installed"],
       [async () => void (await vi.advanceTimersByTimeAsync(120_000)), "it took longer than two minutes"],
     ];
     for (const [happen, reason] of cases) {

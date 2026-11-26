@@ -170,15 +170,7 @@ export class SelfRuns {
     if (await this.parts.codeGivenBack(id)) {
       held.proving = null;
       this.parts.ran(id);
-    } else
-      held.proving = {
-        state: "failed",
-        reason: late
-          ? "it took longer than two minutes"
-          : exit === 0
-            ? "it did not give the code back"
-            : "it stopped with an error",
-      };
+    } else held.proving = { state: "failed", reason: late ? "it took longer than two minutes" : failedHow(exit) };
     this.log(id, held.proving ? `could not give the code back: ${held.proving.reason}` : "the code was given back");
     this.parts.changed();
   }
@@ -231,5 +223,24 @@ export class SelfRuns {
   quit() {
     this.quitting = true;
     for (const held of this.held.values()) held.prover?.stop();
+  }
+}
+
+/**
+ * Why a run that ended in time did not give the code back, from its exit:
+ * the guard's own codes (child-guard.ts), as a shell's, say the program was
+ * not found (127) or could not be started (126: on Windows the guard
+ * refuses a path or an argument it cannot pass safely).
+ */
+function failedHow(exit: number | null): string {
+  switch (exit) {
+    case 0:
+      return "it did not give the code back";
+    case 127:
+      return "it was not found on this computer";
+    case 126:
+      return "it cannot be started from where it is installed";
+    default:
+      return "it stopped with an error";
   }
 }

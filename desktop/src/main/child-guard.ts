@@ -12,7 +12,11 @@
 // sh, no process groups and no signals the app can send: there the guard is
 // `quadit guard PROGRAM ARGS...` of the quadit the app carries (the Windows
 // contract, S1), stopped by closing its standard input; its exit code is
-// the program's.
+// the program's, 127 when the program is not found and 126 when the guard
+// refuses it (a path or an argument holding ", % or a control character,
+// which cmd.exe could read anew; a .ps1, or a file without an extension).
+// Each program gets a hidden console of its own there, and an agent's run
+// that is stopped is ended at once, with nothing gentler first.
 //
 // A child gets no terminal and no window of the app's; it gets the login
 // shell's PATH and none of the app's QUADIT_ settings (childEnv).
