@@ -35,10 +35,12 @@ const (
 	maxAttempts     = 8
 )
 
-// queueDelivery puts one event in a webhook's queue.
+// queueDelivery puts one event in a webhook's queue, once: an event queued
+// already (a batch the dispatcher handles again) leaves its delivery as it
+// is, waiting, made or given up.
 func (s *Server) queueDelivery(ctx context.Context, db store.DB, h core.Webhook, ev core.Event) error {
 	now := time.Now().UnixMilli()
-	return db.Upsert(ctx, core.WebhookDelivery{ID: id.New(), WorkspaceID: h.WorkspaceID, WebhookID: h.ID, Seq: ev.Seq, EventType: ev.Type,
+	return db.Ensure(ctx, core.WebhookDelivery{ID: id.New(), WorkspaceID: h.WorkspaceID, WebhookID: h.ID, Seq: ev.Seq, EventType: ev.Type,
 		State: core.DeliveryPending, CreatedAt: now, NextAt: now}, "webhook_id", "seq")
 }
 
@@ -109,19 +111,33 @@ func (s *Server) runDeliveries(ctx context.Context) {
 // waitingDeliveries reads the waiting deliveries of each webhook that is
 // not busy, oldest first. Each webhook's own queue is read by itself: one
 // that keeps failing, however long its backlog, or that cannot be read this
-// round, takes nothing from the others.
+// round, takes nothing from the others. Only events the dispatcher has
+// finished with are read: a batch it is still on may yet queue an earlier
+// event for the same webhook (a rule's), which must go first.
 func (s *Server) waitingDeliveries(ctx context.Context, busy *busyHooks) (map[string][]core.WebhookDelivery, error) {
 	var hooks []core.Webhook
 	if err := s.st.List(ctx, &hooks, store.Where(store.Live)); err != nil {
 		return nil, err
+	}
+	var wss []core.Workspace
+	if err := s.st.List(ctx, &wss, store.Q{}); err != nil {
+		return nil, err
+	}
+	dispatched := map[string]int64{}
+	for _, ws := range wss {
+		dispatched[ws.ID] = ws.DispatchedSeq
 	}
 	byHook := map[string][]core.WebhookDelivery{}
 	for _, h := range hooks {
 		if busy.has(h.ID) {
 			continue
 		}
+		where := []store.Cond{store.Eq("webhook_id", h.ID), store.Eq("state", core.DeliveryPending)}
+		if upTo, ok := dispatched[h.WorkspaceID]; ok {
+			where = append(where, store.Lte("seq", upTo))
+		}
 		var list []core.WebhookDelivery
-		q := store.Q{Where: []store.Cond{store.Eq("webhook_id", h.ID), store.Eq("state", core.DeliveryPending)}, Order: "seq", Limit: deliveryBatch}
+		q := store.Q{Where: where, Order: "seq", Limit: deliveryBatch}
 		if err := s.st.List(ctx, &list, q); err != nil {
 			if ctx.Err() == nil {
 				s.log.Error("webhook deliveries: a webhook's queue could not be read; it waits for the next round", "webhook", h.ID, "err", err)

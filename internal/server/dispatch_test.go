@@ -67,6 +67,18 @@ func (r *receiver) last() map[string]any {
 	return r.got[len(r.got)-1]
 }
 
+// seqs are the events' numbers, in the order heard.
+func (r *receiver) seqs() []float64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []float64
+	for _, m := range r.got {
+		seq, _ := m["seq"].(float64)
+		out = append(out, seq)
+	}
+	return out
+}
+
 func (r *receiver) types() string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -214,49 +226,187 @@ func TestAFailingWebhookDoesNotHoldUpTheOthers(t *testing.T) {
 	eventually(t, "the working webhook to hear the comment", func() bool { return strings.Contains(fine.types(), "comment.created") })
 }
 
+// TestADispatchedBatchDoneAgainSendsNothingTwice: a batch the dispatcher
+// handles again, because a reaction failed (a wake-up that could not be
+// queued) or because the server stopped before it recorded how far it
+// got, leaves every delivery already queued or made as it is: none is
+// sent twice, and one made keeps its id, state, attempts and times.
+func TestADispatchedBatchDoneAgainSendsNothingTwice(t *testing.T) {
+	// Not in parallel: it times the background work against a fault, which a busy machine delays.
+	testdb.Each(t, func(t *testing.T, plain store.Store) {
+		st := newFaultyStore(plain)
+		s := newSite(t, st)
+		_, bea := s.invitedPerson(t)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		hook := newReceiver(t, "")
+		s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": hook.srv.URL, "event_types": []string{"task.created"}})
+		deliveries := func() []core.WebhookDelivery {
+			var list []core.WebhookDelivery
+			if err := plain.List(t.Context(), &list, store.Q{Order: "seq"}); err != nil {
+				t.Fatal(err)
+			}
+			return list
+		}
+
+		// The daily jobs are queued when the server starts; wait for them,
+		// so the fault meets the wake-up. The task's wake-up for Bea cannot
+		// be queued the first time: the batch is handled again.
+		eventually(t, "the daily jobs to be queued", func() bool {
+			n, err := plain.Count(t.Context(), "jobs", store.Eq("kind", "trash.purge"))
+			return err == nil && n > 0
+		})
+		fired := st.faults.arm(fault{op: "insert", table: "jobs", times: 1})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Dock crane", "assignee": bea})
+		// Every event dispatched and every delivery made.
+		settled := func() bool {
+			var ws core.Workspace
+			if err := plain.Get(t.Context(), &ws, store.Eq("slug", "games")); err != nil || ws.DispatchedSeq != ws.Seq {
+				return false
+			}
+			list := deliveries()
+			for _, d := range list {
+				if d.State != core.DeliveryOK {
+					return false
+				}
+			}
+			return len(list) > 0
+		}
+		eventually(t, "the tasks' deliveries to be made", func() bool { return fired() == 1 && settled() })
+		made := deliveries()
+
+		// The server stopped before it recorded how far it got: the batch
+		// is handled again from before the delivery made.
+		if _, err := plain.Update(t.Context(), "workspaces", map[string]any{"dispatched_seq": made[0].Seq - 1}, store.Eq("slug", "games")); err != nil {
+			t.Fatal(err)
+		}
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Second"})
+		eventually(t, "the second task's delivery to be made", func() bool { return settled() && len(deliveries()) == len(made)+1 })
+		for i, again := range deliveries()[:len(made)] {
+			if again != made[i] {
+				t.Fatalf("a delivery made was changed by the batch done again:\n%+v\nwas\n%+v", again, made[i])
+			}
+		}
+		heard := map[float64]bool{}
+		for _, seq := range hook.seqs() {
+			if heard[seq] {
+				t.Fatalf("the webhook heard event %v twice", seq)
+			}
+			heard[seq] = true
+		}
+		if len(heard) != len(made)+1 {
+			t.Fatalf("the webhook heard %d events, want %d", len(heard), len(made)+1)
+		}
+	})
+}
+
+// TestAWebhookHearsEventsInOrder: a webhook hears its events in the order
+// they happened, also when one reaches it through a rule and a later one
+// through its own subscription, and when the batch holding them is handled
+// a second time because a reaction failed the first.
+func TestAWebhookHearsEventsInOrder(t *testing.T) {
+	// Not in parallel: it times the background work against a fault, which a busy machine delays.
+	testdb.Each(t, func(t *testing.T, plain store.Store) {
+		st := newFaultyStore(plain)
+		s := newSite(t, st)
+		_, bea := s.invitedPerson(t)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Talked about"})
+		hook := newReceiver(t, "")
+		ref := s.change(t, s.owner, "", "webhook.create", M{"name": "mirror", "url": hook.srv.URL, "event_types": []string{"task.updated"}})["ref"]
+		s.change(t, s.owner, "", "rule.create", M{"name": "comments too", "match": M{"event_types": []string{"comment.created"}},
+			"action": M{"kind": "webhook", "webhook_id": ref}})
+		eventually(t, "the daily jobs to be queued, and the events so far to be dispatched", func() bool {
+			var ws core.Workspace
+			if err := plain.Get(t.Context(), &ws, store.Eq("slug", "games")); err != nil || ws.DispatchedSeq != ws.Seq {
+				return false
+			}
+			n, err := plain.Count(t.Context(), "jobs", store.Eq("kind", "trash.purge"))
+			return err == nil && n > 0
+		})
+
+		// One batch: a wake-up for Bea, which cannot be queued the first
+		// time; a comment, which reaches the webhook through the rule; a
+		// change of the task, which reaches it through its subscription.
+		fired := st.faults.arm(fault{op: "insert", table: "jobs", times: 1})
+		s.call(t, s.owner, "", "POST", w+"/changes", M{"changes": []M{
+			{"id": id.New(), "type": "task.create", "args": M{"project": "SVA", "title": "Dock crane", "assignee": bea}},
+			{"id": id.New(), "type": "comment.create", "args": M{"task": "SVA-1", "body": "first"}},
+			{"id": id.New(), "type": "task.update", "args": M{"id": "SVA-1", "title": "Talked about, then"}},
+		}}, 200, nil)
+		eventually(t, "the webhook to hear the comment and the change", func() bool { return strings.Count(hook.types(), " ") == 1 })
+		if fired() != 1 {
+			t.Fatalf("the fault fired %d times, want once", fired())
+		}
+		if got := hook.types(); got != "comment.created task.updated" {
+			t.Fatalf("the webhook heard %q, want the comment, then the change", got)
+		}
+	})
+}
+
 // TestAWebhooksDeliveriesAreQueuedABatchAtATime: the dispatcher queues the
-// deliveries of a batch of events in one write, not one write each: on a
-// slow disk a commit for every event a busy webhook wants would hold every
-// later event, and every other webhook, behind it.
+// deliveries of a batch of events (dispatchBatch, 300) in one write, not
+// one write each: on a slow disk a commit for every event a busy webhook
+// wants would hold every later event, and every other webhook, behind it.
 func TestAWebhooksDeliveriesAreQueuedABatchAtATime(t *testing.T) {
 	t.Parallel()
-	st := &deliveriesAlone{Store: testdb.SQLite(t)}
-	s := newSite(t, st)
-	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
-	s.change(t, s.owner, "", "webhook.create", M{"name": "nowhere", "url": "http://127.0.0.1:9/x", "event_types": []string{"task.*"}})
-	batch := make([]M, 400)
-	for i := range batch {
-		batch[i] = M{"id": id.New(), "type": "task.create", "args": M{"project": "SVA", "title": fmt.Sprintf("Backlog %d", i)}}
-	}
-	s.call(t, s.owner, "", "POST", w+"/changes", M{"changes": batch}, 200, nil)
-	eventually(t, "every task's delivery to be queued", func() bool {
-		n, err := st.Count(t.Context(), "webhook_deliveries")
-		return err == nil && n == len(batch)
+	testdb.Each(t, func(t *testing.T, plain store.Store) {
+		st := &deliveryWrites{Store: plain}
+		s := newSite(t, st)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "webhook.create", M{"name": "nowhere", "url": "http://127.0.0.1:9/x", "event_types": []string{"task.*"}})
+		batch := make([]M, 400)
+		for i := range batch {
+			batch[i] = M{"id": id.New(), "type": "task.create", "args": M{"project": "SVA", "title": fmt.Sprintf("Backlog %d", i)}}
+		}
+		s.call(t, s.owner, "", "POST", w+"/changes", M{"changes": batch}, 200, nil)
+		eventually(t, "every task's delivery to be queued", func() bool {
+			n, err := plain.Count(t.Context(), "webhook_deliveries")
+			return err == nil && n == len(batch)
+		})
+		// The 400 events, and the few before them, are two batches at most.
+		if n := st.writes.Load(); n > 2 {
+			t.Fatalf("the deliveries of %d events were queued in %d writes, want two at most", len(batch), n)
+		}
 	})
-	if n := st.alone.Load(); n != 0 {
-		t.Fatalf("%d deliveries were queued in a write of their own", n)
-	}
 }
 
-// deliveriesAlone is a store that counts the webhook deliveries written
-// outside a transaction of several writes (Atomic).
-type deliveriesAlone struct {
+// deliveryWrites is a store that counts the writes that queue webhook
+// deliveries: each delivery queued on its own, and each transaction
+// (Atomic) that queues any.
+type deliveryWrites struct {
 	store.Store
-	alone atomic.Int64
+	writes atomic.Int64
 }
 
-func (s *deliveriesAlone) In(workspaceID string) store.DB {
-	return &deliveriesAloneDB{DB: s.Store.In(workspaceID), alone: &s.alone}
+func (s *deliveryWrites) In(workspaceID string) store.DB {
+	return &deliveryWritesDB{DB: s.Store.In(workspaceID), writes: &s.writes}
 }
 
-type deliveriesAloneDB struct {
+func (s *deliveryWrites) Atomic(ctx context.Context, fn func(store.DB) error) error {
+	var inside atomic.Int64
+	err := s.Store.Atomic(ctx, func(db store.DB) error { return fn(&deliveryWritesDB{DB: db, writes: &inside}) })
+	if inside.Load() > 0 {
+		s.writes.Add(1)
+	}
+	return err
+}
+
+// deliveryWritesDB counts the deliveries it queues.
+type deliveryWritesDB struct {
 	store.DB
-	alone *atomic.Int64
+	writes *atomic.Int64
 }
 
-func (db *deliveriesAloneDB) Upsert(ctx context.Context, row any, key ...string) error {
+func (db *deliveryWritesDB) Ensure(ctx context.Context, row any, key ...string) error {
 	if _, ok := row.(core.WebhookDelivery); ok {
-		db.alone.Add(1)
+		db.writes.Add(1)
+	}
+	return db.DB.Ensure(ctx, row, key...)
+}
+
+func (db *deliveryWritesDB) Upsert(ctx context.Context, row any, key ...string) error {
+	if _, ok := row.(core.WebhookDelivery); ok {
+		db.writes.Add(1)
 	}
 	return db.DB.Upsert(ctx, row, key...)
 }
