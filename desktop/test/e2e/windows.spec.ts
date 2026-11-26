@@ -6,15 +6,19 @@
 // stand-ins first on the person's PATH in the registry, which is where the
 // app reads the PATH on Windows (put back as it was after each test).
 //
-// The stand-in Claude Code is internal/fakeagent: the command's test binary
-// (go test -c ./internal/cli, as bin/fake-claude.exe), which is the agent
-// program when FAKEAGENT says which. Told "Connect to Quadit CODE" it gives
-// nothing back, so the card falls back to the line to paste, and the test
-// gives the code back itself with quadit connect, as the agent would.
+// Two stand-ins play Claude Code:
+//   - internal/fakeagent, the command's test binary (go test -c
+//     ./internal/cli, as bin/fake-claude.exe), which is the agent program
+//     when FAKEAGENT says which, for a run Quadit starts. Told "Connect to
+//     Quadit CODE" it gives nothing back: there the card falls back to the
+//     line to paste, and the test gives the code back with quadit connect.
+//   - Node itself as claude.exe, with a script it loads first (NODE_OPTIONS,
+//     GIVES_CODE_BACK below), which plays the one-prompt run: told
+//     `-p "Connect to Quadit CODE"`, it runs `quadit connect CODE`, finding
+//     quadit on the PATH it was given, as Claude Code does.
 //
 // What the app holds besides its server (the run giving a code back, quadit
-// run) starts under quadit guard there: the last test needs a quadit that
-// has it.
+// run) starts under quadit guard there.
 
 import { execFile, execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
@@ -22,7 +26,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import type { Page } from "@playwright/test";
-import { readUserVariable, writeUserVariable } from "../../src/main/windows-environment";
+import { readUserVariable, systemPath, writeUserVariable } from "../../src/main/windows-environment";
 import { Desktop, expect, screen, test } from "./desktop";
 import { bareEnv, type Run } from "./run";
 
@@ -53,13 +57,31 @@ const CLAUDE_DONE = [
 ];
 
 /**
- * A computer of the test's own: a home folder, a folder first on the
- * person's PATH with a quadit.exe (the run's own), and with `claudeCode`
- * Claude Code's settings folder and the stand-in claude.exe there. Gives the
- * app's environment, where quadit keeps its logins, the stand-in's record of
- * its starts, and the way to put the PATH back.
+ * The script Node loads first as the stand-in Claude Code that gives its
+ * code back. Anywhere else (the app itself, run from source, reads
+ * NODE_OPTIONS too) it does nothing.
  */
-function windowsComputer(run: Run, { claudeCode }: { claudeCode: boolean }) {
+const GIVES_CODE_BACK = `const { basename } = require("node:path");
+if (basename(process.execPath).toLowerCase() === "claude.exe") {
+  const prompt = process.execArgv[process.execArgv.indexOf("-p") + 1] ?? "";
+  const code = /^Connect to Quadit (\\S+)$/.exec(prompt)?.[1];
+  const said = code ? require("node:child_process").spawnSync("quadit", ["connect", code], { stdio: "inherit" }) : { status: 3 };
+  process.exit(said.status ?? 1);
+}
+`;
+
+/**
+ * A computer of the test's own: a home folder, and a folder first on the
+ * person's PATH with, unless `quadit` is false, a quadit.exe (the run's own);
+ * with `claude`, Claude Code's settings folder and a stand-in claude.exe
+ * there ("fake-agent" or "gives-code-back", above). Gives the app's
+ * environment, where quadit keeps its logins, the stand-in's record of its
+ * starts, the PATH the test set, and the way to put the PATH back.
+ */
+function windowsComputer(
+  run: Run,
+  { claude, quadit = true }: { claude: "none" | "fake-agent" | "gives-code-back"; quadit?: boolean },
+) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-windows-")));
   const home = join(root, "home");
   const bin = join(root, "bin");
@@ -67,14 +89,16 @@ function windowsComputer(run: Run, { claudeCode }: { claudeCode: boolean }) {
   mkdirSync(appData, { recursive: true });
   mkdirSync(join(home, "AppData", "Local"), { recursive: true });
   mkdirSync(bin);
-  copyFileSync(run.binary, join(bin, "quadit.exe"));
+  if (quadit) copyFileSync(run.binary, join(bin, "quadit.exe"));
   const scripts = join(root, "scripts.json");
   const record = join(root, "record.jsonl");
   writeFileSync(scripts, JSON.stringify([CLAUDE_DONE]));
-  if (claudeCode) {
+  const preload = join(root, "gives-code-back.cjs");
+  writeFileSync(preload, GIVES_CODE_BACK);
+  if (claude !== "none") {
     mkdirSync(join(home, ".claude"));
     writeFileSync(join(home, ".claude", "settings.json"), JSON.stringify({ permissions: { allow: ["Read"] } }));
-    copyFileSync(FAKE_AGENT, join(bin, "claude.exe"));
+    copyFileSync(claude === "fake-agent" ? FAKE_AGENT : process.execPath, join(bin, "claude.exe"));
   }
   const before = readUserVariable("Path");
   const path = `${bin};${before?.value ?? ""}`;
@@ -93,6 +117,8 @@ function windowsComputer(run: Run, { claudeCode }: { claudeCode: boolean }) {
       FAKEAGENT: "claude",
       FAKEAGENT_SCRIPTS: scripts,
       FAKEAGENT_RECORD: record,
+      // Forward slashes: NODE_OPTIONS reads a backslash inside quotes as an escape.
+      ...(claude === "gives-code-back" ? { NODE_OPTIONS: `--require "${preload.replaceAll("\\", "/")}"` } : {}),
     },
     restore: () => writeUserVariable("Path", before),
   };
@@ -114,20 +140,25 @@ function asTheAgent(run: Run, config: string, args: string[]) {
 
 /**
  * The first run, from its first page: set up on this computer as Lou Local,
- * and with `connect` Claude Code connected on its card (the code given back
- * by the test when the card asks for it); then Continue. Gives the server's
- * address and its window.
+ * and Claude Code connected on its card: "by-hand", the code given back by
+ * the test when the card asks for it; "by-itself", by the app's own run of
+ * the stand-in; then Continue. Gives the server's address and its window.
  */
 async function firstRun(
   desktop: Desktop,
   run: Run,
   computer: ReturnType<typeof windowsComputer>,
-  connect: boolean,
+  connect: "none" | "by-hand" | "by-itself",
 ): Promise<{ origin: string; page: Page }> {
   const first = await desktop.firstRun();
   await first.getByLabel("Your name").fill("Lou Local");
   await first.getByRole("button", { name: "Set up on this computer" }).click();
-  if (connect) {
+  if (connect === "by-itself") {
+    const card = first.getByRole("article", { name: "Claude Code" });
+    await card.getByRole("button", { name: "Connect Claude Code" }).click({ timeout: 90_000 });
+    await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 90_000 });
+  }
+  if (connect === "by-hand") {
     const card = first.getByRole("article", { name: "Claude Code" });
     await card.getByRole("button", { name: "Connect Claude Code" }).click({ timeout: 90_000 });
     const line = card.getByText(/^Connect to Quadit \S{6}$/);
@@ -149,14 +180,14 @@ async function firstRun(
 test("set up on this computer, the app runs quadit.exe as its server, signs its window in, and quitting stops it", async ({
   run,
 }) => {
-  const computer = windowsComputer(run, { claudeCode: false });
+  const computer = windowsComputer(run, { claude: "none" });
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   let origin = "";
   try {
     const desktop = await Desktop.launch(data, run, [], { env: computer.env, firstStart: true });
     try {
       let page: Page;
-      ({ origin, page } = await firstRun(desktop, run, computer, false));
+      ({ origin, page } = await firstRun(desktop, run, computer, "none"));
       expect(await answers(origin)).toBe(true);
       expect(existsSync(join(data, "server", "quadit.sqlite"))).toBe(true);
       expect(await page.evaluate(async () => (await fetch("/api/v1/auth/me")).status)).toBe(200);
@@ -176,12 +207,12 @@ test("Connect sets a stand-in Claude Code up with Windows paths, it gives its co
   run,
 }) => {
   test.setTimeout(300_000);
-  const computer = windowsComputer(run, { claudeCode: true });
+  const computer = windowsComputer(run, { claude: "fake-agent" });
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   try {
     const desktop = await Desktop.launch(data, run, [], { env: computer.env, firstStart: true });
     try {
-      await firstRun(desktop, run, computer, true);
+      await firstRun(desktop, run, computer, "by-hand");
       const settings = join(computer.home, ".claude", "settings.json");
       const login = join(computer.configDir, "claude.json");
       expect(JSON.parse(readFileSync(settings, "utf8"))).toEqual({
@@ -216,7 +247,7 @@ test("Run by Quadit starts the stand-in Claude Code for the task waiting on it, 
   run,
 }, testInfo) => {
   test.setTimeout(300_000);
-  const computer = windowsComputer(run, { claudeCode: true });
+  const computer = windowsComputer(run, { claude: "fake-agent" });
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   const folder = testInfo.outputPath("game");
   mkdirSync(folder, { recursive: true });
@@ -240,7 +271,7 @@ test("Run by Quadit starts the stand-in Claude Code for the task waiting on it, 
     const desktop = await Desktop.launch(data, run, [], { env: computer.env, firstStart: true });
     try {
       // The first run handed GS-3 to Claude Code's agent: it waits on it, so Start running starts it at once.
-      const { page } = await firstRun(desktop, run, computer, true);
+      const { page } = await firstRun(desktop, run, computer, "by-hand");
       await expect(page.getByText(/is for Claude Code/)).toBeVisible({ timeout: 20_000 });
       await desktop.chooseMenuItem("connect");
       const connect = await desktop.appPage("connect.html");
@@ -264,6 +295,60 @@ test("Run by Quadit starts the stand-in Claude Code for the task waiting on it, 
 
       await card.getByRole("button", { name: /^Stop running GS for @/ }).click();
       await expect.poll(entries, { timeout: 70_000 }).toEqual([]);
+    } finally {
+      await desktop.close();
+    }
+  } finally {
+    computer.restore();
+  }
+});
+
+test("the first Connect puts the app's quadit on the person's PATH, the stand-in gives its code back through the guard, Disconnect takes exactly that out, and Connect puts it back", async ({
+  run,
+}) => {
+  test.setTimeout(300_000);
+  // No quadit on the PATH: the app's own (QUADIT_DESKTOP_QUADIT, run from source) is what Connect puts there.
+  const computer = windowsComputer(run, { claude: "gives-code-back", quadit: false });
+  const folder = dirname(run.binary);
+  const added = `${computer.path}${computer.path.endsWith(";") ? "" : ";"}${folder}`;
+  /** Where a program started now with the PATH Windows gives finds quadit (where.exe, as a terminal would). */
+  const quaditFound = async () => {
+    const where = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "where.exe");
+    try {
+      return execFileSync(where, ["quadit"], { env: { ...bareEnv(), PATH: await systemPath() }, encoding: "utf8" })
+        .trim()
+        .toLowerCase();
+    } catch {
+      return "";
+    }
+  };
+  const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
+  try {
+    const desktop = await Desktop.launch(data, run, [], { env: computer.env, firstStart: true });
+    try {
+      // Connected by itself: the app's one-prompt run of the stand-in, under quadit guard, gave the code back with
+      // the quadit it found on the PATH Connect had just added to.
+      await firstRun(desktop, run, computer, "by-itself");
+      expect(readUserVariable("Path")?.value).toBe(added);
+      expect(await quaditFound()).toContain(join(folder, "quadit.exe").toLowerCase());
+
+      await desktop.chooseMenuItem("connect");
+      const connect = await desktop.appPage("connect.html");
+      const card = connect.getByRole("article", { name: "Claude Code" });
+      await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 20_000 });
+      await card.getByRole("button", { name: "Disconnect Claude Code" }).click();
+      const undo = connect.getByRole("dialog", { name: "What disconnecting Claude Code changes" });
+      await expect(undo.getByText("Your PATH", { exact: true })).toBeVisible();
+      await undo.getByRole("button", { name: "Disconnect Claude Code" }).click();
+      await expect(connect.getByRole("status").filter({ hasText: "Disconnected." })).toBeVisible({ timeout: 70_000 });
+      expect(readUserVariable("Path")?.value).toBe(computer.path);
+      expect(await quaditFound()).toBe("");
+
+      // Again, in the same session: the folder goes back on the PATH.
+      await card.getByRole("button", { name: "Connect Claude Code" }).click();
+      await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 90_000 });
+      expect(readUserVariable("Path")?.value).toBe(added);
+      await screen(connect, "windows-05-connected-by-itself.png");
     } finally {
       await desktop.close();
     }
