@@ -265,4 +265,4 @@ The admin area's health panel shows failing webhooks, undelivered wake-ups, repo
 | --- | --- |
 | `git` | Syncing a folder of Markdown files in a repository with pages. The server keeps only the last commit, and for a source with a folder only that folder (git 2.25 or later; an older git, or a remote that refuses a shallow clone, gets a whole copy) |
 | `ffmpeg`, `ffprobe` | A sheet of stills for each uploaded clip, so agents can look at video cheaply |
-| Chrome or Chromium | The render check: a picture of a task or page as a person sees it. Set `QUADIT_CHROME` if it is not on the path |
+| Chrome or Chromium | The render check: a picture of a task or page as a person sees it. Set `QUADIT_CHROME` if it is not on the path. Where the browser cannot make its own sandbox and stops with "No usable sandbox!" (Ubuntu 23.10 and later, most containers), set `QUADIT_CHROME_ARGS=--no-sandbox`; the Docker image already does |
