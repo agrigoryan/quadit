@@ -93,15 +93,25 @@ func (s *Server) dispatch(ctx context.Context, ws core.Workspace) (int64, error)
 	if err := db.List(ctx, &l.viewWatchers, store.Where(store.Eq("subject_type", "view"))); err != nil {
 		return 0, err
 	}
-	for _, ev := range evs {
-		// Webhooks mirror the feed, history too: its payload says quiet.
-		for _, h := range l.hooks {
-			if hookWants(h, ev) {
-				if err := s.queueDelivery(ctx, db, h, ev); err != nil {
-					return 0, err
+	// Webhooks mirror the feed, history too: its payload says quiet. The
+	// batch's deliveries are queued in one write: one each would be a
+	// commit for every event a webhook wants, which on a slow disk holds
+	// every later event, and every other webhook, behind a busy one.
+	if err := s.st.Atomic(ctx, func(tx store.DB) error {
+		for _, ev := range evs {
+			for _, h := range l.hooks {
+				if hookWants(h, ev) {
+					if err := s.queueDelivery(ctx, tx, h, ev); err != nil {
+						return err
+					}
 				}
 			}
 		}
+		return nil
+	}); err != nil {
+		return 0, err
+	}
+	for _, ev := range evs {
 		if isNews(ev) {
 			if err := s.reactToNews(ctx, l, ev); err != nil {
 				return 0, err

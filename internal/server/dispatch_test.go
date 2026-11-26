@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -11,9 +12,11 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/id"
 	"github.com/agrigoryan/quadit/internal/store"
 	"github.com/agrigoryan/quadit/internal/testdb"
@@ -209,6 +212,53 @@ func TestAFailingWebhookDoesNotHoldUpTheOthers(t *testing.T) {
 	}
 	s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "after the backlog"})
 	eventually(t, "the working webhook to hear the comment", func() bool { return strings.Contains(fine.types(), "comment.created") })
+}
+
+// TestAWebhooksDeliveriesAreQueuedABatchAtATime: the dispatcher queues the
+// deliveries of a batch of events in one write, not one write each: on a
+// slow disk a commit for every event a busy webhook wants would hold every
+// later event, and every other webhook, behind it.
+func TestAWebhooksDeliveriesAreQueuedABatchAtATime(t *testing.T) {
+	t.Parallel()
+	st := &deliveriesAlone{Store: testdb.SQLite(t)}
+	s := newSite(t, st)
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "webhook.create", M{"name": "nowhere", "url": "http://127.0.0.1:9/x", "event_types": []string{"task.*"}})
+	batch := make([]M, 400)
+	for i := range batch {
+		batch[i] = M{"id": id.New(), "type": "task.create", "args": M{"project": "SVA", "title": fmt.Sprintf("Backlog %d", i)}}
+	}
+	s.call(t, s.owner, "", "POST", w+"/changes", M{"changes": batch}, 200, nil)
+	eventually(t, "every task's delivery to be queued", func() bool {
+		n, err := st.Count(t.Context(), "webhook_deliveries")
+		return err == nil && n == len(batch)
+	})
+	if n := st.alone.Load(); n != 0 {
+		t.Fatalf("%d deliveries were queued in a write of their own", n)
+	}
+}
+
+// deliveriesAlone is a store that counts the webhook deliveries written
+// outside a transaction of several writes (Atomic).
+type deliveriesAlone struct {
+	store.Store
+	alone atomic.Int64
+}
+
+func (s *deliveriesAlone) In(workspaceID string) store.DB {
+	return &deliveriesAloneDB{DB: s.Store.In(workspaceID), alone: &s.alone}
+}
+
+type deliveriesAloneDB struct {
+	store.DB
+	alone *atomic.Int64
+}
+
+func (db *deliveriesAloneDB) Upsert(ctx context.Context, row any, key ...string) error {
+	if _, ok := row.(core.WebhookDelivery); ok {
+		db.alone.Add(1)
+	}
+	return db.DB.Upsert(ctx, row, key...)
 }
 
 // TestAProjectsWebhookIsNotToldOfTasksOfOtherProjects: a webhook made for
