@@ -1,6 +1,8 @@
 // The server list page: every added server with what it answered just now,
 // and the form that adds one. All work is done by the app (src/main/server-list.ts)
-// through window.quaditPages.
+// through window.quaditPages. The list is drawn again whenever anything the
+// app shows changes (a window's page publishing, the server here starting):
+// a removal being asked about, and the button in focus, stay as they were.
 
 import { element, make } from "@/pages/dom";
 import { localDetails, runLocalChoice } from "@/pages/local";
@@ -15,6 +17,8 @@ const addInsecure = element<HTMLButtonElement>("add-insecure");
 const invitation = element<HTMLParagraphElement>("invitation");
 const runLocal = element<HTMLElement>("run-local");
 const runLocalBox = element<HTMLDivElement>("run-local-choice");
+/** The server whose removal the person is being asked about; written by its row's Remove, Keep and Yes. */
+let confirmingId: string | null = null;
 
 /** What a person should know about a server's answer, in a line. */
 function describe(status: ServerStatus): { text: string; signIn: boolean; warn: boolean } {
@@ -86,20 +90,28 @@ function row(server: ServerView, local: LocalServerView): HTMLLIElement {
   const yes = make("button", "Remove", "danger");
   yes.type = "button";
   yes.setAttribute("aria-label", `Yes, remove ${server.name}`);
-  yes.addEventListener("click", () => void api.removeServer(server.id));
+  yes.addEventListener("click", () => {
+    confirmingId = null;
+    void api.removeServer(server.id);
+  });
   const no = make("button", "Keep");
   no.type = "button";
+  no.setAttribute("aria-label", `Keep ${server.name}`);
   no.addEventListener("click", () => {
+    confirmingId = null;
     confirming.hidden = true;
     actions.hidden = false;
     remove.focus();
   });
   confirming.append(yes, no);
   remove.addEventListener("click", () => {
+    confirmingId = server.id;
     actions.hidden = true;
     confirming.hidden = false;
     no.focus();
   });
+  actions.hidden = confirmingId === server.id;
+  confirming.hidden = confirmingId !== server.id;
   item.append(about, actions, confirming);
 
   // Signing in to the server on this computer happens in its own window.
@@ -118,7 +130,11 @@ function row(server: ServerView, local: LocalServerView): HTMLLIElement {
 
 async function render() {
   const [servers, local] = await Promise.all([api.listServers(), api.localServer()]);
+  // A button of the list in focus is found again by its name in the rows drawn anew.
+  const focused = list.contains(document.activeElement) ? document.activeElement?.getAttribute("aria-label") : null;
+  if (!servers.some((server) => server.id === confirmingId)) confirmingId = null;
   list.replaceChildren(...servers.map((server) => row(server, local)));
+  if (focused) list.querySelector<HTMLElement>(`[aria-label="${CSS.escape(focused)}"]`)?.focus();
   empty.hidden = servers.length > 0;
   const choice = runLocalChoice(local);
   runLocalBox.replaceChildren(...choice);

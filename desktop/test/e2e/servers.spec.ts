@@ -2,6 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Rectangle } from "electron";
+import { PAGES_CHANGED } from "../../src/shared/pages-api";
 import { APP_VERSION, Desktop, expect, signInWithPassword, test } from "./desktop";
 
 test("a server added by its address opens in its own window, on its own session, at its sign-in page", async ({
@@ -43,6 +44,29 @@ test("a server added by its address opens in its own window, on its own session,
   );
   expect(own).toEqual({ sameSession: true, persistent: true, sandboxed: true, isolated: true, node: false });
   expect((await page.evaluate(() => navigator.userAgent)).split(" ").at(-1)).toBe(`QuaditDesktop/${APP_VERSION}`);
+});
+
+test("a removal being asked about stays asked, its button in focus, while the list is drawn again", async ({
+  desktop,
+  run,
+}) => {
+  await desktop.addServer(run.server, "Work");
+  const list = await desktop.serverList();
+  await list.getByRole("button", { name: "Remove Work" }).click();
+  await expect(list.getByRole("button", { name: "Keep Work" })).toBeFocused();
+  // What the app shows changed meanwhile (a window's page published, a server answered): every page is told, and
+  // the list is drawn again (the row marked now is gone once it is).
+  await list
+    .getByRole("button", { name: "Yes, remove Work" })
+    .evaluate((button) => button.setAttribute("data-drawn-before", ""));
+  await desktop.app.evaluate(({ webContents }, channel) => {
+    for (const contents of webContents.getAllWebContents()) contents.send(channel);
+  }, PAGES_CHANGED);
+  await expect(list.locator("[data-drawn-before]")).toHaveCount(0);
+  await expect(list.getByRole("button", { name: "Keep Work" })).toBeFocused();
+  await expect(list.getByRole("button", { name: "Remove Work" })).toBeHidden();
+  await list.getByRole("button", { name: "Yes, remove Work" }).click();
+  await expect(list.getByText("No servers yet.")).toBeVisible();
 });
 
 test("an address that is not a Quadit server is refused with the reason", async ({ desktop }) => {
