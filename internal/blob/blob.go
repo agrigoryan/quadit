@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -80,9 +81,10 @@ func (d *Disk) Check(_ context.Context) error {
 	return nil
 }
 
-// path is where key is kept; a key that climbs out of the root is refused.
+// path is where key is kept; a key that climbs out of the root, or names
+// the root itself, is refused. Keys are slash-separated on every system.
 func (d *Disk) path(key string) (string, error) {
-	clean := filepath.Clean("/" + key)
+	clean := path.Clean("/" + key)
 	if strings.Contains(key, "..") || clean == "/" {
 		return "", errors.New("blob: bad key")
 	}

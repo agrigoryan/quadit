@@ -72,8 +72,10 @@ func TestDisk(t *testing.T) {
 		t.Fatal(err)
 	}
 	testStore(t, d)
-	if err := d.Put(context.Background(), "../escape", strings.NewReader("x"), ""); err == nil {
-		t.Fatal("a key that climbs out of the store was accepted")
+	for _, key := range []string{"../escape", "", "/", "ws/.."} {
+		if err := d.Put(context.Background(), key, strings.NewReader("x"), ""); err == nil {
+			t.Fatalf("the key %q, out of the store or the store itself, was accepted", key)
+		}
 	}
 }
 
