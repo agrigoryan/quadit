@@ -31,9 +31,12 @@ type taskCreateArgs struct {
 	Epic          string `json:"epic"`
 	Milestone     string `json:"milestone"`
 	Cycle         string `json:"cycle"`
-	Estimate      *int   `json:"estimate"`
+	// Estimate left out is the template's, or none; null is none, whatever
+	// the template says; a value is held to the project's scale.
+	Estimate Opt[int] `json:"estimate"`
 	// KeepEstimate takes the estimate as given, on the project's scale or
 	// not, 0 included: an import brings a task's estimate as it was there.
+	// For admins, who alone import.
 	KeepEstimate bool     `json:"keep_estimate"`
 	Labels       []string `json:"labels"`
 	DueOn        string   `json:"due_on"`
@@ -76,10 +79,9 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 
 	// The template fills what the caller left empty, and may open a
 	// decision on the task once it is made.
-	named := a.Estimate != nil
-	var opens *decisionOpenArgs
+	var preset Preset
 	if a.Template != "" {
-		if opens, err = c.applyTemplate(project, &a); err != nil {
+		if preset, err = c.applyTemplate(project, &a); err != nil {
 			return err
 		}
 	}
@@ -92,16 +94,25 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 	if !priorityOK(a.Priority) {
 		return invalid("priority", priorityHelp)
 	}
-	// The estimate the caller names is held to the project's scale, unless
-	// it is to be kept as given; a template's is applied as it is.
-	estimate := a.Estimate
+	// The estimate: the one named, held to the project's scale unless an
+	// admin's import keeps it as given; none for null; the template's, as it
+	// is, when none is named.
+	if a.KeepEstimate && !c.system && !c.actor.Role.AtLeast(core.RoleAdmin) {
+		return forbidden("keep_estimate is for imports and needs the admin role; leave it out and the estimate is held to the project's scale")
+	}
+	estimate := preset.Estimate
 	switch {
-	case estimate == nil: // none
-	case named && !a.KeepEstimate:
-		if estimate, err = taskEstimate(project.Settings, *estimate); err != nil {
+	case !a.Estimate.Set:
+	case a.Estimate.Null:
+		estimate = nil
+	case a.KeepEstimate:
+		estimate = &a.Estimate.V
+	default:
+		if estimate, err = taskEstimate(project.Settings, a.Estimate.V); err != nil {
 			return err
 		}
-	case *estimate < 0:
+	}
+	if estimate != nil && *estimate < 0 {
 		return invalid("estimate", estimateHelp)
 	}
 	if err := c.checkTaskHandoffLimit(0, a.HandoffLimit); err != nil {
@@ -202,10 +213,10 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 	}
 
 	// The decision the template opens on it.
-	if opens == nil {
+	if preset.Decision == nil {
 		return nil
 	}
-	o := *opens
+	o := *preset.Decision
 	o.ID, o.Task = "", t.ID
 	return c.applyNested("decision.open", o)
 }

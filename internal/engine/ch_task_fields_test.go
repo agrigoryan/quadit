@@ -181,3 +181,52 @@ func TestOnlyAnEstimateNamedInAChangeIsChecked(t *testing.T) {
 		w.refused(engine.CodeInvalid, w.owner.ID, "task.create", M{"project": "SVA", "title": "Imported", "estimate": -1, "keep_estimate": true})
 	})
 }
+
+// TestATaskMadeFromATemplateTakesItsEstimateUnlessOneIsSent: on
+// task.create, an estimate left out is the template's, applied as it is
+// (an explicit 0 included), or none without one; null is none, whatever the
+// template says; a value is that value, held to the scale.
+func TestATaskMadeFromATemplateTakesItsEstimateUnlessOneIsSent(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien", "settings": M{"estimates": true}})
+		w.do(w.owner.ID, "template.create", M{"name": "Off", "project": "SVA", "preset": M{"estimate": 4}})
+		w.do(w.owner.ID, "template.create", M{"name": "Zero", "project": "SVA", "preset": M{"estimate": 0}})
+		w.do(w.owner.ID, "template.create", M{"name": "Plain", "project": "SVA"})
+		for _, c := range []struct {
+			name string
+			args M
+			want string
+		}{
+			{"left out, from a template", M{"template": "Off"}, "4"},
+			{"left out, from a template's zero", M{"template": "Zero"}, "0"},
+			{"left out, from a template without one", M{"template": "Plain"}, "none"},
+			{"left out, without a template", M{}, "none"},
+			{"null, over a template's", M{"template": "Off", "estimate": nil}, "none"},
+			{"null, over a template's zero", M{"template": "Zero", "estimate": nil}, "none"},
+			{"a value, over a template's", M{"template": "Off", "estimate": 5}, "5"},
+		} {
+			c.args["project"], c.args["title"] = "SVA", c.name
+			ref := w.do(w.owner.ID, "task.create", c.args).Ref
+			if got := w.estimateOf(ref); got != c.want {
+				t.Errorf("%s: %s, want %s", c.name, got, c.want)
+			}
+		}
+		w.refused(engine.CodeInvalid, w.owner.ID, "task.create", M{"project": "SVA", "title": "Off the scale", "template": "Off", "estimate": 4})
+	})
+}
+
+// TestOnlyAnAdminKeepsAnEstimateAsGiven: keep_estimate is for imports,
+// which are an admin's; anyone else sending it is refused, as quiet is.
+func TestOnlyAnAdminKeepsAnEstimateAsGiven(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien", "settings": M{"estimates": true}})
+		coder := w.agent("coder")
+		w.refused(engine.CodeForbidden, coder, "task.create", M{"project": "SVA", "title": "Imported", "estimate": 4, "keep_estimate": true})
+		w.refused(engine.CodeInvalid, coder, "task.create", M{"project": "SVA", "title": "Sized", "estimate": 4})
+		w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Imported", "estimate": 4, "keep_estimate": true})
+	})
+}

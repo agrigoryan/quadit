@@ -763,7 +763,7 @@ export interface Preset {
   priority?: number;
   labels?: string[];
   assignee?: string;
-  estimate?: number;
+  estimate?: number | null;
   decision?: DecisionOpenArgs | null;
 }
 

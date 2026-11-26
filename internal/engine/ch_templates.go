@@ -23,7 +23,7 @@ type Preset struct {
 	Priority int      `json:"priority,omitempty"`
 	Labels   []string `json:"labels,omitempty"`
 	Assignee string   `json:"assignee,omitempty"`
-	Estimate int      `json:"estimate,omitempty"`
+	Estimate *int     `json:"estimate,omitempty"` // 0 is an estimate, nil none
 	// Decision, when set, is opened on the new task: a review template
 	// starts with its question and options.
 	Decision *decisionOpenArgs `json:"decision,omitempty"`
@@ -129,11 +129,12 @@ func (c *cx) loadTemplate(project core.Project, ref string) (core.Template, erro
 }
 
 // applyTemplate fills what the caller left empty on a new task from a
-// template, and returns the decision the template opens, if any.
-func (c *cx) applyTemplate(project core.Project, a *taskCreateArgs) (*decisionOpenArgs, error) {
+// template, and returns the template's preset for what is filled in later:
+// the estimate and the decision the template opens.
+func (c *cx) applyTemplate(project core.Project, a *taskCreateArgs) (Preset, error) {
 	tp, err := c.loadTemplate(project, a.Template)
 	if err != nil {
-		return nil, err
+		return Preset{}, err
 	}
 	if a.Title == "" {
 		a.Title = tp.Title
@@ -146,7 +147,7 @@ func (c *cx) applyTemplate(project core.Project, a *taskCreateArgs) (*decisionOp
 	var ps Preset
 	if len(tp.Preset) > 0 {
 		if err := json.Unmarshal(tp.Preset, &ps); err != nil {
-			return nil, err
+			return ps, err
 		}
 	}
 	if a.Status == "" {
@@ -161,8 +162,5 @@ func (c *cx) applyTemplate(project core.Project, a *taskCreateArgs) (*decisionOp
 	if a.Assignee == "" {
 		a.Assignee = ps.Assignee
 	}
-	if a.Estimate == nil && ps.Estimate != 0 {
-		a.Estimate = &ps.Estimate
-	}
-	return ps.Decision, nil
+	return ps, nil
 }
