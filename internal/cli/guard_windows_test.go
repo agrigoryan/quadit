@@ -32,7 +32,8 @@ func guardApart(t *testing.T, dir string, spec testServe, stdout, stderr io.Writ
 	raw, _ := json.Marshal(spec)
 	cmd := exec.Command(exe, "-test.run=^$")
 	// The guard is no fake agent itself: what it guards may be one (spec.GuardEnv).
-	cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "FAKEAGENT=") }), "QUADIT_TEST_SERVE="+string(raw))
+	cmd.Env = append(slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "FAKEAGENT=") }),
+		"QUADIT_TEST_SERVE="+string(raw), appGuard+"=1") // as the app starts it
 	cmd.Dir, cmd.Stdout, cmd.Stderr = dir, stdout, stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.DETACHED_PROCESS}
 	input, err := cmd.StdinPipe()
@@ -127,6 +128,9 @@ func TestTheGuardRunsTheProgramAsGivenAndExitsAsItDoes(t *testing.T) {
 	}
 	if r.Stdin != "" || r.Env["QUADIT_GUARD_MARK"] != "passed on" {
 		t.Fatalf("the program read %q from its input and saw %v", r.Stdin, r.Env)
+	}
+	if _, ok := r.Env[appGuard]; ok {
+		t.Fatalf("the app's mark was passed on to the program: %v", r.Env)
 	}
 }
 
@@ -232,7 +236,28 @@ func TestTheGuardStartsACmdFileWithItsArgumentsAsTheyAre(t *testing.T) {
 	}
 }
 
+func TestTheGuardStartsNothingUnlessTheAppStartedIt(t *testing.T) {
+	dir := t.TempDir()
+	spec, record := fakeToGuard(t, dir, []fakeagent.Step{exit(0)})
+	for _, kv := range spec.GuardEnv {
+		name, value, _ := strings.Cut(kv, "=")
+		t.Setenv(name, value) // were it started, the program would record it
+	}
+	for _, mark := range []string{"", "0", "yes"} {
+		t.Setenv(appGuard, mark)
+		var out, errs strings.Builder
+		if code := Run(append([]string{"guard"}, spec.Guard...), &out, &errs); code != 126 ||
+			errs.String() != "quadit guard is the Quadit app's own way to start programs: a person or an agent starts them otherwise\n" {
+			t.Fatalf("%s=%q: exit %d, said %q", appGuard, mark, code, errs.String())
+		}
+	}
+	if records := fakeagent.Records(record); len(records) != 0 {
+		t.Fatalf("a guard the app did not start started %d programs", len(records))
+	}
+}
+
 func TestTheGuardSaysHowItIsUsedAndWhatItDidNotFind(t *testing.T) {
+	t.Setenv(appGuard, "1")
 	var out, errs strings.Builder
 	if code := Run([]string{"guard"}, &out, &errs); code != exitFailed || errs.String() != "usage: quadit guard PROGRAM [ARGS...]\n" {
 		t.Fatalf("exit %d, said %q", code, errs.String())

@@ -24,7 +24,11 @@
 // is all Windows offers for a program that shares no console with it.
 //
 // It is not in the help that lists commands for people: only the app uses
-// it.
+// it, and it starts nothing unless the app's mark is in its environment
+// (QUADIT_APP_GUARD=1). An agent allowed to run quadit could otherwise
+// start any program through it; the mark is never passed on to the
+// program. (quadit listen --exec and quadit run add program_path= start
+// programs by design; this keeps the guard from being one more way.)
 
 package cli
 
@@ -34,11 +38,17 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/sys/windows"
 )
+
+// appGuard is the variable the desktop app sets, to 1, in the environment
+// of the guards it starts.
+const appGuard = "QUADIT_APP_GUARD"
 
 // stopGrace is how long a program asked to stop has before it is ended
 // outright: the desktop guard's five seconds, within which quadit run ends
@@ -49,6 +59,10 @@ const stopGrace = 5 * time.Second
 // exit code is PROGRAM's; 127 when PROGRAM is not found, 126 when it is
 // not a program the guard starts.
 func guard(args []string, _, stderr io.Writer) int {
+	if os.Getenv(appGuard) != "1" {
+		fmt.Fprintln(stderr, "quadit guard is the Quadit app's own way to start programs: a person or an agent starts them otherwise")
+		return 126
+	}
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "usage: quadit guard PROGRAM [ARGS...]")
 		return exitFailed
@@ -64,6 +78,15 @@ func guard(args []string, _, stderr io.Writer) int {
 		fmt.Fprintln(stderr, err)
 		return 126
 	}
+	if err := canStartIn(path, "."); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 126
+	}
+	// The guard's environment, without the app's mark.
+	cmd.Env = slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		name, _, _ := strings.Cut(kv, "=")
+		return envName(name) == appGuard
+	})
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr // no standard input: os/exec gives the null device
 	group, err := startInGroup(cmd)
 	if err != nil {
