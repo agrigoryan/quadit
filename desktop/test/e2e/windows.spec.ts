@@ -12,10 +12,10 @@
 //     when FAKEAGENT says which, for a run Quadit starts. Told "Connect to
 //     Quadit CODE" it gives nothing back: there the card falls back to the
 //     line to paste, and the test gives the code back with quadit connect.
-//   - Node itself as claude.exe, with a script it loads first (NODE_OPTIONS,
-//     GIVES_CODE_BACK below), which plays the one-prompt run: told
+//   - claude.cmd (GIVES_CODE_BACK below), as npm installs a program: told
 //     `-p "Connect to Quadit CODE"`, it runs `quadit connect CODE`, finding
-//     quadit on the PATH it was given, as Claude Code does.
+//     quadit on the PATH it was given, as Claude Code does, and notes what
+//     it did (STANDIN_RECORD). The guard starts a .cmd through cmd.exe.
 //
 // What the app holds besides its server (the run giving a code back, quadit
 // run) starts under quadit guard there.
@@ -57,18 +57,21 @@ const CLAUDE_DONE = [
 ];
 
 /**
- * The script Node loads first as the stand-in Claude Code that gives its
- * code back. Anywhere else (the app itself, run from source, reads
- * NODE_OPTIONS too) it does nothing.
+ * The stand-in Claude Code that gives its code back, a .cmd: the code is the
+ * fourth word of the prompt, its second argument. It notes its start, where
+ * it finds quadit, and what quadit connect said, in STANDIN_RECORD.
  */
-const GIVES_CODE_BACK = `const { basename } = require("node:path");
-if (basename(process.execPath).toLowerCase() === "claude.exe") {
-  const prompt = process.execArgv[process.execArgv.indexOf("-p") + 1] ?? "";
-  const code = /^Connect to Quadit (\\S+)$/.exec(prompt)?.[1];
-  const said = code ? require("node:child_process").spawnSync("quadit", ["connect", code], { stdio: "inherit" }) : { status: 3 };
-  process.exit(said.status ?? 1);
-}
-`;
+const GIVES_CODE_BACK = [
+  "@echo off",
+  "setlocal",
+  '>>"%STANDIN_RECORD%" echo started: %*',
+  'for /f "tokens=4" %%c in ("%~2") do set code=%%c',
+  "if not defined code exit /b 3",
+  '>>"%STANDIN_RECORD%" where quadit 2>&1',
+  '>>"%STANDIN_RECORD%" quadit connect %code% 2>&1',
+  "exit /b %errorlevel%",
+  "",
+].join("\r\n");
 
 /**
  * A computer of the test's own: a home folder, and a folder first on the
@@ -93,13 +96,13 @@ function windowsComputer(
   const scripts = join(root, "scripts.json");
   const record = join(root, "record.jsonl");
   writeFileSync(scripts, JSON.stringify([CLAUDE_DONE]));
-  const preload = join(root, "gives-code-back.cjs");
-  writeFileSync(preload, GIVES_CODE_BACK);
+  const standIn = join(root, "stand-in.log");
   if (claude !== "none") {
     mkdirSync(join(home, ".claude"));
     writeFileSync(join(home, ".claude", "settings.json"), JSON.stringify({ permissions: { allow: ["Read"] } }));
-    copyFileSync(claude === "fake-agent" ? FAKE_AGENT : process.execPath, join(bin, "claude.exe"));
   }
+  if (claude === "fake-agent") copyFileSync(FAKE_AGENT, join(bin, "claude.exe"));
+  if (claude === "gives-code-back") writeFileSync(join(bin, "claude.cmd"), GIVES_CODE_BACK);
   const before = readUserVariable("Path");
   // Without a closing ";" (Windows' own default ends with one): Connect's folder then comes after one it adds, and
   // Disconnect gives back exactly this.
@@ -112,6 +115,7 @@ function windowsComputer(
     home,
     configDir: dirname(login.trim()),
     record,
+    standIn,
     path,
     env: {
       ...places,
@@ -119,8 +123,7 @@ function windowsComputer(
       FAKEAGENT: "claude",
       FAKEAGENT_SCRIPTS: scripts,
       FAKEAGENT_RECORD: record,
-      // Forward slashes: NODE_OPTIONS reads a backslash inside quotes as an escape.
-      ...(claude === "gives-code-back" ? { NODE_OPTIONS: `--require "${preload.replaceAll("\\", "/")}"` } : {}),
+      STANDIN_RECORD: standIn,
     },
     restore: () => writeUserVariable("Path", before),
   };
@@ -307,7 +310,7 @@ test("Run by Quadit starts the stand-in Claude Code for the task waiting on it, 
 
 test("the first Connect puts the app's quadit on the person's PATH, the stand-in gives its code back through the guard, Disconnect takes exactly that out, and Connect puts it back", async ({
   run,
-}) => {
+}, testInfo) => {
   test.setTimeout(300_000);
   // No quadit on the PATH: the app's own (QUADIT_DESKTOP_QUADIT, run from source) is what Connect puts there.
   const computer = windowsComputer(run, { claude: "gives-code-back", quadit: false });
@@ -328,8 +331,8 @@ test("the first Connect puts the app's quadit on the person's PATH, the stand-in
   try {
     const desktop = await Desktop.launch(data, run, [], { env: computer.env, firstStart: true });
     try {
-      // Connected by itself: the app's one-prompt run of the stand-in, under quadit guard, gave the code back with
-      // the quadit it found on the PATH Connect had just added to.
+      // Connected by itself: the app's one-prompt run of the stand-in (a .cmd, which the guard starts through
+      // cmd.exe) gave the code back with the quadit it found on the PATH Connect had just added to.
       await firstRun(desktop, run, computer, "by-itself");
       expect(readUserVariable("Path")?.value).toBe(added);
       expect(await quaditFound()).toContain(join(folder, "quadit.exe").toLowerCase());
@@ -356,5 +359,12 @@ test("the first Connect puts the app's quadit on the person's PATH, the stand-in
     }
   } finally {
     computer.restore();
+    // What shows where a code got lost: the app's log of its runs of the tool (what the guard and the stand-in said),
+    // and the stand-in's own notes.
+    for (const [name, file] of [
+      ["the app's log of its Claude Code runs", join(data, "tools", "logs", "claude.log")],
+      ["the stand-in's notes", computer.standIn],
+    ] as const)
+      if (existsSync(file)) await testInfo.attach(name, { path: file, contentType: "text/plain" });
   }
 });
