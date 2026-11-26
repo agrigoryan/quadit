@@ -1,5 +1,3 @@
-//go:build unix
-
 package cli
 
 import (
@@ -13,7 +11,6 @@ import (
 	"net/http/httptest"
 	"slices"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -242,11 +239,11 @@ func TestQuaditRunsTheAgentForATaskOnARealServer(t *testing.T) {
 		apart := rt.serveApart(&syncBuffer{})
 		q.change(owner, "comment.create", map[string]any{"task": "RC-1", "body": "Count to 120"})
 		rt.eventually("the fourth run working", func() bool { return state(4) == core.AgentSessionRunning })
-		_ = apart.Process.Signal(syscall.SIGKILL)
+		_ = apart.Process.Kill()
 		_ = apart.Wait()
 		killed := rt.records()[3].PID
-		if !alive(killed) {
-			t.Fatal("the program died with the runner: the test shows nothing")
+		if alive(killed) != programOutlivesRunner {
+			t.Fatalf("the program alive after its runner was killed: %v; on this system: %v", alive(killed), programOutlivesRunner)
 		}
 		rt.serve()
 		rt.eventually("the run interrupted", func() bool { return q.runs(owner, "RC-1")[4]["reason"] == core.RunInterrupted })

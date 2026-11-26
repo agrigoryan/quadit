@@ -1,5 +1,3 @@
-//go:build unix
-
 package cli
 
 import (
@@ -10,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -422,11 +419,7 @@ func TestAProgramMaybeLaunchedIsInterruptedAndNotStartedAgain(t *testing.T) {
 func TestAProcessIsOursOnlyByGroupAndStartTime(t *testing.T) {
 	rt := newRunTest(t, core.ProgramClaude)
 	start := func() *exec.Cmd {
-		cmd := exec.Command("sleep", "600")
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-		if err := cmd.Start(); err != nil {
-			t.Fatal(err)
-		}
+		cmd := sleeper(t)
 		t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
 		return cmd
 	}
@@ -541,11 +534,7 @@ func TestNothingIsSentBeforeTheLoginIsVerified(t *testing.T) {
 
 func TestARecordedProgramIsStoppedWithoutTheLoginFile(t *testing.T) {
 	rt := newRunTest(t, core.ProgramClaude)
-	cmd := exec.Command("sleep", "600")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
+	cmd := sleeper(t)
 	exited := make(chan struct{})
 	go func() { _ = cmd.Wait(); close(exited) }()
 	t.Cleanup(func() { _ = cmd.Process.Kill(); <-exited })

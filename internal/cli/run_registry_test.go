@@ -1,9 +1,8 @@
-//go:build unix
-
 package cli
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -27,24 +26,29 @@ func TestTheRegistryRefusesAFolderOutsideTheRules(t *testing.T) {
 	}
 	file := filepath.Join(project, "README")
 	_ = os.WriteFile(file, nil, 0o600)
-	_ = os.Symlink(home, filepath.Join(dir, "to-home"))
-	_ = os.Symlink("/usr/bin", filepath.Join(project, "to-usr"))
-	strict := folderRules{home: home, roots: systemRoots} // the computer's own system folders
+	// The system's own folder and the top of the drive the home folder is on.
+	system, root := "/usr/bin", "/"
+	if runtime.GOOS == "windows" {
+		system, root = filepath.Join(cmp.Or(os.Getenv("SystemRoot"), `C:\Windows`), "System32"), filepath.VolumeName(dir)+`\`
+	}
+	symlink(t, home, filepath.Join(dir, "to-home"))
+	symlink(t, system, filepath.Join(project, "to-system"))
+	strict := folderRules{home: home, roots: systemRoots()} // the computer's own system folders
 	lenient := folderRules{home: home, roots: testRoots()}
 	for _, c := range []struct {
 		name, path string
 		rules      folderRules
 		want       string
 	}{
-		{"a relative path", "devel/game", lenient, "folder= must be an absolute path"},
-		{"a folder that does not exist", filepath.Join(home, "nope"), lenient, "~/nope does not exist"},
-		{"a file", file, lenient, "~/devel/game/README is not a folder"},
+		{"a relative path", filepath.FromSlash("devel/game"), lenient, "folder= must be an absolute path"},
+		{"a folder that does not exist", filepath.Join(home, "nope"), lenient, filepath.FromSlash("~/nope does not exist")},
+		{"a file", file, lenient, filepath.FromSlash("~/devel/game/README is not a folder")},
 		{"the home folder", home, lenient, "~ is your home folder: pick the project's own folder"},
 		{"a link to the home folder", filepath.Join(dir, "to-home"), lenient, "is your home folder"},
 		{"above the home folder", dir, lenient, dir + " is above your home folder: pick the project's own folder"},
-		{"the root", "/", lenient, "/ is above your home folder"},
-		{"a system folder", "/usr/bin", strict, "/usr/bin is a system folder: pick the project's own folder"},
-		{"a link to a system folder", filepath.Join(project, "to-usr"), lenient, "~/devel/game/to-usr is a system folder"},
+		{"the root", root, lenient, root + " is above your home folder"},
+		{"a system folder", system, strict, system + " is a system folder: pick the project's own folder"},
+		{"a link to a system folder", filepath.Join(project, "to-system"), lenient, filepath.FromSlash("~/devel/game/to-system is a system folder")},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			_, _, err := c.rules.check(c.path)
@@ -62,7 +66,7 @@ func TestTheRegistryRefusesAFolderOutsideTheRules(t *testing.T) {
 	}
 	t.Run("the project's own folder, labeled with ~", func(t *testing.T) {
 		canon, label, err := lenient.check(project)
-		if err != nil || canon != project || label != "~/devel/game" {
+		if err != nil || canon != project || label != filepath.FromSlash("~/devel/game") {
 			t.Fatalf("check = %s %s %v", canon, label, err)
 		}
 	})
@@ -84,16 +88,12 @@ func TestTheRegistryBindsAnEntryByIDs(t *testing.T) {
 	rt := newRunTest(t, core.ProgramClaude)
 	rt.writeRegistry()
 	link := filepath.Join(rt.dir, "game-link")
-	if err := os.Symlink(rt.folder, link); err != nil {
-		t.Fatal(err)
-	}
-	program := filepath.Join(rt.dir, "bin", "claude")
+	symlink(t, rt.folder, link)
+	program := filepath.Join(rt.dir, "bin", "claude"+filepath.Ext(rt.entry.ProgramPath))
 	_ = os.MkdirAll(filepath.Dir(program), 0o700)
-	if err := os.Symlink(rt.entry.ProgramPath, program); err != nil {
-		t.Fatal(err)
-	}
+	symlink(t, rt.entry.ProgramPath, program)
 	code, said := rt.add("login="+rt.login, "project=sva", "folder="+link, "program=claude", "program_path="+program)
-	if code != 0 || said != "Added: @claude runs SVA in ~/devel/game with Claude Code 2.1.331 on Test Mac." {
+	if code != 0 || said != "Added: @claude runs SVA in "+filepath.FromSlash("~/devel/game")+" with Claude Code 2.1.331 on Test Mac." {
 		t.Fatalf("add: %d %s", code, said)
 	}
 	reg, err := readRegistry(rt.files.registry)
@@ -105,7 +105,7 @@ func TestTheRegistryBindsAnEntryByIDs(t *testing.T) {
 		e.ProgramPath != program || e.Login != rt.login || e.Mode != modeInPlace || len(e.ID) != 8 {
 		t.Fatalf("the entry is not bound by ids, the canonical folder and the program as given: %+v", e)
 	}
-	if st, _ := os.Stat(rt.files.registry); st.Mode().Perm() != 0o600 {
+	if st, _ := os.Stat(rt.files.registry); runtime.GOOS != "windows" && st.Mode().Perm() != 0o600 { // Windows keeps no such mode
 		t.Fatalf("the registry's mode is %v", st.Mode())
 	}
 }
@@ -146,13 +146,13 @@ func TestTheRegistryHoldsOneProjectPerFolderAndOneEntryPerAgentAndProject(t *tes
 	add := func() (int, string) {
 		return rt.add("login="+rt.login, "project=SVA", "folder="+rt.folder, "program=claude", "program_path="+rt.entry.ProgramPath)
 	}
-	if code, said := add(); code != 1 || said != "@claude already runs SVA on this computer, in ~/devel/game" {
+	if code, said := add(); code != 1 || said != "@claude already runs SVA on this computer, in "+filepath.FromSlash("~/devel/game") {
 		t.Fatalf("a second entry of the agent and project: %d %s", code, said)
 	}
 	other := rt.entry
 	other.ID, other.ProjectID, other.Project, other.AgentID = "0000aaaa", "0199aaaa-0000-7000-8000-0000000000ab", "GS", fakeCodexID
 	rt.writeRegistry(other)
-	if code, said := add(); code != 1 || said != "~/devel/game already runs GS on this computer: one project per folder" {
+	if code, said := add(); code != 1 || said != filepath.FromSlash("~/devel/game")+" already runs GS on this computer: one project per folder" {
 		t.Fatalf("a second project in the folder: %d %s", code, said)
 	}
 	other.ProjectID, other.Project = fakeProjectID, "SVA" // another agent on the same project and folder is allowed
@@ -175,7 +175,7 @@ func TestTheRegistryIsWrittenWhole(t *testing.T) {
 				return
 			default:
 			}
-			raw, err := os.ReadFile(rt.files.registry)
+			raw, err := readWhole(rt.files.registry) // as quadit run and its forms read it
 			if err == nil && !json.Valid(raw) {
 				select {
 				case torn <- string(raw):
@@ -213,9 +213,7 @@ func TestTheRegistryIsWrittenWhole(t *testing.T) {
 func TestTheFolderLockFollowsTheFoldersIdentity(t *testing.T) {
 	rt := newRunTest(t, core.ProgramClaude)
 	link := filepath.Join(rt.dir, "game-link")
-	if err := os.Symlink(rt.folder, link); err != nil {
-		t.Fatal(err)
-	}
+	symlink(t, rt.folder, link)
 	srv := newServing(rt.files, rt.host(), testMachine, &syncBuffer{}, "")
 	lock, err := srv.takeFolder(rt.folder, "@claude")
 	if err != nil {
@@ -245,13 +243,30 @@ func TestAFolderSpelledOtherwiseIsStillRefused(t *testing.T) {
 	if st, err := os.Stat(strings.ToUpper(home)); err != nil || !st.IsDir() {
 		t.Skip("this volume tells case apart: no other spelling names the same folder")
 	}
-	rules := folderRules{home: home, roots: append(testRoots(), "/Library")}
-	for _, path := range []string{strings.ToUpper(home), strings.ToUpper(dir), "/LIBRARY"} {
+	system := "/Library"
+	if runtime.GOOS == "windows" {
+		system = cmp.Or(os.Getenv("SystemRoot"), `C:\Windows`)
+	}
+	rules := folderRules{home: home, roots: append(testRoots(), system)}
+	for _, path := range []string{strings.ToUpper(home), strings.ToUpper(dir), strings.ToUpper(system)} {
 		if _, err := os.Stat(path); err != nil {
 			continue
 		}
 		if _, _, err := rules.check(path); err == nil {
 			t.Fatalf("%s passed the folder rules", path)
 		}
+	}
+}
+
+// symlink makes a link, or skips the test where this computer gives no
+// right to make one (Windows, for one not an administrator and without
+// Developer Mode).
+func symlink(t *testing.T, target, link string) {
+	t.Helper()
+	if err := os.Symlink(target, link); err != nil {
+		if runtime.GOOS == "windows" {
+			t.Skipf("this computer makes no symbolic links for this test: %v", err)
+		}
+		t.Fatal(err)
 	}
 }

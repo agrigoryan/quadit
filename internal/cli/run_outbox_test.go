@@ -226,10 +226,7 @@ func TestAnOutboxThatCannotBeChangedIsNotSentInALoop(t *testing.T) {
 	dir := t.TempDir()
 	out, _ := openOutbox(dir)
 	_, _ = out.add(stepsWrite("0199eeee-0000-7000-8000-0000000000d7", 0))
-	if err := os.Chmod(dir, 0o500); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chmod(dir, 0o700)
+	refuseWritesIn(t, dir)
 	srv := &recordingServer{}
 	if _, err := out.flush(context.Background(), srv, ""); err == nil {
 		t.Fatal("a write that could not be taken out of the outbox was taken as sent")

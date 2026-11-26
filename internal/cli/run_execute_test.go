@@ -1,5 +1,3 @@
-//go:build unix
-
 package cli
 
 import (
@@ -8,10 +6,10 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -240,7 +238,7 @@ func TestOneRunAtATimeInAFolderAcrossAgents(t *testing.T) {
 func TestARunWaitsWhileItsSessionWasWrittenInATerminal(t *testing.T) {
 	const session = "0199ffff-0000-7000-8000-000000000003"
 	rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
-	file := filepath.Join(rt.home, ".claude", "projects", notLetterOrDigit.ReplaceAllString(rt.folder, "-"), session+".jsonl")
+	file := filepath.Join(rt.home, ".claude", "projects", claudeProjectName(rt.folder), session+".jsonl")
 	_ = os.MkdirAll(filepath.Dir(file), 0o700)
 	_ = os.WriteFile(file, []byte("{}\n{}\n"), 0o600)
 	rt.seedState(func(s *entryState) {
@@ -315,7 +313,7 @@ func TestAStopKillsTheWholeProcessGroup(t *testing.T) {
 		t.Fatalf("%v", row)
 	}
 	rt.acked(head)
-	if alive(rt.records()[0].PID) || alive(rt.children()[0]) || syscall.Kill(-rt.records()[0].PID, 0) == nil {
+	if alive(rt.records()[0].PID) || alive(rt.children()[0]) || groupLeft(rt.records()[0].PID) {
 		t.Fatal("something of the program's group still runs")
 	}
 }
@@ -347,7 +345,7 @@ func TestSigtermStopsEveryGroupWithinFourSeconds(t *testing.T) {
 	})
 	rt.eventually("both grandchildren", func() bool { return len(rt.children()) == 2 })
 	sent := time.Now()
-	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
+	if err := askThisRunnerToStop(); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -359,7 +357,7 @@ func TestSigtermStopsEveryGroupWithinFourSeconds(t *testing.T) {
 		t.Fatalf("quadit run did not stop on SIGTERM:\n%s", &out)
 	}
 	for _, r := range rt.records() {
-		if syscall.Kill(-r.PID, 0) == nil && alive(r.PID) {
+		if groupLeft(r.PID) {
 			t.Fatalf("the group %d still runs", r.PID)
 		}
 	}
@@ -763,13 +761,16 @@ func TestAStopAfterTheProgramEndedLeavesItDone(t *testing.T) {
 	})
 	rt.f.stopRun(row["id"].(string))
 	rt.eventually("the stop handed to the runner", func() bool { return rt.f.count(func(f *fakeQuadit) int { return f.stopsHanded }) > 0 })
-	_ = syscall.Kill(rt.children()[0], syscall.SIGKILL) // the drain ends
+	killLeft(rt.children()[0]) // the drain ends
 	if row := rt.ended(0); row["state"] != core.AgentSessionDone {
 		t.Fatalf("a stop asked after the program ended made it %v", row)
 	}
 }
 
 func TestStoppingTheRunnerCutsAMembersStopShort(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("on Windows a member's stop ends the program outright at once: there is no slower ladder to cut short")
+	}
 	stubborn := []fakeagent.Step{claudeInit(), claudeSays("Counting."), {Ignore: "SIGINT"}, {Child: true}, {UntilSignal: []string{"{}"}}}
 	rt := newRunTest(t, core.ProgramClaude, stubborn)
 	rt.times.stopLadder = defaultTimings.stopLadder // ten seconds for SIGINT
@@ -835,11 +836,7 @@ func TestALaunchThatCannotBeWrittenDownDoesNotHappen(t *testing.T) {
 	rt.f.addItem(fakeItem{Task: "SVA-12"})
 	rt.serve()
 	rt.eventually("waiting for the folder", func() bool { return len(rt.f.allRuns()) > 0 && rt.f.allRuns()[0]["reason"] == core.RunFolderBusy })
-	dir := rt.files.entry(rt.entry.ID)
-	if err := os.Chmod(dir, 0o500); err != nil { // the journal cannot be written from now on
-		t.Fatal(err)
-	}
-	defer os.Chmod(dir, 0o700)
+	refuseWritesIn(t, rt.files.entry(rt.entry.ID)) // the journal cannot be written from now on
 	srv.releaseFolder(rt.folder, lock)
 	rt.eventually("the entry's error", func() bool {
 		return strings.HasPrefix(readStatus(rt.files.status()).Entries[rt.entry.ID].Message, "a run could not be written down")
@@ -855,11 +852,7 @@ func TestAnEndThatCannotBeKeptHoldsTheEntry(t *testing.T) {
 	head := rt.f.addItem(fakeItem{Task: "SVA-12"})
 	rt.serve()
 	rt.running(0)
-	outbox := filepath.Join(rt.files.entry(rt.entry.ID), "outbox")
-	if err := os.Chmod(outbox, 0o500); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chmod(outbox, 0o700)
+	allow := refuseWritesIn(t, filepath.Join(rt.files.entry(rt.entry.ID), "outbox"))
 	rt.eventually("the entry held", func() bool {
 		return readStatus(rt.files.status()).Entries[rt.entry.ID].Message == string(errEndNotKept)
 	})
@@ -868,7 +861,7 @@ func TestAnEndThatCannotBeKeptHoldsTheEntry(t *testing.T) {
 	if len(rt.f.ackList()) != 0 || len(rt.records()) != 1 {
 		t.Fatalf("while its end was not kept the entry acknowledged %v and started %d programs", rt.f.ackList(), len(rt.records()))
 	}
-	_ = os.Chmod(outbox, 0o700)
+	allow()
 	rt.acked(head)
 	rt.eventually("the next item run", func() bool { return len(rt.records()) == 2 })
 }
@@ -927,11 +920,10 @@ func terminalOnDisk(outbox string) bool {
 
 func TestAProgramMovedBetweenItsCheckAndItsStartIsNotStarted(t *testing.T) {
 	rt := newRunTest(t, core.ProgramClaude, claudeDone("done"))
-	link := filepath.Join(rt.dir, "bin", "claude")
+	exe := filepath.Ext(rt.entry.ProgramPath) // .exe on Windows, which starts nothing else
+	link := filepath.Join(rt.dir, "bin", "claude"+exe)
 	_ = os.MkdirAll(filepath.Dir(link), 0o700)
-	if err := os.Symlink(rt.entry.ProgramPath, link); err != nil {
-		t.Fatal(err)
-	}
+	symlink(t, rt.entry.ProgramPath, link)
 	entry := rt.entry
 	entry.ProgramPath = link
 	rt.writeRegistry(entry)
@@ -943,15 +935,13 @@ func TestAProgramMovedBetweenItsCheckAndItsStartIsNotStarted(t *testing.T) {
 	rt.eventually("the check before the start held", func() bool { _, err := os.Stat(gate + ".waiting"); return err == nil })
 	// Another program at the path, after it was checked: a copy of the
 	// fake, which would record its start.
-	other := filepath.Join(rt.dir, "bin", "other")
+	other := filepath.Join(rt.dir, "bin", "other"+exe)
 	raw, err := os.ReadFile(rt.entry.ProgramPath)
 	if err != nil || os.WriteFile(other, raw, 0o700) != nil {
 		t.Fatal(err)
 	}
 	_ = os.Remove(link)
-	if err := os.Symlink(other, link); err != nil {
-		t.Fatal(err)
-	}
+	symlink(t, other, link)
 	open()
 	rt.eventually("the run ended", func() bool { return ended(rt.runState(0)) })
 	if len(rt.records()) != 0 {

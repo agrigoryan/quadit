@@ -1,5 +1,3 @@
-//go:build unix
-
 package cli
 
 import (
@@ -11,14 +9,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -117,7 +114,7 @@ func (c *testClock) advance(d time.Duration) {
 // testRoots are the system folders, but those the tests' temporary folders
 // are under.
 func testRoots() []string {
-	return slices.DeleteFunc(slices.Clone(systemRoots), func(r string) bool { return r == "/private" || r == "/var" || r == "/tmp" })
+	return slices.DeleteFunc(systemRoots(), func(r string) bool { return r == "/private" || r == "/var" || r == "/tmp" })
 }
 
 // The machine of the tests' registries.
@@ -248,8 +245,7 @@ func (rt *runTest) cleanup() {
 	for _, r := range fakeagent.Records(rt.record) {
 		for _, pid := range []int{r.PID, r.Child} {
 			if pid > 0 {
-				_ = syscall.Kill(-pid, syscall.SIGKILL) // a group left by a failed test
-				_ = syscall.Kill(pid, syscall.SIGKILL)
+				killLeft(pid)
 			}
 		}
 	}
@@ -318,13 +314,20 @@ func (rt *runTest) children() []int {
 	return out
 }
 
-// alive reports whether a process lives (a zombie not reaped counts as gone).
-func alive(pid int) bool {
-	if syscall.Kill(pid, 0) != nil {
-		return false
+// sleeper starts a process that sleeps ten minutes on its own, as a
+// program a runner that stopped left would be, and gives it.
+func sleeper(t *testing.T) *exec.Cmd {
+	t.Helper()
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
 	}
-	out, err := exec.Command("ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output()
-	return err == nil && len(bytes.TrimSpace(out)) > 0 && !bytes.HasPrefix(bytes.TrimSpace(out), []byte("Z"))
+	cmd := exec.Command(exe, "-test.run=^$")
+	cmd.Env = append(os.Environ(), "FAKEAGENT="+fakeagent.Sleeper)
+	if err := startAlone(cmd); err != nil {
+		t.Fatal(err)
+	}
+	return cmd
 }
 
 // changesOf are the changes the server got of a type, in order.
@@ -389,9 +392,13 @@ func TestQuaditRunWithSecretIsStillTheSecretsRunner(t *testing.T) {
 	srv := serveFakeSecrets(t)
 	t.Setenv("QUADIT_URL", srv)
 	t.Setenv("QUADIT_TOKEN", "t")
+	command, want := []string{"sh", "-c", `echo "the key is $KEY"`}, "the key is •••\n"
+	if runtime.GOOS == "windows" {
+		command, want = []string{"cmd", "/c", "echo the key is %KEY%"}, "the key is •••\r\n"
+	}
 	var out, errs bytes.Buffer
-	code := Run([]string{"run", "--secret", "KEY", "--", "sh", "-c", `echo "the key is $KEY"`}, &out, &errs)
-	if code != 0 || out.String() != "the key is •••\n" {
+	code := Run(append([]string{"run", "--secret", "KEY", "--"}, command...), &out, &errs)
+	if code != 0 || out.String() != want {
 		t.Fatalf("exit %d, printed %q %q", code, out.String(), errs.String())
 	}
 }
@@ -434,6 +441,21 @@ func TestAnotherRunnerExitsWithThree(t *testing.T) {
 	}
 }
 
+func TestTheRunnerLockKeepsASecondProcessOutUntilItsHolderDies(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	rt.writeRegistry()
+	apart := rt.serveApart(&syncBuffer{})
+	rt.eventually("the other process serving", func() bool { return runnerServing(rt.files) })
+	var out, errs bytes.Buffer
+	code := Run([]string{"run", "registry=" + rt.files.registry}, &out, &errs)
+	if want := "another quadit run serves this computer (pid " + strconv.Itoa(apart.Process.Pid) + ")\n"; code != 3 || errs.String() != want {
+		t.Fatalf("exit %d, said %q, want 3 and %q", code, errs.String(), want)
+	}
+	_ = apart.Process.Kill()
+	_ = apart.Wait()
+	rt.eventually("the lock let go with its holder", func() bool { return !runnerServing(rt.files) })
+}
+
 func TestEachEntryUsesItsOwnLoginAndLeaseFile(t *testing.T) {
 	rt := newRunTest(t, core.ProgramClaude)
 	otherLogin := filepath.Join(rt.dir, "other", "codex.json")
@@ -463,7 +485,9 @@ func TestAnEntryStartsWhenItIsAddedAndStopsWhenItIsRemoved(t *testing.T) {
 	rt.serve()
 	rt.eventually("the runner serving", func() bool { return strings.Contains(rt.out.String(), "serving 0 entries") })
 	rt.writeRegistry(rt.entry)
-	rt.eventually("the entry listening", func() bool { return strings.Contains(rt.out.String(), "SVA @claude ~/devel/game: listening") })
+	rt.eventually("the entry listening", func() bool {
+		return strings.Contains(rt.out.String(), "SVA @claude "+filepath.FromSlash("~/devel/game")+": listening")
+	})
 	rt.writeRegistry()
 	rt.eventually("the entry gone from status.json", func() bool { _, ok := readStatus(rt.files.status()).Entries[rt.entry.ID]; return !ok })
 	held := len(rt.f.holdList())
@@ -517,7 +541,7 @@ func TestARunnerNeverTakesTheLeaseFromAChat(t *testing.T) {
 	if st := readStatus(rt.files.status()).Entries[rt.entry.ID]; st.State != statusAside {
 		t.Fatalf("status %+v, want aside", st)
 	}
-	if !strings.Contains(rt.out.String(), "SVA @claude ~/devel/game: a chat listens to SVA; trying again in") || len(rt.records()) != 0 {
+	if !strings.Contains(rt.out.String(), "SVA @claude "+filepath.FromSlash("~/devel/game")+": a chat listens to SVA; trying again in") || len(rt.records()) != 0 {
 		t.Fatalf("said:\n%s", rt.out)
 	}
 }
@@ -547,7 +571,7 @@ func TestQuaditRunListSaysWhatEachEntryDoes(t *testing.T) {
 	rt.eventually("ready", func() bool { return readStatus(rt.files.status()).Entries[rt.entry.ID].State == statusReady })
 	var out bytes.Buffer
 	runList(rt.files, rt.host(), false, &out, &out)
-	if out.String() != "e5d2a91c  @claude  SVA  ~/devel/game  Claude Code  ready\n" {
+	if out.String() != "e5d2a91c  @claude  SVA  "+filepath.FromSlash("~/devel/game")+"  Claude Code  ready\n" {
 		t.Fatalf("list printed %q", out.String())
 	}
 	out.Reset()
@@ -572,27 +596,43 @@ func TestQuaditRunListSaysWhatEachEntryDoes(t *testing.T) {
 
 // testServe is how a test starts the test binary as quadit run in a
 // process of its own (QUADIT_TEST_SERVE, read by TestMain): the registry,
-// the home folder, the program it fakes.
+// the home folder, the program it fakes. With Guard, the binary is first
+// `quadit guard` of Guard, with GuardEnv added to the environment it
+// passes on; the program it guards, when it is this binary again, is
+// quadit run as the rest says.
 type testServe struct {
-	Registry  string `json:"registry"`
-	Home      string `json:"home"`
-	FakeAgent string `json:"fake_agent"`
+	Registry  string   `json:"registry"`
+	Home      string   `json:"home"`
+	FakeAgent string   `json:"fake_agent"`
+	Guard     []string `json:"guard,omitempty"`
+	GuardEnv  []string `json:"guard_env,omitempty"`
 }
 
 // serveForTest serves as quadit run does, on the test's computer, until
-// SIGINT or SIGTERM (or SIGKILL, which is what such a test sends). The
-// programs it starts are the fake agent.
+// it is asked to stop (or killed, which is what such a test does). The
+// programs it starts are the fake agent. Or it is the guard (Guard).
 func serveForTest(spec string) int {
 	var s testServe
 	if err := json.Unmarshal([]byte(spec), &s); err != nil {
 		return 2
+	}
+	if len(s.Guard) > 0 {
+		args, env := s.Guard, s.GuardEnv
+		s.Guard, s.GuardEnv = nil, nil
+		raw, _ := json.Marshal(s) // a testServe always encodes
+		_ = os.Setenv("QUADIT_TEST_SERVE", string(raw))
+		for _, kv := range env {
+			name, value, _ := strings.Cut(kv, "=")
+			_ = os.Setenv(name, value) // a variable not set shows in the test that reads it
+		}
+		return guard(args, os.Stdout, os.Stderr)
 	}
 	_ = os.Setenv("FAKEAGENT", s.FakeAgent) // for its children: this process is past fakeagent.Main
 	files, err := runFilesFor(s.Registry)
 	if err != nil {
 		return 2
 	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := untilAskedToStop(context.Background())
 	defer stop()
 	host := runHost{home: s.Home, roots: testRoots(), clock: systemClock{start: time.Now()}, times: testTimings()}
 	return serve(ctx, files, host, os.Stdout, os.Stderr)

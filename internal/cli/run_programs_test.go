@@ -192,7 +192,8 @@ func TestEverySettingThatCouldChangeTheLoginPauses(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "home", ".claude", "settings.json")
 		_ = os.MkdirAll(filepath.Dir(path), 0o700)
-		_ = os.WriteFile(path, []byte(`{}`), 0o000)
+		_ = os.WriteFile(path, []byte(`{}`), 0o600)
+		makeUnreadable(t, path)
 		if got := settingsPause(claudeCode{}, filepath.Join(dir, "home"), filepath.Join(dir, "folder"), login); got != core.PauseLoginMismatch {
 			t.Fatalf("an unreadable settings file read as %q", got)
 		}
