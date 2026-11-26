@@ -47,20 +47,18 @@ func TestLoginTakesTheTokenFromStandardInput(t *testing.T) {
 		if saved != (savedConfig{URL: srv.URL, Token: "qd_secret"}) {
 			t.Fatalf("saved %+v", saved)
 		}
-		if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
-			t.Fatalf("saved with mode %v", info.Mode().Perm())
+		if readableByOthers(t, path) {
+			t.Fatal("saved where others may read it")
 		}
 	})
 	t.Run("a login file readable by others is made private", func(t *testing.T) {
-		if err := os.Chmod(path, 0o644); err != nil {
-			t.Fatal(err)
-		}
+		openToOthers(t, path)
 		var out, errs bytes.Buffer
 		if code := login(context.Background(), []string{srv.URL, "-"}, strings.NewReader("qd_secret"), &out, &errs); code != 0 {
 			t.Fatalf("exit %d: %s", code, errs.String())
 		}
-		if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
-			t.Fatalf("left with mode %v", info.Mode().Perm())
+		if readableByOthers(t, path) {
+			t.Fatal("left where others may read it")
 		}
 	})
 	t.Run("refused by the server, nothing is saved", func(t *testing.T) {

@@ -5,10 +5,8 @@ package cli
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -59,9 +57,9 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout, stderr i
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
-	// WriteFile sets the mode only on a file it creates: a login file that
-	// is already there is made private before the token goes into it.
-	if err := os.Chmod(path, 0o600); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	// The file is private before the token goes into it: one made now, and
+	// one already there, which may have been open to others.
+	if err := createPrivate(path); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -72,4 +70,17 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout, stderr i
 	}
 	fmt.Fprintf(stdout, "saved to %s\n%s", path, me)
 	return 0
+}
+
+// createPrivate makes the file at path, empty, unless it is there, and keeps
+// it to the person running the command (makePrivate).
+func createPrivate(path string) error {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return makePrivate(path)
 }
