@@ -61,19 +61,29 @@ export class QuaditCli {
     private where: { home: string; shell: string; platform: NodeJS.Platform },
   ) {}
 
-  /** Looks at the login shell's PATH for the quadit command and for a way to put one there. */
+  /**
+   * Looks at the login shell's PATH for the quadit command and for a way to
+   * put one there. On Windows the command is quadit.exe, the one program the
+   * app can start (a quadit.cmd is not), and only the PATH a new terminal
+   * gets counts: the registry's, read anew, which shows a change at once.
+   */
   async look(): Promise<CliLook> {
     const { platform } = this.where;
-    const paths = platform === "win32" ? win32 : posix;
+    const windows = platform === "win32";
+    const paths = windows ? win32 : posix;
     const path = (await this.shellPath()).split(paths.delimiter).filter((dir) => paths.isAbsolute(dir));
-    const binary =
-      findCommand("quadit", path, platform) ??
-      (this.linkedNow && findCommand("quadit", [paths.dirname(this.linkedNow)], platform));
+    const binary = windows
+      ? findCommand("quadit.exe", path, platform)
+      : (findCommand("quadit", path, platform) ??
+        (this.linkedNow && findCommand("quadit", [paths.dirname(this.linkedNow)], platform)));
     if (binary) return { path, found: { path: binary, version: await this.version(binary) }, install: null };
     return { path, found: null, install: this.install(path) };
   }
 
-  /** The app put its copy on the PATH at `link`: this session's calls use it (look finds it), whatever the PATH the app sees says. */
+  /**
+   * The app linked its copy at `link` (macOS, Linux): this session's calls
+   * use it (look finds it), whatever the login PATH the app sees says.
+   */
   linked(link: string) {
     this.linkedNow = link;
   }
@@ -145,12 +155,16 @@ export class QuaditCli {
 /**
  * The program `name` stands for on `path`, as `platform` finds it: the first
  * folder that has it. On Windows a program is a file with one of the
- * extensions PATHEXT lists, tried in its order in each folder (quadit is
- * quadit.exe there); elsewhere a file its owner may run. Null without one.
+ * extensions PATHEXT lists, tried in its order in each folder, unless
+ * `name` has one already (quadit.exe): then that file alone, as Windows
+ * finds a name typed with its extension; elsewhere a file its owner may
+ * run. Null without one.
  */
 export function findCommand(name: string, path: string[], platform: NodeJS.Platform): string | null {
   const windows = platform === "win32";
-  const names = windows ? programExtensions().map((extension) => name + extension) : [name];
+  const extensions = windows ? programExtensions() : [];
+  const named = extensions.some((extension) => name.toLowerCase().endsWith(extension));
+  const names = windows && !named ? extensions.map((extension) => name + extension) : [name];
   for (const dir of path) {
     for (const file of names) {
       const candidate = join(dir, file);

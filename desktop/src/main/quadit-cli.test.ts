@@ -174,6 +174,31 @@ describe("QuaditCli on Windows", () => {
     expect(look.found?.path).toBe(join(bin, "quadit.exe"));
   });
 
+  it("takes only quadit.exe for the command, never a quadit.cmd before it, which the app could not start", async () => {
+    const { root } = computer();
+    const first = join(root, "first");
+    const later = join(root, "later");
+    mkdirSync(first);
+    mkdirSync(later);
+    writeFileSync(join(first, "quadit.cmd"), "");
+    writeFileSync(join(later, "quadit.exe"), "");
+    const cli = new QuaditCli(null, async () => `${first};${later}`, { home: root, shell: "", platform: "win32" });
+    expect((await cli.look()).found?.path).toBe(join(later, "quadit.exe"));
+  });
+
+  it("finds quadit only on the PATH a new terminal gets, never where the app said it put it", async () => {
+    const { root } = computer();
+    const bundled = join(root, "quadit.exe");
+    writeFileSync(bundled, "");
+    let path = join(root, "none");
+    const cli = new QuaditCli(bundled, async () => path, { home: root, shell: "", platform: "win32" });
+    // Connect put its folder on the PATH, and Disconnect took it out again: the app's copy is still there, unused.
+    cli.linked(bundled);
+    expect(await cli.look()).toMatchObject({ found: null, install: { way: "path", folder: root } });
+    path = `${join(root, "none")};${root}`;
+    expect((await cli.look()).found?.path).toBe(bundled);
+  });
+
   it("without one, adds the folder of the app's own quadit.exe to the PATH, and nothing without a copy of the app's", async () => {
     const { root } = computer();
     const where = { home: root, shell: "", platform: "win32" as const };

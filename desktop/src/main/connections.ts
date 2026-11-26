@@ -747,9 +747,6 @@ export class Connections {
       }
       const link = plan.applied.find((record) => record.kind === "link");
       if (link) this.parts.cli.linked(link.path);
-      // On Windows its folder is on the PATH now, which this session's look reads anew; said all the same.
-      if (plan.applied.some((record) => record.kind === "path") && this.parts.cli.bundled)
-        this.parts.cli.linked(this.parts.cli.bundled);
 
       // The agent of this workspace the tool works as can prove the connection from inside it, given a code.
       const member = choiceHolds ? agent && { id: agent.id, handle: agent.handle } : this.memberOf(plan, worksAs);

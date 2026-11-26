@@ -158,6 +158,8 @@ function setUp({
           "relative-folder",
           writableOnPath ? bin : join(root, "not-a-folder"),
           ...(ownBinOnPath ? [join(home, ".local", "bin")] : []),
+          // On Windows the person's own PATH, as the registry has it now, comes after the machine's.
+          ...(platform === "win32" ? (registry.get("Path")?.value.split(";") ?? []) : []),
         ].join(platform === "win32" ? ";" : ":"),
       { home, shell, platform },
     ),
@@ -1348,6 +1350,18 @@ posixOnly("on Windows", () => {
     expect(registry.get("Path")?.value).toBe(`${PATH.value};${root}`);
     await disconnect("pi");
     expect(registry.get("Path")).toEqual(PATH);
+  });
+
+  it("adds the folder again for a Connect after the Disconnect that took it out, in the same session", async () => {
+    registry.set("Path", { ...PATH });
+    const { connections, connect, disconnect, root, choice } = setUp({ platform: "win32", quaditOnPath: false });
+    await connect(choice("codex"));
+    await disconnect("codex");
+    expect(registry.get("Path")).toEqual(PATH);
+    // The app's copy is still where it was; it is not on the PATH a new terminal gets.
+    expect((await connections.state()).cli).toMatchObject({ found: null, pathFolder: root });
+    await connect(choice("codex"));
+    expect(registry.get("Path")?.value).toBe(`${PATH.value};${root}`);
   });
 
   it("makes the person's PATH when they had none, and takes it away again", async () => {
