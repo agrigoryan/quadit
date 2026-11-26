@@ -58,24 +58,36 @@ func askThisRunnerToStop() error {
 	return nil
 }
 
-// refuseWritesIn makes dir refuse new files until allow is called: an
-// entry of its access list denies everyone adding a file or a folder.
+// refuseWritesIn makes dir refuse new files, and the removal and
+// replacement of those in it, until allow is called, as a folder of mode
+// 0500 does: entries of its access list deny everyone adding a file or a
+// folder or removing one there, and removing any file it holds.
 func refuseWritesIn(t *testing.T, dir string) (allow func()) {
 	t.Helper()
-	const addFile, addFolder = 0x2, 0x4 // FILE_ADD_FILE, FILE_ADD_SUBDIRECTORY
-	return deny(t, dir, addFile|addFolder)
+	const addFile, addFolder, deleteChild = 0x2, 0x4, 0x40 // FILE_ADD_FILE, FILE_ADD_SUBDIRECTORY, FILE_DELETE_CHILD
+	return deny(t, dir,
+		denial(addFile|addFolder|deleteChild, windows.NO_INHERITANCE),
+		denial(windows.DELETE, windows.SUB_OBJECTS_ONLY_INHERIT|windows.INHERIT_ONLY))
 }
 
 // makeUnreadable makes a file refuse to be read: an entry of its access
 // list denies everyone reading it.
 func makeUnreadable(t *testing.T, path string) {
 	t.Helper()
-	deny(t, path, windows.FILE_READ_DATA)
+	deny(t, path, denial(windows.FILE_READ_DATA, windows.NO_INHERITANCE))
 }
 
-// deny denies everyone access to path, until undo (or the test's end)
-// puts its access list back.
-func deny(t *testing.T, path string, access windows.ACCESS_MASK) (undo func()) {
+// denial is an entry of an access list denying everyone access, inherited
+// as inheritance says.
+func denial(access windows.ACCESS_MASK, inheritance uint32) windows.EXPLICIT_ACCESS {
+	everyone, _ := windows.CreateWellKnownSid(windows.WinWorldSid) // a well-known SID is always made
+	return windows.EXPLICIT_ACCESS{AccessPermissions: access, AccessMode: windows.DENY_ACCESS, Inheritance: inheritance,
+		Trustee: windows.TRUSTEE{TrusteeForm: windows.TRUSTEE_IS_SID, TrusteeType: windows.TRUSTEE_IS_WELL_KNOWN_GROUP, TrusteeValue: windows.TrusteeValueFromSID(everyone)}}
+}
+
+// deny adds entries to path's access list, until undo (or the test's end)
+// puts the list back as it was (and with it what its files inherited).
+func deny(t *testing.T, path string, entries ...windows.EXPLICIT_ACCESS) (undo func()) {
 	t.Helper()
 	sd, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.DACL_SECURITY_INFORMATION)
 	if err != nil {
@@ -85,12 +97,7 @@ func deny(t *testing.T, path string, access windows.ACCESS_MASK) (undo func()) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	everyone, err := windows.CreateWellKnownSid(windows.WinWorldSid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	denied, err := windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{{AccessPermissions: access, AccessMode: windows.DENY_ACCESS, Inheritance: windows.NO_INHERITANCE,
-		Trustee: windows.TRUSTEE{TrusteeForm: windows.TRUSTEE_IS_SID, TrusteeType: windows.TRUSTEE_IS_WELL_KNOWN_GROUP, TrusteeValue: windows.TrusteeValueFromSID(everyone)}}}, was)
+	denied, err := windows.ACLFromEntries(entries, was)
 	if err != nil {
 		t.Fatal(err)
 	}

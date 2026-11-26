@@ -42,7 +42,7 @@ func TestThePromptGoesOnStandardInputNeverAsAnArgument(t *testing.T) {
 	rt.serve()
 	row := rt.ended(0)
 	r := rt.records()[0]
-	if !strings.HasPrefix(r.Stdin, "Quadit started you, @claude, on Test Mac in ~/devel/game, for task SVA-12.") || !strings.Contains(r.Stdin, `ITEM #1001 comment SVA-12 from @aram: "please do it"`) {
+	if !strings.HasPrefix(r.Stdin, "Quadit started you, @claude, on Test Mac in "+filepath.FromSlash("~/devel/game")+", for task SVA-12.") || !strings.Contains(r.Stdin, `ITEM #1001 comment SVA-12 from @aram: "please do it"`) {
 		t.Fatalf("the prompt on standard input:\n%s", r.Stdin)
 	}
 	// The agent reads the item's line; people read on the run what started it.
@@ -471,7 +471,7 @@ func TestTheFallbackIsPostedWhenTheAgentWroteNothing(t *testing.T) {
 	if code := rt.stop(); code != 0 {
 		t.Fatalf("exit %d", code)
 	}
-	for _, want := range []string{"quadit run: serving 1 entry on Test Mac (stop with Ctrl-C)", "SVA @claude ~/devel/game: listening", "SVA-12 @claude: received #1001 (assigned from @aram)", "SVA-12 @claude: done in"} {
+	for _, want := range []string{"quadit run: serving 1 entry on Test Mac (stop with Ctrl-C)", "SVA @claude " + filepath.FromSlash("~/devel/game") + ": listening", "SVA-12 @claude: received #1001 (assigned from @aram)", "SVA-12 @claude: done in"} {
 		if !strings.Contains(rt.out.String(), want) {
 			t.Fatalf("quadit run did not say %q:\n%s", want, rt.out)
 		}
@@ -569,8 +569,9 @@ func TestStepsCarryNoCommandLines(t *testing.T) {
 	script := []fakeagent.Step{claudeInit(), claudeRunsBash("Run the tests"),
 		{Out: fmt.Sprintf(edit, "{folder}/README")}, {Out: fmt.Sprintf(edit, "/etc/passwd")}, {SleepMS: 60}, claudeEnds("done")}
 	rt := newRunTest(t, core.ProgramClaude)
+	inJSON, _ := json.Marshal(rt.folder) // a Windows path's backslashes escaped
 	for i, s := range script {
-		script[i].Out = strings.ReplaceAll(s.Out, "{folder}", rt.folder)
+		script[i].Out = strings.ReplaceAll(s.Out, "{folder}", strings.Trim(string(inJSON), `"`))
 	}
 	rt.setScripts(script)
 	rt.f.addItem(fakeItem{Task: "SVA-12"})

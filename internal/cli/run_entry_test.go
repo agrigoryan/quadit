@@ -499,7 +499,8 @@ func TestTheProgramsSettingsNamingAnotherLoginPauseTheEntry(t *testing.T) {
 			rt.eventually("paused", func() bool {
 				return readStatus(rt.files.status()).Entries[rt.entry.ID].Pause == core.PauseLoginMismatch
 			})
-			_ = os.WriteFile(path, []byte(strings.Replace(c.setting, "%s", rt.login, 1)), 0o600)
+			// Written with /, as JSON and TOML take a Windows path without escapes.
+			_ = os.WriteFile(path, []byte(strings.Replace(c.setting, "%s", filepath.ToSlash(rt.login), 1)), 0o600)
 			rt.eventually("ready once the setting names the entry's login", func() bool {
 				return readStatus(rt.files.status()).Entries[rt.entry.ID].State == statusReady
 			})
