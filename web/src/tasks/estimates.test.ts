@@ -58,6 +58,11 @@ describe("scaleOf", () => {
     expect(scaleOf(project({ estimates: true }))).toEqual({ name: "points", values: null, zero: false, sizes: false });
   });
 
+  it("reads a scale it does not know as any whole number", () => {
+    const later = { estimates: true, estimate_scale: "golden" } as unknown as ProjectSettings; // as a newer server could send it
+    expect(scaleOf(project(later))?.name).toBe("points");
+  });
+
   it("has the scale's values, extended where asked, and says whether 0 is one and whether it reads sizes", () => {
     expect(
       scaleOf(project({ estimates: true, estimate_scale: "tshirt", estimate_extended: true, estimate_zero: true })),

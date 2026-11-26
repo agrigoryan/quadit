@@ -57,7 +57,8 @@ export const extendedValues = (name: EstimateScale): number[] => (name === "poin
 export function scaleOf(project: Project | undefined): Scale | null {
   const settings = project?.settings;
   if (!settings?.estimates) return null;
-  const name = settings.estimate_scale || "points";
+  // A name this app does not know (from a newer server) reads as any number.
+  const name = SCALES.find((s) => s === settings.estimate_scale) ?? "points";
   return {
     name,
     values: name === "points" ? null : scaleValues(name, !!settings.estimate_extended),

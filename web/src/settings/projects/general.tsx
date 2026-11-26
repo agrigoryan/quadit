@@ -33,7 +33,7 @@ function EstimateOptions({
   disabled: boolean;
   onChange: (patch: ProjectSettings) => void;
 }) {
-  const scale = settings.estimate_scale || "points";
+  const scale = SCALES.find((s) => s === settings.estimate_scale) ?? "points";
   const sizes = scale === "tshirt";
   return (
     <div className="flex flex-col gap-3 pb-1">
@@ -42,7 +42,7 @@ function EstimateOptions({
           id="project-estimate-scale"
           value={scale}
           disabled={disabled}
-          onChange={(v) => onChange({ estimate_scale: v as typeof scale })}
+          onChange={(v) => onChange({ estimate_scale: SCALES.find((s) => s === v) })}
           options={SCALES.map((name) => ({
             value: name,
             label:

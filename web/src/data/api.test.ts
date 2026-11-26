@@ -1,9 +1,9 @@
 // When to try again (data/api.ts): whenReachable's waits, and what ends them early; a
 // request called off is not a network failure; a read left unanswered is one;
-// and a read of a file's first bytes.
+// a read of a file's first bytes; and how a refusal is said.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, NetworkError, noteReachable, onReachableAgain, whenReachable } from "@/data/api";
+import { api, ApiError, errorMessage, NetworkError, noteReachable, onReachableAgain, whenReachable } from "@/data/api";
 import { type FakeServer, fakeServer, refuse } from "@/test/fake-server";
 
 let server: FakeServer;
@@ -317,5 +317,23 @@ describe("a read of a file's first bytes", () => {
     expect(seen.signal?.aborted).toBe(false);
     await later(1);
     expect(await read).toBeInstanceOf(NetworkError);
+  });
+});
+
+describe("errorMessage", () => {
+  it("adds the allowed values to a refusal, or the nearest one", () => {
+    expect(errorMessage(new ApiError(400, { message: "unknown status", allowed: ["Todo", "Done"] }))).toBe(
+      "unknown status (allowed: Todo, Done)",
+    );
+    expect(errorMessage(new ApiError(400, { message: "unknown status", nearest: "Done" }))).toBe(
+      "unknown status (did you mean Done?)",
+    );
+  });
+
+  it("says the allowed values once where the message names them already", () => {
+    const refusal = { message: "this project estimates in 1, 2, 3, 5 or 8 points", allowed: ["1", "2", "3", "5", "8"] };
+    expect(errorMessage(new ApiError(400, refusal))).toBe("this project estimates in 1, 2, 3, 5 or 8 points");
+    const sizes = { message: "this project estimates in XS, S, M, L or XL", allowed: ["XS", "S", "M", "L", "XL"] };
+    expect(errorMessage(new ApiError(400, sizes))).toBe("this project estimates in XS, S, M, L or XL");
   });
 });

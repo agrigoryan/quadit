@@ -372,7 +372,9 @@ export const workspacePath = (slug: string, path: string) => `/api/v1/w/${encode
 export function errorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.nearest) return `${err.message} (did you mean ${err.nearest}?)`;
-    if (err.allowed?.length) return `${err.message} (allowed: ${err.allowed.join(", ")})`;
+    // A message that names the allowed values already ("this project estimates in 1, 2, 3, 5 or 8 points") says them once.
+    const unsaid = err.allowed?.some((value) => !err.message.includes(value));
+    if (unsaid && err.allowed) return `${err.message} (allowed: ${err.allowed.join(", ")})`;
     return err.message;
   }
   if (err instanceof Error) return err.message;
