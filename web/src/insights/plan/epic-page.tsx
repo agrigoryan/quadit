@@ -174,7 +174,7 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
                   ? t("ins.progress.withStarted", { done: tally.done, started: tally.started, total: tally.total })
                   : t("ins.progress", { done: tally.done, total: tally.total })}
               </span>
-              {tally.points > 0 && (
+              {!!project.settings?.estimates && (
                 <span className="text-ink-3">{t("ins.points", { done: tally.pointsDone, total: tally.points })}</span>
               )}
             </div>

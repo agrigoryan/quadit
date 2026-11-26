@@ -172,6 +172,7 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
             selected={selected}
             onSelectedChange={setSelected}
             onAdd={can.edit(project?.id) ? add : undefined}
+            project={project}
           />
         )}
         {!board && <BulkBar tasks={chosen} onClear={clearSelection} />}

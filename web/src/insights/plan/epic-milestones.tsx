@@ -8,7 +8,7 @@ import { type FormEvent, type KeyboardEvent, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Diamond, Ellipsis, Pencil, Plus, Trash2 } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { getTaskByKey, sortByRank, useLookup, useRows } from "@/data/selectors";
+import { getTaskByKey, sortByRank, useLookup, useLookupEvenIfGone, useRows } from "@/data/selectors";
 import type { Epic, Milestone, Task } from "@/types/core";
 import { count } from "@/lib/amounts";
 import { createMilestone, deleteMilestone, moveMilestone, updateMilestone } from "@/insights/plan/actions";
@@ -82,9 +82,10 @@ interface GroupProps {
 
 function Group({ epic, milestone, ordered, tasks, readOnly, rowProps }: GroupProps) {
   const statuses = useLookup("statuses");
+  const projects = useLookupEvenIfGone("projects");
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState(false);
-  const tally = tallyOf(tasks, statuses);
+  const tally = tallyOf(tasks, statuses, projects);
   const name = milestone?.name ?? t("epic.noMilestone");
   const at = milestone ? ordered.indexOf(milestone) : -1;
 

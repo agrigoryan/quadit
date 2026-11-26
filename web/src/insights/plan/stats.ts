@@ -1,19 +1,31 @@
 // Progress of epics, milestones and cycles, counted from the store so it
-// moves the moment a task does. The rules match the server's dashboard:
-// canceled tasks are left out, and "at risk" means the same three things.
+// moves the moment a task does, and what a project's cycles can hold. The
+// rules match the server's dashboard: canceled tasks are left out, a task
+// counts the points tasks/estimates.ts says, and "at risk" means the same
+// three things.
 
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { useArchived, useLookup, useRows } from "@/data/selectors";
+import { useArchived, useLookup, useLookupEvenIfGone, useRows } from "@/data/selectors";
 import type { Dict } from "@/data/store";
 import { daysUntil } from "@/lib/time";
-import { type Epic, isCanceledCategory, isDoneCategory, type Status, type Task } from "@/types/core";
+import {
+  type Cycle,
+  type Epic,
+  isCanceledCategory,
+  isDoneCategory,
+  type Project,
+  type Status,
+  type Task,
+} from "@/types/core";
+import { pointsOf } from "@/tasks/estimates";
 
 export interface Tally {
   total: number;
   done: number;
   /** Under way: started or waiting. */
   started: number;
+  /** Every task's points (tasks/estimates.ts pointsOf): a task of a project that does not estimate counts 1. */
   points: number;
   pointsDone: number;
   /** When any of its tasks last changed. */
@@ -22,21 +34,23 @@ export interface Tally {
 
 export const emptyTally = (): Tally => ({ total: 0, done: 0, started: 0, points: 0, pointsDone: 0, lastMove: 0 });
 
-function addTo(tally: Tally, task: Task, statuses: Dict<Status>) {
+function addTo(tally: Tally, task: Task, statuses: Dict<Status>, projects: Dict<Project>) {
   const category = statuses[task.status_id]?.category;
   if (isCanceledCategory(category)) return;
+  const points = pointsOf(task, projects[task.project_id]);
   tally.total++;
-  tally.points += task.estimate ?? 0;
+  tally.points += points;
   if (isDoneCategory(category)) {
     tally.done++;
-    tally.pointsDone += task.estimate ?? 0;
+    tally.pointsDone += points;
   } else if (category === "started" || category === "waiting") tally.started++;
   if (task.updated_at > tally.lastMove) tally.lastMove = task.updated_at;
 }
 
-export function tallyOf(tasks: Task[], statuses: Dict<Status>): Tally {
+/** `projects` holds the tasks' projects, an archived one too: it still says how its tasks are estimated. */
+export function tallyOf(tasks: Task[], statuses: Dict<Status>, projects: Dict<Project>): Tally {
   const out = emptyTally();
-  for (const task of tasks) addTo(out, task, statuses);
+  for (const task of tasks) addTo(out, task, statuses, projects);
   return out;
 }
 
@@ -48,14 +62,39 @@ export function useTallies(field: "epic_id" | "milestone_id" | "cycle_id"): Dict
   const live = useRows("tasks");
   const archived = useArchived("tasks");
   const statuses = useLookup("statuses");
+  const projects = useLookupEvenIfGone("projects");
   return useMemo(() => {
     const out: Dict<Tally> = {};
     for (const task of [...live, ...archived]) {
       const id = task[field];
-      if (id) addTo((out[id] ??= emptyTally()), task, statuses);
+      if (id) addTo((out[id] ??= emptyTally()), task, statuses, projects);
     }
     return out;
-  }, [live, archived, statuses, field]);
+  }, [live, archived, statuses, projects, field]);
+}
+
+/** How many of the latest ended cycles capacity is the mean of. */
+const CAPACITY_CYCLES = 3;
+
+/**
+ * What a project's cycle can hold, about: the mean of the points done (or,
+ * where it does not estimate, the tasks done) in its up to three latest
+ * cycles that have ended before `today`, rounded, with how many cycles that
+ * was. Undefined while none has ended. `cycles` are the project's; `tallies`
+ * are by cycle, from useTallies, and need the finished tasks to have arrived.
+ */
+export function capacityOf(
+  cycles: Cycle[],
+  tallies: Dict<Tally>,
+  today: string,
+): { points: number; cycles: number } | undefined {
+  const ended = cycles
+    .filter((c) => c.ends_on < today)
+    .sort((a, b) => b.ends_on.localeCompare(a.ends_on))
+    .slice(0, CAPACITY_CYCLES);
+  if (ended.length === 0) return undefined;
+  const done = ended.reduce((sum, c) => sum + (tallies[c.id]?.pointsDone ?? 0), 0);
+  return { points: Math.round(done / ended.length), cycles: ended.length };
 }
 
 export type Risk = "" | "past" | "soon" | "stale";

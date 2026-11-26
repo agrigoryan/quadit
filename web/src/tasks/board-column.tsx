@@ -105,6 +105,7 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
     },
     [heightsAt, virtual],
   );
+  const shownTasks = useMemo(() => cards.map((card) => card.task), [cards]);
   const items = virtual.getVirtualItems();
   const shownIds = useMemo(
     () => items.map((item) => cards[item.index]?.id).filter((id): id is string => !!id),
@@ -144,7 +145,8 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
         ) : (
           <>
             <h2 className="min-w-0 truncate text-sm font-medium">{group.title}</h2>
-            <GroupCount group={group} count={cards.length} className="flex-1" />
+            <GroupCount group={group} tasks={shownTasks} project={project} />
+            <span className="flex-1" aria-hidden />
           </>
         )}
         {status && project && !renaming && (

@@ -76,6 +76,11 @@ export const pages = {
   "cycles.ends": "Ends",
   "cycles.create": "Create cycle",
   "cycles.range": "{from} to {to}",
+  "cycles.capacity.points": "{scope} of about {n} point | {scope} of about {n} points",
+  "cycles.capacity.tasks": "{scope} of about {n} task | {scope} of about {n} tasks",
+  "cycles.capacity.hint":
+    "About what the last ended cycle completed | About what the last {n} ended cycles completed, on average",
+  "cycles.capacity.over": "More than the cycle is likely to hold",
   "cycles.noTasks": "No tasks in this cycle yet. Set a task's cycle from its panel or the task list.",
   "cycles.empty": "No cycles yet",
   "cycles.emptyHint": "A cycle is a fixed stretch of days the team plans work into. Pick its first and last day above.",

@@ -5,7 +5,7 @@ import { TriangleAlert } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t, tMaybe } from "@/lib/i18n";
-import { useSlug } from "@/data/selectors";
+import { useLookupEvenIfGone, useSlug } from "@/data/selectors";
 import { daysUntil, formatDay } from "@/lib/time";
 import type { EpicProgress } from "@/types/dashboard";
 import { Panel, PanelEmpty } from "@/insights/ui/panel";
@@ -16,7 +16,8 @@ function riskText(epic: EpicProgress): string {
   return tMaybe(`ins.risk.${epic.at_risk_code ?? ""}`, epic.at_risk ?? "");
 }
 
-function Row({ epic, showProject }: { epic: EpicProgress; showProject: boolean }) {
+/** `estimates`: the epic's project estimates its tasks, so its points are shown; elsewhere each task is a point and the count says it. */
+function Row({ epic, showProject, estimates }: { epic: EpicProgress; showProject: boolean; estimates: boolean }) {
   const slug = useSlug();
   const late = !!epic.target_on && daysUntil(epic.target_on) < 0 && epic.state !== "done" && epic.done < epic.total;
   return (
@@ -43,9 +44,9 @@ function Row({ epic, showProject }: { epic: EpicProgress; showProject: boolean }
         <Progress done={epic.done} started={epic.started} total={epic.total} className="min-w-0 flex-1" />
         <span className="shrink-0 text-xs text-ink-2 tnum">
           {t("dash.epics.count", { done: epic.done, total: epic.total })}
-          {!!epic.points && (
+          {estimates && (
             <span className="text-ink-3">
-              {t("dash.epics.points", { done: epic.points_done ?? 0, total: epic.points })}
+              {t("dash.epics.points", { done: epic.points_done ?? 0, total: epic.points ?? 0 })}
             </span>
           )}
         </span>
@@ -70,6 +71,10 @@ export function EpicsPanel({
   className?: string;
 }) {
   const atRisk = epics.filter((e) => e.at_risk).length;
+  // An epic's tasks are in its project: by its key, an archived one too.
+  const estimating = new Set(
+    Object.values(useLookupEvenIfGone("projects")).flatMap((p) => (p.settings?.estimates ? [p.key] : [])),
+  );
   return (
     <Panel
       title={t("nav.epics")}
@@ -86,7 +91,7 @@ export function EpicsPanel({
       ) : (
         <ul className="border-t border-line/70">
           {epics.map((epic) => (
-            <Row key={epic.id} epic={epic} showProject={showProject} />
+            <Row key={epic.id} epic={epic} showProject={showProject} estimates={estimating.has(epic.project)} />
           ))}
         </ul>
       )}

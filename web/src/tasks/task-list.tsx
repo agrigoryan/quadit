@@ -11,7 +11,7 @@ import { useLookup } from "@/data/selectors";
 import { isDraft } from "@/data/store";
 import { usePeek, useTaskNav } from "@/nav/task-link";
 import { takeSeen, useTaskOrder } from "@/nav/task-queue";
-import type { SortBy, Task } from "@/types/core";
+import type { Project, SortBy, Task } from "@/types/core";
 import type { NewTaskDraft } from "@/tasks/draft";
 import { comparer, type TaskGroup } from "@/tasks/filters";
 import { GroupHeader } from "@/tasks/group-header";
@@ -42,6 +42,8 @@ interface Props {
   onSelectedChange: (next: Set<string>) => void;
   /** Opens the create dialog with these values filled in; left out for someone who may not create tasks here. */
   onAdd?: (draft: NewTaskDraft) => void;
+  /** The project in view, if there is one: where it estimates, a group's count tells its points too. */
+  project?: Project;
 }
 
 /** The property a group stands for (tasks/properties). */
@@ -60,7 +62,7 @@ const groupingOf = (group: TaskGroup) => GROUPINGS.find((p) => p.name === group.
  * on screen are drawn, so the list stays quick at any length. Left for a
  * task's page and come back to, it is where it was (nav/place.ts).
  */
-export function TaskList({ groups, nested, sort, selected, onSelectedChange, onAdd }: Props) {
+export function TaskList({ groups, nested, sort, selected, onSelectedChange, onAdd, project }: Props) {
   const open = useTaskNav();
   const peek = usePeek();
   const peeking = peek.key !== undefined;
@@ -285,6 +287,7 @@ export function TaskList({ groups, nested, sort, selected, onSelectedChange, onA
               {section.head > 0 && (
                 <GroupHeader
                   group={group}
+                  project={project}
                   collapsed={collapsed.has(group.id)}
                   onToggle={toggle}
                   onAdd={onAdd && addTo}

@@ -1,8 +1,9 @@
 // A project's cycles, as a list of rows, and starting a new one.
 
 import { type FormEvent, useMemo, useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
+import { Gauge, Plus, RefreshCw } from "lucide-react";
 import { useParams } from "react-router";
+import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
 import { useCycles, useProjectByKey, useSlug } from "@/data/selectors";
@@ -13,7 +14,7 @@ import { usePageTitle } from "@/lib/ui-state";
 import { addDays } from "@/lib/days";
 import { createCycle } from "@/insights/plan/actions";
 import { cycleName, cyclePhase } from "@/insights/plan/cycle-page";
-import { type Tally, useTallies } from "@/insights/plan/stats";
+import { capacityOf, type Tally, useTallies } from "@/insights/plan/stats";
 import { PlanRow } from "@/insights/plan/plan-row";
 import { useTasksBy } from "@/insights/plan/tasks-by";
 import { NotFoundPage } from "@/ui/not-found";
@@ -21,6 +22,7 @@ import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import { Input } from "@/ui/input";
+import { Tooltip } from "@/ui/tooltip";
 
 /** A project's cycles: the stretches of days its work is planned into. */
 export function CyclesPage() {
@@ -53,6 +55,7 @@ function Cycles({ project }: { project: Project }) {
   const tallies = useTallies("cycle_id");
   const now = serverDay();
   const groups = useMemo(() => inGroups(cycles, now), [cycles, now]);
+  const capacity = capacityOf(cycles, tallies, now);
   const [openId, setOpenId] = useState<string | null>(null);
   const readOnly = !useCan().edit(project.id);
 
@@ -88,7 +91,14 @@ function Cycles({ project }: { project: Project }) {
                         </Badge>
                       ) : undefined
                     }
-                    meta={<CycleMeta cycle={cycle} tally={tallies[cycle.id]} />}
+                    meta={
+                      <CycleMeta
+                        cycle={cycle}
+                        tally={tallies[cycle.id]}
+                        estimates={!!project.settings?.estimates}
+                        capacity={group.id === "past" ? undefined : capacity}
+                      />
+                    }
                     tally={tallies[cycle.id]}
                     tasks={tasksBy[cycle.id] ?? []}
                     open={openId === cycle.id}
@@ -105,21 +115,70 @@ function Cycles({ project }: { project: Project }) {
   );
 }
 
-/** The cycle's dates and, when its tasks are estimated, its points. */
-function CycleMeta({ cycle, tally }: { cycle: Cycle; tally: Tally | undefined }) {
-  // Points done are not known until the finished tasks have arrived; the row says it is loading.
+interface MetaProps {
+  cycle: Cycle;
+  tally: Tally | undefined;
+  /** The project estimates: the counts are in points. */
+  estimates: boolean;
+  /** What a cycle of the project can hold, for one that has not ended. */
+  capacity: ReturnType<typeof capacityOf>;
+}
+
+/**
+ * The cycle's dates and, where the project estimates, its points; for one
+ * not yet ended, its scope against what the project's cycles complete.
+ */
+function CycleMeta({ cycle, tally, estimates, capacity }: MetaProps) {
+  // Points done are not known until the finished tasks have arrived, nor is capacity; the row says it is loading.
   const restLoaded = useRestLoaded();
   return (
     <>
-      {restLoaded && !!tally?.points && (
-        <span className="shrink-0 text-xs text-ink-3 tnum max-md:hidden">
-          {t("ins.points", { done: tally.pointsDone, total: tally.points })}
-        </span>
+      {restLoaded && capacity ? (
+        <Capacity scope={tally?.points ?? 0} capacity={capacity} estimates={estimates} />
+      ) : (
+        restLoaded &&
+        estimates && (
+          <span className="shrink-0 text-xs text-ink-3 tnum max-md:hidden">
+            {t("ins.points", { done: tally?.pointsDone ?? 0, total: tally?.points ?? 0 })}
+          </span>
+        )
       )}
       <span className="shrink-0 text-xs text-ink-3 tnum max-sm:hidden">
         {t("cycles.range", { from: formatDay(cycle.starts_on), to: formatDay(cycle.ends_on) })}
       </span>
     </>
+  );
+}
+
+/** "34 of about 30 points": what is planned against what is done in a cycle, marked when it is more. */
+function Capacity({
+  scope,
+  capacity,
+  estimates,
+}: {
+  scope: number;
+  capacity: NonNullable<MetaProps["capacity"]>;
+  estimates: boolean;
+}) {
+  const over = scope > capacity.points;
+  const text = t(estimates ? "cycles.capacity.points" : "cycles.capacity.tasks", { scope, n: capacity.points });
+  const hint = t("cycles.capacity.hint", { n: capacity.cycles });
+  const told = over ? [text, t("cycles.capacity.over"), hint] : [text, hint];
+  return (
+    <Tooltip label={told.slice(1).join(". ")} side="top">
+      <span
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the figure can be stepped to with Tab, to read how it is worked out in the tooltip
+        tabIndex={0}
+        aria-label={told.join(". ")}
+        className={cx(
+          "flex shrink-0 items-center gap-1 rounded-sm text-xs tnum outline-offset-2",
+          over ? "font-medium text-wait" : "text-ink-3",
+        )}
+      >
+        <Gauge className="size-3" aria-hidden />
+        {text}
+      </span>
+    </Tooltip>
   );
 }
 

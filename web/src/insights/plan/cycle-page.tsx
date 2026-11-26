@@ -62,6 +62,8 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
   const tasks = useTasksBy(project.id, "cycle_id")[cycle.id] ?? NO_TASKS;
   const tally = useTallies("cycle_id")[cycle.id] ?? emptyTally();
   const phase = cyclePhase(cycle);
+  // Points are shown where the project estimates; elsewhere every task is one, and the counts say it.
+  const estimates = !!project.settings?.estimates;
   const next = cycles.find((c) => c.starts_on > cycle.ends_on);
   const unfinished = tasks.filter((task) => isOpenCategory(statuses[task.status_id]?.category));
   const groups = useMemo(
@@ -149,7 +151,7 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
                 <span>
                   {t("ins.progress.withStarted", { done: tally.done, started: tally.started, total: tally.total })}
                 </span>
-                {tally.points > 0 && (
+                {estimates && (
                   <span className="text-ink-3">{t("ins.points", { done: tally.pointsDone, total: tally.points })}</span>
                 )}
               </div>
@@ -158,7 +160,7 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
           </div>
         </div>
 
-        <BurnPanel cycle={cycle} hasPoints={tally.points > 0} />
+        <BurnPanel cycle={cycle} hasPoints={estimates} />
 
         <div className="border-t border-line" style={keyColumn(groups.flatMap((g) => g.tasks.map((task) => task.key)))}>
           {groups.length === 0 && (
