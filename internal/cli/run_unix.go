@@ -150,8 +150,9 @@ func untilAskedToStop(ctx context.Context) (context.Context, context.CancelFunc)
 	return signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 }
 
-// replaceFile renames from over to, which may exist.
-func replaceFile(from, to string) error { return os.Rename(from, to) }
+// replaceFile renames from over to, which may exist. Whether the rename
+// reaches the disk at once is syncDir's on macOS and Linux.
+func replaceFile(from, to string, _ bool) error { return os.Rename(from, to) }
 
 // readWhole reads a file that writeWhole writes.
 func readWhole(path string) ([]byte, error) { return os.ReadFile(path) }

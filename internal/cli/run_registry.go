@@ -159,7 +159,18 @@ func changeRegistry(ctx context.Context, files runFiles, change func(*registry) 
 
 // writeWhole writes a file whole and durably: a temporary file in the same
 // folder, flushed to the disk, renamed over the file. Mode 0600.
-func writeWhole(path string, data []byte) error {
+func writeWhole(path string, data []byte) error { return replaceWhole(path, data, true) }
+
+// writeWholeToShow writes a file whole as writeWhole does, but not through
+// to the disk: a file that only shows what is happening now (status.json,
+// rewritten at every change) is not worth a flush each time, and a power
+// loss that takes it back a moment does no harm.
+func writeWholeToShow(path string, data []byte) error { return replaceWhole(path, data, false) }
+
+// replaceWhole writes a temporary file in path's folder and renames it
+// over path, so a reader sees the old file or the new one; durable, both
+// are flushed to the disk first.
+func replaceWhole(path string, data []byte, durable bool) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*")
 	if err != nil {
 		return err
@@ -168,18 +179,21 @@ func writeWhole(path string, data []byte) error {
 	if err == nil {
 		err = tmp.Chmod(0o600)
 	}
-	if err == nil {
+	if err == nil && durable {
 		err = tmp.Sync()
 	}
 	if closeErr := tmp.Close(); err == nil {
 		err = closeErr
 	}
 	if err == nil {
-		err = replaceFile(tmp.Name(), path)
+		err = replaceFile(tmp.Name(), path, durable)
 	}
 	if err != nil {
 		os.Remove(tmp.Name())
 		return err
+	}
+	if !durable {
+		return nil
 	}
 	return syncDir(filepath.Dir(path))
 }

@@ -357,11 +357,11 @@ func untilAskedToStop(ctx context.Context) (context.Context, context.CancelFunc)
 	}
 }
 
-// replaceFile renames from over to, which may exist, through to the disk.
-// A reader that has to open (Go opens files without letting them be
-// renamed over meanwhile) holds it back a moment: it is tried again for a
-// while.
-func replaceFile(from, to string) error {
+// replaceFile renames from over to, which may exist, through to the disk
+// when throughToDisk says so. A reader that has to open (Go opens files
+// without letting them be renamed over meanwhile) holds it back a moment:
+// it is tried again for a while.
+func replaceFile(from, to string, throughToDisk bool) error {
 	src, err := windows.UTF16PtrFromString(from)
 	if err != nil {
 		return err
@@ -372,7 +372,11 @@ func replaceFile(from, to string) error {
 	}
 	deadline := time.Now().Add(2 * time.Second)
 	for {
-		err := windows.MoveFileEx(src, dst, windows.MOVEFILE_REPLACE_EXISTING|windows.MOVEFILE_WRITE_THROUGH)
+		flags := uint32(windows.MOVEFILE_REPLACE_EXISTING)
+		if throughToDisk {
+			flags |= windows.MOVEFILE_WRITE_THROUGH
+		}
+		err := windows.MoveFileEx(src, dst, flags)
 		busy := errors.Is(err, windows.ERROR_ACCESS_DENIED) || errors.Is(err, windows.ERROR_SHARING_VIOLATION)
 		if !busy || time.Now().After(deadline) {
 			if err != nil {

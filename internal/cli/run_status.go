@@ -99,7 +99,7 @@ func (b *statusBoard) drop(id string) {
 // write writes status.json; the caller holds b.mu. A status not written
 // is written with the next change.
 func (b *statusBoard) write() {
-	_ = writeWhole(b.path, plainJSON(statusFile{Version: 1, PID: os.Getpid(), At: utcTime(b.clock.Now()), Machine: b.machine, Entries: b.entries}))
+	_ = writeWholeToShow(b.path, plainJSON(statusFile{Version: 1, PID: os.Getpid(), At: utcTime(b.clock.Now()), Machine: b.machine, Entries: b.entries}))
 }
 
 // readStatus reads status.json, empty when there is none.
