@@ -15,7 +15,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -261,11 +260,14 @@ func startBrowser(ctx context.Context, chrome, profile string) (*browser, error)
 		out.Close()
 		return nil, err
 	}
-	args := append([]string{"--headless=new", "--remote-debugging-pipe", "--disable-gpu", "--hide-scrollbars", "--no-first-run",
+	args := append([]string{"--headless=new", "--disable-gpu", "--hide-scrollbars", "--no-first-run",
 		"--no-default-browser-check", "--user-data-dir=" + profile}, chromeSwitches()...)
-	cmd := exec.CommandContext(ctx, chrome, append(args, "about:blank")...)
-	cmd.ExtraFiles = []*os.File{toBrowser, fromBrowser} // the browser reads commands on 3 and answers on 4
-	err = cmd.Start()
+	cmd := exec.CommandContext(ctx, chrome, args...)
+	pipeSwitches, err := passPipes(cmd, toBrowser, fromBrowser)
+	if err == nil {
+		cmd.Args = append(append(cmd.Args, pipeSwitches...), "about:blank")
+		err = cmd.Start()
+	}
 	toBrowser.Close()
 	fromBrowser.Close()
 	if err != nil {
@@ -414,7 +416,8 @@ func fitWholePage(ctx context.Context, devtools *cdp, s string, p Request) (int,
 	return whole, nil
 }
 
-// findChrome returns a Chrome or Chromium to run, or "".
+// findChrome returns a Chrome or Chromium to run, or "": one on PATH, or
+// one installed where this system puts them.
 func findChrome() string {
 	if p := os.Getenv("QUADIT_CHROME"); p != "" {
 		return p
@@ -424,11 +427,9 @@ func findChrome() string {
 			return p
 		}
 	}
-	if runtime.GOOS == "darwin" {
-		for _, p := range []string{"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium"} {
-			if _, err := os.Stat(p); err == nil {
-				return p
-			}
+	for _, p := range installedBrowsers() {
+		if _, err := os.Stat(p); err == nil {
+			return p
 		}
 	}
 	return ""
