@@ -437,6 +437,7 @@ API paths are under `/api/v1/w/-/`; the `-` means "the workspace of this token".
 - A task moved to another project gets a new key; the old key still finds it. Moved back to a project it was in, it gets its key there back (unless another task has that number now).
 - A saved view that names a label, status or epic deleted since is read without that part, and the answer says so (`note`).
 - `quadit tasks assignee=me status=todo label=art open=1 sort=priority`; `count=1` returns only the number; `view=SLUG` runs a saved view.
+- Estimates: `estimate=5,8`, `estimate=M` (a T-shirt size: 3 points, on any project) or `estimate=none` asks for tasks by estimate. In a change an estimate is a number of points or a T-shirt size, on the project's scale where it has one (`quadit layout KEY` says which); `null` clears it (`estimate=none` in the command), and 0 is an estimate apart from none only where the project allows zero estimates.
 - `quadit show SVA-12 since=1042` returns only what happened in the task after feed position 1042.
 - A refusal says what was wrong, lists what would have been accepted and suggests the nearest match:
 
