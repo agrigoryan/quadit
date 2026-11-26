@@ -75,7 +75,7 @@ describe("localAgents", () => {
       {
         connections: {
           agentsOf: () => {
-            throw new Error("/Users/aram/Library/Application Support/Quadit/connections.json cannot be read");
+            throw new Error("/Users/maya/Library/Application Support/Quadit/connections.json cannot be read");
           },
         },
         runner: { available: true, projectsOf: async () => ({ machine: "", projects: [] }) },
@@ -86,7 +86,7 @@ describe("localAgents", () => {
     );
     expect(agents).toEqual([]);
     expect(logged).toEqual([
-      "local agents: /Users/aram/Library/Application Support/Quadit/connections.json cannot be read",
+      "local agents: /Users/maya/Library/Application Support/Quadit/connections.json cannot be read",
     ]);
   });
 });

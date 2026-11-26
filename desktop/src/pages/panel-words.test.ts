@@ -17,7 +17,7 @@ describe("the panel's words", () => {
   });
 
   it("names a workspace's block by the workspace, and its server only when there are several", () => {
-    expect(headingOf("NSLabs", "This computer", 1)).toBe("NSLabs");
-    expect(headingOf("NSLabs", "This computer", 2)).toBe("NSLabs on This computer");
+    expect(headingOf("Harbor Studio", "This computer", 1)).toBe("Harbor Studio");
+    expect(headingOf("Harbor Studio", "This computer", 2)).toBe("Harbor Studio on This computer");
   });
 });
