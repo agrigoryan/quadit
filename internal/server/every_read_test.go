@@ -1008,11 +1008,15 @@ func newNormaliser(baseURL string) *normaliser {
 func (n *normaliser) name(id, name string) { n.names[id] = "<" + name + ">" }
 
 // replace has every from in a text become to. A Windows path's backslashes
-// are doubled in JSON: that form is replaced too, and first, so that it is
-// found before the plain one could be inside it.
+// are doubled each time it is quoted: in JSON, in a line that quotes it,
+// and in such a line carried in JSON. Those forms are replaced too, the
+// most quoted first, so each is found before a less quoted one could be
+// inside it.
 func (n *normaliser) replace(from, to string) {
-	if escaped := strings.ReplaceAll(from, `\`, `\\`); escaped != from {
-		n.replaces = append(n.replaces, escaped, to)
+	if strings.Contains(from, `\`) {
+		for _, times := range []int{4, 2} {
+			n.replaces = append(n.replaces, strings.ReplaceAll(from, `\`, strings.Repeat(`\`, times)), to)
+		}
 	}
 	n.replaces = append(n.replaces, from, to)
 }
