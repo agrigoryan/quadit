@@ -6,7 +6,7 @@ import (
 )
 
 // TestAFolderLabelIsAPathAsTheRunnersSystemWritesIt: a runner's folder is
-// labelled from the root or the home folder on every system, and on
+// labeled from the root or the home folder on every system, and on
 // Windows from a drive or a network share too; anything else, or a label
 // too long or with a control character, is refused.
 func TestAFolderLabelIsAPathAsTheRunnersSystemWritesIt(t *testing.T) {
