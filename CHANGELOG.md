@@ -4,6 +4,8 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-26
+
 Windows support is new in this release. It was checked by automated tests on Windows: the server's and the command's tests, the desktop app's, and the app end to end (set up on this computer, Connect, and a run Quadit starts), with stand-in agents. Nobody has run it on a person's own Windows computer yet, the real Claude Code and Codex were not run on Windows, and the Windows installer is not signed, so SmartScreen warns when it is opened.
 
 ### Added
@@ -183,7 +185,8 @@ The first public release.
 - A desktop app for macOS, Windows and Linux (pre-release, not signed yet): a window for each server, sign-in through the browser, answers from a notification or the menu bar, quick capture, and Connect, which sets up Claude Code, Codex and other agent harnesses to work in Quadit.
 - Install with the install script, Homebrew, Docker (`ghcr.io/agrigoryan/quadit`), `.deb` and `.rpm` packages with a systemd service, or the archives on GitHub Releases.
 
-[Unreleased]: https://github.com/agrigoryan/quadit/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/agrigoryan/quadit/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.8.0
 [0.7.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.7.0
 [0.6.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.6.0
 [0.5.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.5.0
