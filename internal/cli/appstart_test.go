@@ -200,7 +200,12 @@ func TestTheCommandStartsTheAppWhenItsServerIsNotRunning(t *testing.T) {
 // keeps the command off the network, means the app's server is not
 // running.
 func TestTheAppIsStartedOnlyForItsServerNotRunning(t *testing.T) {
-	refusedErr := &net.OpError{Op: "dial", Err: os.NewSyscallError("connect", syscall.ECONNREFUSED)}
+	// A refusal as this system gives it: each has its own error for one.
+	down, _ := downServer(t)
+	_, refusedErr := http.Get(down)
+	if refusedErr == nil {
+		t.Fatal("an address where nothing listens answered")
+	}
 	timeout := &net.OpError{Op: "dial", Err: os.NewSyscallError("connect", syscall.ETIMEDOUT)}
 	cases := []struct {
 		name    string
@@ -235,7 +240,7 @@ func TestTheAppIsStartedOnlyForItsServerNotRunning(t *testing.T) {
 
 // TestTheAppIsStartedWithoutAShell: the command lines that start the app
 // are argument lists: the bundle id on macOS, the recorded path on Linux
-// (which must be a full path), and none elsewhere.
+// and Windows (which must be a full path), and none elsewhere.
 func TestTheAppIsStartedWithoutAShell(t *testing.T) {
 	mac, err := appCommand("darwin", appLogin{Path: "/Applications/Quadit.app/Contents/MacOS/Quadit; rm -rf ~"})
 	if err != nil || !slices.Equal(mac, []string{"/usr/bin/open", "-g", "-j", "-b", "io.github.agrigoryan.quadit", "--args", "--background"}) {
@@ -248,8 +253,17 @@ func TestTheAppIsStartedWithoutAShell(t *testing.T) {
 	if _, err := appCommand("linux", appLogin{Path: "quadit"}); err == nil {
 		t.Fatal("Linux: a path that is not a full one was taken")
 	}
-	if _, err := appCommand("windows", appLogin{Path: `C:\Quadit\Quadit.exe`}); err == nil {
-		t.Fatal("Windows: an app was to be started")
+	// A full path as this computer writes one: C:\ on Windows, / elsewhere.
+	exe := filepath.Join(os.TempDir(), "Programs", "Quadit", "Quadit.exe")
+	windows, err := appCommand("windows", appLogin{Path: exe})
+	if err != nil || !slices.Equal(windows, []string{exe, "--background"}) {
+		t.Fatalf("Windows: %q, %v", windows, err)
+	}
+	if _, err := appCommand("windows", appLogin{Path: "Quadit.exe"}); err == nil {
+		t.Fatal("Windows: a path that is not a full one was taken")
+	}
+	if _, err := appCommand("freebsd", appLogin{Path: exe}); err == nil {
+		t.Fatal("FreeBSD: an app was to be started")
 	}
 	// Whether it runs on macOS is asked by its bundle id; the answer names it, or is empty.
 	if argv := runningCommand(); !slices.Equal(argv, []string{"/usr/bin/lsappinfo", "find", "bundleid=io.github.agrigoryan.quadit"}) {

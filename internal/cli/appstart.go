@@ -19,7 +19,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -63,8 +62,8 @@ type systemStarter struct{}
 // running reports whether the app runs: on macOS, whether the system knows
 // an application of its bundle id (lsappinfo, which needs no permission,
 // and finds the app wherever its bundle is and whatever it is called). On
-// Linux a second start of the app hands its arguments to the first, so it
-// is always started.
+// Linux and Windows a second start of the app hands its arguments to the
+// first, so it is always started.
 func (systemStarter) running(ctx context.Context) bool {
 	if runtime.GOOS != "darwin" {
 		return false
@@ -99,14 +98,14 @@ func (systemStarter) start(ctx context.Context, app appLogin) error {
 }
 
 // appCommand is the argument list that starts the app in the background
-// on a system: on macOS `open` with the app's bundle id, on Linux the
-// app's executable as it recorded its path. Elsewhere no server runs on
-// the computer for the app to start.
+// on a system: on macOS `open` with the app's bundle id, on Linux and
+// Windows the app's executable as it recorded its path. Elsewhere no server
+// runs on the computer for the app to start.
 func appCommand(goos string, app appLogin) ([]string, error) {
 	switch goos {
 	case "darwin":
 		return []string{"/usr/bin/open", "-g", "-j", "-b", appBundleID, "--args", "--background"}, nil
-	case "linux":
+	case "linux", "windows":
 		if !filepath.IsAbs(app.Path) {
 			return nil, fmt.Errorf("the login names no path of the app to start (%q)", app.Path)
 		}
@@ -221,7 +220,7 @@ func isQuadit(ctx context.Context, client *http.Client, base string) int {
 // refused reports whether a request failed because nothing listens at the
 // address: not a timeout, not a name that does not resolve.
 func refused(err error) bool {
-	return errors.Is(err, syscall.ECONNREFUSED)
+	return errors.Is(err, connectionRefused)
 }
 
 // onThisComputer reports whether a server's address is this computer's
