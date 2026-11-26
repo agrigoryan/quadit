@@ -132,7 +132,7 @@ func Replace(from, to string) error {
 	if err != nil {
 		return err
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }() // a folder opened to rename in: nothing was written through it
 	return root.Rename(filepath.Base(from), filepath.Base(to))
 }
 
