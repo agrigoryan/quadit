@@ -120,8 +120,10 @@ posixOnly("startChild", () => {
  * A stand-in for `quadit guard` (the Windows contract, S1), as a script
  * named `guard` in a folder of its own: Node started there with "guard"
  * first runs it, so the app's `quadit guard PROGRAM ARGS...` is played by
- * Node, on any system. It runs PROGRAM with ARGS as given, with no input,
- * its outputs passed through, exits with its code, and ends it when its own
+ * Node, on any system. As quadit's does, it starts nothing (exit 126)
+ * unless the app's mark QUADIT_APP_GUARD=1 is in its environment, which it
+ * does not pass on. It runs PROGRAM with ARGS as given, with no input, its
+ * outputs passed through, exits with its code, and ends it when its own
  * input closes, unless GUARD_DEAF is set: then it never does.
  */
 function fakeGuard(): string {
@@ -129,8 +131,11 @@ function fakeGuard(): string {
   writeFileSync(
     join(dir, "guard"),
     `const { spawn } = require("node:child_process");
+if (process.env.QUADIT_APP_GUARD !== "1") process.exit(126);
 const [program, ...args] = process.argv.slice(2);
-const child = spawn(program, args, { stdio: ["ignore", "inherit", "inherit"] });
+const env = { ...process.env };
+delete env.QUADIT_APP_GUARD;
+const child = spawn(program, args, { stdio: ["ignore", "inherit", "inherit"], env });
 child.on("exit", (code) => process.exit(code ?? 1));
 process.stdin.on("end", () => process.env.GUARD_DEAF || child.kill());
 process.stdin.resume();
@@ -148,7 +153,7 @@ describe("startChild on Windows: quadit guard", () => {
       process.execPath,
       [
         "-e",
-        "console.log(process.argv.slice(1).join('|')); console.error('two'); process.exit(3)",
+        "console.log(process.argv.slice(1).join('|')); console.error(process.env.QUADIT_APP_GUARD ?? 'two'); process.exit(3)",
         "one; two",
         "$HOME",
         'say "hi"',
@@ -171,18 +176,37 @@ describe("startChild on Windows: quadit guard", () => {
     await child.exited;
   });
 
-  it("ends a guard still there once the time to stop is up", async () => {
+  it("starts the guard with the app's mark, whatever environment it is given", async () => {
     const lines: string[] = [];
-    const child = start(process.execPath, ["-e", "console.log('up'); setTimeout(() => {}, 12000)"], {
+    const child = start(process.execPath, ["-e", "console.log('ran')"], {
+      cwd: fakeGuard(),
+      env: { PATH: process.env.PATH ?? "", SystemRoot: process.env.SystemRoot ?? "" },
+      line: (line) => lines.push(line),
+    });
+    expect(await child.exited).toBe(0);
+    expect(lines).toEqual(["ran"]);
+  });
+
+  it("ends a guard still there once the time to stop is up, and only then", async () => {
+    const lines: string[] = [];
+    // A program that would outlast the test: only the guard ended outright ends the wait for it.
+    const child = start(process.execPath, ["-e", "console.log(process.pid); setTimeout(() => {}, 60000)"], {
       cwd: fakeGuard(),
       env: { ...process.env, GUARD_DEAF: "1" },
       line: (line) => lines.push(line),
     });
-    await until(() => lines.includes("up"));
+    await until(() => lines.length === 1);
     const asked = Date.now();
     child.stop();
-    await child.exited;
-    expect(Date.now() - asked).toBeGreaterThanOrEqual(5_000);
+    try {
+      await child.exited;
+      const waited = Date.now() - asked;
+      expect(waited).toBeGreaterThanOrEqual(5_000);
+      expect(waited).toBeLessThan(10_000);
+    } finally {
+      // The stand-in guard, unlike quadit's, leaves its program behind when it is ended.
+      process.kill(Number(lines[0]));
+    }
   }, 15_000);
 
   it("starts nothing without a quadit of the app's, and says why", async () => {
@@ -224,17 +248,24 @@ describe("childEnv", () => {
 });
 
 describe("withoutQuadit and withPath", () => {
-  it("takes out every Quadit setting, whatever its case, as Windows reads them", () => {
-    expect(withoutQuadit({ Quadit_Token: "t", QUADIT_URL: "u", quadit_config: "c", HOME: "/h" })).toEqual({
-      HOME: "/h",
-    });
+  it("takes out every Quadit setting, on Windows whatever its case, as Windows reads the names", () => {
+    const env = { Quadit_Token: "t", QUADIT_URL: "u", quadit_config: "c", HOME: "/h" };
+    expect(withoutQuadit(env, "win32")).toEqual({ HOME: "/h" });
+    // Elsewhere a name is its case: only QUADIT_ names are Quadit's.
+    expect(withoutQuadit(env, "linux")).toEqual({ Quadit_Token: "t", quadit_config: "c", HOME: "/h" });
   });
 
-  it("gives one PATH, every other spelling of it taken out, as Windows keeps it as Path", () => {
-    expect(withPath({ Path: "C:\\Windows", PATHEXT: ".EXE", HOME: "/h" }, "C:\\Tools;C:\\Windows")).toEqual({
+  it("gives one PATH, on Windows every other spelling of it taken out, as Windows keeps it as Path", () => {
+    const env = { Path: "C:\\Windows", PATHEXT: ".EXE", HOME: "/h" };
+    expect(withPath(env, "C:\\Tools;C:\\Windows", "win32")).toEqual({
       PATHEXT: ".EXE",
       HOME: "/h",
       PATH: "C:\\Tools;C:\\Windows",
+    });
+    // Elsewhere Path is a variable of its own, kept.
+    expect(withPath({ Path: "mine", PATH: "/bin" }, "/usr/bin:/bin", "darwin")).toEqual({
+      Path: "mine",
+      PATH: "/usr/bin:/bin",
     });
   });
 });

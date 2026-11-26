@@ -16,7 +16,9 @@
 // refuses it (a path or an argument holding ", % or a control character,
 // which cmd.exe could read anew; a .ps1, or a file without an extension).
 // Each program gets a hidden console of its own there, and an agent's run
-// that is stopped is ended at once, with nothing gentler first.
+// that is stopped is ended at once, with nothing gentler first. The guard is
+// the app's own tool: it starts nothing unless the app's mark,
+// QUADIT_APP_GUARD=1, is in its environment, which it does not pass on.
 //
 // A child gets no terminal and no window of the app's; it gets the login
 // shell's PATH and none of the app's QUADIT_ settings (childEnv).
@@ -42,6 +44,9 @@ status=$?
 trap '' TERM
 kill -TERM 0 2>/dev/null
 exit "$status"`;
+
+/** The variable that tells quadit guard the app started it (the Windows contract, S1). */
+const GUARD_MARK = "QUADIT_APP_GUARD";
 
 /** How long a group asked to stop has before it is killed outright, and how long after that the app waits at most. */
 const STOP_GRACE_MS = 5_000;
@@ -116,7 +121,8 @@ function startUnderQuadit(quadit: string, program: string, args: string[], optio
   // No console window: the app is a window program, and a console program it starts would get one of its own.
   const child = spawn(quadit, ["guard", program, ...args], {
     cwd: options.cwd,
-    env: options.env,
+    // Set after whatever took the QUADIT_ settings out of the environment given, on purpose.
+    env: { ...options.env, [GUARD_MARK]: "1" },
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
   });
@@ -180,18 +186,26 @@ export function childEnv(env: NodeJS.ProcessEnv, login: string, path?: string): 
 
 /**
  * `env` without any QUADIT_ setting: the person's own servers' address and
- * token never reach what the app runs. Matched in any case, as Windows
- * matches the names of variables.
+ * token never reach what the app runs. On Windows, which matches the names
+ * of variables in any case, in any case; elsewhere a name is its case.
  */
-export function withoutQuadit(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return Object.fromEntries(Object.entries(env).filter(([key]) => !key.toUpperCase().startsWith("QUADIT_")));
+export function withoutQuadit(env: NodeJS.ProcessEnv, platform: NodeJS.Platform = process.platform): NodeJS.ProcessEnv {
+  const named = platform === "win32" ? (key: string) => key.toUpperCase() : (key: string) => key;
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !named(key).startsWith("QUADIT_")));
 }
 
 /**
- * `env` with `path` as its PATH. Windows matches the names of variables in
- * any case and keeps this one as "Path": every spelling of it goes first, or
- * the program would be given two and see either.
+ * `env` with `path` as its PATH. On Windows, which matches the names of
+ * variables in any case and keeps this one as "Path", every spelling of it
+ * goes first, or the program would be given two and see either; elsewhere
+ * Path is another variable, and stays.
  */
-export function withPath(env: NodeJS.ProcessEnv, path: string): NodeJS.ProcessEnv {
-  return { ...Object.fromEntries(Object.entries(env).filter(([key]) => key.toUpperCase() !== "PATH")), PATH: path };
+export function withPath(
+  env: NodeJS.ProcessEnv,
+  path: string,
+  platform: NodeJS.Platform = process.platform,
+): NodeJS.ProcessEnv {
+  const kept =
+    platform === "win32" ? Object.entries(env).filter(([key]) => key.toUpperCase() !== "PATH") : Object.entries(env);
+  return { ...Object.fromEntries(kept), PATH: path };
 }
