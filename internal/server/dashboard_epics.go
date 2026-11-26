@@ -20,8 +20,11 @@ type epicProgress struct {
 	Total    int    `json:"total"`
 	Done     int    `json:"done"`
 	Started  int    `json:"started"`
-	Points   int    `json:"points,omitempty"`
-	PointsOK int    `json:"points_done,omitempty"`
+	// Points and PointsOK, its points and those done, are there (0
+	// included) exactly when points are shown for it: when one of its tasks
+	// is in a project that estimates.
+	Points   *int `json:"points,omitempty"`
+	PointsOK *int `json:"points_done,omitempty"`
 	// AtRisk: the target date is close or past and work is left, or nothing
 	// has moved in two weeks.
 	AtRisk string `json:"at_risk,omitempty"`
@@ -43,7 +46,11 @@ func epicProgressOf(scope dashboardScope) []epicProgress {
 		byEpic[epic.ID] = &epicProgress{ID: epic.ID, Name: epic.Name, Project: names.projects[epic.ProjectID].Key, State: epic.State, Lead: names.handle(epic.LeadID), TargetOn: epic.TargetOn}
 	}
 	lastMove := map[string]int64{}
-	estimated := map[string]bool{}
+	type tally struct {
+		points, done int
+		shown        bool
+	}
+	tallies := map[string]*tally{}
 	for _, t := range scope.tasks {
 		category := names.statuses[t.StatusID].Category
 		progress, ok := byEpic[t.EpicID]
@@ -51,13 +58,18 @@ func epicProgressOf(scope dashboardScope) []epicProgress {
 			continue
 		}
 		settings := names.projects[t.ProjectID].Settings
-		estimated[t.EpicID] = estimated[t.EpicID] || settings.Estimating()
+		points := tallies[t.EpicID]
+		if points == nil {
+			points = &tally{}
+			tallies[t.EpicID] = points
+		}
+		points.shown = points.shown || settings.Estimating()
+		points.points += settings.Points(t)
 		progress.Total++
-		progress.Points += settings.Points(t)
 		switch category {
 		case core.CatDone:
 			progress.Done++
-			progress.PointsOK += settings.Points(t)
+			points.done += settings.Points(t)
 		case core.CatStarted, core.CatWaiting:
 			progress.Started++
 		}
@@ -67,8 +79,8 @@ func epicProgressOf(scope dashboardScope) []epicProgress {
 	}
 	var epics []epicProgress
 	for epicID, progress := range byEpic {
-		if !estimated[epicID] {
-			progress.Points, progress.PointsOK = 0, 0
+		if points := tallies[epicID]; points != nil && points.shown {
+			progress.Points, progress.PointsOK = &points.points, &points.done
 		}
 		markAtRisk(progress, lastMove[epicID], scope.now)
 		epics = append(epics, *progress)
