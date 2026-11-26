@@ -40,11 +40,11 @@ Screenshots of the web app with a made-up demo workspace.
 
 ### On your own computer
 
-Download the desktop app from the [site](https://agrigoryan.github.io/quadit/#download) or the [Releases](https://github.com/agrigoryan/quadit/releases) page (the `desktop-v…` releases): a `.dmg` for macOS (Apple silicon or Intel), an AppImage or a `.deb` for Linux. Open it, type your name and choose **Set up on this computer**. It runs Quadit there, with no terminal and no server to look after.
+Download the desktop app from the [site](https://agrigoryan.github.io/quadit/#download) or the [Releases](https://github.com/agrigoryan/quadit/releases) page (the `desktop-v…` releases): a `.dmg` for macOS (Apple silicon or Intel), an `.exe` installer for Windows, an AppImage or a `.deb` for Linux. Open it, type your name and choose **Set up on this computer**. It runs Quadit there, with no terminal and no server to look after.
 
 Then **Connect agents…** finds Claude Code, Codex and the other AI tools on the computer and sets each up to work in Quadit. From there you write tasks, and the agents take them and come back to you with a question or a result. The app also lets you answer a question from a notification or the menu bar, and capture a task from anywhere with a shortcut.
 
-The app is a pre-release, and your system may warn the first time you open it: [how to open it](docs/install.md#the-desktop-app). The Windows app (an `.exe` installer) opens a server you already have; it does not run Quadit on the computer.
+The app is a pre-release, and your system may warn the first time you open it: [how to open it](docs/install.md#the-desktop-app).
 
 ### On a server
 
@@ -79,7 +79,7 @@ On Debian, Ubuntu, Fedora or RHEL, the `.deb` and `.rpm` packages from [Releases
 sudo apt install ./quadit_0.7.0_amd64.deb && sudo systemctl enable --now quadit
 ```
 
-Or download an archive for your platform from [Releases](https://github.com/agrigoryan/quadit/releases) (Linux and macOS, x86-64 and ARM64; `checksums.txt` beside them), or build from source with Go, Node.js 24 and pnpm:
+Or download an archive for your platform from [Releases](https://github.com/agrigoryan/quadit/releases) (Linux, macOS and Windows, x86-64 and ARM64; `checksums.txt` beside them). On Windows it is a `.zip` with `quadit.exe` in it: put its folder on your PATH. Or build from source with Go, Node.js 24 and pnpm:
 
 ```bash
 git clone https://github.com/agrigoryan/quadit && cd quadit
