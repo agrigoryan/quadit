@@ -1,7 +1,8 @@
 // Estimates as a project has them: a scale picked in its settings, an
 // estimate picked from it with Shift+E and shown as a size on a T-shirt
-// project, a zero estimate kept apart from none, and the list filtered by
-// estimate. What reached the server is read back through the CLI.
+// project, a zero estimate kept apart from none, the list filtered by
+// estimate, and an estimate given in the create dialog, typed or over a
+// template's. What reached the server is read back through the CLI.
 
 import { expect, type Quadit, test } from "./quadit";
 
@@ -109,4 +110,66 @@ test("the list is filtered by estimate, and the address keeps it", async ({ page
   await expect(page.getByRole("link", { name: `Open ${small}` })).toBeVisible();
   await expect(page.getByRole("link", { name: `Open ${big}` })).toBeHidden();
   await expect(page.getByRole("link", { name: `Open ${unsized}` })).toBeHidden();
+});
+
+/** The estimate of the task the create dialog made, found by its title; "not made yet" until it is there. */
+async function estimateOfMade(quadit: Quadit, project: string, title: string): Promise<number | string | undefined> {
+  const listed = JSON.parse(await quadit.cli("--json", "tasks", `project=${project}`, `q=${title}`)) as {
+    tasks?: { key: string; title: string }[];
+  };
+  const made = (listed.tasks ?? []).find((t) => t.title === title);
+  return made ? estimateOf(quadit, made.key) : "not made yet";
+}
+
+test("an estimate typed in the create dialog keeps the dialog open, and the task is made with it", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  await settle(quadit, project.key, { estimates: true, estimate_scale: "points" });
+  await page.goto(`/e2e/p/${project.key}/tasks`);
+  await expect(page.getByRole("button", { name: "Filter", exact: true })).toBeVisible();
+  await page.keyboard.press("c");
+  const dialog = page.getByRole("dialog", { name: "New task" });
+  await dialog.getByRole("textbox", { name: "Task title" }).fill("Measure the swell");
+  await dialog.getByRole("button", { name: "Estimate" }).click();
+  await page.getByRole("spinbutton", { name: "Estimate, in points" }).fill("8");
+  await page.getByRole("button", { name: "Set", exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "8 points" })).toBeVisible();
+
+  await dialog.getByRole("button", { name: /^Create task/ }).click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => estimateOfMade(quadit, project.key, "Measure the swell")).toBe(8);
+});
+
+test("No estimate picked in the create dialog beats the template's", async ({ page, project, quadit }) => {
+  await settle(quadit, project.key, { estimates: true, estimate_scale: "fibonacci" });
+  await quadit.cli(
+    "do",
+    "template.create",
+    JSON.stringify({ project: project.key, name: "Spike", preset: { estimate: 5 } }),
+  );
+  await page.goto(`/e2e/p/${project.key}/tasks`);
+  await expect(page.getByRole("button", { name: "Filter", exact: true })).toBeVisible();
+  await page.keyboard.press("c");
+  const dialog = page.getByRole("dialog", { name: "New task" });
+  await dialog.getByRole("textbox", { name: "Task title" }).fill("Try the new tide model");
+  await dialog.getByRole("button", { name: "Template" }).click();
+  await page.getByRole("option", { name: "Spike" }).click();
+  await dialog.getByRole("button", { name: "5 points" }).click();
+  await page.getByRole("option", { name: "No estimate" }).click();
+  await expect(dialog.getByRole("button", { name: "Estimate" })).toBeVisible();
+  await dialog.getByRole("button", { name: /^Create task/ }).click();
+  await expect(dialog).toBeHidden();
+
+  await expect.poll(() => estimateOfMade(quadit, project.key, "Try the new tide model")).toBeUndefined();
+
+  // Left as the template has it, the template's estimate is the task's.
+  await page.keyboard.press("c");
+  await dialog.getByRole("textbox", { name: "Task title" }).fill("Try the old tide model");
+  await dialog.getByRole("button", { name: "Template" }).click();
+  await page.getByRole("option", { name: "Spike" }).click();
+  await dialog.getByRole("button", { name: /^Create task/ }).click();
+  await expect.poll(() => estimateOfMade(quadit, project.key, "Try the old tide model")).toBe(5);
 });
