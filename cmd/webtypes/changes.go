@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/engine"
 )
 
@@ -30,6 +31,13 @@ export type PriorityName = `)
 			b.WriteString(" | ")
 		}
 		fmt.Fprintf(&b, "%q", name)
+	}
+	b.WriteString(";\n\n/** An estimate may be given as a T-shirt size, on any project. */\nexport type TShirtSize = ")
+	for i, size := range core.TShirtSizes {
+		if i > 0 {
+			b.WriteString(" | ")
+		}
+		fmt.Fprintf(&b, "%q", size)
 	}
 	b.WriteString(";\n\n/** Each change the server accepts, by name, with its arguments. */\nexport interface Changes {\n")
 	for _, name := range engine.ChangeTypes() {

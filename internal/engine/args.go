@@ -1,4 +1,5 @@
-// Reading a change's arguments strictly, with priorities by name.
+// Reading a change's arguments strictly, with priorities and estimates by
+// name.
 
 package engine
 
@@ -11,6 +12,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/agrigoryan/quadit/internal/core"
 )
 
 // idArgs are the arguments of a change that names one row by its id.
@@ -27,7 +30,7 @@ func (c *cx) args(v any) error {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		raw = []byte("{}")
 	}
-	raw, err := namedPriority(raw)
+	raw, err := numbersByName(raw)
 	if err != nil {
 		return err
 	}
@@ -94,26 +97,52 @@ func (c *cx) argsRefusal(v any, err error) error {
 // PriorityNames are a priority's names, by its number.
 var PriorityNames = []string{"none", "urgent", "high", "medium", "low"}
 
-// namedPriority lets a priority be written by name ("high") as well as by
-// number, and says what the names are when one is misspelled.
-func namedPriority(raw json.RawMessage) (json.RawMessage, error) {
-	if !bytes.Contains(raw, []byte(`"priority"`)) {
+// namedNumbers are the arguments a change takes by name as well as by
+// number, with the number a name stands for and what to say of one that
+// stands for none: a priority ("high"), and an estimate, which may be a
+// T-shirt size ("M") on any project, or a number written as text.
+var namedNumbers = []struct {
+	arg     string
+	number  func(name string) (int, bool)
+	allowed []string
+	refusal string
+}{
+	{"priority", func(name string) (int, bool) {
+		n := slices.IndexFunc(PriorityNames, func(known string) bool { return strings.EqualFold(strings.TrimSpace(name), known) })
+		return n, n >= 0
+	}, PriorityNames, "unknown priority %q"},
+	{"estimate", core.EstimatePoints, core.TShirtSizes, "unknown estimate %q: an estimate is a number of points or a T-shirt size"},
+}
+
+// numbersByName lets each of namedNumbers be written by name, turning the
+// name into its number, and says what the names are when one is
+// misspelled.
+func numbersByName(raw json.RawMessage) (json.RawMessage, error) {
+	var args map[string]json.RawMessage
+	changed := false
+	for _, named := range namedNumbers {
+		if !bytes.Contains(raw, []byte(`"`+named.arg+`"`)) {
+			continue
+		}
+		if args == nil {
+			if err := json.Unmarshal(raw, &args); err != nil {
+				return raw, nil //nolint:nilerr // not an object: the strict decoder after this refuses it in a caller's words
+			}
+		}
+		var name *string
+		if err := json.Unmarshal(args[named.arg], &name); err != nil || name == nil {
+			continue // a number, null, or not there: as it is
+		}
+		n, ok := named.number(*name)
+		if !ok {
+			return nil, &Error{Code: CodeInvalid, Field: named.arg, Message: fmt.Sprintf(named.refusal, *name),
+				Allowed: named.allowed, Nearest: nearest(*name, named.allowed)}
+		}
+		args[named.arg] = json.RawMessage(strconv.Itoa(n))
+		changed = true
+	}
+	if !changed {
 		return raw, nil
 	}
-	var args map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &args); err != nil {
-		return raw, nil //nolint:nilerr // not an object: the strict decoder after this refuses it in a caller's words
-	}
-	var name string
-	if err := json.Unmarshal(args["priority"], &name); err != nil {
-		return raw, nil //nolint:nilerr // a number, or null: as it is
-	}
-	for n, known := range PriorityNames {
-		if strings.EqualFold(strings.TrimSpace(name), known) {
-			args["priority"] = json.RawMessage(strconv.Itoa(n))
-			return json.Marshal(args)
-		}
-	}
-	return nil, &Error{Code: CodeInvalid, Field: "priority", Message: fmt.Sprintf("unknown priority %q", name),
-		Allowed: PriorityNames, Nearest: nearest(name, PriorityNames)}
+	return json.Marshal(args)
 }

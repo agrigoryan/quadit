@@ -473,7 +473,7 @@ func TestPlanning(t *testing.T) {
 		epic := w.do(w.owner.ID, "epic.create", M{"project": "SVA", "name": "Boss fight", "target_on": "2027-01-15"})
 		ms := w.do(w.owner.ID, "milestone.create", M{"epic": epic.Ref, "name": "Art"})
 		w.do(w.owner.ID, "task.create", M{"project": "SVA", "title": "Boss sprite", "epic": "boss fight", "milestone": ms.Ref, "estimate": 3})
-		if got := w.task("SVA-1"); got.EpicID != epic.Ref || got.MilestoneID != ms.Ref || got.Estimate != 3 {
+		if got := w.task("SVA-1"); got.EpicID != epic.Ref || got.MilestoneID != ms.Ref || got.Estimate == nil || *got.Estimate != 3 {
 			t.Fatalf("task = %+v", got)
 		}
 		// Cycles are made as needed, and a task goes in "current".

@@ -854,7 +854,7 @@ func TestSecondAuditFindings(t *testing.T) {
 			t.Fatalf("a setting reset with null is still there: %s", out)
 		}
 		// A wrong kind of value is explained.
-		if out := do(asker, "task.update", M{"id": "SVA-1", "estimate": "lots"}, 400); !strings.Contains(out, "estimate takes a number") {
+		if out := do(asker, "task.update", M{"id": "SVA-1", "estimate": true}, 400); !strings.Contains(out, "estimate takes a number") {
 			t.Fatalf("a wrong kind of value: %s", out)
 		}
 		// The same change sent again says what it made.

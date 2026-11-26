@@ -57,7 +57,7 @@ func TestDashboardAndExportShape(t *testing.T) {
 	s := newSite(t, testdb.SQLite(t))
 	const owner = "@aram"
 
-	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien", "settings": M{"estimates": true}})
 	s.change(t, s.owner, "", "project.create", M{"key": "OPS", "name": "Operations"})
 	s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 	s.change(t, s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
@@ -230,7 +230,7 @@ const shapeDashboardJSON = `{
    "total": 3,
    "done": 1,
    "started": 1,
-   "points": 5,
+   "points": 6,
    "points_done": 2,
    "at_risk": "past its target date",
    "at_risk_code": "past_target"
@@ -658,7 +658,7 @@ OPS Todo: 2
 const shapeExport = `
 README.txt | deflated | 705 | d5b732b4d9a9139d7f738562f7ec1e6cf4e8effb96421f59172f5fc9e8842929
 data/members.json | deflated | 843 | 204b799549f9013aa666f436aac76769af74f40578ae0e48303053c2935f817d
-data/projects.json | deflated | 344 | 1a512062438cf547ca5c3ca4e586922b433dbae258976396509ef55816a7ad50
+data/projects.json | deflated | 420 | 9df278ce738534671e2c379298b7a14547f7fdbe2357ab903c9bd41cad42ffa1
 data/statuses.json | deflated | 2838 | 70b6511306b0abb9d5c2d487ff55e0596e7f149115dd8ec320856d898bbe21af
 data/labels.json | deflated | 186 | 5afec1d856b7b74c848122bcaca2602a31349fc6eadf9b5f9e51944c3f7e81f2
 data/epics.json | deflated | 434 | 90027cc39c7286519cdc0db8cd6db9b1b459f9c6370a24cfc5fc932d6e600f58
@@ -677,7 +677,7 @@ data/properties.json | deflated | 397 | be182b84fd472a4df5f7d24cde2617677310c71a
 data/preferences.json | deflated | 134 | 24085cc7c3325fa74f3db6d810f23fc525110007139aca3048b1ddb24680ee02
 data/views.json | deflated | 3 | 37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570
 data/tasks.json | deflated | 2312 | e3f0e10264f8fd8d9f14defa6a7f07c18ab66c84dc0599a042c7731db627a68b
-data/events.json | deflated | 40243 | 41832977a15c42800d22cd0115770ce150d2574eedd551ecb7c69b0f485bcfec
+data/events.json | deflated | 40327 | 269a3a431b524b8e09ca650d3767293a842e7928f769be21fa75a9eb93a9d9bd
 tasks/SVA/SVA-1 Boss design.md | deflated | 731 | 5d296083ad02d6137e3286fcbd56d91dabae98b173d0bb44f46e3d86e43dafef
 tasks/SVA/SVA-2 Boss music.md | deflated | 139 | d991d93cc46ce7ed7bea1d59521d4a9f5d5ba75d5747e9e5316bd34fbd30250e
 tasks/SVA/SVA-3 Explosion effect.md | deflated | 176 | 34046b56614aed05d3b99776206bf73d6dea854f8a1079c9637db83e6d8cc8a1

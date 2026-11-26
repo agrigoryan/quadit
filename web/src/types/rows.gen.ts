@@ -542,6 +542,10 @@ export interface ProjectSettings {
   cycle_days?: number;
   cycle_start?: number;
   estimates?: boolean;
+  estimate_scale?: string;
+  estimate_extended?: boolean;
+  estimate_zero?: boolean;
+  estimate_ignore_unestimated?: boolean;
 }
 
 export interface PushSubscription {

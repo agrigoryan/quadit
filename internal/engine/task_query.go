@@ -246,6 +246,20 @@ func (r *Resolver) TaskFilter(q core.TaskQuery, readable []string) (f store.Task
 			return f, "", &Error{Code: CodeInvalid, Message: fmt.Sprintf("no cycle %q: use current, next, a cycle number or none", ref)}
 		}
 	}
+	// Estimates, by number or by T-shirt size, or none.
+	for _, ref := range q.Estimate {
+		if strings.EqualFold(ref, "none") {
+			f.NoEstimate = true
+			continue
+		}
+		n, ok := core.EstimatePoints(ref)
+		if !ok {
+			allowed := append([]string{"none"}, core.TShirtSizes...)
+			return f, "", &Error{Code: CodeInvalid, Field: "estimate", Message: "unknown estimate " + strconv.Quote(ref) + ": ask for a number of points, a T-shirt size or none",
+				Allowed: allowed, Nearest: nearest(ref, allowed)}
+		}
+		f.Estimates = append(f.Estimates, n)
+	}
 	if q.Milestone != "" {
 		// By id (anything as long as one), or by name.
 		f.MilestoneID = q.Milestone

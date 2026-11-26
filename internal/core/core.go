@@ -5,7 +5,8 @@
 // milliseconds; zero means "not set". Dates are "YYYY-MM-DD".
 //
 // The db tag names the column a field is stored in. ",null" stores the zero
-// value as NULL; ",json" stores the field as JSON.
+// value as NULL; ",json" stores the field as JSON. A pointer is stored as
+// NULL when nil: the way a column keeps its zero apart from none.
 //
 // "Page" is the word in prose, in the web app and in handler names; "Doc"
 // is the word in types, tables and change names. They are the same thing.
@@ -20,6 +21,7 @@
 //	            listeners
 //	tasks.go    what organizes tasks: epics, milestones, cycles, views, links
 //	            to code, mentions, templates, preferences, old keys
+//	estimates.go the scales a project estimates on, and a task's points
 //	inbox.go    watchers and notifications
 //	files.go    files and attachments
 //	pages.go    pages (Doc), blocks, versions, databases, repository sources,
@@ -307,12 +309,24 @@ func (l Listener) HeldByRunner(now int64) bool {
 // such a label.
 var ListenerLabel = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N} '-]{0,39}$`)
 
-// ProjectSettings are a project's switches.
+// ProjectSettings are a project's switches. What they mean for estimates
+// is read through the methods in estimates.go.
 type ProjectSettings struct {
 	Cycles     bool `json:"cycles,omitempty"`
 	CycleDays  int  `json:"cycle_days,omitempty"`
 	CycleStart int  `json:"cycle_start,omitempty"` // weekday the cycle starts on, 0 = Sunday
-	Estimates  bool `json:"estimates,omitempty"`
+	// Estimates: the project estimates its tasks, on EstimateScale (one of
+	// EstimateScales; "" is points). The three options after it are kept
+	// while estimates are off, for when they are on again.
+	Estimates     bool   `json:"estimates,omitempty"`
+	EstimateScale string `json:"estimate_scale,omitempty"`
+	// EstimateExtended adds the scale's two further values.
+	EstimateExtended bool `json:"estimate_extended,omitempty"`
+	// EstimateZero makes 0 an estimate of its own, apart from none.
+	EstimateZero bool `json:"estimate_zero,omitempty"`
+	// EstimateIgnoreUnestimated counts a task without an estimate as 0
+	// points, not 1.
+	EstimateIgnoreUnestimated bool `json:"estimate_ignore_unestimated,omitempty"`
 }
 
 // Project holds tasks under one key (SVA), with its own workflow.
@@ -390,12 +404,13 @@ type Task struct {
 	WaitingOutside bool `json:"waiting_outside,omitempty" db:"waiting_outside"`
 	// AskedBy is the person an agent works this task for: whoever gave it
 	// to an agent. Agents work on the task with no more access than theirs.
-	AskedBy       string   `json:"asked_by,omitempty" db:"asked_by,null"`
-	ParentID      string   `json:"parent_id,omitempty" db:"parent_id,null"`
-	EpicID        string   `json:"epic_id,omitempty" db:"epic_id,null"`
-	MilestoneID   string   `json:"milestone_id,omitempty" db:"milestone_id,null"`
-	CycleID       string   `json:"cycle_id,omitempty" db:"cycle_id,null"`
-	Estimate      int      `json:"estimate,omitempty" db:"estimate,null"`
+	AskedBy     string `json:"asked_by,omitempty" db:"asked_by,null"`
+	ParentID    string `json:"parent_id,omitempty" db:"parent_id,null"`
+	EpicID      string `json:"epic_id,omitempty" db:"epic_id,null"`
+	MilestoneID string `json:"milestone_id,omitempty" db:"milestone_id,null"`
+	CycleID     string `json:"cycle_id,omitempty" db:"cycle_id,null"`
+	// Estimate is in points; nil is none, which is not the same as 0.
+	Estimate      *int     `json:"estimate,omitempty" db:"estimate"`
 	LabelIDs      []string `json:"label_ids,omitempty" db:"label_ids,json"`
 	LeaseHolderID string   `json:"lease_holder_id,omitempty" db:"lease_holder_id,null"` // who has taken it
 	LeaseUntil    int64    `json:"lease_until,omitempty" db:"lease_until,null"`         // until when they hold it

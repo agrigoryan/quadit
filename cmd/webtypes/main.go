@@ -80,7 +80,8 @@ func (w *writer) writeNamed(b *strings.Builder) {
 var rawJSON = reflect.TypeFor[json.RawMessage]()
 
 // object is a struct's fields as a TypeScript object type, at an indent of
-// depth. At the top of a change's arguments (top) a priority may be a name.
+// depth. At the top of a change's arguments (top) a priority may be a name,
+// and an estimate a T-shirt size.
 func (w *writer) object(t reflect.Type, depth int, top bool) string {
 	fields := w.fields(t, depth, top)
 	if len(fields) == 0 {
@@ -113,8 +114,8 @@ func (w *writer) fields(t reflect.Type, depth int, top bool) []string {
 			continue
 		}
 		typ := w.typeOf(f.Type, depth+1)
-		if top && name == "priority" && isPriority(f.Type) {
-			typ = strings.Replace(typ, "number", "number | PriorityName", 1)
+		if named, ok := numberNames[name]; ok && top && isWholeNumber(f.Type) {
+			typ = strings.Replace(typ, "number", "number | "+named, 1)
 		}
 		// Required holds only for a change's own arguments: the same struct
 		// inside another (a template's preset decision) is filled in later.
@@ -203,9 +204,13 @@ func optional(t reflect.Type) (reflect.Type, bool) {
 	return f.Type, true
 }
 
-// isPriority reports whether t holds a number, which the engine also takes
-// as a priority's name (see engine.PriorityNames).
-func isPriority(t reflect.Type) bool {
+// numberNames are the change arguments the engine takes by name as well as
+// by number (see engine's numbersByName), with the type of their names.
+var numberNames = map[string]string{"priority": "PriorityName", "estimate": "TShirtSize"}
+
+// isWholeNumber reports whether t holds a whole number, through an Opt or
+// a pointer.
+func isWholeNumber(t reflect.Type) bool {
 	if inner, ok := optional(t); ok {
 		t = inner
 	}

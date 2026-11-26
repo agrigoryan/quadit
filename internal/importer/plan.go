@@ -79,7 +79,7 @@ type Task struct {
 	Assignee    string // a name or an email address
 	Labels      []string
 	DueOn       string
-	Estimate    int
+	Estimate    *int // in points; nil for none
 	Epic        string
 	ParentExt   string
 	URL         string // where it lived

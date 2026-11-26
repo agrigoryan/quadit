@@ -161,8 +161,8 @@ func (c *cx) applyTemplate(project core.Project, a *taskCreateArgs) (*decisionOp
 	if a.Assignee == "" {
 		a.Assignee = ps.Assignee
 	}
-	if a.Estimate == 0 {
-		a.Estimate = ps.Estimate
+	if a.Estimate == nil && ps.Estimate != 0 {
+		a.Estimate = &ps.Estimate
 	}
 	return ps.Decision, nil
 }

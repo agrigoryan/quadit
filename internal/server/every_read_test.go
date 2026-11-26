@@ -221,7 +221,7 @@ func newRichWorkspace(t *testing.T, s *site, st store.Store) *richWorkspace {
 
 	// People, agents and projects.
 	rw.n.name(s.ownerID(t), "@aram")
-	do("project SVA", "project.create", M{"key": "SVA", "name": "Samurai vs Alien", "description": "The game."})
+	do("project SVA", "project.create", M{"key": "SVA", "name": "Samurai vs Alien", "description": "The game.", "settings": M{"estimates": true}})
 	do("project OPS", "project.create", M{"key": "OPS", "name": "Operations"})
 	do("project ARC", "project.create", M{"key": "ARC", "name": "Archived project"})
 	do("project DEL", "project.create", M{"key": "DEL", "name": "Deleted project"})

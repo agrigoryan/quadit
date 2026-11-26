@@ -120,6 +120,21 @@ func (c conn) taskWhere(filter store.TaskFilter) *clause {
 		}
 		where.add(`t.priority IN (`+placeholders(len(filter.Priorities))+`)`, args...)
 	}
+	// Estimate: one of these, or none.
+	if len(filter.Estimates) > 0 || filter.NoEstimate {
+		var choices []string
+		var args []any
+		if filter.NoEstimate {
+			choices = append(choices, `t.estimate IS NULL`)
+		}
+		if len(filter.Estimates) > 0 {
+			choices = append(choices, `t.estimate IN (`+placeholders(len(filter.Estimates))+`)`)
+			for _, estimate := range filter.Estimates {
+				args = append(args, estimate)
+			}
+		}
+		where.add(`(`+strings.Join(choices, ` OR `)+`)`, args...)
+	}
 	// Due in a range of dates.
 	if filter.DueBefore != "" {
 		where.add(`t.due_on <= ?`, filter.DueBefore)

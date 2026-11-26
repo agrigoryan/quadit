@@ -314,6 +314,8 @@ type TaskFilter struct {
 	CycleIDs      []string
 	NoCycle       bool
 	Priorities    []int
+	Estimates     []int  // any of these
+	NoEstimate    bool   // or none
 	DueBefore     string // due on or before this date
 	DueAfter      string
 	MentionsID    string // tasks that mention this member

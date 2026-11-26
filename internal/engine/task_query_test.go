@@ -33,6 +33,7 @@ func TestViewQueryIsReadByTheEngine(t *testing.T) {
 			{"a label of another project", "OPS", M{"label": []string{"art"}}, "query.label", `no label "art"`},
 			{"a label nearly right", "SVA", M{"label": []string{"arts"}}, "query.label", `no label "arts"`},
 			{"a sort there is none of", "", M{"sort": "nope"}, "query.sort", "unknown sort"},
+			{"an estimate that is no number, size or none", "", M{"estimate": []string{"5", "huge"}}, "query.estimate", `unknown estimate "huge"`},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				w.t = t
@@ -47,6 +48,7 @@ func TestViewQueryIsReadByTheEngine(t *testing.T) {
 			t.Fatalf("the refusal does not name the nearest label: %+v", e)
 		}
 		w.do(w.owner.ID, "view.create", M{"name": "Art", "project": "SVA", "query": M{"label": []string{"art"}, "open": true}})
+		w.do(w.owner.ID, "view.create", M{"name": "Sized", "project": "SVA", "query": M{"estimate": []string{"5", "m", "none"}}})
 	})
 }
 

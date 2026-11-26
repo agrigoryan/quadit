@@ -3,6 +3,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"sort"
@@ -14,7 +15,7 @@ import (
 )
 
 // handleShowProjectLayout describes one project: its statuses, labels, members, epics,
-// cycles and templates, by name.
+// cycles and templates, by name, and the estimates it takes.
 func (s *Server) handleShowProjectLayout(x *c) error {
 	project, err := x.resolver(x.ctx()).Project(x.r.PathValue("key"))
 	if err != nil {
@@ -30,7 +31,40 @@ func (s *Server) handleShowProjectLayout(x *c) error {
 	if x.wantText() {
 		return x.text(layoutText(project, out))
 	}
-	return x.ok(map[string]any{"project": map[string]string{"key": project.Key, "name": project.Name, "description": project.Description}, "layout": out})
+	about := map[string]any{"key": project.Key, "name": project.Name, "description": project.Description}
+	if estimates := layoutEstimatesOf(project.Settings); estimates != nil {
+		about["estimates"] = estimates
+	}
+	return x.ok(map[string]any{"project": about, "layout": out})
+}
+
+// layoutEstimates is what a project takes as an estimate, so an agent can
+// send one without being refused first: the scale, its values in points (0
+// among them where allowed; none on points, which takes any whole number),
+// its sizes on the T-shirt scale (which the API takes as well as the
+// numbers), and all of it in words.
+type layoutEstimates struct {
+	Scale  string   `json:"scale"`
+	Values []int    `json:"values,omitempty"`
+	Sizes  []string `json:"sizes,omitempty"`
+	Words  string   `json:"words"`
+}
+
+// layoutEstimatesOf is a project's layoutEstimates; nil when it does not
+// estimate.
+func layoutEstimatesOf(s *core.ProjectSettings) *layoutEstimates {
+	if !s.Estimating() {
+		return nil
+	}
+	out := &layoutEstimates{Scale: cmp.Or(s.EstimateScale, core.ScalePoints), Values: s.EstimateValues(), Words: s.EstimateWords()}
+	if out.Scale == core.ScaleTShirt {
+		for _, n := range out.Values {
+			if n > 0 { // 0 is a number of points, not a size
+				out.Sizes = append(out.Sizes, s.EstimateName(n))
+			}
+		}
+	}
+	return out
 }
 
 // layoutItem is one thing a project has, by name, with what its kind of
@@ -153,6 +187,9 @@ func layoutTemplates(templates []core.Template, projectID string) []layoutItem {
 func layoutText(project core.Project, out map[string][]layoutItem) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "project %s  %s\n", project.Key, project.Name)
+	if estimates := layoutEstimatesOf(project.Settings); estimates != nil {
+		fmt.Fprintf(&b, "estimates: %s (%s scale)\n", estimates.Words, estimates.Scale)
+	}
 	for _, k := range []string{"statuses", "labels", "members", "epics", "cycles", "templates"} {
 		var parts []string
 		for _, item := range out[k] {

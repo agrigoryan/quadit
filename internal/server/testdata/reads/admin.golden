@@ -194,7 +194,7 @@ source.update (admin): id, root, title, repo, branch, subdir, authority, write_m
 status.create (admin): id, project (required), name (required), category (required), color, rank
 status.delete (admin): id (required), move_to
 status.update (admin): id (required), name, category, color, rank, is_default
-task.create (member): id, project, title, description, status, priority, assignee, waiting_on, waiting_on_note, parent, epic, milestone, cycle, estimate, labels, due_on, rank, template, handoff_limit, number
+task.create (member): id, project, title, description, status, priority, assignee, waiting_on, waiting_on_note, parent, epic, milestone, cycle, estimate, keep_estimate, labels, due_on, rank, template, handoff_limit, number
 task.delete (member): id (required)
 task.move (member): id (required), project (required)
 task.release (member): id (required)
@@ -940,6 +940,17 @@ seq: 286
  },
  "project": {
   "description": "The game.",
+  "estimates": {
+   "scale": "fibonacci",
+   "values": [
+    1,
+    2,
+    3,
+    5,
+    8
+   ],
+   "words": "1, 2, 3, 5 or 8 points"
+  },
   "key": "SVA",
   "name": "Samurai vs Alien"
  }
@@ -948,6 +959,7 @@ seq: 286
 === GET /api/v1/w/games/projects/SVA/layout?format=text
 200
 project SVA  Samurai vs Alien
+estimates: 1, 2, 3, 5 or 8 points (fibonacci scale)
 statuses: Backlog (backlog), Todo (unstarted), In Progress (started), Review (started), Waiting (waiting), Done (done), Canceled (canceled)
 labels: art, bug, last
 members: @aram, @artist (agent), @bea, @cy, @ops (agent)
@@ -3935,6 +3947,7 @@ OPS-5  [Done]  Patch the kernel
    "cycle",
    "milestone",
    "priority",
+   "estimate",
    "due_before",
    "due_after",
    "mentions",
@@ -4455,7 +4468,7 @@ ARC-1  [Todo]  In an archived project
 200
 SVA-1  Boss design
 status: In Progress   priority: high   assignee: @artist   waits on: @aram (review the result)   held by: @artist
-labels: art, bug   epic: Boss fight   milestone: Alpha   hand-offs between agents: 2 at most   cycle: 1   due: <day+5>   estimate: 3   seq: 286
+labels: art, bug   epic: Boss fight   milestone: Alpha   hand-offs between agents: 2 at most   cycle: 1   due: <day+5>   estimate: 3 points   seq: 286
 ---
 Four phases.
 
@@ -6936,7 +6949,7 @@ seq: 282
 200
 SVA-1  Boss design
 status: In Progress   priority: high   assignee: @artist   waits on: @aram (review the result)   held by: @artist
-labels: art, bug   epic: Boss fight   milestone: Alpha   hand-offs between agents: 2 at most   cycle: 1   due: <day+5>   estimate: 3   seq: 286
+labels: art, bug   epic: Boss fight   milestone: Alpha   hand-offs between agents: 2 at most   cycle: 1   due: <day+5>   estimate: 3 points   seq: 286
 ---
 Four phases.
 
@@ -7221,7 +7234,7 @@ How many phases?
 200
 SVA-1  Boss design
 status: In Progress   priority: high   assignee: @artist   waits on: @aram (review the result)   held by: @artist
-labels: art, bug   epic: Boss fight   milestone: Alpha   hand-offs between agents: 2 at most   cycle: 1   due: <day+5>   estimate: 3   seq: 286
+labels: art, bug   epic: Boss fight   milestone: Alpha   hand-offs between agents: 2 at most   cycle: 1   due: <day+5>   estimate: 3 points   seq: 286
 ---
 Four phases.
 
@@ -9763,6 +9776,10 @@ doc  doc <doc OPS runbook>  OPS runbook — Rotate, then restart. The **vault** 
      "key": "SVA",
      "name": "Samurai vs Alien",
      "rank": "00000000sg",
+     "settings": {
+      "estimate_scale": "fibonacci",
+      "estimates": true
+     },
      "updated_seq": 17,
      "workspace_id": "<id #154>"
     }
@@ -18870,6 +18887,7 @@ seq: 286
    "cycle",
    "milestone",
    "priority",
+   "estimate",
    "due_before",
    "due_after",
    "mentions",
@@ -19936,6 +19954,10 @@ seq: 286
    "key": "SVA",
    "name": "Samurai vs Alien",
    "rank": "00000000sg",
+   "settings": {
+    "estimate_scale": "fibonacci",
+    "estimates": true
+   },
    "updated_seq": 17,
    "workspace_id": "<id #154>"
   },
@@ -22025,6 +22047,10 @@ seq: 286
    "key": "SVA",
    "name": "Samurai vs Alien",
    "rank": "00000000sg",
+   "settings": {
+    "estimate_scale": "fibonacci",
+    "estimates": true
+   },
    "updated_seq": 17,
    "workspace_id": "<id #154>"
   },
@@ -24980,6 +25006,10 @@ seq: 286
    "key": "SVA",
    "name": "Samurai vs Alien",
    "rank": "00000000sg",
+   "settings": {
+    "estimate_scale": "fibonacci",
+    "estimates": true
+   },
    "updated_seq": 17,
    "workspace_id": "<id #154>"
   },
@@ -31402,7 +31432,7 @@ Reds and golds.
    "id": "<epic Boss fight>",
    "lead": "@aram",
    "name": "Boss fight",
-   "points": 5,
+   "points": 6,
    "points_done": 2,
    "project": "SVA",
    "started": 1,
@@ -31861,7 +31891,7 @@ ARC Todo: 1
    "id": "<epic Boss fight>",
    "lead": "@aram",
    "name": "Boss fight",
-   "points": 5,
+   "points": 6,
    "points_done": 2,
    "project": "SVA",
    "started": 1,
@@ -32687,7 +32717,7 @@ OPS Done: 1
   {
    "date": "<day+0>",
    "done": 0,
-   "points": 0,
+   "points": 1,
    "points_done": 0,
    "scope": 1
   },
@@ -33650,7 +33680,7 @@ id: 16
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #212>","data":{"changes":{"deleted_at":{"from":null,"to":1700000000000}},"id":"<id #201>","key":"GS"},"entity_id":"<id #201>","entity_type":"project","project_id":"<id #201>","scope_id":"<id #201>","scope_type":"project","seq":16,"type":"project.deleted"}
 
 id: 17
-data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #213>","data":{"row":{"created_at":1700000000000,"created_by":"<@aram>","description":"The game.","id":"<project SVA>","key":"SVA","name":"Samurai vs Alien","rank":"00000000sg","updated_seq":17,"workspace_id":"<id #154>"}},"entity_id":"<project SVA>","entity_type":"project","project_id":"<project SVA>","scope_id":"<project SVA>","scope_type":"project","seq":17,"type":"project.created"}
+data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #213>","data":{"row":{"created_at":1700000000000,"created_by":"<@aram>","description":"The game.","id":"<project SVA>","key":"SVA","name":"Samurai vs Alien","rank":"00000000sg","settings":{"estimate_scale":"fibonacci","estimates":true},"updated_seq":17,"workspace_id":"<id #154>"}},"entity_id":"<project SVA>","entity_type":"project","project_id":"<project SVA>","scope_id":"<project SVA>","scope_type":"project","seq":17,"type":"project.created"}
 
 id: 18
 data: {"actor_id":"<@aram>","at":1700000000000,"change_id":"<id #213>","data":{"row":{"category":"backlog","color":"#9ca3af","id":"<id #214>","name":"Backlog","project_id":"<project SVA>","rank":"00000000sg","updated_seq":18}},"entity_id":"<id #214>","entity_type":"status","project_id":"<project SVA>","scope_id":"<project SVA>","scope_type":"project","seq":18,"type":"status.created"}
@@ -34630,6 +34660,10 @@ Nothing here needs this product to be read.
   "key": "SVA",
   "name": "Samurai vs Alien",
   "rank": "00000000sg",
+  "settings": {
+   "estimate_scale": "fibonacci",
+   "estimates": true
+  },
   "updated_seq": 17,
   "workspace_id": "<id #154>"
  }
@@ -37234,6 +37268,10 @@ Nothing here needs this product to be read.
     "key": "SVA",
     "name": "Samurai vs Alien",
     "rank": "00000000sg",
+    "settings": {
+     "estimate_scale": "fibonacci",
+     "estimates": true
+    },
     "updated_seq": 17,
     "workspace_id": "<id #154>"
    }

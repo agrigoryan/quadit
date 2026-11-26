@@ -10,7 +10,8 @@ import (
 )
 
 // handleShowCycleChart returns a cycle's scope against done, day by day, in tasks
-// and in points.
+// and in points (core's Points: a project that does not estimate counts a
+// task as 1).
 func (s *Server) handleShowCycleChart(x *c) error {
 	var cycle core.Cycle
 	if err := x.db.Get(x.ctx(), &cycle, store.Eq("id", x.r.PathValue("id")), store.Live); err != nil {
@@ -42,6 +43,7 @@ func (s *Server) handleShowCycleChart(x *c) error {
 	if err != nil {
 		return err
 	}
+	settings := names.projects[cycle.ProjectID].Settings
 	today := time.Now().UTC()
 	var days []day
 	for date := start; !date.After(end); date = date.AddDate(0, 0, 1) {
@@ -56,10 +58,10 @@ func (s *Server) handleShowCycleChart(x *c) error {
 				continue
 			}
 			row.Scope++
-			row.Points += t.Estimate
+			row.Points += settings.Points(t)
 			if t.CompletedAt != 0 && t.CompletedAt < eod {
 				row.Done++
-				row.PointsDone += t.Estimate
+				row.PointsDone += settings.Points(t)
 			}
 		}
 		days = append(days, row)

@@ -33,7 +33,7 @@ var tools = []tool{
 	{Name: "tasks", Desc: "Find tasks. All filters combine. Returns one line per task; count=true returns only the number.",
 		Props: map[string]arg{"project": text("project key"), "assignee": text("me, @handle or none"), "status": text("status name or category (backlog, unstarted, started, waiting, done, canceled)"),
 			"open": flag("true for not done and not canceled"), "waiting_on": text("me or @handle"), "label": text("label name"), "epic": text("epic name, or none"), "cycle": textOrInteger("current, next, a number, or none"),
-			"priority": textOrInteger("1 urgent, 2 high, 3 medium, 4 low"), "has_open_decision": flag("true"), "asked": text("tasks with an open question asked of this member"),
+			"priority": textOrInteger("1 urgent, 2 high, 3 medium, 4 low"), "estimate": textOrInteger("points, a T-shirt size (M) or none; comma-separated for any of them"), "has_open_decision": flag("true"), "asked": text("tasks with an open question asked of this member"),
 			"changed_since": integer("feed position: tasks with any activity after it"), "mentions": text("me or @handle"), "q": text("text in the title"), "parent": text("task key"),
 			"creator": text("me or @handle"), "held_by": text("who has taken it: me or @handle"), "due_before": text("YYYY-MM-DD"), "due_after": text("YYYY-MM-DD"),
 			"fields": text("comma-separated fields to return instead of the line, e.g. key,title,status"),
@@ -55,7 +55,7 @@ var tools = []tool{
 		Run: toolAck},
 	{Name: "decisions", Desc: "The decision log: questions with their options, the answer, the reason and the date.",
 		Props: map[string]arg{"state": text("answered (default: any but open), open, picked, sent_back, not_needed, all"), "project": text("project key"), "q": text("text in the question"), "asked": text("me or @handle")}, Run: readPathTool("/decisions")},
-	{Name: "layout", Desc: "A project's statuses, labels, members, agents, epics, cycles and templates, by name.", Props: map[string]arg{"!project": text("project key")},
+	{Name: "layout", Desc: "A project's statuses, labels, members, agents, epics, cycles and templates, by name, and the estimates it takes.", Props: map[string]arg{"!project": text("project key")},
 		Run: readPathTool("/projects/{project}/layout", "project")},
 	{Name: "docs", Desc: "The page tree with ids.", Run: readPathTool("/docs")},
 	{Name: "doc", Desc: "One page as Markdown, then its open comment threads: each with its id, what it is on (words of a block, a block, or \"on the page\") and its comments and replies by whom and when. " +
@@ -71,7 +71,7 @@ var tools = []tool{
 		Props: map[string]arg{"!title": text("page title"), "!markdown": text("the note"), "mode": text("replace (default) or append"), "dry_run": flag("true checks the note without saving it")},
 		Run:   toolRemember},
 	{Name: "changes", Desc: "Every change type with its arguments. Read once to learn what change can do.", Run: readPathTool("/api/v1/changes")},
-	{Name: "change", Desc: "Make one change. Common types: task.create {project, title, description, assignee, labels, parent}; task.update {id, status, assignee, waiting_on, priority, add_labels}; " +
+	{Name: "change", Desc: "Make one change. Common types: task.create {project, title, description, assignee, labels, parent}; task.update {id, status, assignee, waiting_on, priority, estimate, add_labels} (an estimate is points or a T-shirt size, on the project's scale; null clears it); " +
 		"task.take {id}; comment.create {task, body, waiting_on} (add evidence {checked, measured, not_verified} to post a result, and attachments:[{file}] with ids from upload to show what you made: a picture, a screenshot, a clip); " +
 		"comment.create {doc, block, quote, body} on words of a page (quote: the exact words of the block; occurrence: N picks one when they are there more than once), without quote on a block, without block on the page, {parent, body} to reply in a comment's thread; comment.update {id, resolved}; " +
 		"decision.open {task, question, options:[{label, description, attachments:[{file}]}], recommended, recommendation, ask} (the ask tool does this, with files, in one call); decision.pick {id, option, note}; " +

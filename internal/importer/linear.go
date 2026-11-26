@@ -4,7 +4,6 @@ package importer
 
 import (
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -33,12 +32,20 @@ func linearRow(get csvCells) Task {
 	case get("started") != "" && t.Category == core.CatUnstarted:
 		t.Category = core.CatStarted
 	}
-	whole, _, _ := strings.Cut(get("estimate"), ".")
-	if n, err := strconv.Atoi(whole); err == nil {
-		t.Estimate = n // no estimate, or not a number: none
-	}
+	t.Estimate = linearEstimate(get("estimate"))
 	if l := get("labels"); l != "" {
 		t.Labels = strings.Split(l, ",")
 	}
 	return t
+}
+
+// linearEstimate reads an estimate as Linear writes it: a number of points
+// (cut to a whole one), or a T-shirt size, which stands for its number.
+// Anything else, or nothing, is no estimate.
+func linearEstimate(cell string) *int {
+	whole, _, _ := strings.Cut(cell, ".")
+	if n, ok := core.EstimatePoints(whole); ok {
+		return &n
+	}
+	return nil
 }

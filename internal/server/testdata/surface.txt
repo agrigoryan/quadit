@@ -600,6 +600,7 @@ change task.create arg epic
 change task.create arg estimate
 change task.create arg handoff_limit
 change task.create arg id
+change task.create arg keep_estimate
 change task.create arg labels
 change task.create arg milestone
 change task.create arg number
@@ -873,6 +874,7 @@ mcp tasks arg cycle
 mcp tasks arg due_after
 mcp tasks arg due_before
 mcp tasks arg epic
+mcp tasks arg estimate
 mcp tasks arg fields
 mcp tasks arg has_open_decision
 mcp tasks arg held_by

@@ -133,10 +133,15 @@ func (u *taskEdit) numbers() error {
 		p.setNumber("priority", a.Priority, &t.Priority)
 	}
 	if a.Estimate.Set {
-		if err := checkEstimate(a.Estimate.V); err != nil {
-			return err
+		var estimate *int
+		if !a.Estimate.Null {
+			var err error
+			if estimate, err = taskEstimate(u.pr.Settings, a.Estimate.V); err != nil {
+				return err
+			}
 		}
-		p.setNumber("estimate", a.Estimate, &t.Estimate)
+		p.put("estimate", t.Estimate, estimate)
+		t.Estimate = estimate
 	}
 	return nil
 }

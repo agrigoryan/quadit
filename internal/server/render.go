@@ -45,7 +45,7 @@ type taskView struct {
 	Cycle        int    `json:"cycle,omitempty"`
 	Parent       string `json:"parent,omitempty"`
 	DueOn        string `json:"due_on,omitempty"`
-	Estimate     int    `json:"estimate,omitempty"`
+	Estimate     *int   `json:"estimate,omitempty"` // in points; 0 is an estimate, nil none
 	Project      string `json:"project,omitempty"`
 	Description  string `json:"description,omitempty"`
 	Truncated    bool   `json:"description_truncated,omitempty"`
@@ -56,6 +56,9 @@ type taskView struct {
 	UpdatedSeq   int64  `json:"updated_seq"` // moves when its own fields change
 	Trashed      bool   `json:"trashed,omitempty"`
 	Archived     bool   `json:"archived,omitempty"`
+	// estimateText is the estimate in words, as its project says it
+	// (estimateText), for the text forms; "" for none.
+	estimateText string
 }
 
 // formatTime is a moment as the compact forms show it, in UTC to the
@@ -123,12 +126,29 @@ func (who *viewer) taskViews(ctx context.Context, tasks []core.Task) ([]taskView
 		if t.Priority > 0 && t.Priority < len(priorityNames) {
 			v.Priority = priorityNames[t.Priority]
 		}
+		if t.Estimate != nil {
+			v.estimateText = estimateText(names.projects[t.ProjectID].Settings, *t.Estimate)
+		}
 		if t.LeaseHolderID != "" && t.LeaseUntil > now {
 			v.HeldBy = names.handle(t.LeaseHolderID)
 		}
 		out[i] = v
 	}
 	return out, nil
+}
+
+// estimateText says an estimate as the text forms do: with its size on a
+// T-shirt project ("M (3 points)"), in points elsewhere ("3 points", "1
+// point").
+func estimateText(s *core.ProjectSettings, points int) string {
+	unit := fmt.Sprintf("%d points", points)
+	if points == 1 {
+		unit = "1 point"
+	}
+	if name := s.EstimateName(points); name != strconv.Itoa(points) {
+		return name + " (" + unit + ")"
+	}
+	return unit
 }
 
 // detailedTaskViews turns tasks into their listed form with the fields a
@@ -470,8 +490,8 @@ func (d taskDetail) text() string {
 	if t.DueOn != "" {
 		meta = append(meta, "due: "+t.DueOn)
 	}
-	if t.Estimate != 0 {
-		meta = append(meta, fmt.Sprintf("estimate: %d", t.Estimate))
+	if t.estimateText != "" {
+		meta = append(meta, "estimate: "+t.estimateText)
 	}
 	meta = append(meta, fmt.Sprintf("seq: %d", d.Seq))
 	b.WriteString(strings.Join(meta, "   ") + "\n")

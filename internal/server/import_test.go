@@ -303,3 +303,43 @@ func TestImportsFromDifferentPlacesDoNotMeet(t *testing.T) {
 
 	})
 }
+
+// TestAnImportKeepsEachEstimateAsItWas: into a project that estimates on a
+// scale, an estimate off it comes as it was, a 0 too, and a T-shirt size as
+// its number: the import does not fail on an estimate.
+func TestAnImportKeepsEachEstimateAsItWas(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(t, s.owner, "", "project.create", M{"key": "ENG", "name": "Engineering", "settings": M{"estimates": true}})
+		path := filepath.Join(t.TempDir(), "linear.csv")
+		if err := os.WriteFile(path, []byte("ID,Title,Status,Estimate\nX-1,Off the scale,Todo,4\nX-2,Nothing to it,Todo,0\nX-3,Sized,Todo,L\nX-4,Not estimated,Todo,\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		plan, err := importer.Read("linear", path, nil, http.DefaultClient)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := importer.Apply(siteSink{s, t}, plan, "ENG"); err != nil {
+			t.Fatalf("the import failed: %v", err)
+		}
+		var list struct {
+			Tasks []struct {
+				Title    string `json:"title"`
+				Estimate *int   `json:"estimate"`
+			} `json:"tasks"`
+		}
+		s.call(t, s.owner, "", "GET", w+"/tasks?project=ENG&sort=key&fields=title,estimate", nil, 200, &list)
+		var got []string
+		for _, task := range list.Tasks {
+			estimate := "none"
+			if task.Estimate != nil {
+				estimate = fmt.Sprint(*task.Estimate)
+			}
+			got = append(got, task.Title+" "+estimate)
+		}
+		if want := "Off the scale 4, Nothing to it 0, Sized 5, Not estimated none"; strings.Join(got, ", ") != want {
+			t.Fatalf("imported as %s, want %s", strings.Join(got, ", "), want)
+		}
+	})
+}

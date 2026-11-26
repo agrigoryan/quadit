@@ -3,7 +3,9 @@
 package engine
 
 import (
+	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -59,6 +61,13 @@ func projectCreate(c *cx, a projectCreateArgs) error {
 	lead, err := c.optMember("lead", a.Lead)
 	if err != nil {
 		return err
+	}
+	if a.Settings != nil {
+		settings, err := newSettings(nil, *a.Settings)
+		if err != nil {
+			return err
+		}
+		a.Settings = &settings
 	}
 	rk, err := nextRank[core.Project](c, store.Live)
 	if err != nil {
@@ -177,17 +186,14 @@ func (c *cx) projectLead(p *patch, lead Opt[string], pr core.Project) error {
 	return nil
 }
 
-// projectSettings applies new cycle settings, as a whole.
+// projectSettings applies new settings, as a whole (see newSettings).
 func projectSettings(p *patch, settings Opt[core.ProjectSettings], pr core.Project) error {
 	if !settings.Set {
 		return nil
 	}
-	s := settings.V
-	if s.Cycles && s.CycleDays == 0 {
-		s.CycleDays = defaultCycleDays
-	}
-	if s.CycleDays < 0 || s.CycleDays > 90 || s.CycleStart < 0 || s.CycleStart > 6 {
-		return invalid("settings", "cycle_days is 1 to 90 and cycle_start is a weekday, 0 (Sunday) to 6")
+	s, err := newSettings(pr.Settings, settings.V)
+	if err != nil {
+		return err
 	}
 	var old core.ProjectSettings
 	if pr.Settings != nil {
@@ -198,6 +204,33 @@ func projectSettings(p *patch, settings Opt[core.ProjectSettings], pr core.Proje
 		p.changes["settings"] = core.FieldChange{From: pr.Settings, To: &s}
 	}
 	return nil
+}
+
+// newSettings checks a project's settings as sent, replacing old (nil for a
+// new project), and fills in what the server decides: a cycle's length,
+// and the scale of a project that estimates and names none. Turning
+// estimates on starts on the Fibonacci scale; a project that already
+// estimated with no scale named (one made before scales) keeps any whole
+// number, which it now names.
+func newSettings(old *core.ProjectSettings, s core.ProjectSettings) (core.ProjectSettings, error) {
+	if s.Cycles && s.CycleDays == 0 {
+		s.CycleDays = defaultCycleDays
+	}
+	if s.CycleDays < 0 || s.CycleDays > 90 || s.CycleStart < 0 || s.CycleStart > 6 {
+		return s, invalid("settings", "cycle_days is 1 to 90 and cycle_start is a weekday, 0 (Sunday) to 6")
+	}
+	s.EstimateScale = strings.ToLower(strings.TrimSpace(s.EstimateScale))
+	switch {
+	case s.EstimateScale != "" && !slices.Contains(core.EstimateScales, s.EstimateScale):
+		return s, &Error{Code: CodeInvalid, Field: "settings", Message: fmt.Sprintf("unknown estimate_scale %q", s.EstimateScale),
+			Allowed: core.EstimateScales, Nearest: nearest(s.EstimateScale, core.EstimateScales)}
+	case !s.Estimates || s.EstimateScale != "":
+	case old == nil || !old.Estimates:
+		s.EstimateScale = core.ScaleFibonacci
+	default:
+		s.EstimateScale = core.ScalePoints
+	}
+	return s, nil
 }
 
 // rekeyTasks gives a project's tasks, the trash included, keys under the

@@ -18,24 +18,27 @@ func init() {
 }
 
 type taskCreateArgs struct {
-	ID            string   `json:"id"`
-	Project       string   `json:"project"`
-	Title         string   `json:"title"`
-	Description   string   `json:"description"`
-	Status        string   `json:"status"`
-	Priority      int      `json:"priority"`
-	Assignee      string   `json:"assignee"`
-	WaitingOn     string   `json:"waiting_on"`
-	WaitingOnNote string   `json:"waiting_on_note"`
-	Parent        string   `json:"parent"`
-	Epic          string   `json:"epic"`
-	Milestone     string   `json:"milestone"`
-	Cycle         string   `json:"cycle"`
-	Estimate      int      `json:"estimate"`
-	Labels        []string `json:"labels"`
-	DueOn         string   `json:"due_on"`
-	Rank          string   `json:"rank"`
-	Template      string   `json:"template"`
+	ID            string `json:"id"`
+	Project       string `json:"project"`
+	Title         string `json:"title"`
+	Description   string `json:"description"`
+	Status        string `json:"status"`
+	Priority      int    `json:"priority"`
+	Assignee      string `json:"assignee"`
+	WaitingOn     string `json:"waiting_on"`
+	WaitingOnNote string `json:"waiting_on_note"`
+	Parent        string `json:"parent"`
+	Epic          string `json:"epic"`
+	Milestone     string `json:"milestone"`
+	Cycle         string `json:"cycle"`
+	Estimate      *int   `json:"estimate"`
+	// KeepEstimate takes the estimate as given, on the project's scale or
+	// not, 0 included: an import brings a task's estimate as it was there.
+	KeepEstimate bool     `json:"keep_estimate"`
+	Labels       []string `json:"labels"`
+	DueOn        string   `json:"due_on"`
+	Rank         string   `json:"rank"`
+	Template     string   `json:"template"`
 	// HandoffLimit is how many times the task may be passed from agent to
 	// agent in all; 0 is no limit.
 	HandoffLimit int `json:"handoff_limit"`
@@ -73,6 +76,7 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 
 	// The template fills what the caller left empty, and may open a
 	// decision on the task once it is made.
+	named := a.Estimate != nil
 	var opens *decisionOpenArgs
 	if a.Template != "" {
 		if opens, err = c.applyTemplate(project, &a); err != nil {
@@ -88,8 +92,17 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 	if !priorityOK(a.Priority) {
 		return invalid("priority", priorityHelp)
 	}
-	if err := checkEstimate(a.Estimate); err != nil {
-		return err
+	// The estimate the caller names is held to the project's scale, unless
+	// it is to be kept as given; a template's is applied as it is.
+	estimate := a.Estimate
+	switch {
+	case estimate == nil:
+	case named && !a.KeepEstimate:
+		if estimate, err = taskEstimate(project.Settings, *estimate); err != nil {
+			return err
+		}
+	case *estimate < 0:
+		return invalid("estimate", estimateHelp)
 	}
 	if err := c.checkTaskHandoffLimit(0, a.HandoffLimit); err != nil {
 		return err
@@ -104,7 +117,7 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 		return err
 	}
 	t := core.Task{ID: tid, WorkspaceID: c.ws, ProjectID: project.ID, Title: title, Description: a.Description, StatusID: st.ID,
-		Priority: a.Priority, WaitingOnNote: a.WaitingOnNote, ParentID: parent.ID, Estimate: a.Estimate, DueOn: a.DueOn,
+		Priority: a.Priority, WaitingOnNote: a.WaitingOnNote, ParentID: parent.ID, Estimate: estimate, DueOn: a.DueOn,
 		HandoffLimit: a.HandoffLimit, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedAt: c.at}
 
 	// Who it is given to, who it is worked for, and whose move it is.

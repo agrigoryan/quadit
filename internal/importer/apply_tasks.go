@@ -61,8 +61,10 @@ func (a *applier) makeTask(t Task, depth int) error {
 	if len(t.DueOn) >= 10 {
 		args["due_on"] = t.DueOn[:10]
 	}
-	if t.Estimate > 0 {
-		args["estimate"] = t.Estimate
+	if t.Estimate != nil {
+		// As it was there, on this project's scale or not: an import does
+		// not fail on an estimate.
+		args["estimate"], args["keep_estimate"] = *t.Estimate, true
 	}
 	made, err := a.createTask(t, key, args, notes)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"testing"
 )
 
@@ -68,7 +69,9 @@ func TestLinearRow(t *testing.T) {
 		"ENG-1,Half,Todo,High,2.5,\"a,b\",,,\n" +
 		"ENG-2,None,In Progress,,,,,,\n" +
 		"ENG-3,Gone,Todo,Urgent,x,,2024-01-01,,\n" +
-		"ENG-4,Begun,Todo,,,,,,2024-01-01\n"
+		"ENG-4,Begun,Todo,,,,,,2024-01-01\n" +
+		"ENG-5,Zero,Todo,,0,,,,\n" +
+		"ENG-6,Sized,Todo,,xl,,,,\n"
 	plan, err := readCSV(writeFile(t, "linear.csv", text), "linear", linearRow)
 	if err != nil {
 		t.Fatal(err)
@@ -76,20 +79,26 @@ func TestLinearRow(t *testing.T) {
 	want := []struct {
 		category string
 		priority int
-		estimate int
+		estimate string // "none" or the number
 		labels   []string
 	}{
-		{"unstarted", 2, 2, []string{"a", "b"}},
-		{"started", 0, 0, nil},
-		{"canceled", 1, 0, nil},
-		{"started", 0, 0, nil},
+		{"unstarted", 2, "2", []string{"a", "b"}},
+		{"started", 0, "none", nil},
+		{"canceled", 1, "none", nil},
+		{"started", 0, "none", nil},
+		{"unstarted", 0, "0", nil},
+		{"unstarted", 0, "8", nil},
 	}
 	if len(plan.Tasks) != len(want) {
 		t.Fatalf("%d tasks", len(plan.Tasks))
 	}
 	for i, w := range want {
 		got := plan.Tasks[i]
-		if got.Category != w.category || got.Priority != w.priority || got.Estimate != w.estimate || !reflect.DeepEqual(got.Labels, w.labels) {
+		estimate := "none"
+		if got.Estimate != nil {
+			estimate = strconv.Itoa(*got.Estimate)
+		}
+		if got.Category != w.category || got.Priority != w.priority || estimate != w.estimate || !reflect.DeepEqual(got.Labels, w.labels) {
 			t.Errorf("%s: got %+v", got.Ext, got)
 		}
 	}

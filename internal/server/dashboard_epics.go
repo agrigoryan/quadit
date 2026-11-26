@@ -31,7 +31,8 @@ type epicProgress struct {
 
 // epicProgressOf is the epics a dashboard covers with their progress: the
 // tasks and points done and started, leaving out canceled tasks and
-// canceled epics.
+// canceled epics. An epic has points (core's Points) when one of its tasks
+// is in a project that estimates.
 func epicProgressOf(scope dashboardScope) []epicProgress {
 	names := scope.names
 	byEpic := map[string]*epicProgress{}
@@ -42,18 +43,21 @@ func epicProgressOf(scope dashboardScope) []epicProgress {
 		byEpic[epic.ID] = &epicProgress{ID: epic.ID, Name: epic.Name, Project: names.projects[epic.ProjectID].Key, State: epic.State, Lead: names.handle(epic.LeadID), TargetOn: epic.TargetOn}
 	}
 	lastMove := map[string]int64{}
+	estimated := map[string]bool{}
 	for _, t := range scope.tasks {
 		category := names.statuses[t.StatusID].Category
 		progress, ok := byEpic[t.EpicID]
 		if !ok || category == core.CatCanceled {
 			continue
 		}
+		settings := names.projects[t.ProjectID].Settings
+		estimated[t.EpicID] = estimated[t.EpicID] || settings.Estimating()
 		progress.Total++
-		progress.Points += t.Estimate
+		progress.Points += settings.Points(t)
 		switch category {
 		case core.CatDone:
 			progress.Done++
-			progress.PointsOK += t.Estimate
+			progress.PointsOK += settings.Points(t)
 		case core.CatStarted, core.CatWaiting:
 			progress.Started++
 		}
@@ -63,6 +67,9 @@ func epicProgressOf(scope dashboardScope) []epicProgress {
 	}
 	var epics []epicProgress
 	for epicID, progress := range byEpic {
+		if !estimated[epicID] {
+			progress.Points, progress.PointsOK = 0, 0
+		}
 		markAtRisk(progress, lastMove[epicID], scope.now)
 		epics = append(epics, *progress)
 	}

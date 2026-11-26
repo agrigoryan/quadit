@@ -9,6 +9,9 @@
 /** A priority may be given by name as well as by number. */
 export type PriorityName = "none" | "urgent" | "high" | "medium" | "low";
 
+/** An estimate may be given as a T-shirt size, on any project. */
+export type TShirtSize = "XS" | "S" | "M" | "L" | "XL" | "XXL" | "XXXL";
+
 /** Each change the server accepts, by name, with its arguments. */
 export interface Changes {
   "agent.create": {
@@ -563,7 +566,8 @@ export interface Changes {
     epic?: string;
     milestone?: string;
     cycle?: string;
-    estimate?: number;
+    estimate?: number | TShirtSize | null;
+    keep_estimate?: boolean;
     labels?: string[];
     due_on?: string;
     rank?: string;
@@ -602,7 +606,7 @@ export interface Changes {
     epic?: string | null;
     milestone?: string | null;
     cycle?: string | null;
-    estimate?: number | null;
+    estimate?: number | TShirtSize | null;
     due_on?: string | null;
     rank?: string | null;
     labels?: string[] | null;
@@ -768,6 +772,10 @@ export interface ProjectSettings {
   cycle_days?: number;
   cycle_start?: number;
   estimates?: boolean;
+  estimate_scale?: string;
+  estimate_extended?: boolean;
+  estimate_zero?: boolean;
+  estimate_ignore_unestimated?: boolean;
 }
 
 export interface RenameOption {

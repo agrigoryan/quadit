@@ -106,6 +106,7 @@ type TaskQuery struct {
 	Cycle        []string `json:"cycle,omitempty"` // current, next, a number, an id, or none
 	Milestone    string   `json:"milestone,omitempty"`
 	Priority     []int    `json:"priority,omitempty"`
+	Estimate     []string `json:"estimate,omitempty"` // numbers of points, T-shirt sizes, or none
 	DueBefore    string   `json:"due_before,omitempty"`
 	DueAfter     string   `json:"due_after,omitempty"`
 	Mentions     string   `json:"mentions,omitempty"`

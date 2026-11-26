@@ -303,3 +303,54 @@ func TestARunnersMachineIDIsFoundByIt(t *testing.T) {
 		}
 	})
 }
+
+// TestAPointerFieldKeepsItsZeroApartFromNone: a pointer field is NULL when
+// nil and its value otherwise, 0 included, written whole or by Update.
+func TestAPointerFieldKeepsItsZeroApartFromNone(t *testing.T) {
+	eachDB(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		db := s.In(fillTasks(t, s, 3))
+		var tasks []core.Task
+		if err := db.List(ctx, &tasks, store.Q{Order: "created_seq"}); err != nil {
+			t.Fatal(err)
+		}
+		zero, five := 0, 5
+		set := map[string]any{tasks[0].ID: nil, tasks[1].ID: zero, tasks[2].ID: &five}
+		for taskID, estimate := range set {
+			if _, err := db.Update(ctx, "tasks", map[string]any{"estimate": estimate}, store.Eq("id", taskID)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		read := func(taskID string) *int {
+			t.Helper()
+			var got core.Task
+			if err := db.Get(ctx, &got, store.Eq("id", taskID)); err != nil {
+				t.Fatal(err)
+			}
+			return got.Estimate
+		}
+		if got := read(tasks[0].ID); got != nil {
+			t.Errorf("none reads as %d", *got)
+		}
+		if got := read(tasks[1].ID); got == nil || *got != 0 {
+			t.Errorf("0 reads as %v, want 0", got)
+		}
+		if got := read(tasks[2].ID); got == nil || *got != 5 {
+			t.Errorf("5 reads as %v, want 5", got)
+		}
+
+		// Written whole, and read again into a row that held a value.
+		made := tasks[0]
+		made.ID, made.Number, made.Key, made.Estimate = id.New(), 99, "P0-99", &zero
+		if err := db.Insert(ctx, made); err != nil {
+			t.Fatal(err)
+		}
+		if got := read(made.ID); got == nil || *got != 0 {
+			t.Errorf("0 inserted reads as %v, want 0", got)
+		}
+		again := core.Task{Estimate: &five}
+		if err := db.Get(ctx, &again, store.Eq("id", tasks[0].ID)); err != nil || again.Estimate != nil {
+			t.Errorf("a row without an estimate, read into one with, keeps %v (%v)", again.Estimate, err)
+		}
+	})
+}

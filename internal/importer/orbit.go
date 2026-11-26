@@ -209,8 +209,11 @@ func (r *orbitReader) tasks() error {
 func (r *orbitReader) task(ot orbitTask) (Task, error) {
 	st := r.statusOf[ot.StatusID]
 	t := Task{Ext: ot.ID, Project: KeyFrom(r.keyOf[ot.ProjectID]), Title: ot.Title, Description: ot.Description, Status: st.Name, Category: st.Category,
-		Priority: priorityNames[ot.Priority], DueOn: ot.DueAt, Estimate: ot.Estimate, ParentExt: ot.ParentTaskID, URL: ot.URL,
+		Priority: priorityNames[ot.Priority], DueOn: ot.DueAt, ParentExt: ot.ParentTaskID, URL: ot.URL,
 		Epic: r.milestoneOf[ot.MilestoneID], WasKey: ot.Identifier, Number: ot.Number}
+	if ot.Estimate > 0 { // Orbit's 0 is none
+		t.Estimate = &ot.Estimate
+	}
 	if len(ot.AssigneeIDs) > 0 {
 		t.Assignee = orStr(r.who[ot.AssigneeIDs[0]], ot.AssigneeIDs[0])
 	}

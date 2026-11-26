@@ -4,8 +4,10 @@
 // A row struct is registered with its table in store/tables.go. Each field
 // tagged `db:"col"` is the column col; `db:"col,null"` stores the field's
 // zero value ("" or 0) as NULL; `db:"col,json"` stores the field as JSON
-// text (JSONB on Postgres), and its zero value as NULL. Reading, NULL is
-// always the zero value. A field without a tag, or tagged "-", is not
+// text (JSONB on Postgres), and its zero value as NULL. A pointer field is
+// NULL when nil and its value otherwise, zero included: the way a column
+// keeps 0 apart from none. Reading, NULL is always the zero value (a nil
+// pointer). A field without a tag, or tagged "-", is not
 // stored. metaOf reads the tags once per type, checks that every name is
 // plain (so that quoting it with ident is safe) and keeps the result.
 //
@@ -298,6 +300,12 @@ func (d dest) Scan(src any) error {
 			return err
 		}
 		d.v.SetFloat(n.Float64)
+	case reflect.Pointer:
+		value := reflect.New(d.v.Type().Elem())
+		if err := (dest{d.f, value.Elem()}).Scan(src); err != nil {
+			return err
+		}
+		d.v.Set(value)
 	default:
 		return fmt.Errorf("store: column %s: cannot load into a %s", d.f.col, d.v.Type())
 	}
