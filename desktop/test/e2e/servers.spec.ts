@@ -70,6 +70,36 @@ test("a removal being asked about stays asked, its button in focus, while the li
   await expect(list.getByText("No servers yet.")).toBeVisible();
 });
 
+test("focus stays on the same server's button while the list is drawn again, two servers of one name or not", async ({
+  desktop,
+  run,
+}) => {
+  await desktop.addServer(run.server, "Work");
+  await desktop.addServer(run.other, "Work");
+  const list = await desktop.serverList();
+  const second = list.getByRole("listitem").filter({ hasText: run.other });
+  /** Draws the list again, as any change the app shows does, and waits until it has. */
+  const drawAgain = async () => {
+    await list.locator("#list").evaluate((rows) => {
+      for (const row of rows.children) row.setAttribute("data-drawn-before", "");
+    });
+    await desktop.app.evaluate(({ webContents }, channel) => {
+      for (const contents of webContents.getAllWebContents()) contents.send(channel);
+    }, PAGES_CHANGED);
+    await expect(list.locator("li[data-drawn-before]")).toHaveCount(0);
+  };
+  await second.getByRole("button", { name: "Remove Work", exact: true }).focus();
+  await drawAgain();
+  await expect(second.getByRole("button", { name: "Remove Work", exact: true })).toBeFocused();
+  // The browser sign-in is drawn disabled until its server answers again: focus waits on the row's Open meanwhile.
+  const signIn = second.getByRole("button", { name: "Sign in to Work with your browser" });
+  await expect(signIn).toBeEnabled();
+  await signIn.focus();
+  await drawAgain();
+  await expect(list.locator(":focus")).toHaveCount(1);
+  await expect(second.locator(":focus")).toHaveCount(1);
+});
+
 test("an address that is not a Quadit server is refused with the reason", async ({ desktop }) => {
   const list = await desktop.serverList();
   await list.getByLabel("Address").fill("ftp://files.example.com");

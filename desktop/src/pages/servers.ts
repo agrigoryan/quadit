@@ -52,6 +52,7 @@ function transportNote(server: ServerView): string {
 
 function row(server: ServerView, local: LocalServerView): HTMLLIElement {
   const item = make("li", "", "server");
+  item.dataset.server = server.id;
   const about = make("div", "", "about");
   about.append(make("strong", server.name), make("span", server.origin, "origin"));
   const note = server.local ? "" : transportNote(server);
@@ -64,15 +65,18 @@ function row(server: ServerView, local: LocalServerView): HTMLLIElement {
   const open = make("button", "Open", "primary");
   open.type = "button";
   open.setAttribute("aria-label", `Open ${server.name}`);
+  open.dataset.control = "open";
   open.addEventListener("click", () => void api.openServer(server.id));
   const signIn = make("button", "Sign in with browser");
   signIn.type = "button";
   signIn.disabled = true;
   signIn.setAttribute("aria-label", `Sign in to ${server.name} with your browser`);
+  signIn.dataset.control = "sign-in";
   signIn.addEventListener("click", () => void api.signIn(server.id));
   const remove = make("button", "Remove", "quiet");
   remove.type = "button";
   remove.setAttribute("aria-label", `Remove ${server.name}`);
+  remove.dataset.control = "remove";
   actions.append(open, signIn, remove);
 
   // Removing asks once more in the row itself: the app forgets the sign-in.
@@ -90,6 +94,7 @@ function row(server: ServerView, local: LocalServerView): HTMLLIElement {
   const yes = make("button", "Remove", "danger");
   yes.type = "button";
   yes.setAttribute("aria-label", `Yes, remove ${server.name}`);
+  yes.dataset.control = "yes";
   yes.addEventListener("click", () => {
     confirmingId = null;
     void api.removeServer(server.id);
@@ -97,6 +102,7 @@ function row(server: ServerView, local: LocalServerView): HTMLLIElement {
   const no = make("button", "Keep");
   no.type = "button";
   no.setAttribute("aria-label", `Keep ${server.name}`);
+  no.dataset.control = "keep";
   no.addEventListener("click", () => {
     confirmingId = null;
     confirming.hidden = true;
@@ -128,13 +134,38 @@ function row(server: ServerView, local: LocalServerView): HTMLLIElement {
   return item;
 }
 
+/**
+ * A control of the list in focus, as rows drawn anew find it again: its
+ * server's id and what it is (its data-control; the controls of the server
+ * on this computer, which have none, by their name, unique in that row).
+ */
+function focusOf(active: Element | null): { server: string; control: string } | null {
+  if (!(active instanceof HTMLElement) || !list.contains(active)) return null;
+  const server = active.closest<HTMLElement>("li[data-server]")?.dataset.server;
+  const control = active.dataset.control ?? active.getAttribute("aria-label");
+  return server && control ? { server, control } : null;
+}
+
+/**
+ * Focuses that control in the rows drawn anew; one drawn disabled (the
+ * browser sign-in, until its server answers again) leaves focus on its
+ * row's Open, so it stays in the row the person was in.
+ */
+function refocus(focused: { server: string; control: string }) {
+  const row = list.querySelector<HTMLElement>(`li[data-server="${CSS.escape(focused.server)}"]`);
+  const control =
+    row?.querySelector<HTMLButtonElement>(`[data-control="${CSS.escape(focused.control)}"]`) ??
+    row?.querySelector<HTMLButtonElement>(`[aria-label="${CSS.escape(focused.control)}"]`);
+  if (control && !control.disabled) control.focus();
+  else row?.querySelector<HTMLElement>('[data-control="open"]')?.focus();
+}
+
 async function render() {
   const [servers, local] = await Promise.all([api.listServers(), api.localServer()]);
-  // A button of the list in focus is found again by its name in the rows drawn anew.
-  const focused = list.contains(document.activeElement) ? document.activeElement?.getAttribute("aria-label") : null;
+  const focused = focusOf(document.activeElement);
   if (!servers.some((server) => server.id === confirmingId)) confirmingId = null;
   list.replaceChildren(...servers.map((server) => row(server, local)));
-  if (focused) list.querySelector<HTMLElement>(`[aria-label="${CSS.escape(focused)}"]`)?.focus();
+  if (focused) refocus(focused);
   empty.hidden = servers.length > 0;
   const choice = runLocalChoice(local);
   runLocalBox.replaceChildren(...choice);
