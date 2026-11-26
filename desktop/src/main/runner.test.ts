@@ -7,7 +7,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type RunningChild, startChild } from "@/main/child-guard";
+import { childStarter, type RunningChild, type StartChild } from "@/main/child-guard";
+
+const startChild = childStarter(process.platform, () => null);
 import { NOT_SERVED, Runner } from "@/main/runner";
 
 const FAKE = join(__dirname, "../../test/fake-quadit-run.cjs");
@@ -37,7 +39,7 @@ async function until(check: () => boolean, ms = 5_000) {
  * project, and a claude and a codex on the login shell's PATH; `start` the
  * spawner, faked unless given; `env` added to the app's.
  */
-function setUp({ start, env = {} }: { start?: typeof startChild; env?: Record<string, string> } = {}) {
+function setUp({ start, env = {} }: { start?: StartChild; env?: Record<string, string> } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "quadit-desktop-runner-")));
   const home = join(root, "home");
   const configDir =
@@ -76,7 +78,7 @@ function setUp({ start, env = {} }: { start?: typeof startChild; env?: Record<st
   };
   const started: Started[] = [];
   const logged: string[] = [];
-  const fakeStart: typeof startChild = (program, args, options): RunningChild => {
+  const fakeStart: StartChild = (program, args, options): RunningChild => {
     let settle: (code: number | null) => void = () => {};
     const exited = new Promise<number | null>((done) => (settle = done));
     const child: Started = { program, args, env: options.env, end: (code) => settle(code), stopped: false };
@@ -100,6 +102,7 @@ function setUp({ start, env = {} }: { start?: typeof startChild; env?: Record<st
       QUADIT_CONFIG: "/x.json",
       ...env,
     },
+    home,
     start: start ?? fakeStart,
     log: (line: string) => void logged.push(line),
     changed: () => {},
@@ -475,6 +478,7 @@ posixOnly("Runner, its commands", () => {
       quadit: () => null,
       path: async () => "",
       env: {},
+      home: "/home/ann",
       start: startChild,
       log: () => {},
       changed: () => {},

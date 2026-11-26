@@ -22,7 +22,7 @@
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { childEnv, type RunningChild } from "@/main/child-guard";
+import { childEnv, type RunningChild, type StartChild } from "@/main/child-guard";
 import { appendLog } from "@/main/log-file";
 import type { SelfRun } from "@/shared/pages-api";
 
@@ -54,12 +54,8 @@ export interface SelfRunsLook {
 
 export interface SelfRunsParts {
   look(): Promise<SelfRunsLook>;
-  /** Starts a program, held to the app (child-guard.ts, startChild). */
-  start(
-    program: string,
-    args: string[],
-    options: { cwd: string; env: NodeJS.ProcessEnv; line: (line: string) => void },
-  ): RunningChild;
+  /** Starts a program, held to the app (child-guard.ts). */
+  start: StartChild;
   /** Whether the server says the tool's connect code was given back. */
   codeGivenBack(id: string): Promise<boolean>;
   /** The tool's connect code still open, if any. */

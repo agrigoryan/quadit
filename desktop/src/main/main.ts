@@ -35,7 +35,7 @@ import {
 import { accountName } from "@/main/account-name";
 import { AppPages } from "@/main/app-pages";
 import { Capture } from "@/main/capture";
-import { startChild } from "@/main/child-guard";
+import { childStarter } from "@/main/child-guard";
 import { ConnectPage } from "@/main/connect-page";
 import { Connections } from "@/main/connections";
 import { deepLinkInArgs, parseDeepLink, SCHEME } from "@/main/deep-link";
@@ -146,6 +146,8 @@ function start() {
   });
 
   const fetcher = (url: string, init?: RequestInit) => net.fetch(url, init);
+  // Every program the app holds besides its server starts this way: on Windows under the guard of the quadit it carries.
+  const startChild = childStarter(process.platform, localServerBinary);
   const checks = new ServerChecks(store, fetcher, (words) => quiet.say(() => void warn(words)));
   const cli = new QuaditCli(bundledCli(), loginShellPath, { home: homedir(), shell: process.env.SHELL || "/bin/sh" });
   // The folder of the quadit logins, as the quadit the person's agents run says (else the app's own).
@@ -301,7 +303,7 @@ function start() {
       });
       return { tools, path: look.path.join(":") };
     },
-    start: (program, args, options) => startChild(program, args, options),
+    start: startChild,
     codeGivenBack: async (id) => (await connections.handshake(id))?.state === "connected",
     openCode: (id) => connections.waitingCodes().find((open) => open.id === id)?.code ?? null,
     newCode: async (id) => void (await connections.newCode(id)),
@@ -316,6 +318,7 @@ function start() {
     quadit: localServerBinary,
     path: loginShellPath,
     env: process.env,
+    home: homedir(),
     start: startChild,
     log: (line) => appendLog(join(dataDir, "tools", "logs", "quadit-run.log"), line),
     changed: () => pages.changed(),

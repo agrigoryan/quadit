@@ -1,12 +1,18 @@
 // The programs the app starts besides its server (a tool run once to give
 // its connect code back: self-runs.ts; quadit run: runner.ts), held so that
-// none outlives the app. Each runs under a small POSIX sh, the guard, in a process
-// group of its own, and ends with the whole group: when the app stops it,
-// when it ends by itself (nothing it started outlives it), and when the app
-// quits or is killed without a word (the app's end of the guard's standard
-// input closes). The group is asked to stop (SIGTERM) and, still there five
-// seconds later, killed outright. What it cannot promise: a program that
-// leaves its group (setsid).
+// none outlives the app, under a guard that ends a program and all it
+// started together: when the app stops it, when it ends by itself (nothing
+// it started outlives it), and when the app quits or is killed without a
+// word (the app's end of the guard's standard input closes). Asked to stop,
+// they have five seconds before they are ended outright.
+//
+// On macOS and Linux the guard is a small POSIX sh, in a process group of
+// its own, which is what is signalled (SIGTERM, then SIGKILL). What it
+// cannot promise: a program that leaves its group (setsid). Windows has no
+// sh, no process groups and no signals the app can send: there the guard is
+// `quadit guard PROGRAM ARGS...` of the quadit the app carries (the Windows
+// contract, S1), stopped by closing its standard input; its exit code is
+// the program's.
 //
 // A child gets no terminal and no window of the app's; it gets the login
 // shell's PATH and none of the app's QUADIT_ settings (childEnv).
@@ -44,21 +50,39 @@ export interface RunningChild {
   stop(): void;
 }
 
+/** What a started program is given besides its arguments: its working folder, its environment, and where each line it writes goes. */
+export interface ChildOptions {
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  line: (line: string) => void;
+}
+
 /**
  * Starts `program` with `args` (never through a shell of its own: each
  * argument is given as it is) under the guard, in `cwd` with `env`; each
- * line it writes, on either output, goes to `line`. Its end comes once its
- * whole group is gone.
+ * line it writes, on either output, goes to `line`. Its end comes once all
+ * it started is gone.
  */
-export function startChild(
-  program: string,
-  args: string[],
-  options: {
-    cwd: string;
-    env: NodeJS.ProcessEnv;
-    line: (line: string) => void;
-  },
-): RunningChild {
+export type StartChild = (program: string, args: string[], options: ChildOptions) => RunningChild;
+
+/**
+ * The way the app starts the programs it holds on `platform`: under the sh
+ * guard, or on Windows under `quadit guard` of `quadit` (the quadit the app
+ * carries). Without one there, nothing can be started: the start ends at
+ * once, saying why.
+ */
+export function childStarter(platform: NodeJS.Platform, quadit: () => string | null): StartChild {
+  if (platform !== "win32") return startUnderSh;
+  return (program, args, options) => {
+    const guard = quadit();
+    if (guard) return startUnderQuadit(guard, program, args, options);
+    options.line(`${program} was not started: this Quadit app has no quadit command of its own to start it with.`);
+    return { exited: Promise.resolve(null), stop: () => {} };
+  };
+}
+
+/** The sh guard (macOS, Linux): the program in a process group of its own, which is what is ended. */
+function startUnderSh(program: string, args: string[], options: ChildOptions): RunningChild {
   // detached: a process group of its own, which is what is ended (never the app's).
   const child = spawn("/bin/sh", ["-c", GUARD_SCRIPT, "quadit-app", program, ...args], {
     cwd: options.cwd,
@@ -76,6 +100,38 @@ export function startChild(
     child.once("error", () => done(null));
   });
   return { exited, stop: () => void end() };
+}
+
+/**
+ * `quadit guard PROGRAM ARGS...` (Windows): the guard ends the program and
+ * all it started when its input closes, asking first and ending them
+ * outright five seconds later, and when it is itself ended. Stopping closes
+ * its input; a guard still there once that time is up is ended outright.
+ */
+function startUnderQuadit(quadit: string, program: string, args: string[], options: ChildOptions): RunningChild {
+  // No console window: the app is a window program, and a console program it starts would get one of its own.
+  const child = spawn(quadit, ["guard", program, ...args], {
+    cwd: options.cwd,
+    env: options.env,
+    stdio: ["pipe", "pipe", "pipe"],
+    windowsHide: true,
+  });
+  for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on("line", options.line);
+  child.stdin.on("error", () => {});
+  let gone = false;
+  const exited = new Promise<number | null>((done) => {
+    child.once("exit", (code) => done(code));
+    child.once("error", () => done(null));
+  }).finally(() => (gone = true));
+  let stopping = false;
+  const stop = () => {
+    if (stopping) return;
+    stopping = true;
+    child.stdin.end();
+    const late = setTimeout(() => gone || child.kill(), STOP_GRACE_MS + KILL_WAIT_MS);
+    void exited.then(() => clearTimeout(late));
+  };
+  return { exited, stop };
 }
 
 /** Whether any process of the group `pgid` is left. */
@@ -114,10 +170,24 @@ async function endGroup(pgid: number): Promise<void> {
  * variable is kept: a tool may need its own keys.
  */
 export function childEnv(env: NodeJS.ProcessEnv, login: string, path?: string): NodeJS.ProcessEnv {
-  return { ...withoutQuadit(env), ...(path ? { PATH: path } : {}), QUADIT_CONFIG: login };
+  const kept = withoutQuadit(env);
+  return { ...(path ? withPath(kept, path) : kept), QUADIT_CONFIG: login };
 }
 
-/** `env` without any QUADIT_ setting: the person's own servers' address and token never reach what the app runs. */
+/**
+ * `env` without any QUADIT_ setting: the person's own servers' address and
+ * token never reach what the app runs. Matched in any case, as Windows
+ * matches the names of variables.
+ */
 export function withoutQuadit(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith("QUADIT_")));
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !key.toUpperCase().startsWith("QUADIT_")));
+}
+
+/**
+ * `env` with `path` as its PATH. Windows matches the names of variables in
+ * any case and keeps this one as "Path": every spelling of it goes first, or
+ * the program would be given two and see either.
+ */
+export function withPath(env: NodeJS.ProcessEnv, path: string): NodeJS.ProcessEnv {
+  return { ...Object.fromEntries(Object.entries(env).filter(([key]) => key.toUpperCase() !== "PATH")), PATH: path };
 }

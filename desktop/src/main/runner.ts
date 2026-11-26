@@ -21,8 +21,7 @@
 import { execFile } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { RunningChild, startChild } from "@/main/child-guard";
-import { withoutQuadit } from "@/main/child-guard";
+import { type RunningChild, type StartChild, withoutQuadit, withPath } from "@/main/child-guard";
 import { homely } from "@/main/connections";
 import { isProjectKey } from "@/shared/bridge";
 import type { Refused, RunEntryView, RunPause, RunProgram, RunWaiting } from "@/shared/pages-api";
@@ -34,8 +33,10 @@ export interface RunnerParts {
   path: () => Promise<string>;
   /** The app's environment; the runner gets it without QUADIT_ settings (withoutQuadit). */
   env: NodeJS.ProcessEnv;
+  /** The person's home folder: where the runner works from, and what a folder is shown under (~). */
+  home: string;
   /** Starts a program, held to the app (child-guard.ts). */
-  start: typeof startChild;
+  start: StartChild;
   /** The app's log of the runner: what it printed, and when it was started and why it ended. */
   log: (line: string) => void;
   /** What a card shows of the runner changed. */
@@ -229,7 +230,7 @@ export class Runner {
       this.listFailed = words;
       return null;
     }
-    const home = this.parts.env.HOME ?? "";
+    const { home } = this.parts;
     return list.entries.flatMap((e) =>
       sameFile(e.login, login) && (e.program === "claude" || e.program === "codex")
         ? [
@@ -296,7 +297,7 @@ export class Runner {
       `program=${a.program}`,
       ...(a.programPath ? [`program_path=${a.programPath}`] : []),
     ];
-    const said = await this.run(args, ADD_MS, { PATH: await this.parts.path() });
+    const said = await this.run(args, ADD_MS, { path: await this.parts.path() });
     if (said.code !== 0) return { ok: false, error: said.words };
     this.parts.log(said.out.trim());
     this.forgetKept();
@@ -391,7 +392,7 @@ export class Runner {
   /** The projects the agent of the login `login` may work in: `quadit me`, as that login. */
   async projects(login: string): Promise<{ ok: true; projects: { key: string; name: string }[] } | Refused> {
     if (!this.available) return NO_QUADIT;
-    const said = await this.run(["--json", "me"], COMMAND_MS, { QUADIT_CONFIG: login });
+    const said = await this.run(["--json", "me"], COMMAND_MS, { login });
     if (said.code !== 0) return { ok: false, error: said.words };
     const me = JSON.parse(said.out) as { projects?: unknown; project_names?: unknown };
     const names = (typeof me.project_names === "object" && me.project_names) || {};
@@ -458,8 +459,8 @@ export class Runner {
     this.another = false;
     this.parts.log("starting quadit run");
     const child = this.parts.start(quadit, ["run"], {
-      cwd: this.parts.env.HOME || "/",
-      env: { ...withoutQuadit(this.parts.env), PATH: path },
+      cwd: this.parts.home,
+      env: withPath(withoutQuadit(this.parts.env), path),
       line: (line) => this.parts.log(line),
     });
     this.child = child;
@@ -508,16 +509,23 @@ export class Runner {
     }
   }
 
-  /** Runs the quadit the app carries with `args`, the app's environment without QUADIT_ settings and with `env`. */
+  /**
+   * Runs the quadit the app carries with `args`, the app's environment
+   * without QUADIT_ settings, as the quadit login `login` when given, and
+   * with `path` as its PATH when given.
+   */
   private run(
     args: string[],
     timeout: number,
-    env: Record<string, string> = {},
+    given: { login?: string; path?: string } = {},
   ): Promise<{ code: number | null; out: string; words: string }> {
     const quadit = this.parts.quadit();
     if (!quadit) return Promise.resolve({ code: null, out: "", words: NO_QUADIT.error });
+    let env = withoutQuadit(this.parts.env);
+    if (given.path !== undefined) env = withPath(env, given.path);
+    if (given.login !== undefined) env = { ...env, QUADIT_CONFIG: given.login };
     return new Promise((resolve) => {
-      execFile(quadit, args, { env: { ...withoutQuadit(this.parts.env), ...env }, timeout }, (err, stdout, stderr) => {
+      execFile(quadit, args, { env, timeout, windowsHide: true }, (err, stdout, stderr) => {
         const code = err ? (typeof err.code === "number" ? err.code : null) : 0;
         // What it said when it refused: its error, else what it printed, else how it ended.
         const words = stderr.trim() || stdout.trim() || err?.message || "";

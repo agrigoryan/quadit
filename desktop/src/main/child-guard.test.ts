@@ -1,8 +1,13 @@
 import { spawn } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { childEnv, GUARD_SCRIPT, startChild } from "@/main/child-guard";
+import { childEnv, childStarter, GUARD_SCRIPT, withoutQuadit, withPath } from "@/main/child-guard";
 
 const posixOnly = describe.skipIf(process.platform === "win32");
+/** The sh guard, as the app starts programs on macOS and Linux. */
+const startChild = childStarter(process.platform === "win32" ? "linux" : process.platform, () => null);
 
 /** Whether the process `pid` still runs. */
 function alive(pid: number): boolean {
@@ -111,6 +116,89 @@ posixOnly("startChild", () => {
   }, 15_000);
 });
 
+/**
+ * A stand-in for `quadit guard` (the Windows contract, S1), as a script
+ * named `guard` in a folder of its own: Node started there with "guard"
+ * first runs it, so the app's `quadit guard PROGRAM ARGS...` is played by
+ * Node, on any system. It runs PROGRAM with ARGS as given, with no input,
+ * its outputs passed through, exits with its code, and ends it when its own
+ * input closes, unless GUARD_DEAF is set: then it never does.
+ */
+function fakeGuard(): string {
+  const dir = mkdtempSync(join(tmpdir(), "quadit-desktop-guard-"));
+  writeFileSync(
+    join(dir, "guard"),
+    `const { spawn } = require("node:child_process");
+const [program, ...args] = process.argv.slice(2);
+const child = spawn(program, args, { stdio: ["ignore", "inherit", "inherit"] });
+child.on("exit", (code) => process.exit(code ?? 1));
+process.stdin.on("end", () => process.env.GUARD_DEAF || child.kill());
+process.stdin.resume();
+`,
+  );
+  return dir;
+}
+
+describe("startChild on Windows: quadit guard", () => {
+  const start = childStarter("win32", () => process.execPath);
+
+  it("starts quadit guard with the program and its arguments as given, line by line, and ends with the program's exit code", async () => {
+    const lines: string[] = [];
+    const child = start(
+      process.execPath,
+      [
+        "-e",
+        "console.log(process.argv.slice(1).join('|')); console.error('two'); process.exit(3)",
+        "one; two",
+        "$HOME",
+        'say "hi"',
+      ],
+      { cwd: fakeGuard(), env: process.env, line: (line) => lines.push(line) },
+    );
+    expect(await child.exited).toBe(3);
+    expect(lines.sort()).toEqual(['one; two|$HOME|say "hi"', "two"]);
+  });
+
+  it("stops the program by closing the guard's input", async () => {
+    const lines: string[] = [];
+    const child = start(process.execPath, ["-e", "console.log('up'); setInterval(() => {}, 1000)"], {
+      cwd: fakeGuard(),
+      env: process.env,
+      line: (line) => lines.push(line),
+    });
+    await until(() => lines.includes("up"));
+    child.stop();
+    await child.exited;
+  });
+
+  it("ends a guard still there once the time to stop is up", async () => {
+    const lines: string[] = [];
+    const child = start(process.execPath, ["-e", "console.log('up'); setTimeout(() => {}, 12000)"], {
+      cwd: fakeGuard(),
+      env: { ...process.env, GUARD_DEAF: "1" },
+      line: (line) => lines.push(line),
+    });
+    await until(() => lines.includes("up"));
+    const asked = Date.now();
+    child.stop();
+    await child.exited;
+    expect(Date.now() - asked).toBeGreaterThanOrEqual(5_000);
+  }, 15_000);
+
+  it("starts nothing without a quadit of the app's, and says why", async () => {
+    const lines: string[] = [];
+    const child = childStarter("win32", () => null)("C:\\Tools\\claude.exe", ["-p", "hi"], {
+      cwd: tmpdir(),
+      env: {},
+      line: (line) => lines.push(line),
+    });
+    expect(await child.exited).toBeNull();
+    expect(lines).toEqual([
+      "C:\\Tools\\claude.exe was not started: this Quadit app has no quadit command of its own to start it with.",
+    ]);
+  });
+});
+
 describe("childEnv", () => {
   it("gives a child the app's environment without the Quadit settings of the person's own servers, its own login and the login shell's PATH", () => {
     expect(
@@ -131,6 +219,22 @@ describe("childEnv", () => {
       HOME: "/h",
       OPENAI_API_KEY: "k",
       QUADIT_CONFIG: "/login.json",
+    });
+  });
+});
+
+describe("withoutQuadit and withPath", () => {
+  it("takes out every Quadit setting, whatever its case, as Windows reads them", () => {
+    expect(withoutQuadit({ Quadit_Token: "t", QUADIT_URL: "u", quadit_config: "c", HOME: "/h" })).toEqual({
+      HOME: "/h",
+    });
+  });
+
+  it("gives one PATH, every other spelling of it taken out, as Windows keeps it as Path", () => {
+    expect(withPath({ Path: "C:\\Windows", PATHEXT: ".EXE", HOME: "/h" }, "C:\\Tools;C:\\Windows")).toEqual({
+      PATHEXT: ".EXE",
+      HOME: "/h",
+      PATH: "C:\\Tools;C:\\Windows",
     });
   });
 });
