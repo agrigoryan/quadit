@@ -154,14 +154,16 @@ func (claudeCode) QuaditSettings(home, folder string) ([]quaditSetting, error) {
 		if err := json.Unmarshal(raw, &settings); err != nil {
 			return nil, fmt.Errorf("%s: %w", path, err)
 		}
-		for _, name := range quaditVariables {
-			if v, ok := settings.Env[name]; ok {
-				var s string
-				if json.Unmarshal(v, &s) != nil {
-					s = string(v) // not a string: set all the same
-				}
-				out = append(out, quaditSetting{File: path, Name: name, Value: s})
+		for key, v := range settings.Env {
+			name := envName(key) // on Windows Quadit_Config is QUADIT_CONFIG
+			if !slices.Contains(quaditVariables, name) {
+				continue
 			}
+			var s string
+			if json.Unmarshal(v, &s) != nil {
+				s = string(v) // not a string: set all the same
+			}
+			out = append(out, quaditSetting{File: path, Name: name, Value: s})
 		}
 	}
 	return out, nil

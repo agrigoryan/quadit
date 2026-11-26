@@ -45,6 +45,7 @@ func programEnv(base []string, login, task, run string) []string {
 	env := make([]string, 0, len(base)+4)
 	for _, kv := range base {
 		name, _, _ := strings.Cut(kv, "=")
+		name = envName(name) // on Windows Quadit_Url is QUADIT_URL
 		if name == "CLAUDECODE" || strings.HasPrefix(name, "CLAUDE_CODE_") || strings.HasPrefix(name, "QUADIT_") || strings.HasPrefix(name, "ELECTRON_") {
 			continue
 		}

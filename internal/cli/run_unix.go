@@ -72,6 +72,18 @@ func programCommand(ctx context.Context, path string, args []string) (*exec.Cmd,
 	return exec.CommandContext(ctx, path, args...), nil
 }
 
+// canStartIn says whether the program at path can be started in folder:
+// on macOS and Linux it always can.
+func canStartIn(string, string) error { return nil }
+
+// envNameFlag is what a regular expression begins with to match an
+// environment variable's name as the system compares it: as it is written.
+const envNameFlag = ""
+
+// envName is an environment variable's name as macOS and Linux compare it:
+// as it is written.
+func envName(name string) string { return name }
+
 // processGroup is a program the runner started, with everything it
 // started since: its process group, which the program leads.
 type processGroup struct{ pgid int }

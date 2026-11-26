@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"slices"
 	"strconv"
 	"syscall"
 	"testing"
@@ -63,4 +65,17 @@ func makeUnreadable(t *testing.T, path string) {
 func startAlone(cmd *exec.Cmd) error {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	return cmd.Start()
+}
+
+func TestEnvironmentNamesKeepTheirCaseOnMacOSAndLinux(t *testing.T) {
+	env := programEnv([]string{"Quadit_Url=http://elsewhere", "QUADIT_URL=x", "Path=/bin"}, "/login.json", "", "")
+	if want := []string{"Quadit_Url=http://elsewhere", "Path=/bin", "QUADIT_CONFIG=/login.json", "NO_COLOR=1"}; !slices.Equal(env, want) {
+		t.Fatalf("the environment %q, want %q", env, want)
+	}
+	home := t.TempDir()
+	_ = os.MkdirAll(filepath.Join(home, ".claude"), 0o700)
+	writeJSON(t, filepath.Join(home, ".claude", "settings.json"), map[string]any{"env": map[string]string{"Quadit_Config": "/other.json"}})
+	if settings, err := (claudeCode{}).QuaditSettings(home, t.TempDir()); err != nil || len(settings) != 0 {
+		t.Fatalf("a name of another case read as a setting: %+v (%v)", settings, err)
+	}
 }

@@ -581,6 +581,9 @@ func runAdd(ctx context.Context, files runFiles, host runHost, fields map[string
 	if path, err = filepath.Abs(path); err != nil {
 		return refuse(err)
 	}
+	if err := canStartIn(path, canon); err != nil {
+		return refuse(err)
+	}
 	version, err := programVersionOf(ctx, path, host.times.version)
 	if err != nil {
 		return refuse(fmt.Errorf("%s was not found on this computer: install it, or give program_path=", prog.Title()))

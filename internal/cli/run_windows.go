@@ -123,6 +123,34 @@ func programCommand(ctx context.Context, path string, args []string) (*exec.Cmd,
 	return cmd, nil
 }
 
+// canStartIn refuses a .cmd or .bat program in a network folder
+// (\\server\share\…): cmd.exe cannot have such a folder as its current
+// one, and starts in the Windows folder instead (Microsoft's KB 156276), so
+// the program would work there, with full access. Its own .exe can start
+// there, and so can a .cmd through a drive letter mapped to the share.
+// folder "." is the current one.
+func canStartIn(program, folder string) error {
+	if ext := strings.ToLower(filepath.Ext(program)); ext != ".cmd" && ext != ".bat" {
+		return nil
+	}
+	if abs, err := filepath.Abs(folder); err == nil {
+		folder = abs
+	}
+	if !strings.HasPrefix(folder, `\\`) {
+		return nil
+	}
+	return fmt.Errorf("%s is a .cmd file, and cmd.exe cannot start one in a network folder (%s): give program_path= the program's own .exe, or map a drive letter to the share and use the folder through it",
+		program, folder)
+}
+
+// envNameFlag is what a regular expression begins with to match an
+// environment variable's name as the system compares it: without regard to case.
+const envNameFlag = "(?i)"
+
+// envName is an environment variable's name as Windows compares it:
+// without regard to case.
+func envName(name string) string { return strings.ToUpper(name) }
+
 // batchQuoted is an argument with no double quote in it, in double quotes,
 // read back as it is both by cmd.exe and by the program the .cmd starts:
 // backslashes before the closing quote are doubled, so it is not read as

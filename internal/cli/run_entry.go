@@ -239,7 +239,8 @@ func (e *liveEntry) stop(cause error) {
 }
 
 // check makes the checks of an entry's start, in order: the login and the
-// project (verifyLogin), the lease file, the folder, the program, the
+// project (verifyLogin), the lease file, whether the program can start in
+// the folder at all (canStartIn), the folder, the program, the
 // program's own settings, its sign-in. It gives the pause the first that
 // fails sets, or the error it says; neither when all pass. A paused entry
 // has its login, project and lease file all the same: its holds need them.
@@ -249,6 +250,10 @@ func (e *liveEntry) check(ctx context.Context) (pause string, err error) {
 	}
 	if err := e.openLease(); err != nil {
 		return "", err
+	}
+	// An entry written before this rule may hold such a pair.
+	if err := canStartIn(e.reg.ProgramPath, e.reg.Folder); err != nil {
+		return "", entryError(err.Error())
 	}
 	if pause := e.checkFolderAndProgram(ctx); pause != "" {
 		return pause, nil

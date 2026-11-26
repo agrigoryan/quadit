@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
+	"github.com/agrigoryan/quadit/internal/core"
 	"github.com/agrigoryan/quadit/internal/fakeagent"
 )
 
@@ -186,21 +187,35 @@ func TestAFolderIsOneWhateverItsSpelling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spellings := []string{strings.ToUpper(dir), strings.ToLower(dir), strings.ReplaceAll(dir, `\`, "/"), `\\?\` + dir}
-	long, _ := windows.UTF16PtrFromString(dir)
-	short := make([]uint16, windows.MAX_LONG_PATH)
-	if n, err := windows.GetShortPathName(long, &short[0], uint32(len(short))); err == nil && n > 0 {
-		spellings = append(spellings, windows.UTF16ToString(short[:n]))
+	// A name too long for 8.3, which the volume gives a short name if it
+	// makes them.
+	dir = filepath.Join(dir, "a folder with a long name")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
 	}
 	want, err := fileIdentity(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, s := range spellings {
-		if got, err := fileIdentity(s); err != nil || got != want {
-			t.Fatalf("%s is %q (%v), %s is %q", s, got, err, dir, want)
+	same := func(t *testing.T, spelling string) {
+		t.Helper()
+		if got, err := fileIdentity(spelling); err != nil || got != want {
+			t.Fatalf("%s is %q (%v), %s is %q", spelling, got, err, dir, want)
 		}
 	}
+	for name, spelling := range map[string]string{"upper case": strings.ToUpper(dir), "lower case": strings.ToLower(dir),
+		"forward slashes": strings.ReplaceAll(dir, `\`, "/"), "the long form": `\\?\` + dir} {
+		t.Run(name, func(t *testing.T) { same(t, spelling) })
+	}
+	t.Run("the short name", func(t *testing.T) {
+		long, _ := windows.UTF16PtrFromString(dir)
+		short := make([]uint16, windows.MAX_LONG_PATH)
+		n, err := windows.GetShortPathName(long, &short[0], uint32(len(short)))
+		if err != nil || n == 0 || strings.EqualFold(windows.UTF16ToString(short[:n]), dir) {
+			t.Skipf("this volume gives %s no short name (%v)", dir, err)
+		}
+		same(t, windows.UTF16ToString(short[:n]))
+	})
 	if other, _ := fileIdentity(filepath.Dir(dir)); other == want {
 		t.Fatal("a folder and the one above it have one identity")
 	}
@@ -282,6 +297,81 @@ func TestWindowsFoldersOutsideTheRulesAreRefused(t *testing.T) {
 	t.Run("a folder outside the home folder is labeled as it is", func(t *testing.T) {
 		if label := (folderRules{home: home}).label(`D:\work\site`); label != `D:\work\site` {
 			t.Fatalf("labeled %s", label)
+		}
+	})
+}
+
+func TestEnvironmentNamesAreReadWithoutCaseOnWindows(t *testing.T) {
+	t.Run("the program's environment", func(t *testing.T) {
+		env := programEnv([]string{"Quadit_Url=http://elsewhere", "quadit_token=secret", "ClaudeCode=1", "Claude_Code_Entrypoint=cli", "Electron_Run_As_Node=1", "Path=C:\\bin"},
+			`C:\login.json`, "SVA-12", "run")
+		want := []string{"Path=C:\\bin", `QUADIT_CONFIG=C:\login.json`, "NO_COLOR=1", "QUADIT_TASK=SVA-12", "QUADIT_SESSION=run"}
+		if !slices.Equal(env, want) {
+			t.Fatalf("the environment %q, want %q", env, want)
+		}
+	})
+	t.Run("Claude Code's settings", func(t *testing.T) {
+		home := t.TempDir()
+		_ = os.MkdirAll(filepath.Join(home, ".claude"), 0o700)
+		writeJSON(t, filepath.Join(home, ".claude", "settings.json"), map[string]any{"env": map[string]string{"Quadit_Config": "C:/other.json", "quadit_token": "t"}})
+		settings, err := claudeCode{}.QuaditSettings(home, t.TempDir())
+		if err != nil || len(settings) != 2 || !slices.ContainsFunc(settings, func(s quaditSetting) bool { return s.Name == "QUADIT_CONFIG" && s.Value == "C:/other.json" }) {
+			t.Fatalf("read %+v (%v)", settings, err)
+		}
+	})
+	t.Run("Codex's settings", func(t *testing.T) {
+		home := t.TempDir()
+		_ = os.MkdirAll(filepath.Join(home, ".codex"), 0o700)
+		_ = os.WriteFile(filepath.Join(home, ".codex", "config.toml"), []byte("[shell_environment_policy.set]\nQuadit_Url = \"http://elsewhere\"\n"), 0o600)
+		settings, err := codex{}.QuaditSettings(home, "")
+		if err != nil || len(settings) != 1 || settings[0].Name != "QUADIT_URL" {
+			t.Fatalf("read %+v (%v)", settings, err)
+		}
+	})
+}
+
+func TestACmdProgramIsNotStartedInANetworkFolder(t *testing.T) {
+	dir := t.TempDir()
+	shim, exe := filepath.Join(dir, "claude.cmd"), filepath.Join(dir, "claude.exe")
+	for _, f := range []string{shim, exe} {
+		_ = os.WriteFile(f, nil, 0o600)
+	}
+	const refused = "is a .cmd file, and cmd.exe cannot start one in a network folder"
+	if err := canStartIn(shim, `\\server\share\game`); err == nil || !strings.Contains(err.Error(), refused) {
+		t.Fatalf("a .cmd in a network folder: %v", err)
+	}
+	for _, c := range [][2]string{{exe, `\\server\share\game`}, {shim, `Z:\game`}, {shim, dir}} {
+		if err := canStartIn(c[0], c[1]); err != nil {
+			t.Fatalf("%s in %s: %v", c[0], c[1], err)
+		}
+	}
+
+	// The same folder reached through the computer's own share of its drive.
+	rt := newRunTest(t, core.ProgramClaude)
+	shared := `\\localhost\` + strings.TrimSuffix(filepath.VolumeName(rt.folder), ":") + `$` + strings.TrimPrefix(rt.folder, filepath.VolumeName(rt.folder))
+	if st, err := os.Stat(shared); err != nil || !st.IsDir() {
+		t.Skipf("this computer does not share its drive as %s: %v", shared, err)
+	}
+	program := filepath.Join(rt.dir, "bin", "claude.cmd")
+	_ = os.MkdirAll(filepath.Dir(program), 0o700)
+	_ = os.WriteFile(program, []byte("@\""+rt.entry.ProgramPath+"\" %*\r\n"), 0o600)
+	t.Run("quadit run add refuses it", func(t *testing.T) {
+		rt.writeRegistry()
+		if code, said := rt.add("login="+rt.login, "project=SVA", "folder="+shared, "program=claude", "program_path="+program); code != 1 || !strings.Contains(said, refused) {
+			t.Fatalf("add: %d %s", code, said)
+		}
+	})
+	t.Run("an entry from before the rule is not served", func(t *testing.T) {
+		entry := rt.entry
+		entry.Folder, entry.ProgramPath = shared, program
+		rt.writeRegistry(entry)
+		rt.f.addItem(fakeItem{Task: "SVA-12"})
+		rt.serve()
+		rt.eventually("the entry's error", func() bool {
+			return strings.Contains(readStatus(rt.files.status()).Entries[entry.ID].Message, refused)
+		})
+		if len(rt.records()) != 0 {
+			t.Fatal("the program was started")
 		}
 	})
 }

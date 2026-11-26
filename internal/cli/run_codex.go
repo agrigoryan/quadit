@@ -128,9 +128,11 @@ func (codex) QuaditSettings(home, _ string) ([]quaditSetting, error) {
 // tomlQuaditVariable finds a QUADIT_CONFIG, QUADIT_URL or QUADIT_TOKEN
 // key on a line, and tomlQuaditValue one with its value; tomlTable finds
 // a table's header.
+// The variable's name is matched without regard to case on Windows, which
+// reads names so (envNameFlag).
 var (
-	tomlQuaditVariable = regexp.MustCompile(`(?:^|[{,\s.])["']?(QUADIT_(?:CONFIG|URL|TOKEN))["']?\s*=`)
-	tomlQuaditValue    = regexp.MustCompile(`(?:^|[{,\s.])["']?(QUADIT_(?:CONFIG|URL|TOKEN))["']?\s*=\s*(?:"([^"]*)"|'([^']*)')`)
+	tomlQuaditVariable = regexp.MustCompile(envNameFlag + `(?:^|[{,\s.])["']?(QUADIT_(?:CONFIG|URL|TOKEN))["']?\s*=`)
+	tomlQuaditValue    = regexp.MustCompile(envNameFlag + `(?:^|[{,\s.])["']?(QUADIT_(?:CONFIG|URL|TOKEN))["']?\s*=\s*(?:"([^"]*)"|'([^']*)')`)
 	tomlTable          = regexp.MustCompile(`^\[\s*([A-Za-z0-9_."'-]+)\s*\]`)
 )
 
@@ -168,7 +170,7 @@ func quaditSettingsInTOML(f *os.File) ([]quaditSetting, error) {
 			return nil, errors.New("a QUADIT_ setting whose value could not be read")
 		}
 		for _, m := range values {
-			out = append(out, quaditSetting{Name: m[1], Value: m[2] + m[3]})
+			out = append(out, quaditSetting{Name: envName(m[1]), Value: m[2] + m[3]})
 		}
 	}
 	return out, scan.Err()
