@@ -80,11 +80,12 @@ fmt:
 	gofmt -w cmd internal
 
 # A release as GoReleaser makes it (.goreleaser.yaml), into dist/ and
-# published nowhere: archives for Linux and macOS, x86 and ARM, checksums,
-# the Homebrew cask and the Docker images. A tag v* pushed to GitHub makes
-# the real one.
+# published nowhere: archives for Linux, macOS and Windows, x86 and ARM,
+# checksums, the Homebrew cask and the Docker images. A tag v* pushed to
+# GitHub makes the real one. Its version follows the server's newest tag,
+# not a desktop app's (desktop-v*), which GoReleaser would take otherwise.
 release:
-	goreleaser release --snapshot --clean
+	GORELEASER_CURRENT_TAG=$$(git describe --tags --match 'v*' --abbrev=0) goreleaser release --snapshot --clean
 
 # Start what make release made, as the release workflow does before it
 # publishes: the archive, the .deb and the image (scripts/release-smoke.sh).

@@ -1,7 +1,9 @@
-# A release: the binaries with the web app inside for Linux and macOS, x86
-# and ARM; their archives, .deb and .rpm packages and checksums on a GitHub
-# Release; the Docker images on ghcr.io; the Homebrew cask in
-# agrigoryan/homebrew-tap. The version comes from the tag (vX.Y.Z) alone.
+# A release: the binaries with the web app inside for Linux, macOS and
+# Windows, x86 and ARM; their archives (zip for Windows), .deb and .rpm
+# packages and checksums on a GitHub Release; the Docker images on ghcr.io;
+# the Homebrew cask in agrigoryan/homebrew-tap. The packages, the images and
+# the cask are Linux's and macOS's alone. The version comes from the tag
+# (vX.Y.Z) alone.
 #
 #   make release      a local snapshot in dist/, nothing published
 #
@@ -26,12 +28,16 @@ builds:
       - web
     ldflags:
       - -s -w -X main.version={{.Version}}
-    goos: [linux, darwin]
+    goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
 
 archives:
   - id: quadit
     formats: [tar.gz]
+    # Windows opens a zip itself; quadit.exe is inside.
+    format_overrides:
+      - goos: windows
+        formats: [zip]
     # No version in the name, so the newest release's archive has a fixed
     # address: releases/latest/download/quadit_linux_amd64.tar.gz.
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
