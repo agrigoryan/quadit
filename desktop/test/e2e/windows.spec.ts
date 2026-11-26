@@ -316,19 +316,36 @@ test("the first Connect puts the app's quadit on the person's PATH, the stand-in
   const computer = windowsComputer(run, { claude: "gives-code-back", quadit: false });
   const folder = dirname(run.binary);
   const added = `${computer.path};${folder}`;
-  /** Where a program started now with the PATH Windows gives finds quadit (where.exe, as a terminal would). */
+  /** What each look below saw: the person's PATH as the registry keeps it, the PATH Windows gives, and where's answer. */
+  const looks: string[] = [];
+  /**
+   * Where a program started now with the PATH Windows gives finds quadit
+   * (where.exe, as a terminal would: with PATHEXT, without which it looks
+   * for a file named quadit alone); "" when nowhere.
+   */
   const quaditFound = async () => {
     const where = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "where.exe");
+    const path = await systemPath();
+    const env = { ...bareEnv(), PATHEXT: process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD", PATH: path };
+    let found = "";
     try {
-      return execFileSync(where, ["quadit"], { env: { ...bareEnv(), PATH: await systemPath() }, encoding: "utf8" })
-        .trim()
-        .toLowerCase();
-    } catch {
-      return "";
+      found = execFileSync(where, ["quadit"], { env, encoding: "utf8" }).trim().toLowerCase();
+    } catch (err) {
+      found = "";
+      looks.push(`where.exe: ${String((err as { stderr?: unknown }).stderr ?? err).trim()}`);
     }
+    looks.push(
+      `HKCU Path: ${readUserVariable("Path")?.value ?? "(none)"}`,
+      `PATH given: ${path}`,
+      `found: ${found}`,
+      "",
+    );
+    return found;
   };
   const data = mkdtempSync(join(tmpdir(), "quadit-desktop-app-"));
   try {
+    // Before Connect, nothing a new terminal would run is quadit.
+    expect(await quaditFound()).toBe("");
     const desktop = await Desktop.launch(data, run, [], { env: computer.env, firstStart: true });
     try {
       // Connected by itself: the app's one-prompt run of the stand-in (a .cmd, which the guard starts through
@@ -366,5 +383,10 @@ test("the first Connect puts the app's quadit on the person's PATH, the stand-in
       ["the stand-in's notes", computer.standIn],
     ] as const)
       if (existsSync(file)) await testInfo.attach(name, { path: file, contentType: "text/plain" });
+    // And the person's PATH at each look, before Connect too.
+    await testInfo.attach("the PATH at each look", {
+      body: [`HKCU Path set by the test: ${computer.path}`, "", ...looks].join("\n"),
+      contentType: "text/plain",
+    });
   }
 });
