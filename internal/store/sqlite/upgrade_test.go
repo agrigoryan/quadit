@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -18,7 +19,11 @@ import (
 // folder and in one whose name has the characters a file pattern gives
 // meaning to, and in one whose name looks like a copy's.
 func TestUpgradeAndBack(t *testing.T) {
-	for _, folder := range []string{"data", "data [1] *?", "data.before-v2"} {
+	pattern := "data [1] *?"
+	if runtime.GOOS == "windows" {
+		pattern = "data [1]" // no name on Windows holds * or ?
+	}
+	for _, folder := range []string{"data", pattern, "data.before-v2"} {
 		t.Run(folder, func(t *testing.T) {
 			dir := filepath.Join(t.TempDir(), folder)
 			if err := os.Mkdir(dir, 0o700); err != nil {

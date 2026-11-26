@@ -246,14 +246,15 @@ func TestTheAppIsStartedWithoutAShell(t *testing.T) {
 	if err != nil || !slices.Equal(mac, []string{"/usr/bin/open", "-g", "-j", "-b", "io.github.agrigoryan.quadit", "--args", "--background"}) {
 		t.Fatalf("macOS: %q, %v", mac, err)
 	}
-	linux, err := appCommand("linux", appLogin{Path: "/opt/Quadit/quadit desktop; echo $HOME"})
-	if err != nil || !slices.Equal(linux, []string{"/opt/Quadit/quadit desktop; echo $HOME", "--background"}) {
+	// A full path as this computer writes one: C:\ on Windows, / elsewhere.
+	full := filepath.Join(os.TempDir(), "Quadit", "quadit desktop; echo $HOME")
+	linux, err := appCommand("linux", appLogin{Path: full})
+	if err != nil || !slices.Equal(linux, []string{full, "--background"}) {
 		t.Fatalf("Linux: %q, %v", linux, err)
 	}
 	if _, err := appCommand("linux", appLogin{Path: "quadit"}); err == nil {
 		t.Fatal("Linux: a path that is not a full one was taken")
 	}
-	// A full path as this computer writes one: C:\ on Windows, / elsewhere.
 	exe := filepath.Join(os.TempDir(), "Programs", "Quadit", "Quadit.exe")
 	windows, err := appCommand("windows", appLogin{Path: exe})
 	if err != nil || !slices.Equal(windows, []string{exe, "--background"}) {
