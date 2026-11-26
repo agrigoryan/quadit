@@ -4,7 +4,7 @@
 // whatever its label holds, with only a leading ~/ left for the shell.
 
 import { describe, expect, it } from "vitest";
-import { resumeLine, shellFolder } from "@/insights/agents/resume-line";
+import { powershellFolder, resumeLine, shellFolder } from "@/insights/agents/resume-line";
 
 const id = "0f8e7d6c-5b4a-4321-9fed-cba987654321";
 
@@ -91,5 +91,49 @@ describe("shellFolder", () => {
       "//",
     ])
       expect(shellFolder(label)).toBeNull();
+  });
+});
+
+describe("resumeLine for a run on Windows", () => {
+  it("changes to the folder in PowerShell, and resumes there only once it did", () => {
+    expect(resumeLine({ program: "claude", program_session: id, folder: "~\\devel\\game" })).toBe(
+      `Set-Location -LiteralPath (Join-Path $HOME 'devel\\game'); if ($?) { claude --resume ${id} }`,
+    );
+    expect(resumeLine({ program: "codex", program_session: id, folder: "D:\\work\\site" })).toBe(
+      `Set-Location -LiteralPath 'D:\\work\\site'; if ($?) { codex resume ${id} }`,
+    );
+    expect(resumeLine({ program: "codex", program_session: id, folder: "\\\\nas\\projects\\site" })).toBe(
+      `Set-Location -LiteralPath '\\\\nas\\projects\\site'; if ($?) { codex resume ${id} }`,
+    );
+  });
+});
+
+describe("powershellFolder", () => {
+  it("quotes a label that would mean something to PowerShell, so it is only a name", () => {
+    expect(powershellFolder("~\\Ann's game")).toBe("(Join-Path $HOME 'Ann''s game')");
+    expect(powershellFolder("D:\\$(Remove-Item -Recurse ~)")).toBe("'D:\\$(Remove-Item -Recurse ~)'");
+    expect(powershellFolder("D:\\a; Stop-Computer")).toBe("'D:\\a; Stop-Computer'");
+    expect(powershellFolder("D:\\`$env $HOME")).toBe("'D:\\`$env $HOME'");
+    expect(powershellFolder("D:\\")).toBe("'D:\\'");
+  });
+
+  it("refuses what no Windows name holds, a control character, a quote PowerShell reads as one, an empty part, or another shape", () => {
+    for (const label of [
+      "~\\",
+      "~\\a\\\\b",
+      "~\\a\n",
+      'D:\\say "hi"',
+      "D:\\a|b",
+      "D:\\it\u2019s",
+      "D:\\it\u2018s",
+      "D:work",
+      "\\\\nas",
+      "\\\\nas\\",
+      "~\\a/../b:c",
+      "C:\\a\\",
+      "~root\\x",
+      "\\a",
+    ])
+      expect(powershellFolder(label)).toBeNull();
   });
 });
