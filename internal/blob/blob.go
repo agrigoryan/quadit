@@ -2,6 +2,7 @@
 // stores implement the same interface.
 //
 //	blob.go          the Store interface, and Disk
+//	open_<system>.go opening a file others may remove while it is read
 //	cloud.go         the Config, the cloud stores, Layered, Unusable and Move
 //	cloud_<kind>.go  opening each cloud: s3, gcs, azure
 package blob
@@ -123,7 +124,7 @@ func (d *Disk) Open(_ context.Context, key string) (io.ReadSeekCloser, time.Time
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	f, err := os.Open(p)
+	f, err := OpenFile(p)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, time.Time{}, ErrNotFound
 	}

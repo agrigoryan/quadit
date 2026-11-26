@@ -310,7 +310,7 @@ func (s *Server) receiveFirstPart(ctx context.Context, db store.DB, f *core.File
 
 // putLocal stores the file at path in file storage under key.
 func (s *Server) putLocal(ctx context.Context, key, path string) error {
-	in, err := os.Open(path)
+	in, err := blob.OpenFile(path)
 	if err != nil {
 		return err
 	}
@@ -450,7 +450,7 @@ func (s *Server) finishUpload(ctx context.Context, x *c, f *core.File) error {
 		defer os.Remove(joined)
 		path = joined
 	}
-	in, err := os.Open(path)
+	in, err := blob.OpenFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		// Received whole by another server, or kept on a disk since lost: no
 		// request here can finish it, and the caller cannot pick a server.
@@ -640,7 +640,7 @@ const previewEdge = 720
 // preview would be, a reduced copy. Small images, pixel art among them, are
 // left alone so they stay sharp.
 func imagePreview(path string) (w, h int, preview []byte) {
-	in, err := os.Open(path)
+	in, err := blob.OpenFile(path)
 	if err != nil {
 		return 0, 0, nil
 	}

@@ -428,7 +428,7 @@ func (s *Server) handleDownloadBackup(x *c) error {
 	if err != nil {
 		return err
 	}
-	f, err := os.Open(b.Location)
+	f, err := blob.OpenFile(b.Location)
 	if err != nil {
 		return errNotFound("backup file")
 	}
@@ -485,7 +485,7 @@ func (s *Server) handleRestoreItemFromBackup(x *c) error {
 	if !there {
 		return errNotFound("workspace " + it.Workspace)
 	}
-	f, err := os.Open(bk.Location)
+	f, err := blob.OpenFile(bk.Location)
 	if errors.Is(err, fs.ErrNotExist) {
 		return errNotFound("backup file")
 	}

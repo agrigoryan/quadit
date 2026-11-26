@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -226,4 +227,43 @@ func TestWritable(t *testing.T) {
 			t.Fatalf("asking made the folder: %v", err)
 		}
 	})
+}
+
+// TestAFileBeingReadCanBeRemovedOrReplaced: a file opened with OpenFile may
+// be replaced by another, or removed, while it is read, and the reader
+// reads on what it opened: as on Unix, so on Windows. A file served from
+// the disk store is opened so.
+func TestAFileBeingReadCanBeRemovedOrReplaced(t *testing.T) {
+	dir := t.TempDir()
+	path, other := filepath.Join(dir, "file"), filepath.Join(dir, "other")
+	for name, text := range map[string]string{path: "what was opened", other: "what replaces it"} {
+		if err := os.WriteFile(name, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f, err := OpenFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if err := os.Rename(other, path); err != nil {
+		t.Fatalf("replacing a file being read: %v", err)
+	}
+	if raw, err := io.ReadAll(f); err != nil || string(raw) != "what was opened" {
+		t.Fatalf("the reader of the file replaced read %q, %v", raw, err)
+	}
+	g, err := OpenFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.Close()
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("removing a file being read: %v", err)
+	}
+	if raw, err := io.ReadAll(g); err != nil || string(raw) != "what replaces it" {
+		t.Fatalf("the reader of the file removed read %q, %v", raw, err)
+	}
+	if _, err := OpenFile(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("a file that is not there opened with %v", err)
+	}
 }

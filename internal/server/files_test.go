@@ -529,6 +529,9 @@ func TestAnUploadStartedAgainIsNotOverwrittenByOneStillBeingStored(t *testing.T)
 			slow <- resp.StatusCode
 		}()
 		<-files.held
+		// A failure below still lets the slow request end, so the test ends.
+		release := sync.OnceFunc(func() { close(files.release) })
+		defer release()
 		// The bytes the slow request is storing are open already; asked
 		// again, this server no longer has them, as another would not.
 		if err := os.Remove(filepath.Join(s.dir, "uploads", fid+".part")); err != nil {
@@ -543,7 +546,7 @@ func TestAnUploadStartedAgainIsNotOverwrittenByOneStillBeingStored(t *testing.T)
 		if f.State != "ready" || f.SHA256 != sumOf(after) {
 			t.Fatalf("sent again from the start, the file is %+v", f)
 		}
-		close(files.release)
+		release()
 		<-slow
 
 		s.call(t, s.owner, "", "GET", w+"/files/"+fid, nil, 200, &f)
