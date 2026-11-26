@@ -46,7 +46,7 @@ func TestAnEstimateIsHeldToTheProjectsScale(t *testing.T) {
 		}
 
 		e = w.refused(engine.CodeInvalid, w.owner.ID, "task.create", M{"project": "OPS", "title": "Rotate keys", "estimate": 4})
-		if e.Message != "this project estimates in XS, S, M, L or XL" {
+		if e.Message != "this project estimates in XS, S, M, L or XL" || !slices.Equal(e.Allowed, []string{"XS", "S", "M", "L", "XL"}) {
 			t.Fatalf("an estimate off the T-shirt scale: %+v", e)
 		}
 		w.do(w.owner.ID, "task.create", M{"project": "OPS", "title": "Rotate keys", "estimate": "m"})

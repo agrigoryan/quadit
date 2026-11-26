@@ -96,7 +96,7 @@ func taskCreate(c *cx, a taskCreateArgs) error {
 	// it is to be kept as given; a template's is applied as it is.
 	estimate := a.Estimate
 	switch {
-	case estimate == nil:
+	case estimate == nil: // none
 	case named && !a.KeepEstimate:
 		if estimate, err = taskEstimate(project.Settings, *estimate); err != nil {
 			return err

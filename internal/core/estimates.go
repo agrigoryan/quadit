@@ -64,9 +64,9 @@ func EstimatePoints(word string) (points int, ok bool) {
 // Estimating reports whether the project estimates its tasks.
 func (s *ProjectSettings) Estimating() bool { return s != nil && s.Estimates }
 
-// scale is the scale estimates are held to and named on: the project's
-// own while it estimates, points otherwise or when it names none.
-func (s *ProjectSettings) scale() string {
+// Scale is the scale the project's estimates are held to and named on: its
+// own while it estimates, points when it does not or names none.
+func (s *ProjectSettings) Scale() string {
 	if !s.Estimating() || s.EstimateScale == "" {
 		return ScalePoints
 	}
@@ -83,7 +83,7 @@ func (s *ProjectSettings) ZeroEstimates() bool { return s.Estimating() && s.Esti
 // points (and where the project does not estimate), which take any whole
 // number.
 func (s *ProjectSettings) EstimateValues() []int {
-	values, ok := scaleValues[s.scale()]
+	values, ok := scaleValues[s.Scale()]
 	if !ok {
 		return nil
 	}
@@ -100,7 +100,7 @@ func (s *ProjectSettings) EstimateValues() []int {
 // T-shirt scale ("M"), the number on any other ("3"). A value off the
 // T-shirt scale, 0 among them, is said by its number.
 func (s *ProjectSettings) EstimateName(points int) string {
-	if s.scale() == ScaleTShirt {
+	if s.Scale() == ScaleTShirt {
 		if i := slices.Index(scaleValues[ScaleTShirt], points); i >= 0 {
 			return TShirtSizes[i]
 		}
@@ -108,20 +108,26 @@ func (s *ProjectSettings) EstimateName(points int) string {
 	return strconv.Itoa(points)
 }
 
+// EstimateNames are EstimateValues as the project says them (EstimateName):
+// "0", "1", "2" … or "XS", "S", "M" …; nil on points.
+func (s *ProjectSettings) EstimateNames() []string {
+	var names []string
+	for _, n := range s.EstimateValues() {
+		names = append(names, s.EstimateName(n))
+	}
+	return names
+}
+
 // EstimateWords says the estimates the project takes, for a sentence:
 // "1, 2, 3, 5 or 8 points", "XS, S, M, L or XL", or on points "any whole
 // number of points".
 func (s *ProjectSettings) EstimateWords() string {
-	values := s.EstimateValues()
-	if values == nil {
+	names := s.EstimateNames()
+	if names == nil {
 		return "any whole number of points"
 	}
-	names := make([]string, len(values))
-	for i, n := range values {
-		names[i] = s.EstimateName(n)
-	}
 	words := strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
-	if s.scale() == ScaleTShirt {
+	if s.Scale() == ScaleTShirt {
 		return words
 	}
 	return words + " points"

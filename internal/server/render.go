@@ -56,8 +56,8 @@ type taskView struct {
 	UpdatedSeq   int64  `json:"updated_seq"` // moves when its own fields change
 	Trashed      bool   `json:"trashed,omitempty"`
 	Archived     bool   `json:"archived,omitempty"`
-	// estimateText is the estimate in words, as its project says it
-	// (estimateText), for the text forms; "" for none.
+	// estimateText is the estimate as the text forms say it (see the
+	// function estimateText); "" for none.
 	estimateText string
 }
 

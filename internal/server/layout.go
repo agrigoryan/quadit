@@ -3,7 +3,6 @@
 package server
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"sort"
@@ -56,7 +55,7 @@ func layoutEstimatesOf(s *core.ProjectSettings) *layoutEstimates {
 	if !s.Estimating() {
 		return nil
 	}
-	out := &layoutEstimates{Scale: cmp.Or(s.EstimateScale, core.ScalePoints), Values: s.EstimateValues(), Words: s.EstimateWords()}
+	out := &layoutEstimates{Scale: s.Scale(), Values: s.EstimateValues(), Words: s.EstimateWords()}
 	if out.Scale == core.ScaleTShirt {
 		for _, n := range out.Values {
 			if n > 0 { // 0 is a number of points, not a size

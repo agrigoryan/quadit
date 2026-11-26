@@ -16,6 +16,8 @@ const priorityHelp = "priority is 0 (none), 1 (urgent), 2 (high), 3 (medium) or 
 
 func priorityOK(n int) bool { return n >= 0 && n <= 4 }
 
+const estimateHelp = "an estimate is a number of points, 0 or more"
+
 // taskEstimate is the estimate a change names for a task of a project with
 // these settings: nil for none. A 0 is none where the project does not take
 // 0 as an estimate of its own, as it always was. Where the project
@@ -27,14 +29,12 @@ func taskEstimate(s *core.ProjectSettings, n int) (*int, error) {
 	case n == 0 && !s.ZeroEstimates():
 		return nil, nil
 	case values != nil && !slices.Contains(values, n):
-		return nil, invalid("estimate", "this project estimates in %s", s.EstimateWords())
+		return nil, &Error{Code: CodeInvalid, Field: "estimate", Message: "this project estimates in " + s.EstimateWords(), Allowed: s.EstimateNames()}
 	case n < 0:
 		return nil, invalid("estimate", estimateHelp)
 	}
 	return &n, nil
 }
-
-const estimateHelp = "an estimate is a number of points, 0 or more"
 
 // isOutside reports whether a "waiting on" names no member but an outside
 // event: a build, a delivery, a date, someone who is not here.
