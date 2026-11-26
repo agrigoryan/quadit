@@ -101,7 +101,9 @@ function windowsComputer(
     copyFileSync(claude === "fake-agent" ? FAKE_AGENT : process.execPath, join(bin, "claude.exe"));
   }
   const before = readUserVariable("Path");
-  const path = `${bin};${before?.value ?? ""}`;
+  // Without a closing ";" (Windows' own default ends with one): Connect's folder then comes after one it adds, and
+  // Disconnect gives back exactly this.
+  const path = [bin, before?.value ?? ""].join(";").replace(/;+$/, "");
   writeUserVariable("Path", { value: path, expand: before?.expand ?? true });
   const places = { USERPROFILE: home, HOME: home, APPDATA: appData, LOCALAPPDATA: join(home, "AppData", "Local") };
   // Where quadit keeps its logins and its runner's registry there: the command says, never the test.
@@ -310,7 +312,7 @@ test("the first Connect puts the app's quadit on the person's PATH, the stand-in
   // No quadit on the PATH: the app's own (QUADIT_DESKTOP_QUADIT, run from source) is what Connect puts there.
   const computer = windowsComputer(run, { claude: "gives-code-back", quadit: false });
   const folder = dirname(run.binary);
-  const added = `${computer.path}${computer.path.endsWith(";") ? "" : ";"}${folder}`;
+  const added = `${computer.path};${folder}`;
   /** Where a program started now with the PATH Windows gives finds quadit (where.exe, as a terminal would). */
   const quaditFound = async () => {
     const where = join(process.env.SystemRoot ?? "C:\\Windows", "System32", "where.exe");
