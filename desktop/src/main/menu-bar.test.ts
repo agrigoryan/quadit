@@ -14,7 +14,7 @@ vi.mock("electron", () => ({
       return {};
     },
   },
-  nativeImage: { createFromPath: () => ({ setTemplateImage() {} }) },
+  nativeImage: { createFromPath: () => ({ setTemplateImage() {}, getSize: () => ({ width: 16, height: 16 }) }) },
   Tray: class {
     on() {}
     setToolTip() {}

@@ -7,8 +7,9 @@
 // web app. Each workspace counts once, at its newest summary.
 //
 // Clicking the icon opens the panel (panel.ts); its menu of servers, each
-// with its own number, is on the right click. Linux trays only have a menu,
-// so there the panel is the menu's first item.
+// with its own number, is on the right click (on Windows too, where the
+// icon is in the taskbar's corner). Linux trays only have a menu, so there
+// the panel is the menu's first item.
 
 import { app, Menu, nativeImage, type Rectangle, Tray } from "electron";
 import { PANEL_LABEL } from "@/main/menu";
@@ -16,7 +17,7 @@ import type { ServerStore } from "@/main/servers";
 import { type DesktopSummary, waitsOnYou } from "@/shared/bridge";
 
 export interface MenuBarSetup {
-  /** The menu-bar icon: a template image file (black on transparent). */
+  /** The menu-bar icon: a template image file (black on transparent), or on Windows the app's own. */
   trayIcon: string;
   openServer(serverId: string): void;
   showServerList(): void;
@@ -39,7 +40,9 @@ export class MenuBar {
 
   /** Puts the menu-bar icon up; call once the app is ready. */
   start() {
-    const icon = nativeImage.createFromPath(this.setup.trayIcon);
+    let icon = nativeImage.createFromPath(this.setup.trayIcon);
+    // A tray icon is 16 points across: a larger picture (the app's own icon, on Windows) is brought down to twice that.
+    if (icon.getSize().width > 32) icon = icon.resize({ width: 32, height: 32, quality: "best" });
     icon.setTemplateImage(true);
     const tray = new Tray(icon);
     tray.setToolTip(app.name);

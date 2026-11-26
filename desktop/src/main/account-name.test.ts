@@ -37,9 +37,20 @@ describe("accountName", () => {
     expect(await accountName("linux", "ann", system({}).run)).toBe("ann");
   });
 
-  it("is the login name on Windows, without asking the system anything", async () => {
-    const { run, ran } = system({});
-    expect(await accountName("win32", "ann", run)).toBe("ann");
-    expect(ran).toEqual([]);
+  it("is the account's display name on Windows, as PowerShell gives it, whatever letters it holds", async () => {
+    const ran: string[][] = [];
+    const run = async (command: string, args: string[]) => {
+      ran.push([command, ...args]);
+      return Buffer.from("Zoë Ångström", "utf8").toString("base64");
+    };
+    expect(await accountName("win32", "zoe", run)).toBe("Zoë Ångström");
+    expect(ran[0]?.[0]).toMatch(/\\WindowsPowerShell\\v1\.0\\powershell\.exe$/);
+    const script = Buffer.from(ran[0]?.at(-1) ?? "", "base64").toString("utf16le");
+    expect(script).toContain("UserPrincipal]::Current.DisplayName");
+  });
+
+  it("is the login name on Windows when the account has no display name, or PowerShell cannot say", async () => {
+    expect(await accountName("win32", "ann", async () => "")).toBe("ann");
+    expect(await accountName("win32", "ann", system({}).run)).toBe("ann");
   });
 });
