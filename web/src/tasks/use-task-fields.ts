@@ -20,6 +20,7 @@ export function useTaskFields(draft: NewTaskDraft, { shared = false }: { shared?
     epicId: draft.epicId ?? "",
     parentId: shared ? "" : (draft.parentId ?? ""),
     dueOn: "",
+    estimate: null,
     templateId: "",
   });
 
@@ -27,8 +28,8 @@ export function useTaskFields(draft: NewTaskDraft, { shared = false }: { shared?
 
   function changeProject(id: string) {
     setProjectId(id);
-    // Status, labels, epic, parent and template belong to a project.
-    change({ statusId: "", labelIds: [], epicId: "", parentId: "", templateId: "" });
+    // Status, labels, epic, parent and template belong to a project; an estimate is on its scale.
+    change({ statusId: "", labelIds: [], epicId: "", parentId: "", templateId: "", estimate: null });
   }
 
   return { projectId, project: projects.find((p) => p.id === projectId), fields, change, changeProject };

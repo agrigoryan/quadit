@@ -64,6 +64,7 @@ export function MultiCreateDialog({ draft, onSingle }: Props) {
           epicId: fields.epicId || undefined,
           cycleId: draft.cycleId,
           dueOn: fields.dueOn || undefined,
+          estimate: fields.estimate ?? undefined,
         },
         titles,
       );

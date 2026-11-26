@@ -269,7 +269,7 @@ export function buildTimeline(
     }
     const phrases =
       atom.kind === "changes"
-        ? changePhrases(atom.changes, atom.actorId, atom.data)
+        ? changePhrases(atom.changes, atom.actorId, atom.data, taskId)
         : atom.kind === "files"
           ? [filesPhrase(atom.place, atom.names)]
           : atom.phrases;

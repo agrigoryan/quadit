@@ -169,6 +169,21 @@ describe("BulkBar", () => {
     expect(sent[0]?.args).toEqual({ id: "t1", estimate: 5 });
   });
 
+  it("sets one estimate on every task from the project's scale, a T-shirt size by its name", async () => {
+    seed({ estimates: true, estimate_scale: "tshirt" });
+    renderBar();
+    openMore();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Set estimate…" }));
+    const dialog = screen.getByRole("dialog", { name: "Set estimate…" });
+    fireEvent.click(within(dialog).getByRole("option", { name: /^XL/ }));
+    await waitFor(() => expect(sent).toHaveLength(3));
+    expect(sent.map((s) => s.args)).toEqual([
+      { id: "t1", estimate: 8 },
+      { id: "t2", estimate: 8 },
+      { id: "t3", estimate: 8 },
+    ]);
+  });
+
   it("turns every change off for a read-only member", () => {
     seed({}, { read_only: true });
     renderBar();

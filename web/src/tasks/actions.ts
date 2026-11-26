@@ -454,6 +454,8 @@ export interface NewTask {
   parentId?: string;
   cycleId?: string;
   dueOn?: string;
+  /** Left out for none; 0 is an estimate. */
+  estimate?: number;
   templateId?: string;
   /** Where it goes in manual order; the end of the list when left out. */
   rank?: string;
@@ -505,6 +507,7 @@ function creation(input: NewTask, number: number, rank: string): Creation | null
   if (input.parentId) args.parent = input.parentId;
   if (input.cycleId) args.cycle = input.cycleId;
   if (input.dueOn) args.due_on = input.dueOn;
+  if (input.estimate !== undefined) args.estimate = input.estimate;
   if (input.templateId) args.template = input.templateId;
   if (input.rank) args.rank = input.rank;
   const now = Date.now();
@@ -524,6 +527,7 @@ function creation(input: NewTask, number: number, rank: string): Creation | null
     parent_id: input.parentId,
     cycle_id: input.cycleId,
     due_on: input.dueOn,
+    estimate: input.estimate,
     rank: input.rank ?? rank,
     created_by: me.user_id,
     created_at: now,

@@ -4,7 +4,16 @@ import { describe, expect, it } from "vitest";
 import { isLive } from "@/data/selectors";
 import type { Dict } from "@/data/store";
 import type { Cycle, Epic, Label, Member, Project, Status, Task } from "@/types/core";
-import { emptyFilters, type Filters, fromQuery, groupTasks, matcher, sortFromQuery, toQuery } from "@/tasks/filters";
+import {
+  emptyFilters,
+  type Filters,
+  fromQuery,
+  groupTasks,
+  matcher,
+  normalizeQuery,
+  sortFromQuery,
+  toQuery,
+} from "@/tasks/filters";
 
 const byId = <T extends { id: string }>(rows: T[]): Dict<T> => Object.fromEntries(rows.map((r) => [r.id, r]));
 /** The table as useLookup hands it over: the gone rows left out. */
@@ -92,6 +101,13 @@ describe("matcher", () => {
     expect(ids({ waiting: ["u2"] }, tasks)).toEqual(["person"]);
     expect(ids({ waiting: ["outside"] }, tasks)).toEqual(["outside"]);
     expect(ids({ waiting: ["none"] }, tasks)).toEqual(["nothing"]);
+  });
+
+  it("tells no estimate and an estimate of 0 apart", () => {
+    const tasks = [task({ id: "none" }), task({ id: "zero", estimate: 0 }), task({ id: "three", estimate: 3 })];
+    expect(ids({ estimate: ["none"] }, tasks)).toEqual(["none"]);
+    expect(ids({ estimate: ["0"] }, tasks)).toEqual(["zero"]);
+    expect(ids({ estimate: ["0", "3"] }, tasks)).toEqual(["zero", "three"]);
   });
 
   it("finds text in the title or the key, whatever its case, and needs every filter to pass", () => {
@@ -236,6 +252,7 @@ describe("toQuery and fromQuery", () => {
       priority: ["1", "2"],
       epic: ["e1", "none"],
       cycle: ["cy1"],
+      estimate: ["none", "0", "3"],
       waiting: ["outside"],
       openDecision: true,
       text: "login",
@@ -257,6 +274,7 @@ describe("toQuery and fromQuery", () => {
       label: ["BUG", "gone"],
       epic: ["launch", "old"],
       cycle: ["4"],
+      estimate: ["M", "5", "NONE", "0", "big", "-1"],
     };
     expect(fromQuery(q, source, "u1")).toMatchObject({
       assignee: ["u1", "u2"],
@@ -265,6 +283,20 @@ describe("toQuery and fromQuery", () => {
       label: ["l-bug"],
       epic: ["e1"],
       cycle: ["cy1"],
+      estimate: ["3", "5", "none", "0"],
     });
+  });
+
+  it("read an estimate a view stores as numbers or as one word", () => {
+    expect(fromQuery(normalizeQuery({ estimate: [5, 8] }) ?? {}, source, "u1").estimate).toEqual(["5", "8"]);
+    expect(fromQuery(normalizeQuery({ estimate: "m" }) ?? {}, source, "u1").estimate).toEqual(["3"]);
+  });
+
+  it("send the estimate as a list of words, as the server reads it", () => {
+    expect(toQuery({ ...emptyFilters, estimate: ["none", "0", "5"] }, "SVA", "manual").estimate).toEqual([
+      "none",
+      "0",
+      "5",
+    ]);
   });
 });

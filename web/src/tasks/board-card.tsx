@@ -5,12 +5,13 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
-import { useDecisionFlag, useLookup, useSubtaskProgress } from "@/data/selectors";
+import { useDecisionFlag, useLookup, useRowEvenIfGone, useSubtaskProgress } from "@/data/selectors";
 import { useIsDraft } from "@/data/store";
 import type { Task } from "@/types/core";
 import { waitsOutside } from "@/tasks/actions";
 import { AssigneeControl } from "@/tasks/assignee-control";
-import { AssigneeAvatar, DueChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
+import { scaleOf } from "@/tasks/estimates";
+import { AssigneeAvatar, DueChip, EstimateChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
 import { useTaskLink } from "@/nav/task-link";
 import { LabelChip } from "@/ui/badge";
 import { DecisionMark, PriorityIcon } from "@/ui/icons";
@@ -33,6 +34,8 @@ const CardBody = memo(function CardBody({
   const decision = useDecisionFlag(task.id);
   const progress = useSubtaskProgress(task.id);
   const tags = (task.label_ids ?? []).map((id) => labels[id]).filter((l) => l !== undefined);
+  const scale = scaleOf(useRowEvenIfGone("projects", task.project_id));
+  const estimate = scale && task.estimate != null ? task.estimate : undefined;
   return (
     <>
       <div className="flex items-center gap-1.5">
@@ -47,13 +50,19 @@ const CardBody = memo(function CardBody({
         {avatar ?? <AssigneeAvatar userId={task.assignee_id} />}
       </div>
       <p className="mt-1.5 line-clamp-3 text-sm leading-[1.35]">{title ?? task.title}</p>
-      {(task.waiting_on_id || waitsOutside(task) || tags.length > 0 || task.due_on || progress) && (
+      {(task.waiting_on_id ||
+        waitsOutside(task) ||
+        tags.length > 0 ||
+        task.due_on ||
+        estimate !== undefined ||
+        progress) && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <WaitsOnChip task={task} />
           {tags.slice(0, 3).map((l) => (
             <LabelChip key={l.id} name={l.name} color={l.color} />
           ))}
           {task.due_on && <DueChip day={task.due_on} />}
+          {scale && estimate !== undefined && <EstimateChip value={estimate} scale={scale} />}
           <SubtaskPill taskId={task.id} />
         </div>
       )}

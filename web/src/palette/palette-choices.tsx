@@ -16,8 +16,8 @@ interface Props {
 /** The palette's second page: the values one property of the open task can take (tasks/properties). */
 export function ChoicesPage({ property, task, query, run }: Props) {
   const { name, palette, make, picker } = property;
-  const choices = palette.useChoices(task);
   const q = query.trim();
+  const choices = palette.useChoices(task, q);
   const shown = q ? choices.filter((c) => matches(q, `${c.label} ${c.detail ?? ""} ${c.words ?? ""}`)) : choices;
 
   // A value that does not exist yet (a label) can be made here and put on the task in one go.

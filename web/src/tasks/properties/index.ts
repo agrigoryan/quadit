@@ -67,7 +67,10 @@ export const BULK: (TaskProperty<PropertyName> & { bulk: BulkPart })[] = [
   project,
 ];
 
-/** The create dialog's, in its order: the parent before the due date, where the panel has them the other way round. */
+/**
+ * The create dialog's, in its order: the parent before the due date, where
+ * the panel has them the other way round, and the estimate last, after them.
+ */
 export const CREATE: (TaskProperty<PropertyName> & { Create: ComponentType<CreateProps> })[] = [
   status,
   assignee,
@@ -76,6 +79,7 @@ export const CREATE: (TaskProperty<PropertyName> & { Create: ComponentType<Creat
   epic,
   parent,
   due,
+  estimate,
 ];
 
 /**
@@ -99,7 +103,7 @@ export const TIMELINE: TaskProperty<PropertyName>[] = [
   project,
 ];
 
-const FILTER_TABLE = [assignee, status, category, label, priority, epic, cycle, waiting] as const;
+const FILTER_TABLE = [assignee, status, category, label, priority, epic, cycle, estimate, waiting] as const;
 
 /** The name of each property a task list can be filtered by. */
 export type FilterName = (typeof FILTER_TABLE)[number]["name"];

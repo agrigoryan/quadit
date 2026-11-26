@@ -1,10 +1,11 @@
-import { CalendarDays, Globe, Hourglass, Layers } from "lucide-react";
+import { CalendarDays, Gauge, Globe, Hourglass, Layers } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMe, useMember, useSubtaskProgress } from "@/data/selectors";
 import { dueLabel } from "@/lib/time";
 import type { Task } from "@/types/core";
 import { waitsOutside } from "@/tasks/actions";
+import { estimateShort, estimateWords, type Scale } from "@/tasks/estimates";
 import { Avatar } from "@/ui/avatar";
 import { Tooltip } from "@/ui/tooltip";
 
@@ -67,6 +68,21 @@ export function DueChip({ day, done, className }: { day: string; done?: boolean;
     >
       <CalendarDays className="size-3" aria-hidden />
       {due.text}
+    </span>
+  );
+}
+
+/** A task's estimate, short: "3", or the size on a T-shirt project ("M"). */
+export function EstimateChip({ value, scale, className }: { value: number; scale: Scale; className?: string }) {
+  const words = t("prop.estimate.is", { value: estimateWords(value, scale) });
+  return (
+    <span
+      title={words}
+      className={cx("inline-flex shrink-0 items-center gap-1 text-xs text-ink-2 tnum whitespace-nowrap", className)}
+    >
+      <Gauge className="size-3 text-ink-3" aria-hidden />
+      <span aria-hidden>{estimateShort(value, scale)}</span>
+      <span className="sr-only">{words}</span>
     </span>
   );
 }

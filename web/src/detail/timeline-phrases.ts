@@ -23,13 +23,13 @@ const after: Phrase[] = [
 /** Every field's phrase, in the order they are said in when one line carries several. */
 const phrases: Phrase[] = [...before, ...TIMELINE.flatMap((p) => p.timeline ?? []), ...after];
 
-/** The phrases for a set of field changes. Bookkeeping fields have no writer and say nothing. */
-export function changePhrases(changes: Changes, actorId: string, data: FeedEvent["data"]): string[] {
+/** The phrases for a set of field changes to the task. Bookkeeping fields have no writer and say nothing. */
+export function changePhrases(changes: Changes, actorId: string, data: FeedEvent["data"], taskId: string): string[] {
   const out: string[] = [];
   for (const { field, say } of phrases) {
     const change = changes[field];
     if (!change) continue;
-    const said = say(change, { changes, actorId, data });
+    const said = say(change, { changes, actorId, data, taskId });
     if (Array.isArray(said)) out.push(...said);
     else if (said) out.push(said);
   }

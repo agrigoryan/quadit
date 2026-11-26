@@ -134,7 +134,7 @@ export const detail = {
   "timeline.milestoneCleared": "cleared the milestone",
   "timeline.cycle": "added this to {name}",
   "timeline.cycleCleared": "removed this from its cycle",
-  "timeline.estimate": "set the estimate to {points}",
+  "timeline.estimate": "set the estimate to {value}",
   "timeline.estimateCleared": "cleared the estimate",
   "timeline.parent": "made this a sub-task of {key}",
   "timeline.parentCleared": "removed the parent task",

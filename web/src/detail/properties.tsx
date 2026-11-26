@@ -21,9 +21,8 @@ import { Avatar } from "@/ui/avatar";
  * A typed value's box, given the caret by its key: what is in it is chosen,
  * so what is typed replaces it, and a day's box opens its calendar too.
  */
-function takeCaret(box: HTMLElement) {
+function takeCaret(box: HTMLInputElement) {
   box.focus();
-  if (!(box instanceof HTMLInputElement)) return;
   if (box.type === "date") box.showPicker?.();
   else box.select();
 }
@@ -56,8 +55,9 @@ export function Properties({ task, side }: Props) {
           if (readOnly || !applies(property, task, project) || !control) return;
           e.preventDefault(); // or the letter lands in the box that takes the caret
           control.scrollIntoView({ block: "nearest" });
-          if (property.picker) setOpened(property.name);
-          else takeCaret(control);
+          // A box takes the caret; a value's button opens its picker. An estimate is either, by the project's scale.
+          if (control instanceof HTMLInputElement) takeCaret(control);
+          else if (property.picker) setOpened(property.name);
         },
       ]),
     ),

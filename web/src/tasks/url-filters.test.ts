@@ -16,7 +16,7 @@ const statuses = byId([
   { id: "s-done", project_id: "p1", name: "Done", category: "done", rank: "c" },
 ] as Status[]);
 const source = {
-  projects: byId([{ id: "p1", key: "SVA" }] as Project[]),
+  projects: byId([{ id: "p1", key: "SVA", settings: { estimates: true, estimate_scale: "tshirt" } }] as Project[]),
   members: {
     u1: { user_id: "u1", name: "Ann", handle: "ann", kind: "person" } as Member,
     u2: { user_id: "u2", name: "Bot", handle: "coder", kind: "agent" } as Member,
@@ -44,8 +44,15 @@ const task = (id: string, over: Partial<Task> = {}): Task =>
 
 const TASKS = [
   task("plain"),
-  task("ann", { assignee_id: "u1", label_ids: ["l-bug"], priority: 1, epic_id: "e1", cycle_id: "cy1" }),
-  task("bot", { assignee_id: "u2", status_id: "s-doing", label_ids: ["l-art"], priority: 3, waiting_on_id: "u1" }),
+  task("ann", { assignee_id: "u1", label_ids: ["l-bug"], priority: 1, epic_id: "e1", cycle_id: "cy1", estimate: 3 }),
+  task("bot", {
+    assignee_id: "u2",
+    status_id: "s-doing",
+    label_ids: ["l-art"],
+    priority: 3,
+    waiting_on_id: "u1",
+    estimate: 0,
+  }),
   task("done", { status_id: "s-done", waiting_outside: true }),
 ];
 
@@ -114,6 +121,15 @@ describe("a task page's filters in its address", () => {
     expect(toQuery(read("?cycle=4")!, "SVA", "manual")).toMatchObject({ cycle: ["cy1"] });
   });
 
+  it("estimate: by number or T-shirt size, or none, written back as the size on a T-shirt project", () => {
+    expect(shown("?estimate=m")).toEqual(["ann"]);
+    expect(shown("?estimate=3")).toEqual(["ann"]);
+    expect(shown("?estimate=0")).toEqual(["bot"]);
+    expect(shown("?estimate=none")).toEqual(["plain", "done"]);
+    expect(again("?estimate=3,none,0")).toBe("?estimate=M,none,0");
+    expect(toQuery(read("?estimate=M,none")!, "SVA", "manual")).toMatchObject({ estimate: ["3", "none"] });
+  });
+
   it("waiting_on: a person, an outside event, or nothing", () => {
     expect(shown("?waiting_on=@ann")).toEqual(["bot"]);
     expect(shown("?waiting_on=outside")).toEqual(["done"]);
@@ -129,9 +145,10 @@ describe("a task page's filters in its address", () => {
   });
 
   it("writes every filter in one order, and keeps what else the address carried", () => {
-    const all = "?q=x&waiting_on=none&cycle=4&epic=none&priority=2&label=bug&category=done&status=Doing&assignee=me";
+    const all =
+      "?q=x&waiting_on=none&estimate=5&cycle=4&epic=none&priority=2&label=bug&category=done&status=Doing&assignee=me";
     expect(again(all)).toBe(
-      "?assignee=@ann&status=Doing&category=done&label=bug&priority=2&epic=none&cycle=cy1&waiting_on=none&q=x",
+      "?assignee=@ann&status=Doing&category=done&label=bug&priority=2&epic=none&cycle=cy1&estimate=L&waiting_on=none&q=x",
     );
     const f = read("?label=bug");
     expect(f && searchFromFilters(f, source, "p1", "?view=board&label=art")).toBe("?view=board&label=bug");

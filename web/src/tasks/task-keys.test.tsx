@@ -6,7 +6,7 @@
 // someone who may not. S, A, P and L are tried on the task list
 // (tasks/task-list.test.tsx).
 
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/data/api";
@@ -312,6 +312,17 @@ describe("the Shift keys of the task properties", () => {
     render(<Keys ids={["t1"]} />);
     press("E", "KeyE", { shiftKey: true });
     expect(screen.getByLabelText("Estimate, in points, for 1 task")).toHaveFocus();
+  });
+
+  it("open the scale's list with Shift+E where the project estimates on one, and set what is picked", async () => {
+    seed(undefined, [task(1), task(3)], { estimates: true, estimate_scale: "fibonacci", estimate_zero: true });
+    render(<Keys ids={["t1", "t3"]} />);
+    press("E", "KeyE", { shiftKey: true });
+    const list = screen.getByRole("dialog", { name: "Set estimate…" });
+    fireEvent.click(within(list).getByRole("option", { name: "0 points" }));
+    await waitFor(() => expect(list).not.toBeInTheDocument());
+    const estimate = (id: string) => getState().collections.tasks[id]?.estimate;
+    expect([estimate("t1"), estimate("t3")]).toEqual([0, 0]);
   });
 
   it("open nothing for a task I may not change", () => {

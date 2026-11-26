@@ -4,16 +4,17 @@ import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
-import { useDecisionFlag, useLookup, useRow } from "@/data/selectors";
+import { useDecisionFlag, useLookup, useRow, useRowEvenIfGone } from "@/data/selectors";
 import { useIsDraft } from "@/data/store";
 import { isClosedCategory, type Task } from "@/types/core";
 import { useTaskLink } from "@/nav/task-link";
 import type { Branch } from "@/tasks/list-layout";
 import { AssigneeControl } from "@/tasks/assignee-control";
+import { scaleOf } from "@/tasks/estimates";
 import { priority } from "@/tasks/properties/priority";
 import { status as statusProperty } from "@/tasks/properties/status";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
-import { DueChip, EpicChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
+import { DueChip, EpicChip, EstimateChip, SubtaskPill, WaitsOnChip } from "@/tasks/task-chips";
 import { LabelChip } from "@/ui/badge";
 import { DecisionMark, PriorityIcon, StatusIcon } from "@/ui/icons";
 
@@ -86,6 +87,8 @@ export const TaskRow = memo(function TaskRow({
   // The pickers stay shut on a task the viewer may not change (read-only, another project, the trash).
   const readOnly = !useCan().editTask(task);
   const context = branch?.context ?? false;
+  // Shown where the project estimates; an archived project still says how.
+  const scale = scaleOf(useRowEvenIfGone("projects", task.project_id));
 
   return (
     <div
@@ -196,6 +199,9 @@ export const TaskRow = memo(function TaskRow({
           })}
         </span>
         {!hide?.epic && epic && <EpicChip name={epic.name} className="max-xl:hidden" />}
+        {scale && task.estimate != null && (
+          <EstimateChip value={task.estimate} scale={scale} className="max-sm:hidden" />
+        )}
         {task.due_on && <DueChip day={task.due_on} done={closed} className="max-sm:hidden" />}
         {!hide?.assignee && <AssigneeControl task={task} readOnly={readOnly} className={iconButton} />}
       </div>

@@ -33,11 +33,20 @@ beforeEach(() => {
       { id: "c1", project_id: "p1", number: 4, starts_on: "2026-11-02", ends_on: "2026-11-15" },
       { id: "c2", project_id: "p1", number: 5, name: "Polish", starts_on: "2026-11-16", ends_on: "2026-11-29" },
     ],
-    tasks: [{ id: "t9", project_id: "p1", number: 9, key: "SVA-9", title: "Parent", status_id: "s1", priority: 0 }],
+    projects: [
+      { id: "p1", key: "SVA", name: "Live", rank: "a", settings: { estimates: true } },
+      { id: "p2", key: "OPS", name: "Ops", rank: "b", settings: { estimates: true, estimate_scale: "tshirt" } },
+    ],
+    tasks: [
+      { id: "t9", project_id: "p1", number: 9, key: "SVA-9", title: "Parent", status_id: "s1", priority: 0 },
+      { id: "t2", project_id: "p2", number: 2, key: "OPS-2", title: "Sized", status_id: "s1", priority: 0 },
+    ],
   });
 });
 
-const say = (changes: Changes, data: Record<string, unknown> = {}) => changePhrases(changes, "u1", data);
+/** What the timeline of SVA-9 says; another task's is asked by its id. */
+const say = (changes: Changes, data: Record<string, unknown> = {}, taskId = "t9") =>
+  changePhrases(changes, "u1", data, taskId);
 
 describe("changePhrases", () => {
   it("status", () => {
@@ -97,12 +106,18 @@ describe("changePhrases", () => {
   });
 
   it("estimate, due date and parent", () => {
-    expect(say({ estimate: { from: null, to: 3 } })).toEqual(["set the estimate to 3 pts"]);
+    expect(say({ estimate: { from: null, to: 3 } })).toEqual(["set the estimate to 3 points"]);
+    expect(say({ estimate: { from: 3, to: 0 } })).toEqual(["set the estimate to 0 points"]);
     expect(say({ estimate: { from: 3, to: null } })).toEqual(["cleared the estimate"]);
     expect(say({ due_on: { from: null, to: "2026-12-01" } })).toEqual(["set the due date to Dec 1"]);
     expect(say({ due_on: { from: "2026-12-01", to: null } })).toEqual(["cleared the due date"]);
     expect(say({ parent_id: { from: null, to: "t9" } })).toEqual(["made this a sub-task of SVA-9"]);
     expect(say({ parent_id: { from: "t9", to: null } })).toEqual(["removed the parent task"]);
+  });
+
+  it("an estimate on a T-shirt project, by its size; one off the scale, by its points", () => {
+    expect(say({ estimate: { from: null, to: 3 } }, {}, "t2")).toEqual(["set the estimate to M"]);
+    expect(say({ estimate: { from: null, to: 4 } }, {}, "t2")).toEqual(["set the estimate to 4 points"]);
   });
 
   it("project, archive, trash, title and description", () => {
@@ -144,7 +159,7 @@ describe("changePhrases", () => {
       "added this to the epic Launch",
       "set the milestone to Beta",
       "added this to Cycle 4",
-      "set the estimate to 3 pts",
+      "set the estimate to 3 points",
       "set the due date to Dec 1",
       "made this a sub-task of SVA-9",
     ]);

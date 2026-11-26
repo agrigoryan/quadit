@@ -43,6 +43,12 @@ describe("presetOf", () => {
     });
   });
 
+  it("fills in the estimate as it is stored, a zero estimate too", () => {
+    expect(preset({ estimate: 5 })).toEqual({ estimate: 5 });
+    expect(preset({ estimate: 0 })).toEqual({ estimate: 0 });
+    expect(preset({ priority: 1 })).toEqual({ priority: 1 });
+  });
+
   it("leaves out a deleted status, a deleted label and someone removed from the workspace", () => {
     expect(preset({ status: "Review", labels: ["old"], assignee: "@gone" })).toEqual({ labelIds: [] });
   });

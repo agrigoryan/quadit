@@ -87,6 +87,7 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
       parentId: fields.parentId || undefined,
       cycleId: draft.cycleId,
       dueOn: fields.dueOn || undefined,
+      estimate: fields.estimate ?? undefined,
       templateId: fields.templateId || undefined,
     };
     if (more) {

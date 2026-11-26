@@ -75,7 +75,8 @@ export function TemplateDialog({
     if (priority) next.priority = priority;
     if (picked.length) next.labels = picked;
     if (preset.assignee) next.assignee = preset.assignee;
-    if (preset.estimate) next.estimate = preset.estimate;
+    // A zero estimate is one, kept apart from none.
+    if (preset.estimate !== undefined) next.estimate = preset.estimate;
     if (asks) {
       if (!question.trim()) refuse("question", t("templates.questionNeed"));
       const decision: DecisionSkeleton = { kind, question: question.trim() };

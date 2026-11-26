@@ -10,7 +10,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { api, ApiError } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
 import { clearStore, loadBootstrap } from "@/data/store";
-import type { Member, User, Workspace } from "@/types/core";
+import type { Member, Project, User, Workspace } from "@/types/core";
 import { useToasts } from "@/lib/toast";
 import { ui, useUi } from "@/lib/ui-state";
 import { CreateTaskDialog } from "@/tasks/create-task";
@@ -30,6 +30,7 @@ interface Call {
 let calls: Call[] = [];
 
 beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
   // The Write/Preview switch is a radio group in a form, which measures itself; jsdom cannot.
   globalThis.ResizeObserver ??= class {
     observe() {}
@@ -170,6 +171,69 @@ describe("CreateTaskDialog, one task", () => {
     expect(title()).toHaveFocus();
     expect(screen.getByLabelText("Add a description… Markdown works.")).toHaveValue("");
     await waitFor(() => expect(calls).toHaveLength(1));
+  });
+});
+
+describe("CreateTaskDialog, the estimate", () => {
+  const create = () => screen.getByRole("button", { name: /^Create task/ });
+  const title = () => screen.getByLabelText("Task title");
+  /** The project estimates as these settings say. */
+  function estimating(settings: Project["settings"]) {
+    clearStore();
+    loadBootstrap("acme", {
+      seq: 1,
+      me: { user_id: "u1", handle: "ann", name: "Ann" } as Member,
+      user: { id: "u1" } as User,
+      workspace: { id: "w", slug: "acme" } as Workspace,
+      projects: [{ id: "p1", key: "SVA", name: "Game", settings }],
+      statuses: [{ id: "s1", project_id: "p1", name: "Todo", category: "unstarted", is_default: true, rank: "a" }],
+      members: [{ user_id: "u1", handle: "ann", name: "Ann" }],
+    });
+  }
+
+  it("has no pill where the project does not estimate", () => {
+    open();
+    expect(screen.queryByRole("button", { name: "Estimate" })).toBeNull();
+  });
+
+  it("is picked from the project's scale, and sent with the task", async () => {
+    estimating({ estimates: true, estimate_scale: "tshirt" });
+    open();
+    fireEvent.change(title(), { target: { value: "Fix the menu" } });
+    fireEvent.click(screen.getByRole("button", { name: "Estimate" }));
+    fireEvent.click(screen.getByRole("option", { name: /^M/ }));
+    expect(screen.getByRole("button", { name: "M" })).toBeInTheDocument();
+    fireEvent.click(create());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]?.changes[0]).toMatchObject({ type: "task.create", args: { estimate: 3 } });
+  });
+
+  it("opens with Shift+E while the caret is in no box, and sends a zero estimate as 0", async () => {
+    estimating({ estimates: true, estimate_scale: "fibonacci", estimate_zero: true });
+    open();
+    fireEvent.change(title(), { target: { value: "Fix the menu" } });
+    // Typed in the title, Shift+E is a capital E.
+    fireEvent.keyDown(title(), { key: "E", code: "KeyE", shiftKey: true });
+    expect(screen.queryByRole("dialog", { name: "Set estimate…" })).toBeNull();
+    // On the row of pills, as after Tab, it opens the estimate's.
+    const priority = screen.getByRole("button", { name: "Priority" });
+    act(() => priority.focus());
+    fireEvent.keyDown(priority, { key: "E", code: "KeyE", shiftKey: true });
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Set estimate…" })).getByRole("option", { name: "0 points" }),
+    );
+    fireEvent.click(create());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]?.changes[0]).toMatchObject({ type: "task.create", args: { estimate: 0 } });
+  });
+
+  it("leaves the estimate out where none is picked", async () => {
+    estimating({ estimates: true });
+    open();
+    fireEvent.change(title(), { target: { value: "Fix the menu" } });
+    fireEvent.click(create());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]?.changes[0]?.args).not.toHaveProperty("estimate");
   });
 });
 

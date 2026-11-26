@@ -156,7 +156,7 @@ export interface Phrase {
   field: string;
   say: (
     change: FieldChange,
-    ctx: { changes: Changes; actorId: string; data: FeedEvent["data"] },
+    ctx: { changes: Changes; actorId: string; data: FeedEvent["data"]; taskId: string },
   ) => string | string[] | null;
 }
 
@@ -170,8 +170,11 @@ export interface PalettePart {
   /** The command's words, and the box's placeholder on the page of its values: "Change status…". */
   title: () => string;
   icon: ReactNode;
-  /** The values the open task can take, the one it has checked. A hook. */
-  useChoices: (task: Task) => Choice[];
+  /**
+   * The values the open task can take, the one it has checked. A hook. It is
+   * handed what is typed in the box, for a value made of it (a number).
+   */
+  useChoices: (task: Task, query: string) => Choice[];
   /** What the page says when there is no value at all to offer. */
   empty?: () => string;
 }
@@ -207,6 +210,8 @@ export interface TaskFields {
   epicId: string;
   parentId: string;
   dueOn: string;
+  /** null is none; 0 is an estimate where the project allows it. */
+  estimate: number | null;
   templateId: string;
 }
 

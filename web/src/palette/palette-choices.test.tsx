@@ -191,6 +191,34 @@ describe("the palette on a task", () => {
     await waitFor(() => expect(sent).toEqual([{ type: "task.update", args: { id: "t1", cycle: "c1" } }]));
   });
 
+  it("estimate: no estimate, then the scale's values, a T-shirt size with its points", async () => {
+    seed(undefined, { estimate: 3 }, { estimates: true, estimate_scale: "tshirt", estimate_zero: true });
+    openPalette();
+    choose(/Set estimate/);
+    expect(rows()).toEqual([
+      "No estimate",
+      "0 points",
+      "XS 1 point",
+      "S 2 points",
+      "M 3 points ✓",
+      "L 5 points",
+      "XL 8 points",
+    ]);
+    choose(/^L/);
+    await waitFor(() => expect(sent).toEqual([{ type: "task.update", args: { id: "t1", estimate: 5 } }]));
+  });
+
+  it("estimate in any number: the number typed in the box", async () => {
+    seed(undefined, {}, { estimates: true });
+    openPalette();
+    choose(/Set estimate/);
+    expect(rows()).toEqual(["No estimate ✓"]);
+    fireEvent.change(screen.getByPlaceholderText("Set estimate…"), { target: { value: "13" } });
+    expect(rows()).toEqual(["Set the estimate to 13 points"]);
+    choose(/13 points/);
+    await waitFor(() => expect(sent).toEqual([{ type: "task.update", args: { id: "t1", estimate: 13 } }]));
+  });
+
   it("parent: no parent, then the project's tasks it can go under, by key too", async () => {
     seed();
     openPalette();
