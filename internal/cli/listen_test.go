@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -111,15 +112,14 @@ func TestListenAcknowledgesOnlyWhatItsCommandHandled(t *testing.T) {
 	srv := &inboxServer{items: []int64{3, 5, 8}}
 	dir := t.TempDir()
 	runs := filepath.Join(dir, "runs")
-	// The command fails the first time it is given item #5.
-	script := `printf '%s\n' "$QUADIT_EVENT" >> "$0"; case "$QUADIT_EVENT" in '#5'*) [ "$(grep -c '^#5' "$0")" -ge 2 ];; esac`
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	out := &syncBuffer{}
 	r := &runner{ctx: ctx, c: testClient(t, srv), out: out}
 	done := make(chan error, 1)
 	go func() {
-		done <- r.listen(input{rest: []string{"--secret", "KEY", "--exec", "sh", "-c", script, runs}})
+		// The command fails the first time it is given item #5.
+		done <- r.listen(input{rest: append([]string{"--secret", "KEY", "--exec"}, listenCommand(t, "fail-5-once", runs)...)})
 	}()
 
 	deadline := time.Now().Add(20 * time.Second)
@@ -658,7 +658,7 @@ func TestListenGivesItsCommandWhatWaitPrintsAndKeepsItsLease(t *testing.T) {
 	r := &runner{ctx: ctx, c: testClient(t, srv), out: out}
 	done := make(chan error, 1)
 	go func() {
-		opts := listenArgs([]string{"--exec", "sh", "-c", `printf '%s\n--\n%s' "$QUADIT_ITEM" "$QUADIT_EVENT" > "$0"; sleep 1`, got})
+		opts := listenArgs(append([]string{"--exec"}, listenCommand(t, "keep-item-a-second", got)...))
 		done <- r.listenWith(opts, 200*time.Millisecond)
 	}()
 	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
@@ -920,4 +920,60 @@ func TestListeningPrintsARunnerWithItsMachine(t *testing.T) {
 	if got := who.lines(); got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
+}
+
+// testCommandMark is the first argument of this test binary started as a
+// listen test's command (listenCommand).
+const testCommandMark = "quadit-test-command"
+
+// listenCommand is a command for listen to run, as an argument list: this
+// test binary playing the command called name (testCommand) with args. The
+// tests run no shell: Windows has none of its own, and the one Git brings
+// starts slowly and unevenly there.
+func listenCommand(t *testing.T, name string, args ...string) []string {
+	t.Helper()
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append([]string{exe, testCommandMark, name}, args...)
+}
+
+// testCommand is the command called name, given args, as a listen test has
+// it run; what it returns is its exit status. Each reads the item from
+// QUADIT_EVENT and QUADIT_ITEM, as a command listen runs does.
+func testCommand(name string, args []string) int {
+	event := os.Getenv("QUADIT_EVENT")
+	switch name {
+	case "fail-3": // says something on its output, and fails for item #3
+		fmt.Println(`{"event":"gave_up","seq":99}`)
+		if strings.Contains(event, "#3") {
+			return 3
+		}
+		return 0
+	case "fail-5-once": // notes each item in the file args[0], and fails the first time for #5
+		f, err := os.OpenFile(args[0], os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
+		if err != nil {
+			return 2
+		}
+		defer f.Close()
+		if _, err := fmt.Fprintln(f, event); err != nil {
+			return 2
+		}
+		raw, err := os.ReadFile(args[0])
+		if err != nil {
+			return 2
+		}
+		if strings.HasPrefix(event, "#5") && strings.Count("\n"+string(raw), "\n#5") < 2 {
+			return 1
+		}
+		return 0
+	case "keep-item-a-second": // writes what it was given to the file args[0], and takes a second
+		if err := os.WriteFile(args[0], []byte(os.Getenv("QUADIT_ITEM")+"\n--\n"+event), 0o600); err != nil {
+			return 2
+		}
+		time.Sleep(time.Second)
+		return 0
+	}
+	return 2
 }

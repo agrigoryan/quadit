@@ -27,6 +27,16 @@ func listenFor(t *testing.T, srv http.Handler, args []string, until func(events 
 	r := &runner{ctx: ctx, c: testClient(t, srv), out: out}
 	done := make(chan error, 1)
 	go func() { done <- r.listenWith(listenArgs(append([]string{"events=" + path}, args...)), time.Minute) }()
+	// However the test ends, listen has stopped, and let its events file
+	// go, before the test's folder is removed: Windows removes no open file.
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			t.Error("listen did not stop")
+		}
+	})
 	read := func() []map[string]any {
 		f, err := os.Open(path)
 		if err != nil {
@@ -50,7 +60,8 @@ func listenFor(t *testing.T, srv http.Handler, args []string, until func(events 
 	}
 	cancel()
 	select {
-	case <-done:
+	case err := <-done:
+		done <- err // for the clean-up's wait
 	case <-time.After(10 * time.Second):
 		t.Fatal("listen did not stop")
 	}
@@ -74,7 +85,7 @@ func named(events []map[string]any, name string) []map[string]any {
 // never what the command printed.
 func TestListenGivesUpAnItemAfterItsTries(t *testing.T) {
 	srv := &inboxServer{items: []int64{3, 4}}
-	command := []string{"--exec", "sh", "-c", `echo '{"event":"gave_up","seq":99}'; echo "$QUADIT_EVENT" | grep -q '#3' && exit 3; exit 0`}
+	command := append([]string{"--exec"}, listenCommand(t, "fail-3")...)
 	events, said := listenFor(t, srv, append([]string{"tries=2", "by=the Quadit app"}, command...), func(events []map[string]any) bool {
 		return len(named(events, "run_ended")) == 3
 	})
