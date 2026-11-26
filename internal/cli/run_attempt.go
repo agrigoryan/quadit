@@ -1,5 +1,5 @@
 // One attempt of a run: the program started in the folder, in a process
-// group of its own, with a clean environment and the prompt on its
+// group of its own (a job object on Windows), with a clean environment and the prompt on its
 // standard input; its standard output read as the protocol and both its
 // outputs logged; watched for silence and for the entry's time cap; and
 // stopped, with everything it started, by the ladder each end calls for.
@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -78,6 +77,12 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 	defer log.close()
 	log.line("attempt", fmt.Sprintf("%d: %s %s", n, e.reg.ProgramPath, strings.Join(e.prog.Command(spec), " ")))
 
+	// The program is stopped by its group's ladder, never by a context.
+	cmd, err := programCommand(context.WithoutCancel(ctx), e.reg.ProgramPath, e.prog.Command(spec))
+	if err != nil {
+		log.line("attempt", "not started: "+err.Error())
+		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedItself, nil
+	}
 	outRead, outWrite, err := os.Pipe()
 	if err != nil {
 		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedItself, nil
@@ -88,8 +93,6 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 		outWrite.Close()
 		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedItself, nil
 	}
-	// The program is stopped by its group's ladder, never by a context.
-	cmd := exec.CommandContext(context.WithoutCancel(ctx), e.reg.ProgramPath, e.prog.Command(spec)...)
 	cmd.Dir = e.reg.Folder
 	cmd.Env = programEnv(os.Environ(), e.reg.Login, r.key, r.id)
 	cmd.Stdin = strings.NewReader(prompt)
@@ -121,7 +124,7 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 		closeAll()
 		return outcome{Kind: outcomeFailed, Detail: pause}, endedMoved, nil
 	}
-	err = startInGroup(cmd)
+	group, err := startInGroup(cmd)
 	outWrite.Close() // the program holds its own ends now
 	errWrite.Close()
 	if err != nil {
@@ -130,12 +133,14 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 		log.line("attempt", "not started: "+err.Error())
 		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedItself, nil
 	}
-	// Known gap, left on purpose: a runner killed in the few milliseconds
-	// between the start and the journal's next write leaves a program whose
-	// group is not on disk; recovery then ends its run as interrupted but
-	// cannot stop it. Closing it needs the child held until its group is
-	// written, which takes a wrapper process.
-	pgid := cmd.Process.Pid
+	// Known gap on macOS and Linux, left on purpose: a runner killed in the
+	// few milliseconds between the start and the journal's next write
+	// leaves a program whose group is not on disk; recovery then ends its
+	// run as interrupted but cannot stop it. Closing it needs the child held
+	// until its group is written, which takes a wrapper process. (On
+	// Windows the program's job ends with the runner.)
+	defer group.release()
+	pgid := group.id()
 	started, startErr := processStart(ctx, pgid)
 	r.mu.Lock()
 	r.j.Phase, r.j.PGID, r.j.ProcStart = phaseLaunched, pgid, started
@@ -147,7 +152,7 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 	if err != nil {
 		// What would let a later start recognize the program is not on
 		// disk: it is stopped at once rather than left to run unseen.
-		e.srv.ladder(pgid, t.infraLadder, nil, nil)
+		e.srv.ladder(group, t.infraLadder, nil, nil)
 		_ = cmd.Wait() // its group is stopped; its status says nothing more
 		outRead.Close()
 		errRead.Close()
@@ -210,20 +215,20 @@ watch:
 			break watch
 		case <-r.stopAsked:
 			how = endedByStop
-			e.srv.ladder(pgid, t.stopLadder, exited, ctx.Done())
+			e.srv.ladder(group, t.stopLadder, exited, ctx.Done())
 		case <-r.leaseGone:
 			how = endedLeaseLost
-			e.srv.ladder(pgid, t.infraLadder, exited, nil)
+			e.srv.ladder(group, t.infraLadder, exited, nil)
 		case <-ctx.Done():
 			how = endedInfra
-			e.srv.ladder(pgid, t.infraLadder, exited, nil)
+			e.srv.ladder(group, t.infraLadder, exited, nil)
 		case <-capped:
 			how = endedTimeLimit
-			e.srv.ladder(pgid, t.stopLadder, exited, ctx.Done())
+			e.srv.ladder(group, t.stopLadder, exited, ctx.Done())
 		case <-tick.C:
 			if clock.Awake()-time.Duration(lastOutput.Load()) >= t.idle {
 				how = endedIdle
-				e.srv.ladder(pgid, t.stopLadder, exited, ctx.Done())
+				e.srv.ladder(group, t.stopLadder, exited, ctx.Done())
 			}
 		}
 		if how != endedItself {
@@ -247,8 +252,8 @@ watch:
 	case <-drainFor.C:
 	case <-ctx.Done():
 	}
-	if groupAlive(pgid) {
-		e.srv.ladder(pgid, t.infraLadder, nil, nil)
+	if group.alive() {
+		e.srv.ladder(group, t.infraLadder, nil, nil)
 	}
 	outRead.Close()
 	errRead.Close()
@@ -360,12 +365,12 @@ func (l *runLog) close() {
 // exited, the group's leader is reaped by whoever closes it; without,
 // someone else already reaped it. When hurry closes, the ladder gives way
 // to the infrastructure ladder at once: the runner itself is stopping.
-func (srv *serving) ladder(pgid int, steps []ladderStep, exited, hurry <-chan struct{}) {
+func (srv *serving) ladder(group *processGroup, steps []ladderStep, exited, hurry <-chan struct{}) {
 	for _, step := range steps {
-		signalGroup(pgid, step.sig)
+		group.signal(step.sig)
 		deadline := time.Now().Add(step.within)
 		for {
-			if !chanOpen(exited) && !groupAlive(pgid) {
+			if !chanOpen(exited) && !group.alive() {
 				return
 			}
 			if !time.Now().Before(deadline) {
@@ -373,7 +378,7 @@ func (srv *serving) ladder(pgid int, steps []ladderStep, exited, hurry <-chan st
 			}
 			select {
 			case <-hurry:
-				srv.ladder(pgid, srv.host.times.infraLadder, exited, nil)
+				srv.ladder(group, srv.host.times.infraLadder, exited, nil)
 				return
 			case <-time.After(srv.host.times.pollGroup):
 			}

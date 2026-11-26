@@ -37,8 +37,9 @@
 //   - the tool_use of tools other than Bash and Write (Edit, Read,
 //     MultiEdit, NotebookEdit and the rest), and permission denials;
 //   - `claude auth status` exiting 0 when signed in and 1 when not;
-//   - where a session is kept: <config>/projects/<the folder, every
-//     character not a letter or digit made "-">/<id>.jsonl;
+//   - where a session is kept: <config>/projects/<claudeProjectName of
+//     the folder>/<id>.jsonl, read in the Agent SDK's code, not in Claude
+//     Code's own (a compiled program), nor seen on Windows;
 //   - that a settings env.QUADIT_* reaches the program's Bash tool (the
 //     runner pauses on any, whichever wins).
 // testdata/programs/claude-{fresh,resume,lost,limit,signedout,error}.jsonl
@@ -54,8 +55,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf16"
 )
 
 type claudeCode struct{}
@@ -95,20 +99,40 @@ func claudeHome(home string) string {
 	return filepath.Join(home, ".claude")
 }
 
-// notLetterOrDigit is what Claude Code makes "-" in a folder's path to
-// name the folder of its sessions there.
-var notLetterOrDigit = regexp.MustCompile(`[^A-Za-z0-9]`)
+// claudeProjectName is the name Claude Code gives the folder it keeps a
+// project's sessions in, from the project folder's path: every UTF-16 unit
+// that is not an ASCII letter or digit made "-" (C:\Users\ann\game is
+// C--Users-ann-game), and a name longer than 200 cut there, followed by
+// "-" and a hash of the whole path in base 36 (a Java string hash, made
+// positive). As the Agent SDK's published code does it (0.3.332).
+func claudeProjectName(folder string) string {
+	units := utf16.Encode([]rune(folder))
+	name := make([]byte, len(units))
+	var hash int32
+	for i, u := range units {
+		name[i] = '-'
+		if u < 0x80 && (unicode.IsLetter(rune(u)) || unicode.IsDigit(rune(u))) {
+			name[i] = byte(u)
+		}
+		hash = hash*31 + int32(u)
+	}
+	const most = 200
+	if len(name) <= most {
+		return string(name)
+	}
+	positive := int64(hash)
+	if positive < 0 {
+		positive = -positive
+	}
+	return string(name[:most]) + "-" + strconv.FormatInt(positive, 36)
+}
 
 func (claudeCode) SessionFile(home, session, folder string) (string, bool) {
-	path := filepath.Join(claudeHome(home), "projects", notLetterOrDigit.ReplaceAllString(folder, "-"), session+".jsonl")
+	path := filepath.Join(claudeHome(home), "projects", claudeProjectName(folder), session+".jsonl")
 	if st, err := os.Stat(path); err == nil && st.Mode().IsRegular() {
 		return path, true
 	}
 	return "", false
-}
-
-func (claudeCode) ResumeLine(folderLabel, session string) string {
-	return "cd " + folderForShell(folderLabel) + " && claude --resume " + session
 }
 
 // QuaditSettings reads the env of the user's settings and of both of the

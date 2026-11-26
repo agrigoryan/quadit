@@ -42,9 +42,6 @@ type program interface {
 	ReadSignedIn(exit int, output []byte) (bool, error)
 	// SessionFile is the file the program keeps that session in, if found.
 	SessionFile(home, session, folder string) (string, bool)
-	// ResumeLine is the command a person runs in a terminal to go on with
-	// it (for the log; the web builds its own).
-	ResumeLine(folderLabel, session string) string
 	// QuaditSettings are the QUADIT_CONFIG, QUADIT_URL and QUADIT_TOKEN its
 	// own settings set for the commands it runs, in every file that can
 	// (the user's, and the folder's), whichever wins: such a setting would
@@ -200,20 +197,24 @@ func stepText(s string) string {
 	return s
 }
 
-// relativeIn is path relative to folder, when it is inside it; a path
-// outside the folder (or one that climbs out of it) is not given.
+// relativeIn is path relative to folder, written with / on every system,
+// when it is inside it; a path outside the folder (or one that climbs out
+// of it) is not given.
 func relativeIn(folder, path string) (string, bool) {
-	if path == "" {
+	switch {
+	case path == "":
 		return "", false
-	}
-	if !filepath.IsAbs(path) {
+	case filepath.IsAbs(path):
+	case os.IsPathSeparator(path[0]):
+		path = filepath.VolumeName(folder) + path // on Windows, \x is at the top of the folder's drive
+	default:
 		path = filepath.Join(folder, path)
 	}
 	rel, err := filepath.Rel(folder, filepath.Clean(path))
-	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, "../") {
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return "", false
 	}
-	return rel, true
+	return filepath.ToSlash(rel), true
 }
 
 // errorWords are the program's own error words the runner reads after an
@@ -303,18 +304,4 @@ func programVersion(out []byte) string {
 		v = v[:32]
 	}
 	return v
-}
-
-// shellQuoted is s quoted for a POSIX shell, for a line a person copies.
-func shellQuoted(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
-
-// folderForShell is a folder label (~/devel/game) as a shell line takes
-// it, ~ left out of the quotes so the shell expands it.
-func folderForShell(label string) string {
-	if rest, ok := strings.CutPrefix(label, "~/"); ok {
-		return "~/" + shellQuoted(rest)
-	}
-	return shellQuoted(label)
 }

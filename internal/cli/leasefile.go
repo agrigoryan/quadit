@@ -39,8 +39,11 @@ func openLeaseFile(dir string, c *Client, project string) (*leaseFile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("the listener's lease file: %w", err)
 	}
-	if err := lockFile(f); err != nil {
+	if err := tryLock(f); err != nil {
 		f.Close()
+		if errors.Is(err, errLocked) {
+			return nil, errAnotherListen
+		}
 		return nil, err
 	}
 	return &leaseFile{f: f}, nil

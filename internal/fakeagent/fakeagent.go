@@ -12,7 +12,9 @@
 //
 // The environment it reads:
 //
-//	FAKEAGENT          claude or codex: which program to be
+//	FAKEAGENT          claude or codex: which program to be; or sleep: a
+//	                   program that sleeps ten minutes (Sleeper), which is
+//	                   what a script's child is
 //	FAKEAGENT_SCRIPTS  a JSON file: a list of scripts, each a list of steps
 //	FAKEAGENT_RECORD   a file each start appends one JSON line to (Record),
 //	                   each grandchild it starts one more ({"child": pid}), and
@@ -54,7 +56,7 @@ type Step struct {
 	SleepMS     int      `json:"sleep_ms,omitempty"`     // wait this long
 	UntilSignal []string `json:"until_signal,omitempty"` // block until SIGINT or SIGTERM, then print these lines
 	Ignore      string   `json:"ignore,omitempty"`       // "SIGINT": ignore it from now on
-	Child       bool     `json:"child,omitempty"`        // start `sleep 600` in the same process group, holding standard output
+	Child       bool     `json:"child,omitempty"`        // start a child that sleeps ten minutes (Sleeper), holding standard output
 	Touch       string   `json:"touch,omitempty"`        // make or touch this file ({session} filled in)
 	Last        string   `json:"last,omitempty"`         // write this as the last message (Codex -o)
 	LinesFrom   string   `json:"lines_from,omitempty"`   // print every line of this file but its first, as out does
@@ -73,15 +75,22 @@ type Record struct {
 	Signal string            `json:"signal,omitempty"` // a signal it caught and passed over`
 }
 
+// Sleeper is the FAKEAGENT of a program that sleeps ten minutes and
+// exits, as a program's child that outlives what it was started for. It
+// is the test binary itself, so it is there on every system.
+const Sleeper = "sleep"
+
 // Main acts as the program FAKEAGENT names, and exits; it returns false,
 // doing nothing, when FAKEAGENT names none.
 func Main() bool {
-	which := os.Getenv("FAKEAGENT")
-	if which != "claude" && which != "codex" {
-		return false
+	switch which := os.Getenv("FAKEAGENT"); which {
+	case "claude", "codex":
+		os.Exit(run(which, os.Args[1:]))
+	case Sleeper:
+		time.Sleep(10 * time.Minute)
+		os.Exit(0)
 	}
-	os.Exit(run(which, os.Args[1:]))
-	return true
+	return false
 }
 
 func run(which string, args []string) int {
@@ -149,7 +158,12 @@ func run(which string, args []string) int {
 			}()
 			ignored = true
 		case step.Child:
-			child := exec.CommandContext(context.Background(), "sleep", "600") // the fake's own main: nothing above it to end it
+			self, err := os.Executable()
+			if err != nil {
+				break
+			}
+			child := exec.CommandContext(context.Background(), self) // the fake's own main: nothing above it to end it
+			child.Env = append(os.Environ(), "FAKEAGENT="+Sleeper)
 			child.Stdout = os.Stdout
 			if child.Start() == nil {
 				record(Record{Child: child.Process.Pid, Start: start})

@@ -7,6 +7,7 @@ package cli
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -110,7 +111,7 @@ func (f runFiles) folderLock(identity string) string {
 
 // readRegistry reads the registry; none yet is an empty one.
 func readRegistry(path string) (registry, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := readWhole(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return registry{Version: 1}, nil
 	}
@@ -174,7 +175,7 @@ func writeWhole(path string, data []byte) error {
 		err = closeErr
 	}
 	if err == nil {
-		err = os.Rename(tmp.Name(), path)
+		err = replaceFile(tmp.Name(), path)
 	}
 	if err != nil {
 		os.Remove(tmp.Name())
@@ -190,17 +191,6 @@ func removeDurably(path string) error {
 		return err
 	}
 	return syncDir(filepath.Dir(path))
-}
-
-// syncDir flushes a folder's entries to the disk: the renames and
-// removals the crash boundaries rely on survive a power loss.
-func syncDir(dir string) error {
-	d, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-	defer d.Close()
-	return d.Sync()
 }
 
 // plainJSON is one of the runner's own values as indented JSON, as its
@@ -263,22 +253,46 @@ func cleanMachineName(name string) string {
 }
 
 // folderRules are the rules a folder must pass for a program to run in it
-// with full access: not the home folder nor above it, nothing at or under
-// a system folder.
+// with full access: not the home folder nor above it, not a whole drive,
+// nothing at or under a system folder.
 type folderRules struct {
 	home  string   // the person's home folder
 	roots []string // the system folders
 }
 
 // systemRoots are the folders a program is never run in, nor anywhere
-// under them.
-var systemRoots = []string{"/System", "/Library", "/Applications", "/usr", "/bin", "/sbin", "/etc", "/var", "/private",
-	"/opt", "/tmp", "/dev", "/proc", "/sys", "/boot", "/lib", "/lib64", "/snap", "/nix", "/root", "/cores"}
+// under them: on Windows, Windows itself, where programs are installed and
+// keep what they share, and what the system keeps at a drive's top.
+func systemRoots() []string {
+	if runtime.GOOS != "windows" {
+		return []string{"/System", "/Library", "/Applications", "/usr", "/bin", "/sbin", "/etc", "/var", "/private",
+			"/opt", "/tmp", "/dev", "/proc", "/sys", "/boot", "/lib", "/lib64", "/snap", "/nix", "/root", "/cores"}
+	}
+	drive := cmp.Or(os.Getenv("SystemDrive"), "C:") + `\`
+	roots := []string{cmp.Or(os.Getenv("SystemRoot"), drive+"Windows"), drive + "Program Files", drive + "Program Files (x86)", drive + "ProgramData",
+		drive + "$Recycle.Bin", drive + "System Volume Information", drive + "Recovery", drive + "PerfLogs"}
+	for _, name := range []string{"ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData"} {
+		if dir := os.Getenv(name); dir != "" && !slices.Contains(roots, dir) {
+			roots = append(roots, dir)
+		}
+	}
+	return roots
+}
 
 // check gives the canonical form of path (absolute, links resolved) and
 // its label for servers (the home folder written ~), or refuses it in the
 // words a person reads.
 func (rules folderRules) check(path string) (canon, label string, err error) {
+	if runtime.GOOS == "windows" {
+		// A path in its long form is the plain one: \\?\C:\x is C:\x, and
+		// \\?\UNC\server\share is \\server\share.
+		if rest, ok := strings.CutPrefix(path, `\\?\`); ok {
+			if share, ok := strings.CutPrefix(rest, `UNC\`); ok {
+				rest = `\\` + share
+			}
+			path = rest
+		}
+	}
 	if !filepath.IsAbs(path) {
 		return "", "", errors.New("folder= must be an absolute path")
 	}
@@ -306,6 +320,8 @@ func (rules folderRules) check(path string) (canon, label string, err error) {
 		return "", "", fmt.Errorf("%s is your home folder: pick the project's own folder", shown)
 	case slices.Contains(homes, self):
 		return "", "", fmt.Errorf("%s is above your home folder: pick the project's own folder", shown)
+	case filepath.Dir(canon) == canon:
+		return "", "", fmt.Errorf("%s is a whole drive: pick the project's own folder", shown)
 	}
 	var roots []string
 	for _, root := range rules.roots {
@@ -337,27 +353,31 @@ func identitiesUp(dir string) []string {
 	}
 }
 
-// label is a canonical folder as servers see it: the home folder written ~.
+// label is a canonical folder as servers see it: the home folder written
+// ~, the rest in the system's own form (~/devel/game; on Windows
+// ~\devel\game, D:\work\site).
 func (rules folderRules) label(canon string) string {
-	home := resolved(rules.home)
-	if canon == home {
-		return "~"
-	}
-	if rest, ok := strings.CutPrefix(canon, home+"/"); ok {
-		return "~/" + rest
-	}
-	return canon
+	return underHome(canon, resolved(rules.home))
 }
 
 // shown is a path as a refusal says it: under the home folder, with ~.
 func (rules folderRules) shown(path string) string {
 	for _, home := range []string{filepath.Clean(rules.home), resolved(rules.home)} {
-		if path == home {
-			return "~"
+		if shown := underHome(path, home); shown != path {
+			return shown
 		}
-		if rest, ok := strings.CutPrefix(path, home+"/"); ok {
-			return "~/" + rest
-		}
+	}
+	return path
+}
+
+// underHome is path written from ~ when it is home or under it.
+func underHome(path, home string) string {
+	if path == home {
+		return "~"
+	}
+	sep := string(filepath.Separator)
+	if rest, ok := strings.CutPrefix(path, strings.TrimSuffix(home, sep)+sep); ok {
+		return "~" + sep + rest
 	}
 	return path
 }

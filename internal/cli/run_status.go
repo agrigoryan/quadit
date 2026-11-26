@@ -105,7 +105,7 @@ func (b *statusBoard) write() {
 // readStatus reads status.json, empty when there is none.
 func readStatus(path string) statusFile {
 	var s statusFile
-	if raw, err := os.ReadFile(path); err == nil {
+	if raw, err := readWhole(path); err == nil {
 		_ = json.Unmarshal(raw, &s) // a status not read shows no status
 	}
 	return s

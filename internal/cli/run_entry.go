@@ -407,13 +407,6 @@ func (e *liveEntry) stillAsChecked() string {
 // with --version for at most within: an error for a path that is not an
 // executable regular file, or a program that does not answer.
 func programVersionOf(ctx context.Context, path string, within time.Duration) (string, error) {
-	st, err := os.Stat(path)
-	if err != nil {
-		return "", err
-	}
-	if !st.Mode().IsRegular() || st.Mode().Perm()&0o111 == 0 {
-		return "", fmt.Errorf("%s is not a program", path)
-	}
 	exit, out, err := probe(ctx, path, []string{"--version"}, os.Environ(), within)
 	if err == nil && exit != 0 {
 		err = fmt.Errorf("it exited %d", exit)
@@ -448,18 +441,27 @@ func probe(ctx context.Context, path string, args, env []string, within time.Dur
 	ctx, cancel := context.WithTimeout(ctx, within)
 	defer cancel()
 	out := &capped{max: maxProbeOutput}
-	cmd := exec.CommandContext(ctx, path, args...)
-	cmd.Env, cmd.Stdout, cmd.Stderr = env, out, out
-	cmd.WaitDelay = time.Second
-	cmd.Cancel = func() error {
-		signalGroup(cmd.Process.Pid, sigKill)
-		return nil
-	}
-	if err := startInGroup(cmd); err != nil {
+	// The program is stopped by its group, never by a context.
+	cmd, err := programCommand(context.WithoutCancel(ctx), path, args)
+	if err != nil {
 		return -1, nil, err
 	}
-	err := cmd.Wait()
-	signalGroup(cmd.Process.Pid, sigKill) // what it left behind goes with it
+	cmd.Env, cmd.Stdout, cmd.Stderr = env, out, out
+	cmd.WaitDelay = time.Second
+	group, err := startInGroup(cmd)
+	if err != nil {
+		return -1, nil, err
+	}
+	defer group.release()
+	waited := make(chan error, 1)
+	go func() { waited <- cmd.Wait() }()
+	select {
+	case err = <-waited:
+	case <-ctx.Done():
+		group.signal(sigKill)
+		err = <-waited
+	}
+	group.signal(sigKill) // what it left behind goes with it
 	var exitErr *exec.ExitError
 	if err != nil && !errors.As(err, &exitErr) {
 		return -1, out.bytes(), err
@@ -491,13 +493,17 @@ func (c *capped) bytes() []byte {
 	return append([]byte(nil), c.buf...)
 }
 
-// expandHome is a path a setting gave, with a leading ~ made the home folder.
+// expandHome is a path a setting gave, with a leading ~ made the home
+// folder (~/x, and on Windows ~\x too).
 func expandHome(path, home string) string {
-	if path == "~" {
+	rest, ok := strings.CutPrefix(path, "~")
+	switch {
+	case !ok:
+		return path
+	case rest == "":
 		return home
-	}
-	if rest, ok := strings.CutPrefix(path, "~/"); ok {
-		return filepath.Join(home, rest)
+	case os.IsPathSeparator(rest[0]):
+		return filepath.Join(home, rest[1:])
 	}
 	return path
 }
@@ -955,8 +961,9 @@ func (e *liveEntry) recoverRun(ctx context.Context, j journal) {
 		SendEnd: j.StartSeq > 0 || e.out.hasStart(j.Run), Summary: "Quadit stopped on " + e.srv.machineNow().Name + " while this run worked."}
 	if j.Phase != phaseReceived {
 		if j.PGID > 0 && j.ProcStart != "" {
-			if started, err := processStart(ctx, j.PGID); err == nil && started == j.ProcStart {
-				e.srv.ladder(j.PGID, e.srv.host.times.infraLadder, nil, nil)
+			if group, ok := leftGroup(ctx, j.PGID, j.ProcStart); ok {
+				e.srv.ladder(group, e.srv.host.times.infraLadder, nil, nil)
+				group.release()
 			}
 		}
 		t.Ack = true

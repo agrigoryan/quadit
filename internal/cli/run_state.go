@@ -91,7 +91,7 @@ const keptRuns = 50
 // else (renamed .old) and beginning anew.
 func openState(path string, bind entryState) (*stateFile, error) {
 	f := &stateFile{path: path, s: bind}
-	raw, err := os.ReadFile(path)
+	raw, err := readWhole(path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
 	case err != nil:
@@ -243,7 +243,7 @@ func journalPath(entryDir string) string { return filepath.Join(entryDir, "journ
 
 // readJournal is the run in flight, nil for none.
 func readJournal(entryDir string) (*journal, error) {
-	raw, err := os.ReadFile(journalPath(entryDir))
+	raw, err := readWhole(journalPath(entryDir))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}

@@ -37,6 +37,9 @@ import (
 // client's main: the context its requests run under starts here.
 func Run(args []string, stdout, stderr io.Writer) int {
 	ctx := context.Background()
+	if len(args) > 0 && args[0] == "guard" {
+		return guard(args[1:], stdout, stderr) // before switches are read: every argument is the guarded program's
+	}
 	sw, rest := takeSwitches(args)
 	if len(rest) == 0 || rest[0] == "help" || rest[0] == "-h" || rest[0] == "--help" {
 		fmt.Fprint(stdout, helpFor(rest))

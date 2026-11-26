@@ -18,7 +18,9 @@
 //	run_state.go     state.json and journal.json
 //	run_server.go    what the runner asks of the server
 //	run_status.go    status.json and the printed lines
-//	run_unix.go, run_other.go   what the system gives, or does not
+//	run_unix.go, run_windows.go   what the system gives the runner
+//	guard_windows.go  quadit guard, how the desktop app starts programs on
+//	                 Windows, and the stop event it asks quadit run to stop by
 //
 // The secrets form, `quadit run --secret NAME -- COMMAND`, is another
 // command (cmd_secrets.go) that shares the name.
@@ -32,13 +34,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -85,13 +85,9 @@ func runnerFormOn(ctx context.Context, host runHost, args []string, sw switches,
 		return exitFailed
 	}
 	delete(fields, "registry")
-	if err := canServe(); err != nil {
-		fmt.Fprintln(stderr, err)
-		return exitFailed
-	}
 	switch form {
 	case "":
-		ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+		ctx, stop := untilAskedToStop(ctx)
 		defer stop()
 		return serve(ctx, files, host, stdout, stderr)
 	case "add":
@@ -221,7 +217,7 @@ func (h runHost) rules() folderRules { return folderRules{home: h.home, roots: h
 // systemHost is this computer.
 func systemHost() (runHost, error) {
 	home, err := os.UserHomeDir()
-	return runHost{home: home, roots: systemRoots, clock: systemClock{start: time.Now()}, times: defaultTimings}, err
+	return runHost{home: home, roots: systemRoots(), clock: systemClock{start: time.Now()}, times: defaultTimings}, err
 }
 
 // serving is one quadit run at work: what its entries share.
@@ -579,7 +575,7 @@ func runAdd(ctx context.Context, files runFiles, host runHost, fields map[string
 		if path, err = exec.LookPath(name); err != nil {
 			return refuse(fmt.Errorf("%s was not found on this computer: install it, or give program_path=", prog.Title()))
 		}
-	case !strings.HasPrefix(path, "/"):
+	case !filepath.IsAbs(path):
 		return refuse(errors.New("program_path= must be an absolute path"))
 	}
 	if path, err = filepath.Abs(path); err != nil {

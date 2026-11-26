@@ -104,10 +104,6 @@ func (codex) SessionFile(home, session, _ string) (string, bool) {
 	return matches[0], true
 }
 
-func (codex) ResumeLine(folderLabel, session string) string {
-	return "cd " + folderForShell(folderLabel) + " && codex resume " + session
-}
-
 // QuaditSettings reads config.toml's shell_environment_policy.set.
 func (codex) QuaditSettings(home, _ string) ([]quaditSetting, error) {
 	path := filepath.Join(codexHome(home), "config.toml")

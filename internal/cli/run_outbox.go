@@ -192,7 +192,7 @@ func (o *outbox) add(w outboxWrite) (string, error) {
 		return "", err
 	}
 	next := 1
-	if raw, err := os.ReadFile(filepath.Join(o.dir, lastNumber)); err == nil {
+	if raw, err := readWhole(filepath.Join(o.dir, lastNumber)); err == nil {
 		n, _ := strconv.Atoi(strings.TrimSpace(string(raw))) // unreadable: the files say
 		next = n + 1
 	}
@@ -210,7 +210,7 @@ func (o *outbox) add(w outboxWrite) (string, error) {
 // read is one file of the outbox.
 func (o *outbox) read(name string) (outboxWrite, error) {
 	var w outboxWrite
-	raw, err := os.ReadFile(filepath.Join(o.dir, name))
+	raw, err := readWhole(filepath.Join(o.dir, name))
 	if err != nil {
 		return w, err
 	}
