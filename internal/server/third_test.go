@@ -334,11 +334,12 @@ func TestSyncDoesNotFollowLinks(t *testing.T) {
 	os.Symlink(outside, filepath.Join(work, "link"))
 	run("add", "-A")
 	run("commit", "-q", "-m", "docs")
-	// What is synced is a bare repository, which can be pushed to.
+	// What is synced is a bare repository, which can be pushed to: a copy
+	// of this one made by cloning, which on Windows avoids the receiving
+	// end of a push (git's unpack-objects there has died now and then
+	// without a word, before Quadit had touched anything).
 	bare := filepath.Join(t.TempDir(), "origin.git")
-	run("init", "-q", "--bare", "-b", "main", bare)
-	run("remote", "add", "origin", bare)
-	run("push", "-q", "origin", "main")
+	run("clone", "-q", "--bare", work, bare)
 
 	src := s.change(t, s.owner, "", "source.create", M{"title": "Handbook", "repo": bare, "subdir": "docs"})["ref"].(string)
 	s.call(t, s.owner, "", "POST", w+"/sources/"+src+"/sync", nil, 200, nil)
