@@ -204,8 +204,13 @@ describe("startChild on Windows: quadit guard", () => {
       expect(waited).toBeGreaterThanOrEqual(5_000);
       expect(waited).toBeLessThan(10_000);
     } finally {
-      // The stand-in guard, unlike quadit's, leaves its program behind when it is ended.
-      process.kill(Number(lines[0]));
+      // Ended, the stand-in guard leaves its program behind on macOS and Linux; on Windows Node's own job object ends
+      // it with the guard, and it is gone already.
+      try {
+        process.kill(Number(lines[0]));
+      } catch {
+        // Gone with the guard.
+      }
     }
   }, 15_000);
 
