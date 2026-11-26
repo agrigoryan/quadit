@@ -255,11 +255,14 @@ func (rt *runTest) cleanup() {
 // awaited and what the runner printed.
 func (rt *runTest) eventually(what string, cond func() bool) {
 	rt.t.Helper()
-	deadline := time.Now().Add(20 * time.Second)
+	began := time.Now()
+	deadline := began.Add(20 * time.Second)
 	for !cond() {
 		if time.Now().After(deadline) {
 			status, _ := os.ReadFile(rt.files.status())
-			rt.t.Fatalf("waited for %s; quadit run said:\n%s\nstatus.json: %s\nchanges (fake server): %s", what, rt.out, status, rt.changeTypes())
+			logged, _ := os.ReadFile(rt.files.runnerLog()) // the same lines with the time each was said
+			rt.t.Fatalf("waited for %s (since %s); quadit run said:\n%s\nrunner.log:\n%s\nstatus.json: %s\nchanges (fake server): %s",
+				what, began.UTC().Format(time.RFC3339), rt.out, logged, status, rt.changeTypes())
 		}
 		time.Sleep(rt.poll)
 	}
