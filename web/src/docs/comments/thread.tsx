@@ -43,6 +43,8 @@ interface Props {
   onOpen?: () => void;
   /** Esc in it: it is no longer the one open. Without it, Esc in the reply box leaves the box. */
   onLeave?: () => void;
+  /** It was resolved here, and leaves where it was shown: what takes the cursor it had. */
+  onResolved?: () => void;
 }
 
 /** Words quoted in a thread's name, cut short. */
@@ -68,6 +70,7 @@ export function Thread({
   onLocate,
   onOpen,
   onLeave,
+  onResolved,
 }: Props) {
   const { root, replies } = thread;
   const done = !!root.resolved_at;
@@ -150,7 +153,10 @@ export function Thread({
             <IconButton
               size="sm"
               label={t(done ? "docs.comment.reopen" : "docs.comment.resolve")}
-              onClick={() => resolveComment(root, !done)}
+              onClick={() => {
+                resolveComment(root, !done);
+                if (!done) onResolved?.();
+              }}
             >
               {done ? <RotateCcw className="size-3.5" /> : <Check className="size-3.5" />}
             </IconButton>

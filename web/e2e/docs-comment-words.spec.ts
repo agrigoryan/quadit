@@ -36,7 +36,10 @@ const column = (page: Page) => page.getByRole("complementary", { name: "Comments
 /** Opens the comments column: the header's comments button, then "See all" in its Discussions list. */
 async function seeAll(page: Page) {
   await page.getByRole("button", { name: "Comments" }).click();
-  await page.getByRole("dialog", { name: "Discussions" }).getByRole("button", { name: "See all" }).click();
+  const list = page.getByRole("dialog", { name: "Discussions" });
+  await list.getByRole("button", { name: "See all" }).click();
+  // Gone, not still on its way out, where it would take the next Esc for itself.
+  await expect(list).toBeHidden();
 }
 const thread = (page: Page, text: string) => column(page).getByRole("article").filter({ hasText: text });
 const pageText = (page: Page) => page.getByRole("textbox", { name: "Page text" });

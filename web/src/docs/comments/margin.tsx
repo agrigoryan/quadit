@@ -179,6 +179,10 @@ export function Margin({ docId, projectId, text, className }: Props) {
                 askReply={replyAsked?.thread === id ? replyAsked.n : 0}
                 onOpen={open ? undefined : () => pageUi.openThread(id, true)}
                 onLeave={open ? pageUi.leaveThread : undefined}
+                onResolved={() => {
+                  pageUi.leaveThread();
+                  backToText();
+                }}
               />
             ) : (
               <div className="rounded-lg border border-accent bg-surface p-2">

@@ -109,7 +109,7 @@ function show() {
   const view = render(
     <TooltipProvider>
       <div ref={text}>
-        <div className="qd-editor">
+        <div className="qd-editor bn-editor" tabIndex={-1}>
           <div className="bn-block-outer" data-id="b1" data-top="100">
             <div className="bn-block">
               <p className="bn-block-content">
@@ -245,6 +245,18 @@ describe("the margin", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("textbox", { name: "Comment on this block…" })).toBeNull();
     expect(usePageUi.getState().draftBlock).toBeNull();
+  });
+
+  it("resolved from its open card, the thread leaves the margin and the cursor goes back to the text", async () => {
+    const user = userEvent.setup();
+    const { container } = show();
+    await frame();
+    const words = card("Comment by Aram on “three phases”");
+    await user.click(within(words).getByRole("button", { name: "Reply…" }));
+    await user.click(within(words).getByRole("button", { name: "Resolve" }));
+    expect(screen.queryByRole("article", { name: "Comment by Aram on “three phases”" })).toBeNull();
+    expect(container.querySelector(".bn-editor")).toHaveFocus();
+    expect(usePageUi.getState().focusThread).toBeNull();
   });
 
   it("follows the words as the text changes", async () => {
