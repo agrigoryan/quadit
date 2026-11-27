@@ -173,6 +173,8 @@ export function Cell({
   readOnly,
 }: CellProps) {
   const anchor = useRef<HTMLDivElement>(null);
+  // The day typed into a date's picker, kept when the person leaves it without Enter.
+  const typed = useRef<string | undefined>(undefined);
   const box = cx("flex min-h-7 w-full min-w-0 items-center px-2 text-sm", wrap && "py-1", className);
   const value = <CellValue prop={prop} stored={stored} shown={shown} wrap={wrap} />;
   const empty = shown === undefined || shown === null || shown === "" || (Array.isArray(shown) && shown.length === 0);
@@ -223,11 +225,31 @@ export function Cell({
     );
   }
 
+  /** Leaving a date's picker keeps what was typed into it, as leaving a text box does; Escape gives it up. */
+  function keepTyped() {
+    const day = typed.current;
+    typed.current = undefined;
+    if (day && day !== stored) onChange(day);
+  }
+
   return (
-    <Popover open={editing} onOpenChange={onEditing}>
+    <Popover
+      open={editing}
+      onOpenChange={(open) => {
+        if (open) typed.current = undefined;
+        onEditing(open);
+      }}
+    >
       <PopoverAnchor asChild>
         {/* oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- the mouse's way in; from the keyboard, Enter on the table's active cell opens it */}
-        <div ref={anchor} className={cx(box, "cursor-default")} onClick={() => onEditing(!editing)}>
+        <div
+          ref={anchor}
+          className={cx(box, "cursor-default")}
+          onClick={() => {
+            if (editing) keepTyped();
+            onEditing(!editing);
+          }}
+        >
           {hint ?? value}
         </div>
       </PopoverAnchor>
@@ -235,16 +257,39 @@ export function Cell({
         aria-label={prop.name}
         className="p-0"
         onCloseAutoFocus={(e) => e.preventDefault()}
-        onKeyDown={(e) => e.stopPropagation()}
-        // A click on the cell itself closes the list by its own handler.
-        onInteractOutside={(e) => anchor.current?.contains(e.target as Node) && e.preventDefault()}
+        // A date's editor marks itself, so the table hears Tab from its box and goes on to the next cell.
+        data-cell-editor={prop.type === "date" || undefined}
+        onKeyDown={(e) => {
+          if (e.key === "Tab" && prop.type === "date" && e.target instanceof HTMLInputElement) {
+            keepTyped();
+            onEditing(false);
+            return;
+          }
+          e.stopPropagation();
+        }}
+        onEscapeKeyDown={() => {
+          typed.current = undefined;
+        }}
+        // A click on another cell takes the focus to the table before the editor closes.
+        onBlur={(e) => {
+          if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) keepTyped();
+        }}
+        onInteractOutside={(e) => {
+          // A click on the cell itself closes the editor by its own handler.
+          if (anchor.current?.contains(e.target as Node)) e.preventDefault();
+          else keepTyped();
+        }}
       >
         {prop.type === "date" ? (
           <DatePanel
             label={prop.name}
             value={isDay(stored) ? stored : undefined}
             clearable
+            onTyped={(day) => {
+              typed.current = day;
+            }}
             onChange={(day) => {
+              typed.current = undefined;
               onChange(day);
               onEditing(false);
             }}

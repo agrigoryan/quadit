@@ -36,6 +36,12 @@ export interface DatePanelProps extends Pick<MonthGridProps, "stretch" | "min" |
   clearable?: boolean;
   /** Days offered by name, in their order, beside the month. */
   quick?: QuickDay[];
+  /**
+   * Hears the day the box reads as it is typed, while it is one that can be
+   * picked (undefined otherwise): for a caller that keeps it when the person
+   * leaves without Enter, as a table's cell does.
+   */
+  onTyped?: (day: string | undefined) => void;
 }
 
 /** The arrows move between the days offered by name, which are one Tab stop. */
@@ -66,6 +72,7 @@ export function DatePanel({
   stretch,
   min,
   max,
+  onTyped,
 }: DatePanelProps) {
   const today = localDay(useNow());
   const reading = { today, week: personWeek };
@@ -119,6 +126,7 @@ export function DatePanel({
             setText(e.target.value);
             const day = readDay(e.target.value, reading);
             if (day) setMonth(day);
+            onTyped?.(day && reachable(day) ? day : undefined);
           }}
           onKeyDown={onKeyDown}
           placeholder={t("date.typeHint")}

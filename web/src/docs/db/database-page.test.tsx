@@ -3,9 +3,11 @@
 // with no views yet shows its rows in a table nobody saved, rather than
 // waiting for a view that only someone who may change it would make; and
 // its keys: Cmd+B between its table and its board, N a new row, and J/K
-// and Enter on the row open beside it.
+// and Enter on the row open beside it. A date typed into a cell's picker is
+// kept when the person leaves the cell, by a click elsewhere or by Tab, as a
+// typed value is in any other cell.
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/data/api";
@@ -14,7 +16,8 @@ import DatabaseView from "@/docs/db/database-page";
 import { useDocsStore } from "@/docs/store";
 import { emptyCollections } from "@/data/collections";
 import { useStore } from "@/data/store";
-import type { DBView, Doc } from "@/types/docs";
+import { formatDay } from "@/lib/time";
+import type { DBProperty, DBView, Doc } from "@/types/docs";
 import { WithQuery } from "@/test/query";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -171,5 +174,65 @@ describe("the keys of a database", () => {
     act(() => void fireEvent.keyDown(grid, { key: "Enter", code: "Enter" }));
     expect(address()).toBe("/acme/docs/r2");
     expect(screen.queryByRole("textbox", { name: "Title" })).toBeNull();
+  });
+});
+
+describe("a date typed into a table's cell", () => {
+  const due: DBProperty = { id: "due", database_id: "db1", name: "Due", type: "date", rank: "a" };
+  const dueOf = (id: string) => useStore.getState().collections.docs[id]?.props?.due;
+
+  beforeEach(() => {
+    vi.spyOn(api, "post").mockImplementation((_path: string, body?: unknown) =>
+      Promise.resolve({ results: (body as { changes: unknown[] }).changes.map(() => ({})) }),
+    );
+    useStore.setState((s) => ({
+      collections: {
+        ...s.collections,
+        docs: { db1: database, r1: { ...rows.r1, props: { due: "2026-12-01" } }, r2: rows.r2 },
+        dbviews: { v1: views[0] as DBView },
+        properties: { due },
+      },
+    }));
+  });
+
+  afterEach(async () => {
+    await clearOutbox();
+    vi.restoreAllMocks();
+  });
+
+  /** Opens r1's date in its picker and types into its box. */
+  async function typeInto(words: string) {
+    open();
+    fireEvent.click(screen.getByText(formatDay("2026-12-01")));
+    const picker = screen.getByRole("dialog", { name: "Due" });
+    const box = within(picker).getByRole("textbox", { name: "Due" });
+    fireEvent.change(box, { target: { value: words } });
+    // The picker hears a click outside it a moment after it opens.
+    await act(() => new Promise((done) => setTimeout(done, 0)));
+    return { picker, box };
+  }
+
+  it("is kept when another cell is clicked", async () => {
+    const { picker } = await typeInto("2026-12-05");
+    const other = screen.getByText("Saw");
+    fireEvent.pointerDown(other);
+    fireEvent.mouseDown(other);
+    await waitFor(() => expect(picker).not.toBeInTheDocument());
+    expect(dueOf("r1")).toBe("2026-12-05");
+  });
+
+  it("is kept by Tab, which goes on to the next cell", async () => {
+    const { picker, box } = await typeInto("2026-12-05");
+    fireEvent.keyDown(box, { key: "Tab" });
+    await waitFor(() => expect(picker).not.toBeInTheDocument());
+    expect(dueOf("r1")).toBe("2026-12-05");
+    expect(screen.getByRole("gridcell", { selected: true })).toHaveAttribute("data-cell", "r2:title");
+  });
+
+  it("is given up by Escape", async () => {
+    const { picker, box } = await typeInto("2026-12-05");
+    fireEvent.keyDown(box, { key: "Escape" });
+    await waitFor(() => expect(picker).not.toBeInTheDocument());
+    expect(dueOf("r1")).toBe("2026-12-01");
   });
 });

@@ -108,7 +108,8 @@ export function TableView({ db, view, rows, onOpen, onAdd, peek, readOnly }: Vie
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const target = e.target as HTMLElement;
     // Keys from a menu or a list opened over the table are not for the grid.
-    const inCell = target === grid.current || (target.tagName === "INPUT" && !!target.closest("[data-cell]"));
+    const inCell =
+      target === grid.current || (target.tagName === "INPUT" && !!target.closest("[data-cell], [data-cell-editor]"));
     if (e.key === "Tab" && active && inCell) {
       const r = rows.findIndex((x) => x.id === active.row);
       const c = cols.indexOf(active.col);
