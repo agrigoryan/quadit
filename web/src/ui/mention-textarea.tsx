@@ -4,12 +4,14 @@ import {
   type Ref,
   type TextareaHTMLAttributes,
   useId,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { cx } from "@/lib/cx";
 import { pageLink } from "@/lib/page-refs";
-import { useMembers, useRows } from "@/data/selectors";
+import { canSeePage } from "@/data/access";
+import { useMe, useMembers, useRows } from "@/data/selectors";
 import type { Member } from "@/types/core";
 import type { Doc } from "@/types/docs";
 import { useListening } from "@/data/listening";
@@ -17,7 +19,7 @@ import { sendOnModEnter } from "@/lib/mod-enter";
 import { Avatar } from "@/ui/avatar";
 import { Textarea } from "@/ui/input";
 import { ListeningDot } from "@/ui/listening-dot";
-import { markdownKey } from "@/ui/markdown-keys";
+import { markdownKey, typeText } from "@/ui/markdown-keys";
 import { docTitle, PageIcon } from "@/ui/page-name";
 
 interface Props extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange" | "value"> {
@@ -27,7 +29,10 @@ interface Props extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "onCha
   onSubmit?: () => void;
   /** Files pasted or dropped into the text. */
   onFiles?: (files: File[]) => void;
-  /** The project the text is written in: its pages are offered first after [[. */
+  /**
+   * The project the text is written in: its pages are offered first after
+   * [[, and are written with their titles (see pageWritten).
+   */
   projectId?: string;
   bare?: boolean;
   ref?: Ref<HTMLTextAreaElement>;
@@ -64,17 +69,34 @@ interface Offer {
 const OFFERED = 6;
 
 /**
- * The pages whose title holds what is typed: those of the project first,
- * then the latest changed. A database's rows are left out, as when a page
- * is linked to a task.
+ * The first pages the writer may see whose title holds what is typed: those
+ * of the project first, then the latest changed. A database's rows are left
+ * out, as when a page is linked to a task. Only the first few are kept in
+ * order, whatever the number of pages.
  */
-function pagesFor(docs: Doc[], query: string, projectId: string | undefined): Doc[] {
-  return docs
-    .filter((d) => d.kind !== "row" && docTitle(d).toLowerCase().includes(query))
-    .sort(
-      (a, b) => Number(b.project_id === projectId) - Number(a.project_id === projectId) || b.updated_at - a.updated_at,
-    )
-    .slice(0, OFFERED);
+function pagesFor(docs: Doc[], query: string, projectId: string | undefined, userId: string): Doc[] {
+  const before = (a: Doc, b: Doc) =>
+    Number(b.project_id === projectId) - Number(a.project_id === projectId) || b.updated_at - a.updated_at;
+  const first: Doc[] = [];
+  for (const d of docs) {
+    if (d.kind === "row" || !docTitle(d).toLowerCase().includes(query) || !canSeePage(d, userId)) continue;
+    const at = first.findIndex((kept) => before(d, kept) < 0);
+    first.splice(at < 0 ? first.length : at, 0, d);
+    if (first.length > OFFERED) first.pop();
+  }
+  return first;
+}
+
+/**
+ * What picking a page writes. Its title goes into the text only where
+ * everyone who may read the text may see the page too: a page of the
+ * project the text is in, or the workspace's own page that is not private.
+ * Any other is written by its id alone, which a reader who may see the page
+ * sees by its title, and one who may not sees as the id.
+ */
+function pageWritten(doc: Doc, projectId: string | undefined): string {
+  const everyReader = !doc.owner_id && (!doc.project_id || doc.project_id === projectId);
+  return everyReader ? pageLink(docTitle(doc), doc.id) : `doc:${doc.id}`;
 }
 
 /**
@@ -82,6 +104,7 @@ function pagesFor(docs: Doc[], query: string, projectId: string | undefined): Do
  * the workspace, and typing [[ the pages by title, to be written as a link
  * to the page ([Title](doc:ID)); arrows move, Enter or Tab picks. Cmd+B,
  * Cmd+I and Enter on a list item help write Markdown (ui/markdown-keys.ts).
+ * What is picked is typed in, so the box's own undo takes it back.
  */
 export function MentionTextarea({
   value,
@@ -98,46 +121,52 @@ export function MentionTextarea({
   const box = useRef<HTMLTextAreaElement | null>(null);
   const members = useMembers();
   const docs = useRows("docs");
+  const me = useMe();
   const [typing, setTyping] = useState<Typing | null>(null);
   const [active, setActive] = useState(0);
   const listId = useId();
 
-  let offers: Offer[] = [];
-  if (typing?.kind === "member") {
-    const query = typing.query;
-    offers = members
-      .filter((m) => m.handle.startsWith(query) || m.name.toLowerCase().includes(query))
-      .slice(0, OFFERED)
-      .map((m) => ({ id: m.user_id, insert: `@${m.handle} `, view: <MemberOffer member={m} /> }));
-  } else if (typing?.kind === "page") {
-    offers = pagesFor(docs, typing.query, projectId).map((d) => ({
-      id: d.id,
-      insert: pageLink(docTitle(d), d.id),
-      view: <PageOffer doc={d} />,
-    }));
-  }
+  // Worked out again as what is typed changes, not as the arrows move (track keeps `typing` while it is the same).
+  const offers: Offer[] = useMemo(() => {
+    if (typing?.kind === "member") {
+      const query = typing.query;
+      return members
+        .filter((m) => m.handle.startsWith(query) || m.name.toLowerCase().includes(query))
+        .slice(0, OFFERED)
+        .map((m) => ({ id: m.user_id, insert: `@${m.handle} `, view: <MemberOffer member={m} /> }));
+    }
+    if (typing?.kind === "page") {
+      return pagesFor(docs, typing.query, projectId, me.user_id).map((d) => ({
+        id: d.id,
+        insert: pageWritten(d, projectId),
+        view: <PageOffer doc={d} />,
+      }));
+    }
+    return [];
+  }, [typing, members, docs, projectId, me.user_id]);
   const open = offers.length > 0;
+  // The list can grow shorter under the highlight (a page renamed or trashed meanwhile).
+  const current = Math.min(active, offers.length - 1);
 
   function track(el: HTMLTextAreaElement) {
-    setTyping(typingAt(el.value, el.selectionStart));
+    const now = typingAt(el.value, el.selectionStart);
+    if (now?.kind === typing?.kind && now?.start === typing?.start && now?.query === typing?.query) return;
+    setTyping(now);
     setActive(0);
   }
 
+  /** Writes what is picked in place of what was typed for it, as typing would, so that undo takes it back. */
   function pick(offer: Offer) {
     const el = box.current;
-    if (!el || !typing) return;
-    const caret = el.selectionStart;
-    onChange(value.slice(0, typing.start) + offer.insert + value.slice(caret));
+    const now = el && typingAt(el.value, el.selectionStart);
     setTyping(null);
-    const at = typing.start + offer.insert.length;
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(at, at);
-    });
+    if (!el || !now || now.start !== typing?.start) return;
+    typeText(el, now.start, el.selectionStart, offer.insert);
   }
 
   function keyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (open) {
+    // An input method that is composing has the keys.
+    if (open && !e.nativeEvent.isComposing) {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
         setActive((i) => (i + (e.key === "ArrowDown" ? 1 : offers.length - 1)) % offers.length);
@@ -145,7 +174,7 @@ export function MentionTextarea({
       }
       if ((e.key === "Enter" && !e.metaKey && !e.ctrlKey) || e.key === "Tab") {
         e.preventDefault();
-        pick(offers[active] as Offer);
+        pick(offers[current] as Offer);
         return;
       }
       if (e.key === "Escape") {
@@ -175,13 +204,13 @@ export function MentionTextarea({
         aria-autocomplete="list"
         aria-expanded={open}
         aria-controls={open ? listId : undefined}
-        aria-activedescendant={open ? `${listId}-${active}` : undefined}
+        aria-activedescendant={open ? `${listId}-${current}` : undefined}
         onChange={(e) => {
           onChange(e.target.value);
           track(e.target);
         }}
         onKeyDown={keyDown}
-        onClick={(e) => track(e.currentTarget)}
+        onSelect={(e) => track(e.currentTarget)}
         onBlur={() => setTyping(null)}
         onPaste={(e) => {
           const files = [...e.clipboardData.files];
@@ -192,7 +221,7 @@ export function MentionTextarea({
         }}
         {...rest}
       />
-      {open && <Offers id={listId} offers={offers} active={active} onActive={setActive} onPick={pick} />}
+      {open && <Offers id={listId} offers={offers} active={current} onActive={setActive} onPick={pick} />}
     </div>
   );
 }

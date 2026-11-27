@@ -24,5 +24,19 @@ export function pageIdOf(href: string): string | undefined {
   return url.origin === window.location.origin ? pageAddress.exec(url.pathname)?.[1] : undefined;
 }
 
-/** What points at a page in Markdown: [Title](doc:ID), the title's brackets escaped so they do not end it. */
-export const pageLink = (title: string, id: string) => `[${title.replace(/[\\[\]]/g, "\\$&")}](doc:${id})`;
+/**
+ * What points at a page in Markdown: [Title](doc:ID). The title is on one
+ * line, with what would end the link's words (a bracket) or a table's cell
+ * (a bar) escaped.
+ */
+export const pageLink = (title: string, id: string) =>
+  `[${title
+    .replace(/[\\[\]|]/g, "\\$&")
+    .replace(/\s+/g, " ")
+    .trim()}](doc:${id})`;
+
+/** A Markdown link in a run of text: its words (group 1, escaped as Markdown escapes them) and its address (group 2). */
+export const linkInText = /\[((?:\\.|[^[\]\\\n])*)\]\(([^()\s]*)\)/g;
+
+/** A link's words as they read: Markdown's escapes taken out. */
+export const linkWords = (escaped: string) => escaped.replace(/\\(.)/g, "$1");

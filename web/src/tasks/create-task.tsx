@@ -199,6 +199,7 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
             <MentionTextarea
               bare
               value={description}
+              projectId={projectId}
               onChange={setDescription}
               placeholder={t("create.descPlaceholder")}
               aria-label={t("create.descPlaceholder")}

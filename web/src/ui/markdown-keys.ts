@@ -38,13 +38,13 @@ function wrap(box: HTMLTextAreaElement, mark: string): true {
   const n = mark.length;
   const text = value.slice(start, end);
   if (value.slice(start - n, start) === mark && value.slice(end, end + n) === mark) {
-    type(box, start - n, end + n, text);
+    typeText(box, start - n, end + n, text);
     box.setSelectionRange(start - n, end - n);
   } else if (text.length >= 2 * n && text.startsWith(mark) && text.endsWith(mark)) {
-    type(box, start, end, text.slice(n, -n));
+    typeText(box, start, end, text.slice(n, -n));
     box.setSelectionRange(start, end - 2 * n);
   } else {
-    type(box, start, end, mark + text + mark);
+    typeText(box, start, end, mark + text + mark);
     box.setSelectionRange(start + n, end + n);
   }
   return true;
@@ -61,12 +61,12 @@ function continueList(box: HTMLTextAreaElement): boolean {
   const lineEnd = value.indexOf("\n", caret);
   const end = lineEnd < 0 ? value.length : lineEnd;
   if (value.slice(lineStart + marker.length, end).trim() === "") {
-    type(box, lineStart, end, "");
+    typeText(box, lineStart, end, "");
     return true;
   }
   const number = /^\d+/.exec(bullet)?.[0];
   const next = number ? `${Number(number) + 1}${bullet.slice(number.length)}` : bullet;
-  type(box, caret, caret, `\n${indent}${next}${space}${task ? "[ ] " : ""}`);
+  typeText(box, caret, caret, `\n${indent}${next}${space}${task ? "[ ] " : ""}`);
   return true;
 }
 
@@ -75,7 +75,7 @@ function continueList(box: HTMLTextAreaElement): boolean {
  * Where the browser cannot type it in (a test's), the text is set and the
  * box told, as typing would.
  */
-function type(box: HTMLTextAreaElement, start: number, end: number, text: string) {
+export function typeText(box: HTMLTextAreaElement, start: number, end: number, text: string) {
   box.setSelectionRange(start, end);
   const typed =
     typeof document.execCommand === "function" &&

@@ -38,6 +38,8 @@ export function When({ at }: { at: number }) {
 
 interface BoxProps {
   label: string;
+  /** The task's project, whose pages the box writes with their titles (ui/mention-textarea.tsx). */
+  projectId: string;
   initial?: string;
   submitLabel: string;
   onSubmit: (body: string) => void;
@@ -45,7 +47,7 @@ interface BoxProps {
 }
 
 /** A small text box with its two buttons: used to edit a comment and to reply. */
-function SmallComposer({ label, initial = "", submitLabel, onSubmit, onCancel }: BoxProps) {
+function SmallComposer({ label, projectId, initial = "", submitLabel, onSubmit, onCancel }: BoxProps) {
   const [body, setBody] = useState(initial);
   const submit = () => body.trim() && onSubmit(body.trim());
   return (
@@ -55,6 +57,7 @@ function SmallComposer({ label, initial = "", submitLabel, onSubmit, onCancel }:
         aria-label={label}
         placeholder={label}
         value={body}
+        projectId={projectId}
         onChange={setBody}
         onSubmit={submit}
         onFocus={caretToEnd}
@@ -205,6 +208,7 @@ function Entry({ comment, files, earlier, projectId, readOnly, onReply }: EntryP
         {editing ? (
           <SmallComposer
             label={t("comment.editLabel")}
+            projectId={projectId}
             initial={comment.body}
             submitLabel={t("common.save")}
             onCancel={() => setEditing(false)}
@@ -274,6 +278,7 @@ export const CommentCard = memo(function CommentCard({ task, comment, replies, f
         <div className="ml-7 border-t border-line px-3 py-2.5">
           <SmallComposer
             label={t("comment.replyPlaceholder")}
+            projectId={task.project_id}
             submitLabel={t("comment.sendReply")}
             onCancel={() => setReplying(false)}
             onSubmit={(body) => {
