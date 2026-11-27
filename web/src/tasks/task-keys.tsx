@@ -123,7 +123,12 @@ export function useTaskKeys({ tasksFor, anchorFor, layer = "page", onTrashed }: 
               const me = getState().me;
               if (!tasks.every((task) => can(me).editTask(task) && applies(property, task))) return;
               e.preventDefault(); // or the letter lands in the picker's search box
-              setPicker({ property, ids: tasks.map((task) => task.id), anchor: anchorFor(tasks) });
+              setPicker({
+                property,
+                ids: tasks.map((task) => task.id),
+                anchor: anchorFor(tasks),
+                back: document.activeElement,
+              });
             }),
           ]),
         )),
@@ -139,10 +144,12 @@ interface KeyedPickerProps {
   ids: string[];
   /** What it opens beside. */
   anchor: Element | null;
+  /** What had the focus when the key was pressed (the row's link), which has it again when the picker closes. */
+  back: Element | null;
 }
 
 /** The picker a key opened, on the tasks as they are now: a second label picked sees the first. */
-function KeyedPicker({ property, ids, anchor: at, onClose }: KeyedPickerProps & { onClose: () => void }) {
+function KeyedPicker({ property, ids, anchor: at, back, onClose }: KeyedPickerProps & { onClose: () => void }) {
   // Each opening is a new picker: the element it opens beside stays the one it was given.
   const anchor = useRef(at);
   const live = useLookup("tasks");
@@ -155,6 +162,11 @@ function KeyedPicker({ property, ids, anchor: at, onClose }: KeyedPickerProps & 
       open
       onOpenChange={(open) => !open && onClose()}
       anchor={anchor}
+      // It has no trigger to give the focus back to.
+      onCloseAutoFocus={(e) => {
+        e.preventDefault();
+        if (back instanceof HTMLElement && back.isConnected) back.focus();
+      }}
     />
   );
 }

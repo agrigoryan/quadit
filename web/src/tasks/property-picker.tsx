@@ -179,6 +179,8 @@ interface Props {
   anchor?: RefObject<Element | null>;
   align?: "start" | "center" | "end";
   side?: "top" | "right" | "bottom" | "left";
+  /** Where the focus goes when the picker closes, in place of its trigger: for one that has none, or loses it. */
+  onCloseAutoFocus?: (e: Event) => void;
 }
 
 /**
@@ -187,7 +189,17 @@ interface Props {
  * task panel. A list draws three of these on every row, so nothing but the
  * trigger exists until one is opened.
  */
-export function TaskPropertyPicker({ property, tasks, open, onOpenChange, children, anchor, align, side }: Props) {
+export function TaskPropertyPicker({
+  property,
+  tasks,
+  open,
+  onOpenChange,
+  children,
+  anchor,
+  align,
+  side,
+  onCloseAutoFocus,
+}: Props) {
   const [own, setOwn] = useState(false);
   const isOpen = open ?? own;
   const setOpen = onOpenChange ?? setOwn;
@@ -197,7 +209,13 @@ export function TaskPropertyPicker({ property, tasks, open, onOpenChange, childr
       {children && <PopoverTrigger asChild>{children}</PopoverTrigger>}
       {anchor && <PopoverAnchor virtualRef={anchor} />}
       {isOpen && (
-        <PopoverContent align={align} side={side} aria-label={property.picker.title()} className="p-0">
+        <PopoverContent
+          align={align}
+          side={side}
+          aria-label={property.picker.title()}
+          onCloseAutoFocus={onCloseAutoFocus}
+          className="p-0"
+        >
           {/* Keyed by the property: each kind's list reads different tables. */}
           {picker.List ? (
             <picker.List key={property.name} tasks={tasks} close={() => setOpen(false)} />

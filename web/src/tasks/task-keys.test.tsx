@@ -68,6 +68,7 @@ function Keys({ ids, onTrashed }: { ids: string[]; onTrashed?: () => void }) {
   return (
     <TooltipProvider>
       <input aria-label="field" />
+      <a href="#row">The row</a>
       {picker}
     </TooltipProvider>
   );
@@ -310,6 +311,19 @@ describe("the Shift keys of the task properties", () => {
     await waitFor(() => expect(picker).not.toBeInTheDocument());
     const due = (id: string) => getState().collections.tasks[id]?.due_on;
     expect([due("t1"), due("t3")]).toEqual(["2026-12-01", "2026-12-01"]);
+  });
+
+  it("give the focus back to where it was when the picker a key opened is closed with Escape", async () => {
+    seed(undefined, [task(1)]);
+    render(<Keys ids={["t1"]} />);
+    const row = screen.getByRole("link", { name: "The row" });
+    act(() => row.focus());
+    press("D", "KeyD", { shiftKey: true }, row);
+    const picker = screen.getByRole("dialog", { name: "Set due date…" });
+    expect(within(picker).getByRole("textbox")).toHaveFocus();
+    fireEvent.keyDown(within(picker).getByRole("textbox"), { key: "Escape" });
+    await waitFor(() => expect(picker).not.toBeInTheDocument());
+    await waitFor(() => expect(row).toHaveFocus());
   });
 
   it("clear the due dates of a selection whose tasks are due on different days", async () => {

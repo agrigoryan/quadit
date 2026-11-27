@@ -1,4 +1,4 @@
-import { type CSSProperties, memo } from "react";
+import { type CSSProperties, memo, useRef } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
@@ -91,6 +91,8 @@ export const TaskRow = memo(function TaskRow({
   const context = branch?.context ?? false;
   // Shown where the project estimates; an archived project still says how.
   const scale = scaleOf(useRowEvenIfGone("projects", task.project_id));
+  const rowLink = useRef<HTMLAnchorElement>(null);
+  const dueButton = useRef<HTMLButtonElement>(null);
 
   return (
     <div
@@ -168,6 +170,7 @@ export const TaskRow = memo(function TaskRow({
         </span>
       ) : (
         <Link
+          ref={rowLink}
           {...link}
           // J and K move a marker, not the page's focus: the row's link says it is the one they are on.
           aria-current={focused || undefined}
@@ -205,8 +208,19 @@ export const TaskRow = memo(function TaskRow({
           <EstimateChip value={task.estimate} scale={scale} className="max-sm:hidden" />
         )}
         {task.due_on && (
-          <TaskPropertyPicker property={dueProperty} tasks={[task]} align="end">
+          <TaskPropertyPicker
+            property={dueProperty}
+            tasks={[task]}
+            align="end"
+            // Cleared there, the date takes its button off the row: the focus goes to the row's link.
+            onCloseAutoFocus={(e) => {
+              if (dueButton.current?.isConnected) return;
+              e.preventDefault();
+              rowLink.current?.focus();
+            }}
+          >
             <button
+              ref={dueButton}
               type="button"
               disabled={readOnly}
               aria-label={`${t("prop.due")}: ${dueLabel(task.due_on).text}`}
