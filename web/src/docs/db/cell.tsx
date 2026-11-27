@@ -38,9 +38,10 @@ export interface CellProps {
   readOnly?: boolean;
 }
 
-const INPUT_TYPES = ["text", "number", "url"];
-
-/** Whether typing on a cell of this kind should start writing into it. */
+/**
+ * Whether a cell of this kind is edited in a text box in its place, so typing
+ * on it starts writing into it; the other kinds open an editor beside it.
+ */
 export const takesTyping = (prop: DBProperty) => prop.type === "text" || prop.type === "number" || prop.type === "url";
 
 interface InputProps {
@@ -200,7 +201,7 @@ export function Cell({
     );
   }
 
-  if (INPUT_TYPES.includes(prop.type)) {
+  if (takesTyping(prop)) {
     if (editing) {
       return (
         <CellInput
