@@ -2,15 +2,13 @@
 // to a page, a database's rows, properties and views.
 
 import { useMemo } from "react";
-import { t } from "@/lib/i18n";
 import { useLookup, useMe, useRows as useLiveRows } from "@/data/selectors";
 import { type Dict, getState } from "@/data/store";
 import type { DBProperty, DBView, Doc, DocComment } from "@/types/docs";
+import { docTitle } from "@/ui/page-name";
 
 export const byRank = (a: { rank: string; id: string }, b: { rank: string; id: string }) =>
   a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : a.id < b.id ? -1 : 1;
-
-export const docTitle = (doc: Pick<Doc, "title"> | undefined) => doc?.title?.trim() || t("docs.untitled");
 
 /**
  * True unless the person is limited to some projects and the page is tied

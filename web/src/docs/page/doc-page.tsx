@@ -9,7 +9,7 @@ import { usePageTitle } from "@/lib/ui-state";
 import { useEscapeBack } from "@/nav/escape-back";
 import { restoreDoc } from "@/docs/actions";
 import { useDocsArea } from "@/docs/area";
-import { docTitle } from "@/docs/data";
+import { docTitle } from "@/ui/page-name";
 import { PageBody } from "@/docs/page/page-body";
 import { PageHeader } from "@/docs/page/page-header";
 import { pageUi, usePageUi } from "@/docs/page/state";

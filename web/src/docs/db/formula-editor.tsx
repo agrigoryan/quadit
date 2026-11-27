@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
-import { docTitle } from "@/docs/data";
+import { docTitle } from "@/ui/page-name";
 import { updateProperty } from "@/docs/db/actions";
 import { computeCells } from "@/docs/db/compute";
 import { evalFormula, FUNCTIONS } from "@/docs/db/formula";

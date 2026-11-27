@@ -27,11 +27,11 @@ import { t } from "@/lib/i18n";
 import { getLookupEvenIfGone, getRows } from "@/data/selectors";
 import { getState } from "@/data/store";
 import { decisionStateText } from "@/docs/editor/chips";
-import { canSee, docTitle, pathTo } from "@/docs/data";
+import { canSee, pathTo } from "@/docs/data";
+import { PageIcon, docTitle } from "@/ui/page-name";
 import { mentionable } from "@/docs/editor/decision-refs";
 import type { AnyEditor } from "@/docs/editor/sync";
 import { selectedWords, type Words } from "@/docs/editor/words";
-import { PageIcon } from "@/docs/page-icon";
 import { Avatar } from "@/ui/avatar";
 import { DecisionMark } from "@/ui/icons";
 

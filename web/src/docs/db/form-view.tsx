@@ -2,7 +2,7 @@ import { type FormEvent, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { isDay } from "@/lib/days";
 import { t } from "@/lib/i18n";
-import { docTitle } from "@/docs/data";
+import { docTitle } from "@/ui/page-name";
 import { setViewConfig } from "@/docs/db/actions";
 import { SelfCell } from "@/docs/db/cell";
 import type { Value } from "@/docs/db/formula";

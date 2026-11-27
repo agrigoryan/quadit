@@ -5,7 +5,7 @@
 import { type Location, matchPath, type NavigateFunction } from "react-router";
 import { getLookupEvenIfGone, projectByKey } from "@/data/selectors";
 import { getState } from "@/data/store";
-import { docPath } from "@/docs/area";
+import { docPath } from "@/nav/page-link";
 import { inProject } from "@/docs/data";
 import { isTaskPath, taskPath } from "@/nav/task-link";
 

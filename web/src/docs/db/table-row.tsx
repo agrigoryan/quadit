@@ -11,7 +11,7 @@ import type { Value } from "@/docs/db/formula";
 import { TITLE_WIDTH } from "@/docs/db/prop-meta";
 import type { DBProperty, Doc } from "@/types/docs";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
-import { docPath } from "@/docs/area";
+import { docPath } from "@/nav/page-link";
 
 export const TITLE = "title";
 

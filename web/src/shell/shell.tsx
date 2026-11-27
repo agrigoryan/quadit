@@ -6,7 +6,7 @@ import { ahead } from "@/shell/ahead";
 import { useCan } from "@/data/access";
 import { useHotkeys } from "@/hooks/hotkeys";
 import { copyAndSay } from "@/data/files";
-import { docPath } from "@/docs/area";
+import { docPath } from "@/nav/page-link";
 import { useStore } from "@/data/store";
 import { ui, useUi } from "@/lib/ui-state";
 import { InboxPage } from "@/pages/inbox";

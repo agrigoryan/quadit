@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { matchPath, useLocation } from "react-router";
 import { saveTheme, signOut } from "@/auth/session";
-import { projectDocs, workspaceDocs } from "@/docs/area";
+import { projectDocs, workspaceDocs } from "@/nav/page-link";
 import { useCan } from "@/data/access";
 import { copyAndSay } from "@/data/files";
 import { t } from "@/lib/i18n";

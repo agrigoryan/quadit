@@ -8,7 +8,7 @@ import { Group, Item, Note } from "@/palette/palette-rows";
 import { hitsOnLiveTasks, matches, searchTasks, snippetParts } from "@/palette/palette-search";
 import { DecisionMark, StatusIcon } from "@/ui/icons";
 import { ProjectGlyph } from "@/ui/project-glyph";
-import { docPath } from "@/docs/area";
+import { docPath } from "@/nav/page-link";
 
 interface Props extends CommandContext {
   query: string;

@@ -13,10 +13,10 @@ import { useRow, useRowEvenIfGone, useSlug } from "@/data/selectors";
 import { type MentionRef, useTaskMentions } from "@/data/task-detail";
 import type { Task } from "@/types/core";
 import { Section } from "@/detail/section";
-import { PageIcon } from "@/docs/page-icon";
+import { docPath } from "@/nav/page-link";
+import { PageIcon } from "@/ui/page-name";
 import { useTaskLink } from "@/nav/task-link";
 import { StatusIcon } from "@/ui/icons";
-import { docPath } from "@/docs/area";
 
 export interface Mention {
   kind: "task" | "doc";

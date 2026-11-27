@@ -11,7 +11,7 @@ import { mutate } from "@/data/mutate";
 import { getProjectByKey, getRow, getRows } from "@/data/selectors";
 import { getState } from "@/data/store";
 import { answering } from "@/decisions/actions";
-import { docPath } from "@/docs/area";
+import { docPath } from "@/nav/page-link";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { taskPath } from "@/nav/task-link";

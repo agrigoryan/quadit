@@ -4,10 +4,10 @@
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
 import { useLiveTasks, useLookupEvenIfGone, useMe, useRows } from "@/data/selectors";
-import { docTitle, useLinkablePages } from "@/docs/data";
+import { useLinkablePages } from "@/docs/data";
+import { PageIcon, docTitle } from "@/ui/page-name";
 import { decisionStateText } from "@/docs/editor/chips";
 import { mentionable } from "@/docs/editor/decision-refs";
-import { PageIcon } from "@/docs/page-icon";
 import { Dialog } from "@/ui/dialog";
 import { DecisionMark, StatusIcon } from "@/ui/icons";
 import { PickerList } from "@/ui/picker";

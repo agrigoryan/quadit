@@ -6,8 +6,8 @@ import { t } from "@/lib/i18n";
 import type { Project } from "@/types/core";
 import { setProject } from "@/docs/actions";
 import { useLookupEvenIfGone } from "@/data/selectors";
-import { countBelow, docTitle, useLinkablePages } from "@/docs/data";
-import { PageIcon } from "@/docs/page-icon";
+import { countBelow, useLinkablePages } from "@/docs/data";
+import { PageIcon, docTitle } from "@/ui/page-name";
 import { Picker } from "@/ui/picker";
 import { Button } from "@/ui/button";
 

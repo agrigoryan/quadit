@@ -14,7 +14,7 @@ import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Radio, RadioGroup } from "@/ui/radio-group";
-import { docPath } from "@/docs/area";
+import { docPath } from "@/nav/page-link";
 
 export function SharePopover({ doc }: { doc: Doc }) {
   const me = useMe();

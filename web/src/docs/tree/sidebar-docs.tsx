@@ -9,13 +9,13 @@ import { t } from "@/lib/i18n";
 import { useMe, useSlug } from "@/data/selectors";
 import { ui } from "@/lib/ui-state";
 import { createDoc } from "@/docs/actions";
-import { docTitle, type DocTree, useDocTree } from "@/docs/data";
-import { PageIcon } from "@/docs/page-icon";
+import { type DocTree, useDocTree } from "@/docs/data";
+import { docPath } from "@/nav/page-link";
+import { PageIcon, docTitle } from "@/ui/page-name";
 import { marksProject, ProjectMark } from "@/docs/project-mark";
 import { setOpen, useTreeState } from "@/docs/tree/state";
 import type { Doc } from "@/types/docs";
 import { NavSection } from "@/ui/nav-item";
-import { docPath } from "@/docs/area";
 
 const MAX_DEPTH = 3;
 

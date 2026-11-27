@@ -16,7 +16,7 @@ import { useSession } from "@/auth/session";
 import { getRow, getRowEvenIfGone, useUnreadCounts, useWorkspaceId } from "@/data/selectors";
 import { getState } from "@/data/store";
 import { onStreamEvents } from "@/data/sync";
-import { docPath } from "@/docs/area";
+import { docPath } from "@/nav/page-link";
 import { isKey, t } from "@/lib/i18n";
 import { taskPath } from "@/nav/task-link";
 import { anchorOf, splitTitle } from "@/pages/inbox-actions";

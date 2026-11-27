@@ -15,7 +15,7 @@
 // tasks; task-queue.ts is the list a task's page steps through with J and
 // K; place.ts is where a list was left (its scroll, its keyboard row);
 // project-in-view.ts is the project the screen is about; escape-back.ts is
-// Escape leaving a page of its own.
+// Escape leaving a page of its own; page-link.ts is where a page of Docs is.
 
 import { createContext, useContext, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";

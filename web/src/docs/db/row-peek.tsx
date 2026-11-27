@@ -6,11 +6,11 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useRow, useSlug } from "@/data/selectors";
 import { trashDoc } from "@/docs/actions";
-import { docTitle } from "@/docs/data";
+import { docPath } from "@/nav/page-link";
+import { docTitle } from "@/ui/page-name";
 import { IconButton } from "@/ui/button";
 import { Loading } from "@/ui/spinner";
 import { Tooltip } from "@/ui/tooltip";
-import { docPath } from "@/docs/area";
 
 // The page body brings the editor with it: fetched when a row is first opened.
 const PageBody = lazy(() => import("@/docs/page/page-body").then((m) => ({ default: m.PageBody })));

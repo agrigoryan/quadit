@@ -6,7 +6,7 @@ import { cx } from "@/lib/cx";
 import { useLookup, useMember } from "@/data/selectors";
 import { isDay } from "@/lib/days";
 import { formatDay } from "@/lib/time";
-import { docTitle } from "@/docs/data";
+import { docTitle } from "@/ui/page-name";
 import type { Value } from "@/docs/db/formula";
 import { formulaText } from "@/docs/db/formula-values";
 import { findOption, OptionChip } from "@/docs/db/options";

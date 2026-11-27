@@ -3,8 +3,7 @@ import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 
 import { restoreDoc } from "@/docs/actions";
-import { docTitle } from "@/docs/data";
-import { PageIcon } from "@/docs/page-icon";
+import { PageIcon, docTitle } from "@/ui/page-name";
 import { loadTrash, useTrashed } from "@/docs/trash";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Ago } from "@/ui/ago";

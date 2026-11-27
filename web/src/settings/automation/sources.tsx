@@ -18,7 +18,7 @@ import { queryClient } from "@/data/query";
 import { automationKeys, change, listSources, type Source, type SyncResult } from "@/settings/automation/data";
 import { SourceForm } from "@/settings/automation/source-form";
 import { SyncLine, type SyncState } from "@/settings/automation/sync-line";
-import { docPath } from "@/docs/area";
+import { docPath } from "@/nav/page-link";
 
 /** "docs" for ".../owner/docs.git": what to call a source whose root page is not in view. */
 const repoName = (repo: string) =>

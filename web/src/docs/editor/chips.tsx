@@ -12,10 +12,9 @@ import { useLookupEvenIfGone, useMe, useRowEvenIfGone, useRows, useTaskByKeyEven
 import { useFindTask } from "@/data/find-task";
 import { useRestLoaded } from "@/data/store";
 import type { Decision } from "@/types/core";
-import { docTitle } from "@/docs/data";
+import { PageIcon, docTitle } from "@/ui/page-name";
 import { answerOf, DECISION_REF, decisionsOf } from "@/docs/editor/decision-refs";
 import { openDecision, openDoc, openTask } from "@/docs/nav";
-import { PageIcon } from "@/docs/page-icon";
 import { MemberCard } from "@/tasks/member-card";
 import { DecisionMark } from "@/ui/icons";
 import { TaskMention } from "@/ui/task-mention";

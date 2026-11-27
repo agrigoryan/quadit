@@ -1,6 +1,12 @@
+// How a page is named wherever it shows: its title, and its mark.
+
 import { Brain, Database, FileText, GitBranch, Sparkles } from "lucide-react";
 import { cx } from "@/lib/cx";
+import { t } from "@/lib/i18n";
 import type { Doc } from "@/types/docs";
+
+/** A page's title as shown; one without a title is called Untitled. */
+export const docTitle = (doc: Pick<Doc, "title"> | undefined) => doc?.title?.trim() || t("docs.untitled");
 
 /** Names the server gives pages it makes itself, instead of an emoji. */
 const NAMED = { git: GitBranch, brain: Brain } as const;
