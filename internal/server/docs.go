@@ -276,14 +276,22 @@ func (who *viewer) pageAnswer(ctx context.Context, page core.Doc, blocks []core.
 		return nil, err
 	}
 	out["mentioned_in"], out["mentions"] = back, who.seenMentioned(ctx, fwd)
-	// The files on the page and on its comments: its threads show theirs.
-	on := []string{page.ID}
-	for _, cm := range comments {
-		on = append(on, cm.ID)
-	}
-	_, atts, err := who.attachments(ctx, store.In("subject_id", on))
+	// The files on the page and on its comments: its threads show theirs. Matched by what they are on
+	// as well as its id: ids are the caller's to choose, and the same one may name rows of two tables.
+	_, atts, err := who.attachments(ctx, store.Eq("subject_type", "doc"), store.Eq("subject_id", page.ID))
 	if err != nil {
 		return nil, err
+	}
+	if len(comments) > 0 {
+		ids := make([]string, len(comments))
+		for i, cm := range comments {
+			ids[i] = cm.ID
+		}
+		_, onComments, err := who.attachments(ctx, store.Eq("subject_type", "comment"), store.In("subject_id", ids))
+		if err != nil {
+			return nil, err
+		}
+		atts = append(atts, onComments...)
 	}
 	out["attachments"] = atts
 	if page.SourceID != "" {

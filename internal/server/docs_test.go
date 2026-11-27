@@ -494,3 +494,37 @@ func TestAPageBringsTheFilesOfItsComments(t *testing.T) {
 		}
 	})
 }
+
+// TestAPageBringsOnlyItsOwnFilesWhateverTheirIDs: what a page's read brings
+// is matched by what a file is on as well as its id. A comment given the id
+// of another page (ids are the caller's to choose) does not bring that
+// page's files, nor their names and addresses, with it.
+func TestAPageBringsOnlyItsOwnFilesWhateverTheirIDs(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		upload := func(name string) string {
+			var f struct{ ID string }
+			s.call(t, s.owner, "", "POST", w+"/files?name="+name, []byte("the bytes of "+name), 201, &f)
+			return f.ID
+		}
+		page := s.change(t, s.owner, "", "doc.create", M{"title": "Plan"})["ref"].(string)
+		secret := s.change(t, s.owner, "", "doc.create", M{"title": "Salaries", "private": true})["ref"].(string)
+		s.change(t, s.owner, "", "attachment.add", M{"doc": secret, "file": upload("salaries.csv")})
+		root := s.change(t, s.owner, "", "comment.create", M{"id": secret, "doc": page, "body": "same id"})["ref"].(string)
+		if root != secret {
+			t.Fatalf("the comment took the id %s, want %s", root, secret)
+		}
+		page2 := s.change(t, s.owner, "", "doc.create", M{"title": "Notes"})["ref"].(string)
+		s.change(t, s.owner, "", "comment.create", M{"id": page2, "doc": page, "body": "named like a page"})
+		s.change(t, s.owner, "", "attachment.add", M{"doc": page2, "file": upload("notes.txt")})
+
+		var got struct {
+			Attachments []struct{ File struct{ Name string } }
+		}
+		s.call(t, s.owner, "", "GET", w+"/docs/"+page, nil, 200, &got)
+		if len(got.Attachments) != 0 {
+			t.Fatalf("the page brings files that are not on it or its comments: %+v", got.Attachments)
+		}
+	})
+}
