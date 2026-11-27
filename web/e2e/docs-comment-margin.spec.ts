@@ -262,14 +262,16 @@ test("a thread picked from Discussions below a stack of cards has its reply box 
       `Point ${i} of the review, made at length so that the card is tall.`,
     );
   await page.goto(`/e2e/docs/${doc.id}`);
-  await expect(card(page, "Point 9 of the review")).toBeVisible();
+  // The last of the stack is far below the line its words are on, out of view.
+  await expect(card(page, "Point 9 of the review")).toBeAttached();
+  await expect(card(page, "Point 9 of the review")).not.toBeInViewport();
 
   await page.getByRole("button", { name: /Comments/ }).click();
   await page
     .getByRole("dialog", { name: "Discussions" })
-    .getByRole("button", { name: /Point 1 of/ })
+    .getByRole("button", { name: /Point 9 of/ })
     .click();
-  const reply = card(page, "Point 1 of the review").getByRole("textbox", { name: "Reply…" });
+  const reply = card(page, "Point 9 of the review").getByRole("textbox", { name: "Reply…" });
   await expect(reply).toBeFocused();
   await expect(reply).toBeInViewport();
 });
@@ -349,4 +351,103 @@ test("where the page has no room for a margin, a click on the words opens the th
   // The cursor stays in the text, where the click put it.
   await expect(pageText(page)).toBeFocused();
   await expect(page.locator("[data-comments]")).toBeHidden();
+});
+
+test("the popover at a block stays with its block as the page scrolls, and gives way to a dialog, keeping what was written", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const filler = Array.from({ length: 30 }, (_, i) => `Line ${i + 1} of the plan.`).join("\n\n");
+  const doc = await newPage(quadit, project.key, "Scrolled", `The opening line.\n\n${filler}\n`);
+  const first = doc.blocks.get("The opening line.") ?? "";
+  await quadit.cli("comment", `page=${doc.id}`, `block=${first}`, "About the opening.");
+  await page.goto(`/e2e/docs/${doc.id}`);
+  const mark = page.getByRole("button", { name: "1 open comment thread on this block" });
+  await mark.click();
+  const shown = popover(page);
+  await expect(shown).toBeVisible();
+  const gap = async () => ((await shown.boundingBox())?.y ?? NaN) - ((await mark.boundingBox())?.y ?? NaN);
+  const before = await gap();
+  await page.locator("div[data-page]").evaluate((el) => el.scrollBy({ top: 120 }));
+  await expect.poll(async () => Math.abs((await gap()) - before)).toBeLessThan(3);
+  await page.keyboard.press("Escape");
+
+  // A new thread being written, and the page's versions opened over it: the popover goes, its words kept.
+  await pageText(page).getByText("Line 3 of the plan.").click();
+  await page.keyboard.press("Control+m");
+  await page.keyboard.type("Half a thought");
+  await page.getByRole("button", { name: "More" }).click();
+  await page.getByRole("menuitem", { name: "Version history" }).click();
+  await expect(page.getByRole("dialog", { name: /Version/ })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Comments" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await pageText(page).getByText("Line 3 of the plan.").click();
+  await page.keyboard.press("Control+m");
+  await expect(popover(page).getByRole("textbox", { name: "Comment on this block…" })).toHaveValue("Half a thought");
+});
+
+test("a database row's side peek has its own comments: Add comment there is the row's, and a thread on a block gone shows", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const database = JSON.parse(
+    await quadit.cli(
+      "--json",
+      "do",
+      "doc.create",
+      JSON.stringify({ kind: "database", title: "Vendors", project: project.key }),
+    ),
+  ) as { ref: string };
+  const row = JSON.parse(
+    await quadit.cli(
+      "--json",
+      "do",
+      "doc.create",
+      JSON.stringify({ parent: database.ref, title: "Acme paints", markdown: "Keep this.\n\nCut this.\n" }),
+    ),
+  ) as { ref: string };
+  const read = JSON.parse(await quadit.cli("--json", "doc", row.ref)) as {
+    blocks: { id: string; content?: { text?: string }[] }[];
+  };
+  const cut = read.blocks.find((b) => (b.content ?? []).map((c) => c.text).join("") === "Cut this.")?.id ?? "";
+  await quadit.cli("comment", `page=${row.ref}`, `block=${cut}`, "Why is this here?");
+  await quadit.cli("do", "doc.edit", JSON.stringify({ doc: row.ref, ops: [{ op: "delete", id: cut }] }));
+
+  await page.goto(`/e2e/docs/${database.ref}`);
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  const peek = page.getByRole("dialog", { name: "Acme paints" });
+  await expect(peek.getByText("Keep this.")).toBeVisible();
+  const own = peek.getByRole("region", { name: "Comments on the page" });
+  await expect(own.getByText("The block this was on is gone")).toBeVisible();
+
+  await own.getByRole("button", { name: "Add comment" }).click();
+  const box = own.getByRole("textbox", { name: "Comment on the page…" });
+  await expect(box).toBeFocused();
+  await box.fill("About the row.");
+  await own.getByRole("button", { name: "Comment", exact: true }).click();
+  await expect.poll(() => quadit.cli("comments", row.ref)).toContain("About the row.");
+  expect(await quadit.cli("comments", database.ref)).not.toContain("About the row.");
+});
+
+test("on a phone, a thread shown in the page from the pane is shown with the pane out of the way", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const doc = await newPage(quadit, project.key, "Pocket", "A line.\n");
+  await quadit.cli("comment", `page=${doc.id}`, "Who reads this?");
+  await page.goto(`/e2e/docs/${doc.id}`);
+  await page.getByRole("button", { name: /Comments/ }).click();
+  await page.getByRole("dialog", { name: "Discussions" }).getByRole("button", { name: "See all" }).click();
+  const pane = page.locator("[data-comments]");
+  await expect(pane).toBeFocused();
+  await pane.getByRole("button", { name: "Show in the page" }).click();
+  await expect(pane).toBeHidden();
+  const reply = onPage(page).getByRole("textbox", { name: "Reply…" });
+  await expect(reply).toBeFocused();
+  await expect(reply).toBeInViewport();
 });

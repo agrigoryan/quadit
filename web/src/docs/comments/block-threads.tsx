@@ -74,9 +74,10 @@ export function BlockThreads({ docId, projectId, text }: Props) {
     [text, block],
   );
 
-  // A mark clicked whose threads turn out to have nothing left in the text (their words taken out a
-  // moment ago): nothing is open, and Esc is the page's again.
-  const nothingThere = !!block && !draft && known && shown.length === 0 && !!focusBlock;
+  // A mark clicked just now whose threads turn out to have nothing left in the text (their words taken
+  // out a moment ago): nothing opens, and Esc is the page's again. (Once one was shown, a moment with
+  // none, as a thread's first comment is deleted and its reply takes its place, leaves it open.)
+  const nothingThere = !!focusBlock && !draft && known && shown.length === 0 && cursorAsked === "block";
   useEffect(() => {
     if (nothingThere) pageUi.leaveThread();
   }, [nothingThere]);
