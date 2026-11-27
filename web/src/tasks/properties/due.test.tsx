@@ -112,6 +112,13 @@ describe("the due date's days by name", () => {
     ]);
   });
 
+  it("say the end of next week on a weekend, when this week's working days are over", () => {
+    vi.setSystemTime(new Date(2026, 10, 28, 12));
+    seed({});
+    const picker = openPicker();
+    expect(suggested(picker)[2]).toBe(`End of next week${weekdayAndDay("2026-12-04")}`);
+  });
+
   it("add the end of the current cycle where the project works in cycles, whose days the month tints", () => {
     seed({ cycles: true });
     const picker = openPicker();

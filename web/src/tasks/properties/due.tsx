@@ -11,7 +11,7 @@ import { useCycles, useRow, useRowEvenIfGone } from "@/data/selectors";
 import { addDays } from "@/lib/days";
 import { t } from "@/lib/i18n";
 import { dueLabel, formatDay, localDay, serverDay } from "@/lib/time";
-import { endOfWeek, nextWeek, personWeek } from "@/lib/week";
+import { endOfWeek, nextWeek, personWeek, weekStart } from "@/lib/week";
 import { isClosedCategory } from "@/types/core";
 import { setDue } from "@/tasks/actions";
 import { Pill, pill } from "@/tasks/properties/create-pill";
@@ -47,6 +47,7 @@ function useDueDays({ projectId, epicId, milestoneId }: Around): Pick<DatePanelP
   const epic = useRow("epics", epicId);
   const milestone = useRow("milestones", milestoneId);
   const today = localDay(now);
+  const end = endOfWeek(today, personWeek);
   // A cycle's days are the server's, as everywhere: the current one is the same for everybody.
   const day = serverDay(new Date(now));
   const current =
@@ -55,7 +56,11 @@ function useDueDays({ projectId, epicId, milestoneId }: Around): Pick<DatePanelP
     quick: [
       { label: t("due.quick.today"), day: today },
       { label: t("due.quick.tomorrow"), day: addDays(today, 1) },
-      { label: t("due.quick.endOfWeek"), day: endOfWeek(today, personWeek) },
+      // On a weekend this week's working days are over: the end of the week to come is next week's.
+      {
+        label: end < addDays(weekStart(today, personWeek), 7) ? t("due.quick.endOfWeek") : t("due.quick.endOfNextWeek"),
+        day: end,
+      },
       { label: t("due.quick.nextWeek"), day: nextWeek(today, personWeek) },
       { label: t("due.quick.inTwoWeeks"), day: addDays(today, 14) },
       ...(current ? [{ label: t("due.quick.endOfCycle"), day: current.ends_on }] : []),

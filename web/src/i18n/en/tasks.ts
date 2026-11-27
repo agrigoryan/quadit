@@ -71,6 +71,7 @@ export const tasks = {
   "due.quick.today": "Today",
   "due.quick.tomorrow": "Tomorrow",
   "due.quick.endOfWeek": "End of this week",
+  "due.quick.endOfNextWeek": "End of next week",
   "due.quick.nextWeek": "Next week",
   "due.quick.inTwoWeeks": "In two weeks",
   "due.quick.endOfCycle": "End of this cycle",

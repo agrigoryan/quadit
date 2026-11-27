@@ -176,6 +176,12 @@ describe("readDay", () => {
     expect(readDay("end of week", { ...israel, today: "2026-11-27" })).toBe("2026-12-03");
   });
 
+  it("reads the end of this week on a weekend as the Friday to come, and the end of next week as the one after", () => {
+    const saturday = { ...at, today: "2026-11-28" };
+    expect(readDay("end of this week", saturday)).toBe("2026-12-04");
+    expect(readDay("end of next week", saturday)).toBe("2026-12-11");
+  });
+
   it("takes next week from a weekend to the week after it", () => {
     expect(readDay("next week", { ...at, today: "2026-11-29" })).toBe("2026-11-30");
     expect(readDay("end of week", { ...at, today: "2026-11-28" })).toBe("2026-12-04");

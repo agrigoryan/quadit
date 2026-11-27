@@ -11,7 +11,8 @@
 //     never today; "this fri" may be today; "next fri" is the one after,
 //     except on a Friday, where both are a week on
 //   next week: the first working day of next week; next month: its first day
-//   end of (this) week (eow), end of next week: the week's last working day;
+//   end of (this) week (eow): the week's last working day, or on a weekend
+//     the one to come; end of next week: a week after that;
 //     end of (this) month (eom), end of next month: the month's last day
 //   in 3 days, 3 days, 3d, +3; -1, 2 weeks ago: counted from today, in days,
 //     weeks (w), months (mo) or years (y); a, an and one to twelve as words
@@ -117,7 +118,8 @@ export function readDay(text: string, { today, week }: ReadingContext): string |
     "end week": () => endOfWeek(today, week),
     "end this week": () => endOfWeek(today, week),
     eow: () => endOfWeek(today, week),
-    "end next week": () => endOfWeek(nextWeek(today, week), week),
+    // A week after the end of this one: on a weekend, when that is already next week's, the week after.
+    "end next week": () => addDays(endOfWeek(today, week), 7),
     "end month": () => monthEnd(today),
     "end this month": () => monthEnd(today),
     eom: () => monthEnd(today),
