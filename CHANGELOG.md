@@ -4,7 +4,7 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
-The server upgrades its database when it starts (migration 0031), copying it first; `quadit upgrade --undo` goes back ([upgrades](docs/install.md#upgrades)). It changes the feed's older events: an estimate cleared, or set where there was none, said that none as 0, and now says it as `null`, as the feed does from this version on.
+The server upgrades its database when it starts (migrations 0031 and 0032), copying it first; `quadit upgrade --undo` goes back ([upgrades](docs/install.md#upgrades)). It changes the feed's older events: an estimate cleared, or set where there was none, said that none as 0, and now says it as `null`, as the feed does from this version on. And a comment deleted before no longer mentions what its text named: a task stops listing a page only that comment named.
 
 ### Added
 
