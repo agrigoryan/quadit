@@ -13,9 +13,11 @@ import { Properties } from "@/detail/properties";
 import { api } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
 import { useRow } from "@/data/selectors";
-import { clearStore, loadBootstrap } from "@/data/store";
+import { clearStore, getState, loadBootstrap } from "@/data/store";
 import { fullDay, weekdayAndDay } from "@/lib/time";
 import type { Member, Project, Task, User, Workspace } from "@/types/core";
+import { due } from "@/tasks/properties/due";
+import type { TaskFields } from "@/tasks/properties/property";
 import { TooltipProvider } from "@/ui/tooltip";
 
 type Sent = { type: string; args: Record<string, unknown> };
@@ -140,5 +142,32 @@ describe("the due date's days by name", () => {
     ]);
     fireEvent.click(within(picker).getByRole("button", { name: /^Epic’s target/ }));
     await waitFor(() => expect(sent).toEqual([{ type: "task.update", args: { id: "t1", due_on: "2026-12-18" } }]));
+  });
+});
+
+describe("the create dialog's due date", () => {
+  it("offers today as the picker counts it, when the dialog was opened the day before", () => {
+    vi.setSystemTime(new Date(2026, 10, 26, 23, 59, 55));
+    seed({});
+    const project = getState().collections.projects.p1 as Project;
+    const fields: TaskFields = {
+      statusId: "s1",
+      assigneeId: "",
+      priority: 0,
+      labelIds: [],
+      epicId: "",
+      parentId: "",
+      dueOn: "",
+      templateId: "",
+    };
+    render(
+      <TooltipProvider>
+        <due.Create project={project} value={fields} onChange={() => {}} />
+      </TooltipProvider>,
+    );
+    vi.setSystemTime(new Date(2026, 10, 27, 0, 0, 1));
+    fireEvent.click(screen.getByRole("button", { name: "Due date" }));
+    const picker = screen.getByRole("dialog", { name: "Due date" });
+    expect(suggested(picker)[0]).toBe(`Today${weekdayAndDay("2026-11-27")}`);
   });
 });

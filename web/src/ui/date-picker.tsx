@@ -34,8 +34,11 @@ export interface DatePanelProps extends Pick<MonthGridProps, "stretch" | "min" |
   onChange: (day: string | null) => void;
   /** The value may be empty: the panel offers Clear. */
   clearable?: boolean;
-  /** Days offered by name, in their order, beside the month. */
-  quick?: QuickDay[];
+  /**
+   * Days offered by name, in their order, beside the month: worked out from
+   * the panel's own today, so they count from the day the typed words do.
+   */
+  quick?: (today: string) => QuickDay[];
   /**
    * Hears the day the box reads as it is typed, while it is one that can be
    * picked (undefined otherwise): for a caller that keeps it when the person
@@ -68,7 +71,7 @@ export function DatePanel({
   someSet,
   onChange,
   clearable,
-  quick = [],
+  quick,
   stretch,
   min,
   max,
@@ -81,6 +84,7 @@ export function DatePanel({
   const panel = useRef<HTMLDivElement>(null);
   const lineId = useId();
 
+  const picks = quick?.(today) ?? [];
   const typed = text.trim();
   const read = typed ? readDay(typed, reading) : undefined;
   const refusal = !typed
@@ -146,7 +150,7 @@ export function DatePanel({
       </div>
 
       <div className="flex max-sm:flex-col">
-        {quick.length > 0 && (
+        {picks.length > 0 && (
           // A toolbar: one Tab stop, on its first button; the arrows move among them. On a phone it is
           // one row above the month, scrolled sideways, so the whole picker fits the screen.
           <div
@@ -158,7 +162,7 @@ export function DatePanel({
             onKeyDown={moveAmong}
             className="flex w-52 flex-col gap-px border-r border-line p-1 no-scrollbar max-sm:w-auto max-sm:flex-row max-sm:gap-1 max-sm:overflow-x-auto max-sm:border-r-0 max-sm:border-b max-sm:p-2"
           >
-            {quick.map((pick, i) => (
+            {picks.map((pick, i) => (
               <button
                 key={pick.label}
                 type="button"

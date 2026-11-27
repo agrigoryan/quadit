@@ -112,7 +112,7 @@ describe("DatePanel", () => {
 
   it("offers days by name with their dates, one Tab stop moved through with the arrows", () => {
     const onChange = panel({
-      quick: [
+      quick: () => [
         { label: "Tomorrow", day: "2026-11-27" },
         { label: "Next week", day: "2026-11-30" },
       ],
