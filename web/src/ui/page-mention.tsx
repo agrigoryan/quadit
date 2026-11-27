@@ -2,14 +2,16 @@
 // wherever Markdown is drawn (ui/markdown.tsx). It shows the page as it is
 // now in the workspace copy, its icon and its title, and opens it in the
 // app, as a task's mention opens the task (ui/task-mention.tsx); its card
-// says the page's project and when it last changed. A page the copy does
-// not hold (in the trash, someone else's private page, one of a project the
-// reader may not read) is shown as the words written, quiet.
+// says the page's project and when it last changed. A page the reader may
+// not see (in the trash, someone else's private page, one of a project the
+// reader may not read, the copy holding it or not) is shown as the words
+// written, quiet.
 
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { t } from "@/lib/i18n";
-import { useRow, useRowEvenIfGone, useRows, useSlug } from "@/data/selectors";
+import { canSeePage } from "@/data/access";
+import { useMe, useRow, useRowEvenIfGone, useRows, useSlug } from "@/data/selectors";
 import type { Doc } from "@/types/docs";
 import { docPath } from "@/nav/page-link";
 import { Ago } from "@/ui/ago";
@@ -28,7 +30,10 @@ interface Props {
 export function PageMention({ docId, title, children }: Props) {
   const byId = useRow("docs", docId);
   const docs = useRows("docs");
-  const doc = byId ?? (title ? pageTitled(docs, title) : undefined);
+  const me = useMe();
+  const found = byId ?? (title ? pageTitled(docs, title) : undefined);
+  // A page whose access changed while the app was open is still in the copy: it is asked as the Docs tree asks.
+  const doc = found && canSeePage(found, me.user_id) ? found : undefined;
   const slug = useSlug();
   if (!doc) return <span className="page-mention is-gone">{children}</span>;
   // The space reads the mention aloud, and copies it, as its title after its icon; the layout leaves it out.

@@ -8,7 +8,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
-import { clearStore, loadBootstrap, mergeRows } from "@/data/store";
+import { clearStore, loadBootstrap, mergeRows, useStore } from "@/data/store";
 import { WithQuery } from "@/test/query";
 import type { Member, User, Workspace } from "@/types/core";
 import type { Doc } from "@/types/docs";
@@ -104,6 +104,24 @@ describe("a page named in Markdown", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     expect(text?.textContent).toBe(`Old plan, doc:${ELSEWHERE} and [[Old plan]]`);
     expect(text?.querySelectorAll(".page-mention.is-gone")).toHaveLength(3);
+  });
+
+  it("shows the written words for a page the reader may no longer see: moved to a project not theirs, made private", () => {
+    act(() => {
+      useStore.setState((s) => ({ me: s.me && { ...s.me, scope: { projects: ["p1"] } } }));
+      mergeRows("docs", [
+        page({ id: REVIEW, title: "Meta rework review", project_id: "p2" }),
+        page({ id: NOTES, title: "Notes", owner_id: "u2" }),
+      ]);
+    });
+    const text = show(`[the review](doc:${REVIEW}) and doc:${NOTES}`);
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(text?.textContent).toBe(`the review and doc:${NOTES}`);
+  });
+
+  it("shows a link to a title written with a broken escape as its words", () => {
+    const text = show("[the plan](page-titled:%E0%A4%A)");
+    expect(text?.textContent).toBe("the plan");
   });
 
   it("leaves a link to a page's address on another site a link that opens elsewhere", () => {

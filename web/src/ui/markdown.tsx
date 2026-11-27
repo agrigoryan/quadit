@@ -43,6 +43,15 @@ function splitText(value: string): Node[] {
 /** The address a [[Title]] is given in the tree, its title encoded as the address must be, for RefLink to find the page by. */
 const TITLED = "page-titled:";
 
+/** The title a [[Title]]'s address carries; undefined for one written by hand that does not decode. */
+function titleOf(href: string): string | undefined {
+  try {
+    return decodeURIComponent(href.slice(TITLED.length));
+  } catch {
+    return undefined;
+  }
+}
+
 /** Splits text around mentions and task keys. */
 function splitMentions(value: string): Node[] {
   const out: Node[] = [];
@@ -99,8 +108,10 @@ function RefLink({ href, children }: { href?: string; children?: React.ReactNode
     );
   }
   if (href?.startsWith("task:")) return <TaskMention taskKey={href.slice(5)} />;
-  if (href?.startsWith(TITLED))
-    return <PageMention title={decodeURIComponent(href.slice(TITLED.length))}>{children}</PageMention>;
+  if (href?.startsWith(TITLED)) {
+    const title = titleOf(href);
+    return title === undefined ? <>{children}</> : <PageMention title={title}>{children}</PageMention>;
+  }
   const docId = href ? pageIdOf(href) : undefined;
   if (docId) return <PageMention docId={docId}>{children}</PageMention>;
   return (
