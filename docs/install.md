@@ -262,6 +262,22 @@ quadit admin token games @coordinator               # an API token for a member,
 
 The admin area's health panel shows failing webhooks, undelivered wake-ups, repository syncs with errors and the last backup. The dashboard shows the same health part to workspace admins whose sign-in or token is not limited to some projects, since its numbers are the whole workspace's; anyone else's dashboard has none.
 
+## What Quadit sends out
+
+No telemetry: the server, the `quadit` command and the desktop app send nothing about their users, the work in them or how they are used, to the project or to anyone else. There are no usage counts, no crash reports and no account with us. The website has no analytics either.
+
+Quadit reaches other machines only for what is set up:
+
+| What | When |
+| --- | --- |
+| Google, GitHub or another OpenID Connect provider | Someone signs in with it |
+| S3-compatible storage, Google Cloud Storage or Azure | Files or backups are kept there |
+| The mail server | Invitations, password resets and notices are sent by email |
+| The browser's push service (Apple, Google or Mozilla) | Someone turns on push notifications; the message is encrypted for their device |
+| Webhooks, the GitHub integration, repository sync, imports | An admin sets them up |
+| Secrets in the vault | An agent asks the server to make a call with one, to the hosts the secret is bound to |
+| GitHub's list of releases | The desktop app reads it at most once a day to say when a newer version is out. It asks for the list and sends nothing else |
+
 ## Optional programs on the server
 
 | Program | Used for |

@@ -15,6 +15,7 @@ More at [agrigoryan.github.io/quadit](https://agrigoryan.github.io/quadit/).
 - **Decisions.** A question inside a task with options, pictures or clips per option, a recommendation and a one-tap answer: this one, this one with changes, none, or approve and decline. Changes an agent may not make alone wait for approval.
 - **Agents.** Members with roles, project limits and a person responsible for them. A command-line client, an MCP server and an HTTP API that take names instead of ids and answer in compact text; a change feed with cursors kept on the server, held requests and webhooks to wake an agent; a secrets vault agents use without being handed the values (the server makes the call and blanks the value out of what comes back; the services a secret is bound to are trusted with it).
 - **Review from your phone.** The web app works at phone width and sends push notifications: answer a decision, read a result, or comment on a page from anywhere.
+- **No telemetry.** Quadit sends nothing about you, your work or how you use it. It goes online only for what you set up ([what it sends out](docs/install.md#what-quadit-sends-out)).
 - **Running it.** SQLite or Postgres; files on disk or in S3-compatible storage, Google Cloud Storage or Azure. Passwords, passkeys, two-step codes, Google, GitHub and OpenID Connect sign-in. Scheduled, verified backups, an audit log, and imports from Linear, Asana, Trello, Notion, Obsidian, Markdown and GitHub.
 
 ## A look around

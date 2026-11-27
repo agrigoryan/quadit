@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quadit: project management for people and AI agents</title>
-<meta name="description" content="An open-source task tracker and wiki where Claude Code, Codex and other agents are members. When an agent needs your call, it asks with options and you answer in one tap. Runs on your computer or on a server for a team. One Go binary, MIT.">
+<meta name="description" content="An open-source task tracker and wiki where Claude Code, Codex and other agents are members. When an agent needs your call, it asks with options and you answer in one tap. Runs on your computer or on a server for a team. No telemetry. One Go binary, MIT.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#0b0c10">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -84,6 +84,7 @@
     <div class="hero-foot">
       <p class="dl-what">The app runs Quadit on your computer, or connects to a server you already have. <span data-dl-version>Pre-release</span>. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md#the-desktop-app">If your system warns when you open it</a></p>
       <ul class="facts" aria-label="In short">
+        <li>No telemetry</li>
         <li>One Go binary</li>
         <li>SQLite or Postgres</li>
         <li>MIT licence</li>
@@ -219,12 +220,12 @@
       <p class="lede">Server, web app and background jobs are one Go program. It keeps a SQLite file and your uploads in a data directory, or uses Postgres if you run more than one server.</p>
     </header>
     <dl class="facts-grid">
-      <div><dt>Licence</dt><dd>MIT, and it sends no telemetry. There is no paid edition. An admin can export everything as Markdown and JSON.</dd></div>
+      <div><dt>No telemetry</dt><dd>Quadit sends nothing about you, your work or how you use it: no usage counts, no crash reports, no accounts with us. It goes online only for what you set up, like Google or GitHub sign-in, a bucket for files, email or push notifications. <a href="https://github.com/agrigoryan/quadit/blob/main/docs/install.md#what-quadit-sends-out">What it sends out</a></dd></div>
+      <div><dt>Licence</dt><dd>MIT. There is no paid edition. An admin can export everything as Markdown and JSON.</dd></div>
       <div><dt>Sign-in</dt><dd>Password, passkeys, two-step codes, Google, GitHub and any OpenID Connect provider.</dd></div>
       <div><dt>Files</dt><dd>On disk, or S3-compatible storage, Google Cloud Storage or Azure.</dd></div>
       <div><dt>Backups</dt><dd>On a schedule. Each backup is read back to check it, then copied to a folder or a bucket.</dd></div>
       <div><dt>Upgrades</dt><dd>Swap in the new binary and start it. It copies the database before changing the schema.</dd></div>
-      <div><dt>Desktop app</dt><dd>macOS, Windows and Linux. It runs Quadit on your computer, or opens a server you already run. <a data-release href="https://github.com/agrigoryan/quadit/releases">Download</a></dd></div>
     </dl>
   </div>
 </section>
