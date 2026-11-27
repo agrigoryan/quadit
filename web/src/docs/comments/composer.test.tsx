@@ -5,7 +5,7 @@
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { FileRow, Member, User, Workspace } from "@/types/core";
 import { Composer } from "@/docs/comments/composer";
@@ -21,6 +21,11 @@ vi.mock("@/data/files", async (importOriginal) => ({
       uploads.push({ file, land });
     }),
 }));
+
+beforeAll(() => {
+  // The mention list keeps its highlight in view; jsdom scrolls nothing.
+  Element.prototype.scrollIntoView = vi.fn();
+});
 
 const me = { user_id: "u1", role: "member", name: "Me", kind: "person", handle: "me" } as Member;
 const ana = { user_id: "u2", role: "member", name: "Ana Lee", kind: "person", handle: "ana" } as Member;
@@ -95,7 +100,7 @@ describe("Composer", () => {
     const user = userEvent.setup();
     const { box } = show();
     await user.type(box, "Ask");
-    await user.click(screen.getByRole("button", { name: "Mention someone" }));
+    await user.click(screen.getByRole("button", { name: "Mention a person, task or page" }));
     expect(box).toHaveValue("Ask @");
     expect(box).toHaveFocus();
     await user.click(await screen.findByRole("option", { name: /Ana Lee/ }));
