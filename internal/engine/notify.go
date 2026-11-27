@@ -17,7 +17,8 @@ import (
 // The actor is never notified of their own change, and a member gets at most
 // one item per change and subject: callers notify the most specific reason
 // first. A quiet change (history being imported) notifies nobody, and a
-// member is not told of a task or a page of a project they may not read.
+// member is not told of a task or a page of a project they may not read, nor
+// of a private page not shared with them.
 func (c *cx) notify(userID, typ string, n core.Notification) error {
 	if userID == "" || (userID == c.actor.UserID && !c.selfNotify) || c.quiet || c.noNews {
 		return nil
@@ -44,6 +45,9 @@ func (c *cx) notify(userID, typ string, n core.Notification) error {
 		var d core.Doc
 		if err := c.tx.Get(c.ctx, &d, store.Eq("id", n.DocID)); err != nil {
 			return err
+		}
+		if !CanSeeDoc(d, userID) {
+			return nil // a private page not shared with them: not even its title
 		}
 		where = inDoc(d)
 	}

@@ -80,3 +80,49 @@ func TestNotifyMarksAnItemAddressedUnlessItIsHeardAsAFollower(t *testing.T) {
 		})
 	})
 }
+
+// TestAPageCommentTellsOnlyThoseWhoMaySeeThePage: a comment on a page tells
+// a member it mentions, answers or who follows the page only when they may
+// see the page; one who may not (a private page not shared with them, a
+// page of a project they may not read) is told nothing, not its title nor
+// the comment.
+func TestAPageCommentTellsOnlyThoseWhoMaySeeThePage(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		me := w.owner.ID
+		bea, coder := w.agent("bea"), w.agent("coder")
+		w.do(me, "project.create", M{"key": "OPS", "name": "Operations"})
+		w.do(me, "project.create", M{"key": "SVA", "name": "Samurai vs Aliens"})
+		w.do(me, "agent.update", M{"id": "@coder", "scope": M{"projects": []string{"SVA"}}})
+		salaries := w.do(me, "doc.create", M{"title": "Salaries", "private": true, "shared_with": []string{"@bea"}, "markdown": "who earns what\n"}).Ref
+		vault := w.do(me, "doc.create", M{"title": "Vault runbook", "project": "OPS", "markdown": "rotate\n"}).Ref
+		plain := w.do(me, "doc.create", M{"title": "Handbook", "markdown": "how we work\n"}).Ref
+		told := func(userID, docID string) bool {
+			for _, n := range w.inbox(userID) {
+				if n.DocID == docID {
+					return true
+				}
+			}
+			return false
+		}
+
+		w.do(me, "comment.create", M{"doc": salaries, "body": "@bea @coder the raises are in"})
+		w.do(me, "comment.create", M{"doc": vault, "body": "@bea @coder rotate on Friday"})
+		w.do(me, "comment.create", M{"doc": plain, "body": "@bea @coder read this"})
+		for _, c := range []struct {
+			who, page, what string
+			want        bool
+		}{
+			{bea, salaries, "a private page shared with them", true},
+			{coder, salaries, "a private page not shared with them", false},
+			{bea, vault, "a page of a project they may read", true},
+			{coder, vault, "a page of a project they may not read", false},
+			{coder, plain, "a page of the workspace", true},
+		} {
+			if got := told(c.who, c.page); got != c.want {
+				t.Errorf("mentioned in a comment on %s: told %v, want %v", c.what, got, c.want)
+			}
+		}
+	})
+}
