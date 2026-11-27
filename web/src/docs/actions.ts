@@ -344,8 +344,13 @@ export interface NewDocComment {
   files?: FileRow[];
 }
 
-/** Posts a comment on a page, a block or words of it, or a reply. It shows at once, with its files. */
-export function addComment({ docId, blockId, words, parentId, body, files = [] }: NewDocComment) {
+/**
+ * Posts a comment on a page, a block or words of it, or a reply. It shows
+ * at once, with its files; the promise settles with the server's answer (a
+ * refusal is shown already: who waits on it only has to put back what it
+ * cleared).
+ */
+export function addComment({ docId, blockId, words, parentId, body, files = [] }: NewDocComment): Promise<unknown> {
   const { me } = getState();
   const id = newId();
   const attached = commentFiles(files, id);
@@ -360,7 +365,7 @@ export function addComment({ docId, blockId, words, parentId, body, files = [] }
   }
   if (parentId) args.parent = parentId;
   if (attached.args) args.attachments = attached.args;
-  send({ type: "comment.create", args }, (tx) => {
+  return mutate({ type: "comment.create", args }, (tx) => {
     tx.insert("comments", {
       id,
       doc_id: docId,

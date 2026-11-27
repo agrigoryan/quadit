@@ -27,7 +27,7 @@ const sketch = { id: "f1", name: "sketch.png", content_type: "image/png", url: "
 describe("addComment", () => {
   it("sends the files with a reply and shows them on it at once", async () => {
     const post = vi.spyOn(api, "post").mockResolvedValue({ results: [{}] });
-    addComment({ docId: "d1", parentId: "c0", body: "Like this", files: [sketch] });
+    const answered = addComment({ docId: "d1", parentId: "c0", body: "Like this", files: [sketch] });
 
     const comment = getRows("comments").find((c) => c.body === "Like this");
     const shown = getRows("attachments");
@@ -44,11 +44,12 @@ describe("addComment", () => {
         },
       ],
     });
+    await answered;
   });
 
   it("sends no files when none are given", async () => {
     const post = vi.spyOn(api, "post").mockResolvedValue({ results: [{}] });
-    addComment({ docId: "d1", body: "Plain" });
+    await addComment({ docId: "d1", body: "Plain" });
     await vi.waitFor(() => expect(post).toHaveBeenCalled());
     const sent = post.mock.calls[0]?.[1] as { changes: { args: object }[] } | undefined;
     expect(sent?.changes[0]?.args).not.toHaveProperty("attachments");

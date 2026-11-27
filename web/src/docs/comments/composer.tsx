@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
-import { type Ref, useRef, useState } from "react";
+import { type Ref, useEffect, useRef, useState } from "react";
 import { readyFiles } from "@/data/comment-files";
-import { addDraftFiles, dropDraft, editDraft, EMPTY_DRAFT, useCommentDrafts } from "@/docs/comments/drafts";
+import { addDraftFiles, commentDraft, dropDraft, editDraft, useCommentDraft } from "@/data/comment-drafts";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import type { FileRow } from "@/types/core";
@@ -18,13 +18,23 @@ interface Props {
   placeholder: string;
   /** What the send arrow is called. */
   submitLabel: string;
-  /** What is written, trimmed, and the files given with it, all uploaded. */
-  onSubmit: (comment: { body: string; files: FileRow[] }) => void;
+  /**
+   * What is written, trimmed, and the files given with it, all uploaded.
+   * Given back a promise of the server's answer, the box empties at once and
+   * gets the comment back if the server refuses it (the refusal is shown).
+   */
+  onSubmit: (comment: { body: string; files: FileRow[] }) => Promise<unknown> | void;
   /** Puts the box away, the draft kept: Escape. Without it, Escape leaves the box. */
   onClose?: () => void;
   /** The box's own cancel button: the draft is thrown away. Without it, no such button. */
   onCancel?: () => void;
   autoFocus?: boolean;
+  /**
+   * The cursor was asked for in this box just now: it takes it once it is
+   * drawn, without the page scrolling to it, and says so (`onFocusTaken`).
+   */
+  takeFocus?: boolean;
+  onFocusTaken?: () => void;
   /** The text box, for whoever puts the cursor in it from outside. */
   ref?: Ref<HTMLTextAreaElement>;
 }
@@ -44,20 +54,30 @@ export function Composer({
   onClose,
   onCancel,
   autoFocus,
+  takeFocus,
+  onFocusTaken,
   ref,
 }: Props) {
-  const { body, files } = useCommentDrafts((s) => s.drafts[draft]) ?? EMPTY_DRAFT;
+  const { body, files } = useCommentDraft(draft);
   const [active, setActive] = useState(!!autoFocus);
   const box = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    if (!takeFocus) return;
+    box.current?.focus({ preventScroll: true });
+    onFocusTaken?.();
+  }, [takeFocus, onFocusTaken]);
   const addFiles = (picked: File[]) => addDraftFiles(draft, picked);
   const { over, drop } = useDropFiles(addFiles);
   const ready = readyFiles(files);
   const canSend = body.trim() !== "" && !ready.uploading;
   const send = () => {
     if (!canSend) return;
-    onSubmit({ body: body.trim(), files: ready.files });
+    const sent = commentDraft(draft);
+    const answered = onSubmit({ body: body.trim(), files: ready.files });
     dropDraft(draft);
     setActive(false);
+    // Refused (words taken out meanwhile, a page gone): what was written comes back, unless something new is.
+    answered?.catch(() => editDraft(draft, (now) => (now.body || now.files.length ? now : sent)));
   };
   const cancel =
     onCancel &&

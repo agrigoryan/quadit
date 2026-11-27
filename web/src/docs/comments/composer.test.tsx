@@ -12,7 +12,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { FileRow, Member, User, Workspace } from "@/types/core";
 import { Composer } from "@/docs/comments/composer";
-import { useCommentDrafts } from "@/docs/comments/drafts";
+import { clearCommentDrafts, commentDraft } from "@/data/comment-drafts";
 import { WithQuery } from "@/test/query";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -37,7 +37,7 @@ const row = (name: string) => ({ id: `f-${name}`, name, content_type: "image/png
 
 beforeEach(() => {
   uploads.length = 0;
-  useCommentDrafts.setState({ drafts: {} });
+  clearCommentDrafts();
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
@@ -117,6 +117,23 @@ describe("Composer", () => {
     expect(box).toHaveValue("Ask @ana ");
   });
 
+  it("empties at once when sent, and gets the comment back, files and all, when the server refuses it", async () => {
+    const user = userEvent.setup();
+    let refuse = () => {};
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<void>((_, reject) => {
+          refuse = () => reject(new Error("the words are gone"));
+        }),
+    );
+    const { box } = show({ onSubmit });
+    await user.type(box, "On words since taken out");
+    await user.click(screen.getByRole("button", { name: "Reply" }));
+    expect(box).toHaveValue("");
+    await act(async () => refuse());
+    expect(box).toHaveValue("On words since taken out");
+  });
+
   it("writes a page of the page's own project as a link with its title after [[", async () => {
     const user = userEvent.setup();
     const { box } = show({ projectId: "p1" });
@@ -165,6 +182,6 @@ describe("Composer", () => {
     expect(screen.getByText("a.txt")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Reply" }));
     expect(back.onSubmit).toHaveBeenCalledWith({ body: "On A", files: [row("a.txt")] });
-    expect(useCommentDrafts.getState().drafts["block A"]).toBeUndefined();
+    expect(commentDraft("block A")).toEqual({ body: "", files: [] });
   });
 });
