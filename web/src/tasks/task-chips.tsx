@@ -56,13 +56,17 @@ export function WaitsOnChip({ task, className }: { task: Task; className?: strin
   );
 }
 
+/** The colour of a due date by how near it is (lib/time.ts dueLabel): late in danger, soon in wait; quiet once the task is closed. */
+export const dueTone = (tone: ReturnType<typeof dueLabel>["tone"], done?: boolean) =>
+  done || tone === "later" ? "text-ink-3" : tone === "late" ? "font-medium text-danger" : "text-wait";
+
 export function DueChip({ day, done, className }: { day: string; done?: boolean; className?: string }) {
   const due = dueLabel(day);
   return (
     <span
       className={cx(
         "inline-flex shrink-0 items-center gap-1 text-xs tnum whitespace-nowrap",
-        done || due.tone === "later" ? "text-ink-3" : due.tone === "late" ? "font-medium text-danger" : "text-wait",
+        dueTone(due.tone, done),
         className,
       )}
     >

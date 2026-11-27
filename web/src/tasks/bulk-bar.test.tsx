@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The bulk bar (tasks/bulk-bar.tsx): what it offers for a selection, as
 // buttons and in its More menu, what a project without cycles or estimates
-// leaves out, the forms for a due date and an estimate, and a read-only
+// leaves out, the pickers of a due date and an estimate, and a read-only
 // member's selection with every control off.
 
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -147,8 +147,10 @@ describe("BulkBar", () => {
     openMore();
     fireEvent.click(screen.getByRole("menuitem", { name: "Set due date…" }));
     const dialog = screen.getByRole("dialog", { name: "Set due date…" });
-    fireEvent.change(within(dialog).getByLabelText("Due date for 3 tasks"), { target: { value: "2026-12-01" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Set" }));
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "Due date for 3 tasks" }), {
+      target: { value: "dec 1 2026" },
+    });
+    fireEvent.keyDown(within(dialog).getByRole("textbox", { name: "Due date for 3 tasks" }), { key: "Enter" });
     await waitFor(() => expect(sent).toHaveLength(3));
     expect(sent.map((c) => c.args)).toEqual([
       { id: "t1", due_on: "2026-12-01" },

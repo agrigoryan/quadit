@@ -2,6 +2,7 @@ import { type CSSProperties, memo } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
+import { dueLabel } from "@/lib/time";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
 import { useDecisionFlag, useLookup, useRow, useRowEvenIfGone } from "@/data/selectors";
@@ -11,6 +12,7 @@ import { useTaskLink } from "@/nav/task-link";
 import type { Branch } from "@/tasks/list-layout";
 import { AssigneeControl } from "@/tasks/assignee-control";
 import { scaleOf } from "@/tasks/estimates";
+import { due as dueProperty } from "@/tasks/properties/due";
 import { priority } from "@/tasks/properties/priority";
 import { status as statusProperty } from "@/tasks/properties/status";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
@@ -202,7 +204,18 @@ export const TaskRow = memo(function TaskRow({
         {scale && task.estimate != null && (
           <EstimateChip value={task.estimate} scale={scale} className="max-sm:hidden" />
         )}
-        {task.due_on && <DueChip day={task.due_on} done={closed} className="max-sm:hidden" />}
+        {task.due_on && (
+          <TaskPropertyPicker property={dueProperty} tasks={[task]} align="end">
+            <button
+              type="button"
+              disabled={readOnly}
+              aria-label={`${t("prop.due")}: ${dueLabel(task.due_on).text}`}
+              className="-mx-1 flex h-6 items-center rounded-sm px-1 hover:bg-hover disabled:pointer-events-none data-[state=open]:bg-hover max-sm:hidden"
+            >
+              <DueChip day={task.due_on} done={closed} />
+            </button>
+          </TaskPropertyPicker>
+        )}
         {!hide?.assignee && <AssigneeControl task={task} readOnly={readOnly} className={iconButton} />}
       </div>
     </div>

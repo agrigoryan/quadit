@@ -4,7 +4,7 @@
 // pickers, the property panel, the bulk bar, the create dialog, the palette,
 // the filters, the groupings and the timeline read these descriptions
 // instead of naming the kinds. A part a kind has no use for is left out:
-// a due date is typed, not picked from a list, so it has no picker.
+// a due date is not grouped by, so it has no grouping.
 
 import type { ComponentType, ReactNode } from "react";
 import type { Key } from "@/lib/i18n";
@@ -36,14 +36,12 @@ export interface TaskProperty<Name extends string = string> {
   /**
    * The key that changes it on a list's row or selection and on the open
    * task, by its name in hooks/hotkeys.ts ("s", "shift+c"), and what the
-   * shortcuts sheet calls it. It opens the picker; for a typed value, the
-   * form on a list and the value's box in the panel.
+   * shortcuts sheet calls it. It opens the picker; for a value typed in
+   * the panel's own box (an estimate in any number), it puts the caret there.
    */
   key?: { key: string; shortcut: Key };
-  /** Changing it by picking from a list. */
+  /** Changing it by picking from a list, or from a picker of its own (a day). */
   picker?: PickerPart;
-  /** For a value typed rather than picked: the form that sets it on one task or on all of a selection, in a popover. */
-  Form?: ComponentType<{ tasks: Task[]; onDone: () => void }>;
   /** A value made from typed words, where it does not exist yet: a label. Answers the new value's id at once. */
   make?: { run: (projectId: string | undefined, name: string) => string; label: (name: string) => string };
   /** The settings page where its values are kept, linked from the foot of its lists. */
@@ -270,7 +268,7 @@ export interface RowsPicker {
 /**
  * A list of its own, where picking a row may do more than set the value (an
  * outside wait asks what it waits for), or where there may be no rows at all
- * (an estimate in any number is typed).
+ * (an estimate in any number is typed; a due date is picked in the date picker).
  */
 export interface OwnListPicker {
   List: ComponentType<PickerListProps>;

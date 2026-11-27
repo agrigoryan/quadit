@@ -11,6 +11,7 @@ import { api, ApiError } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Member, Project, Template, User, Workspace } from "@/types/core";
+import { formatDay } from "@/lib/time";
 import { useToasts } from "@/lib/toast";
 import { ui, useUi } from "@/lib/ui-state";
 import { CreateTaskDialog } from "@/tasks/create-task";
@@ -454,7 +455,13 @@ describe("CreateTaskDialog, the properties under the description", () => {
     fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
     choose(/^Epic$/, "Launch");
     choose(/^Parent$/, "Parent");
-    fireEvent.change(screen.getByLabelText("Due date"), { target: { value: "2026-12-01" } });
+    fireEvent.click(screen.getByRole("button", { name: "Due date" }));
+    const box = within(screen.getByRole("dialog", { name: "Due date" })).getByRole("textbox", { name: "Due date" });
+    fireEvent.change(box, { target: { value: "2026-12-01" } });
+    // Enter takes the day, and does not send the dialog's form under it.
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(screen.getByRole("button", { name: formatDay("2026-12-01") })).toBeInTheDocument();
+    expect(calls).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: /^Create task/ }));
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]?.changes[0]?.args).toMatchObject({

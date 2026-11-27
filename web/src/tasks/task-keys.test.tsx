@@ -2,7 +2,7 @@
 // The keys that act on the tasks the keyboard is on (tasks/task-keys.tsx):
 // I gives them to me and takes them back, Shift+S watches them, the copy
 // keys copy, Cmd+Backspace moves them to the trash, the Shift keys of the
-// task properties open a picker or a form, and none of them acts for
+// task properties open a picker, and none of them acts for
 // someone who may not. S, A, P and L are tried on the task list
 // (tasks/task-list.test.tsx).
 
@@ -16,6 +16,7 @@ import { clearUndo } from "@/data/undo";
 import { useToasts } from "@/lib/toast";
 import type { Member, Project, Task, User, Workspace } from "@/types/core";
 import { useTaskKeys } from "@/tasks/task-keys";
+import { TooltipProvider } from "@/ui/tooltip";
 
 const task = (n: number, fields: Partial<Task> = {}): Task => ({
   id: `t${n}`,
@@ -65,10 +66,10 @@ function Keys({ ids, onTrashed }: { ids: string[]; onTrashed?: () => void }) {
     onTrashed,
   });
   return (
-    <>
+    <TooltipProvider>
       <input aria-label="field" />
       {picker}
-    </>
+    </TooltipProvider>
   );
 }
 
@@ -295,14 +296,18 @@ describe("the Shift keys of the task properties", () => {
     expect(options()).toEqual([expect.stringContaining("No milestone")]);
   });
 
-  it("open the form of a typed value, Shift+D the due date's, which sets it on every task", async () => {
+  it("open the date picker with Shift+D, the caret in its box, and a day typed there is set on every task", async () => {
     seed(undefined, [task(1), task(3)]);
     render(<Keys ids={["t1", "t3"]} />);
     press("D", "KeyD", { shiftKey: true });
-    const form = screen.getByRole("dialog", { name: "Due date" });
-    fireEvent.change(screen.getByLabelText("Due date for 2 tasks"), { target: { value: "2026-12-01" } });
-    fireEvent.click(screen.getByRole("button", { name: "Set" }));
-    await waitFor(() => expect(form).not.toBeInTheDocument());
+    const picker = screen.getByRole("dialog", { name: "Set due date…" });
+    const box = within(picker).getByRole("textbox", { name: "Due date for 2 tasks" });
+    expect(box).toHaveFocus();
+    // The letter of the key is not typed into it.
+    expect(box).toHaveValue("");
+    fireEvent.change(box, { target: { value: "2026-12-01" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await waitFor(() => expect(picker).not.toBeInTheDocument());
     const due = (id: string) => getState().collections.tasks[id]?.due_on;
     expect([due("t1"), due("t3")]).toEqual(["2026-12-01", "2026-12-01"]);
   });

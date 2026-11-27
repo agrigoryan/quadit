@@ -10,7 +10,6 @@ import { applies, hasPicker } from "@/tasks/properties/property";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
 import { Button, IconButton } from "@/ui/button";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
-import { Popover, PopoverAnchor, PopoverContent } from "@/ui/popover";
 
 interface Props {
   tasks: Task[];
@@ -49,7 +48,6 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
     setMore(null);
     moreButton.current?.focus();
   };
-  const Form = more?.Form;
 
   return (
     <div
@@ -106,14 +104,6 @@ export const BulkBar = memo(function BulkBar({ tasks, onClear }: Props) {
           side="top"
           align="end"
         />
-      )}
-      {more && Form && (
-        <Popover open onOpenChange={(next) => !next && close()}>
-          <PopoverAnchor virtualRef={moreButton} />
-          <PopoverContent side="top" align="end" aria-label={more.bulk.label?.()} className="w-60 p-3">
-            <Form tasks={tasks} onDone={close} />
-          </PopoverContent>
-        </Popover>
       )}
 
       <Button

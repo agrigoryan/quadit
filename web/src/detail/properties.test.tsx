@@ -11,6 +11,7 @@ import { Properties } from "@/detail/properties";
 import { api } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
 import { clearStore, getState, loadBootstrap } from "@/data/store";
+import { formatDay, today } from "@/lib/time";
 import type { Member, Project, Task, User, Workspace } from "@/types/core";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -153,6 +154,7 @@ describe("Properties", () => {
       "Priority: High",
       "Labels: bug",
       "Epic: No epic",
+      "Due date: No due date",
       "Parent: No parent",
     ])
       expect(within(section()).getByRole("button", { name })).toBeEnabled();
@@ -181,14 +183,20 @@ describe("Properties", () => {
     expect(screen.getByRole("dialog", { name: title })).toBeInTheDocument();
   });
 
-  it("puts the caret in the estimate with Shift+E, its value chosen, and in the due date with Shift+D", () => {
+  it("puts the caret in the estimate with Shift+E, its value chosen", () => {
     seed({ settings: { estimates: true }, task: { estimate: 3 } });
     renderPanel();
     pressShift("e");
     const estimate = within(section()).getByLabelText<HTMLInputElement>("Estimate");
     expect(estimate).toHaveFocus();
+  });
+
+  it("opens the date picker with Shift+D, with the caret in its box", () => {
+    seed();
+    renderPanel();
     pressShift("d");
-    expect(within(section()).getByLabelText("Due date")).toHaveFocus();
+    const picker = screen.getByRole("dialog", { name: "Set due date…" });
+    expect(within(picker).getByRole("textbox", { name: "Due date" })).toHaveFocus();
   });
 
   it("opens nothing with Shift+M outside an epic, Shift+C without cycles, Shift+E without estimates", () => {
@@ -207,11 +215,25 @@ describe("Properties", () => {
     await waitFor(() => expect(sent).toEqual([{ type: "task.update", args: { id: "t1", epic: "e1" } }]));
   });
 
-  it("changes the due date from its field", async () => {
+  it("changes the due date from its picker", async () => {
     seed();
     renderPanel();
-    fireEvent.change(within(section()).getByLabelText("Due date"), { target: { value: "2026-12-01" } });
+    fireEvent.click(within(section()).getByRole("button", { name: "Due date: No due date" }));
+    const box = within(screen.getByRole("dialog", { name: "Set due date…" })).getByRole("textbox");
+    fireEvent.change(box, { target: { value: "dec 1 2026" } });
+    fireEvent.keyDown(box, { key: "Enter" });
     await waitFor(() => expect(sent).toEqual([{ type: "task.update", args: { id: "t1", due_on: "2026-12-01" } }]));
+  });
+
+  it("says how near the due date is, as the task list does, and clears it", async () => {
+    const day = today();
+    seed({ task: { due_on: day } });
+    renderPanel();
+    fireEvent.click(within(section()).getByRole("button", { name: `Due date: ${formatDay(day)}, Today` }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Set due date…" })).getByRole("button", { name: "Clear" }),
+    );
+    await waitFor(() => expect(sent).toEqual([{ type: "task.update", args: { id: "t1", due_on: null } }]));
   });
 
   it("sets the hand-off limit from its field", async () => {
@@ -245,10 +267,10 @@ describe("Properties", () => {
       "Priority: High",
       "Labels: bug",
       "Epic: No epic",
+      "Due date: No due date",
       "Parent: No parent",
     ])
       expect(within(section()).getByRole("button", { name })).toBeDisabled();
-    expect(within(section()).getByLabelText("Due date")).toHaveAttribute("readonly");
     press("s");
     pressShift("p");
     pressShift("d");

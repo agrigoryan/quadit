@@ -5,8 +5,8 @@
 // Cmd+. copies their keys; Cmd+Shift+. a git branch name for the first,
 // Cmd+Option+P its context pack; Cmd+Backspace moves them to the trash.
 // Where tasks are listed, the keys of the task properties (S, A, P, L,
-// Shift with P, M, C, E or D) also open the property's picker, or its
-// form, beside the row; the open task has its own (detail/properties.tsx).
+// Shift with P, M, C, E or D) also open the property's picker beside the
+// row; the open task has its own (detail/properties.tsx).
 
 import { type ReactElement, useRef, useState } from "react";
 import { can, mayBeGivenWork } from "@/data/access";
@@ -23,7 +23,6 @@ import { branchName } from "@/tasks/branch-name";
 import { KEYED, type KeyedProperty } from "@/tasks/properties";
 import { applies, hasPicker } from "@/tasks/properties/property";
 import { TaskPropertyPicker } from "@/tasks/property-picker";
-import { Popover, PopoverAnchor, PopoverContent } from "@/ui/popover";
 
 /**
  * I: gives the tasks to me, or takes them off me when every one is mine
@@ -69,7 +68,7 @@ interface Options {
   /** The tasks a key acts on, as it is pressed. A row not yet numbered by the server is left out. */
   tasksFor: (e: KeyboardEvent) => Task[];
   /**
-   * Where a property's picker or form opens for these tasks (the row or
+   * Where a property's picker opens for these tasks (the row or
    * card of the first). Given, the properties' keys open one; left out, as
    * for the open task, those keys are someone else's.
    */
@@ -80,7 +79,7 @@ interface Options {
   onTrashed?: () => void;
 }
 
-/** Binds the keys; returns the property's picker or form to draw, open while a key has opened it. */
+/** Binds the keys; returns the property's picker to draw, open while a key has opened it. */
 export function useTaskKeys({ tasksFor, anchorFor, layer = "page", onTrashed }: Options): ReactElement | null {
   const [picker, setPicker] = useState<KeyedPickerProps | null>(null);
 
@@ -142,34 +141,20 @@ interface KeyedPickerProps {
   anchor: Element | null;
 }
 
-/**
- * The picker a key opened, or the form of a typed value, on the tasks as
- * they are now: a second label picked sees the first.
- */
+/** The picker a key opened, on the tasks as they are now: a second label picked sees the first. */
 function KeyedPicker({ property, ids, anchor: at, onClose }: KeyedPickerProps & { onClose: () => void }) {
   // Each opening is a new picker: the element it opens beside stays the one it was given.
   const anchor = useRef(at);
   const live = useLookup("tasks");
   const tasks = ids.flatMap((id) => live[id] ?? []);
-  if (tasks.length === 0) return null;
-  const { Form } = property;
-  if (hasPicker(property))
-    return (
-      <TaskPropertyPicker
-        property={property}
-        tasks={tasks}
-        open
-        onOpenChange={(open) => !open && onClose()}
-        anchor={anchor}
-      />
-    );
-  if (!Form) return null;
+  if (tasks.length === 0 || !hasPicker(property)) return null;
   return (
-    <Popover open onOpenChange={(open) => !open && onClose()}>
-      <PopoverAnchor virtualRef={anchor} />
-      <PopoverContent align="start" aria-label={property.title()} className="w-60 p-3">
-        <Form tasks={tasks} onDone={onClose} />
-      </PopoverContent>
-    </Popover>
+    <TaskPropertyPicker
+      property={property}
+      tasks={tasks}
+      open
+      onOpenChange={(open) => !open && onClose()}
+      anchor={anchor}
+    />
   );
 }

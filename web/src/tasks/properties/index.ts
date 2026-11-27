@@ -128,8 +128,8 @@ export const PALETTE = PROPERTIES.filter(
   (p): p is TaskProperty<PropertyName> & { palette: PalettePart } => !!p.palette,
 );
 
-/** A property with a key, and a picker or a form for the key to open. */
+/** A property with a key, and a picker for the key to open. */
 export type KeyedProperty = TaskProperty<PropertyName> & Required<Pick<TaskProperty, "key">>;
 
 /** The properties a key changes (S, A, P, L, Shift+P…), in the table's order. */
-export const KEYED = PROPERTIES.filter((p): p is KeyedProperty => !!p.key && (!!p.picker || !!p.Form));
+export const KEYED = PROPERTIES.filter((p): p is KeyedProperty => !!p.key && !!p.picker);
