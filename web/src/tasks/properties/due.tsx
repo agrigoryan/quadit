@@ -129,7 +129,12 @@ function DuePill({ project, value, onChange }: CreateProps) {
       clearable
       onChange={(day) => onChange({ dueOn: day ?? "" })}
     >
-      <button type="button" className={pill}>
+      <button
+        type="button"
+        className={pill}
+        // The pill shows only the day once one is set; its name keeps saying what the day is.
+        aria-label={value.dueOn ? t("prop.due.is", { day: formatDay(value.dueOn) }) : undefined}
+      >
         <Pill icon={<CalendarDays className="size-3.5" aria-hidden />} set={!!value.dueOn}>
           {value.dueOn ? formatDay(value.dueOn) : t("prop.due")}
         </Pill>

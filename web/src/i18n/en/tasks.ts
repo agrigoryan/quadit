@@ -66,6 +66,7 @@ export const tasks = {
   "prop.outside.label": "Outside:",
   "prop.cycleName": "Cycle {n}",
   "prop.noDue": "No due date",
+  "prop.due.is": "Due date, {day}",
   "prop.set.due": "Set due date…",
   // The days a due date is offered by name, beside the month.
   "due.quick.today": "Today",

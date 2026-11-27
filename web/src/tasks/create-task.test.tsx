@@ -460,7 +460,8 @@ describe("CreateTaskDialog, the properties under the description", () => {
     fireEvent.change(box, { target: { value: "2026-12-01" } });
     // Enter takes the day, and does not send the dialog's form under it.
     fireEvent.keyDown(box, { key: "Enter" });
-    expect(screen.getByRole("button", { name: formatDay("2026-12-01") })).toBeInTheDocument();
+    // The pill still says what it is, with the day.
+    expect(screen.getByRole("button", { name: `Due date, ${formatDay("2026-12-01")}` })).toBeInTheDocument();
     expect(calls).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: /^Create task/ }));
     await waitFor(() => expect(calls).toHaveLength(1));
