@@ -42,7 +42,7 @@ const GAP = 8;
 const DRAFT = "draft";
 
 /** A card's place: how far down the margin, and the words or block text it is on (its name). Null: not in the page now. */
-type Place = { top: number; label: string; fresh: boolean } | null;
+type Place = { top: number; label: string } | null;
 
 export function Margin({ docId, projectId, text, className }: Props) {
   const comments = useDocComments(docId);
@@ -60,8 +60,14 @@ export function Margin({ docId, projectId, text, className }: Props) {
 
   const aside = useRef<HTMLElement>(null);
   const draftBox = useRef<HTMLTextAreaElement>(null);
-  /** Where each card is, by id; a card not in here has not been measured yet. */
-  const [places, setPlaces] = useState<Record<string, Place>>({});
+  /** Where each card is, by id (a card not in here has not been measured yet), and which slide there. */
+  const [layout, setLayout] = useState<{ places: Record<string, Place>; sliding: string[] }>({
+    places: {},
+    sliding: [],
+  });
+  const { places } = layout;
+  /** The open card the places were last worked out for: a new one, and the cards slide to make room for it. */
+  const placedFor = useRef(active);
 
   /** What each card is beside, as one string: the measuring below starts again only when it changes. */
   const anchors = [
@@ -93,13 +99,18 @@ export function Margin({ docId, projectId, text, className }: Props) {
         labels.set(id, found.label);
       }
       const tops = stackCards(cards, active, GAP);
-      setPlaces((before) => {
+      // Cards already in place slide when another one opens; when the text moves under them (typing,
+      // a picture, the page loading), they keep up at once.
+      const slide = placedFor.current !== active;
+      placedFor.current = active;
+      setLayout((before) => {
         const next: Record<string, Place> = {};
         for (const { id } of wanted) {
           const top = tops.get(id);
-          next[id] = top === undefined ? null : { top, label: labels.get(id) ?? "", fresh: !before[id] };
+          next[id] = top === undefined ? null : { top, label: labels.get(id) ?? "" };
         }
-        return JSON.stringify(next) === JSON.stringify(before) ? before : next;
+        if (JSON.stringify(next) === JSON.stringify(before.places)) return before;
+        return { places: next, sliding: slide ? wanted.map((w) => w.id).filter((id) => before.places[id]) : [] };
       });
     };
     const soon = () => {
@@ -162,7 +173,7 @@ export function Margin({ docId, projectId, text, className }: Props) {
             className={cx(
               "absolute inset-x-0 top-0",
               place === undefined && "opacity-0",
-              place && !place.fresh && "transition-transform duration-150 ease-out",
+              layout.sliding.includes(id) && "transition-transform duration-150 ease-out",
               open ? "z-10 [&>*]:shadow-pop" : "[&>*]:shadow-card",
             )}
             style={place ? { transform: `translateY(${place.top}px)` } : undefined}

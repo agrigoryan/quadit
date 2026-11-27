@@ -259,13 +259,20 @@ describe("the margin", () => {
     expect(usePageUi.getState().focusThread).toBeNull();
   });
 
-  it("follows the words as the text changes", async () => {
+  it("follows the words as the text changes at once, and slides the cards when another one opens", async () => {
+    const user = userEvent.setup();
     const { container } = show();
     await frame();
     const words = card("Comment by Aram on “three phases”");
+    const slides = (el: HTMLElement) => !!el.closest("[data-card]")?.className.includes("transition-transform");
     for (const el of container.querySelectorAll('[data-value~="words"]')) el.setAttribute("data-top", "250");
     act(() => changed());
     await frame();
     expect(top(words)).toBe(250);
+    expect(slides(words)).toBe(false);
+
+    await user.click(within(card("Comment by Aram on “phases”")).getByRole("button", { name: "Reply…" }));
+    await frame();
+    expect(slides(words)).toBe(true);
   });
 });
