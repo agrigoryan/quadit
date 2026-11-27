@@ -178,7 +178,7 @@ type inboxItem struct {
 
 // line is the item on one line of text.
 func (item inboxItem) line() string {
-	l := fmt.Sprintf("#%d %s %s %s: %s", item.Seq, item.At, item.By, item.Type, item.Title)
+	l := fmt.Sprintf("#%d %s %s %s: %s", item.Seq, item.At, item.By, item.Type, oneLine(item.Title, 0))
 	if item.Snippet != "" && item.Snippet != item.Title {
 		l += " — " + oneLine(item.Snippet, 200)
 	}

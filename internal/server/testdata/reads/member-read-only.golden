@@ -7529,7 +7529,6 @@ OPS-1 "Which vault?" -> Ours
 SVA-6  Review me
 status: Review   waits on: @bea (needs a look)
 labels: art   seq: 286
-page OPS runbook  (doc <doc OPS runbook>)
 === standing preferences
 - Write short.
 - Explosions are ring-shaped.

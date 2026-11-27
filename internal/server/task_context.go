@@ -24,7 +24,10 @@ func (s *Server) handleShowTaskContext(x *c) error {
 		return err
 	}
 	if x.wantText() {
-		return x.text(x.namePages(x.ctx(), pack.text.String()))
+		text := pack.text.String()
+		titles := pack.detail.knownTitles()
+		x.readTitles(x.ctx(), titles, text)
+		return x.text(titles.named(text))
 	}
 	return x.ok(pack.out)
 }
@@ -38,7 +41,10 @@ func (who *viewer) contextPack(ctx context.Context, t core.Task, maxChars int) (
 		return nil, err
 	}
 	pack := &contextPack{who: who, ctx: ctx, t: t, detail: detail, out: map[string]any{"task": detail}}
-	pack.text.WriteString(detail.text())
+	// The task's pages are listed once, under linked docs (pack.docs).
+	listed := detail
+	listed.Pages = nil
+	pack.text.WriteString(listed.text())
 	for _, part := range []func() error{pack.parents, pack.epic, pack.preferences, pack.recentDecisions, pack.docs} {
 		if err := part(); err != nil {
 			return nil, err
@@ -201,7 +207,7 @@ func (pack *contextPack) docs() error {
 		pack.out["docs"] = pages
 		pack.text.WriteString("=== linked docs\n")
 		for _, page := range pages {
-			fmt.Fprintf(&pack.text, "%s  (doc %s)\n", page.Title, page.ID)
+			fmt.Fprintf(&pack.text, "%s  (doc %s)\n", oneLine(page.Title, 0), page.ID)
 		}
 	}
 	return nil

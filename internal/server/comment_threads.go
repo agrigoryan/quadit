@@ -195,7 +195,7 @@ func (s *Server) handleListPageComments(x *c) error {
 	if text == "" {
 		text = "no comments\n"
 	}
-	return x.text(text)
+	return x.text(x.namePages(x.ctx(), text))
 }
 
 // noteRefs are the ids an inbox item gives whoever acts on it: the page it

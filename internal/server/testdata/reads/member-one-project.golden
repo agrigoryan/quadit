@@ -5605,7 +5605,6 @@ SVA-2  Explosion effect
 status: Todo   assignee: @bea   waits on: @bea (answer: Which color?)
 labels: art   epic: Boss fight   parent: SVA-1   seq: 286
 blocked by SVA-1 [In Progress] Boss design
-page For Bea  (doc <doc For Bea>)
 --- decision 1 (open, asked @bea by @aram) id=<decision SVA-2 color>
 Which color?
   1) Red

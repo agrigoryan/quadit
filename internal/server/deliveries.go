@@ -294,7 +294,7 @@ func (s *Server) sendDelivery(ctx context.Context, ws core.Workspace, h core.Web
 	ev = who.asSeen(ctx, []core.Event{ev})[0]
 	line := ""
 	if names, err := who.names(ctx); err == nil {
-		line = who.eventLine(ctx, ev, names)
+		line = who.namePages(ctx, who.eventLine(ctx, ev, names))
 	}
 	payload := map[string]any{"delivery": deliveryID, "workspace": ws.Slug, "seq": ev.Seq, "type": ev.Type, "text": line, "event": ev,
 		"url": s.cfg.BaseURL}

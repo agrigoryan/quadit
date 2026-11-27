@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -69,6 +70,122 @@ func TestTheTextAnAgentReadsNamesThePagesItPointsAt(t *testing.T) {
 		} {
 			if !strings.Contains(show, want) {
 				t.Errorf("after the page was renamed, the task as text does not say %s: %s", want, show)
+			}
+		}
+	})
+}
+
+// TestATitleIsAddedAfterTheLinkNeverInsideIt: a link's own words, escaped
+// as Markdown escapes them, are the title they read; the title the page has
+// now goes after the whole link (an address with a part, an autolink),
+// never inside its address.
+func TestATitleIsAddedAfterTheLinkNeverInsideIt(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		draft := s.change(t, s.owner, "", "doc.create", M{"title": "Review [draft] | v2", "markdown": "notes\n"})["ref"].(string)
+		address := s.url + "/games/docs/" + draft
+		written := []string{
+			`[Review \[draft\] \| v2](doc:` + draft + `)`,
+			`[part two](` + address + `#two)`,
+			`<` + address + `>`,
+			address + `.`,
+		}
+		s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": strings.Join(written, " and ")})
+		show := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil)
+		named := ` ("Review [draft] | v2")`
+		for _, want := range []string{
+			written[0] + " and",
+			written[1] + named + " and",
+			written[2] + named + " and",
+			address + named + ".",
+		} {
+			if !strings.Contains(show, want) {
+				t.Errorf("the task as text does not say %s: %s", want, show)
+			}
+		}
+	})
+}
+
+// TestEveryLineAnAgentReadsOfACommentNamesItsPages: the feed's line of a
+// comment edited, and a page's threads, name a page by id with its title,
+// as the line of a comment made does.
+func TestEveryLineAnAgentReadsOfACommentNamesItsPages(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		review := s.change(t, s.owner, "", "doc.create", M{"title": "Meta rework review", "markdown": "notes\n"})["ref"].(string)
+		named := "doc:" + review + ` ("Meta rework review")`
+		said := s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "First draft."})["ref"].(string)
+		s.change(t, s.owner, "", "comment.update", M{"id": said, "body": "Now in doc:" + review})
+		if out := s.call(t, s.owner, "", "GET", w+"/events?task=SVA-1&types=comment.updated&format=text", nil, 200, nil); !strings.Contains(out, named) {
+			t.Errorf("the feed's line of the edit does not name the page: %s", out)
+		}
+		s.change(t, s.owner, "", "comment.create", M{"doc": review, "body": "Compare with doc:" + review})
+		if out := s.call(t, s.owner, "", "GET", w+"/docs/"+review+"/comments?format=text", nil, 200, nil); !strings.Contains(out, named) {
+			t.Errorf("the page's threads do not name the page: %s", out)
+		}
+	})
+}
+
+// TestAnAnswerReadsEachPageItNamesOnce: however many times the lines of an
+// answer (a task, its context pack, a page of the feed) point at a page, its
+// title is read once, and once for a page that is not there.
+func TestAnAnswerReadsEachPageItNamesOnce(t *testing.T) {
+	t.Parallel()
+	st := newFaultyStore(testdb.SQLite(t))
+	s := newSite(t, st)
+	s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+	s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+	review := s.change(t, s.owner, "", "doc.create", M{"title": "Meta rework review", "markdown": "notes\n"})["ref"].(string)
+	missing := "01a21abf-0000-7000-8000-00000000dead"
+	for range 6 {
+		s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "See doc:" + review + " and doc:" + missing})
+	}
+	reads := map[string]int{}
+	counting := func(_ map[string]any, where []store.Cond) bool {
+		for _, c := range where {
+			for _, docID := range []string{review, missing} {
+				if c.Col == "id" && (c.Val == docID || c.Op == "in" && slices.Contains(c.Val.([]string), docID)) {
+					reads[docID]++
+				}
+			}
+		}
+		return false // counted, never failed
+	}
+	st.faults.arm(fault{op: "get", table: "docs", match: counting})
+	st.faults.arm(fault{op: "list", table: "docs", match: counting})
+	for _, read := range []string{"/tasks/SVA-1?format=text", "/tasks/SVA-1/context?format=text", "/events?task=SVA-1&format=text"} {
+		clear(reads)
+		out := s.call(t, s.owner, "", "GET", w+read, nil, 200, nil)
+		if !strings.Contains(out, `("Meta rework review")`) {
+			t.Fatalf("%s does not name the page: %s", read, out)
+		}
+		if reads[review] != 1 || reads[missing] != 1 {
+			t.Errorf("%s read the page %d times and the missing one %d times, want each once", read, reads[review], reads[missing])
+		}
+	}
+}
+
+// TestATitleOnSeveralLinesIsListedOnOne: a page whose title was given on
+// several lines is listed on one, in the page tree, on its task and in the
+// context pack, and named on one in an agent's text.
+func TestATitleOnSeveralLinesIsListedOnOne(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss design"})
+		page := s.change(t, s.owner, "", "doc.create", M{"title": "Meta rework\n## review", "markdown": "notes\n"})["ref"].(string)
+		s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "See doc:" + page})
+		for read, path := range map[string]string{"the page tree": "/docs?format=text", "the task": "/tasks/SVA-1?format=text", "the context pack": "/tasks/SVA-1/context?format=text"} {
+			out := s.call(t, s.owner, "", "GET", w+path, nil, 200, nil)
+			if strings.Contains(out, "Meta rework\n") || !strings.Contains(out, "Meta rework ## review") {
+				t.Errorf("%s does not give the title on one line: %s", read, out)
 			}
 		}
 	})

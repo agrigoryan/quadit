@@ -7292,7 +7292,6 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
 relates OPS-1 [Todo] Rotate keys
 blocks SVA-2 [Todo] Explosion effect
 pr 12 open passing https://git.example.com/games/sva/pull/12
-page Quarter one  (doc <doc Plans sub-page>)
 --- decision 1 (picked, asked @aram by @artist) id=<decision SVA-1 explosion>
 Which explosion?
 It is seen from far away.
@@ -7482,7 +7481,6 @@ SVA-2  Explosion effect
 status: Todo   assignee: @bea   waits on: @bea (answer: Which color?)
 labels: art   epic: Boss fight   parent: SVA-1   seq: 286
 blocked by SVA-1 [In Progress] Boss design
-page For Bea  (doc <doc For Bea>)
 --- decision 1 (open, asked @bea by @aram) id=<decision SVA-2 color>
 Which color?
   1) Red
@@ -7870,7 +7868,6 @@ OPS-1 "Which vault?" -> Ours
 SVA-6  Review me
 status: Review   waits on: @bea (needs a look)
 labels: art   seq: 286
-page OPS runbook  (doc <doc OPS runbook>)
 === standing preferences
 - Write short.
 - Explosions are ring-shaped.

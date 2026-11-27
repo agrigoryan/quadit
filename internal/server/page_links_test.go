@@ -256,3 +256,20 @@ func TestATaskLeavesOutAPageLinkedToItThatIsInTheTrash(t *testing.T) {
 		}
 	})
 }
+
+// TestAContextPackListsEachPageOnce: the context pack lists each page the
+// task and a page point at each other through once, under "linked docs".
+func TestAContextPackListsEachPageOnce(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		oneProjectOnly(t, s)
+		handbook := s.change(t, s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "how we work\n"})["ref"].(string)
+		s.change(t, s.owner, "", "link.set", M{"task": "SVA-1", "kind": "doc", "ref": handbook})
+		s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "Read [Handbook](doc:" + handbook + ")"})
+		out := s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1/context?format=text", nil, 200, nil)
+		if n := strings.Count(out, "Handbook  (doc "+handbook+")"); n != 1 || !strings.Contains(out, "=== linked docs\nHandbook  (doc "+handbook+")") {
+			t.Errorf("the context pack lists the page %d times, not once under linked docs: %s", n, out)
+		}
+	})
+}

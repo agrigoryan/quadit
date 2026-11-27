@@ -316,7 +316,7 @@ func (who *viewer) handed(ctx context.Context, ev core.Event, names *nameLookup,
 		data.ReadRow(&note)
 	}
 	note.Seq = ev.Seq
-	return handedItem{Seq: ev.Seq, Item: who.inboxItem(ctx, note, names), Line: who.eventLine(ctx, ev, names), Wake: w}, nil
+	return handedItem{Seq: ev.Seq, Item: who.inboxItem(ctx, note, names), Line: who.namePages(ctx, who.eventLine(ctx, ev, names)), Wake: w}, nil
 }
 
 // taskBatch is what a runner's hold answers with its head ev beside it: the

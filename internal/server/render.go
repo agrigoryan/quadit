@@ -430,6 +430,16 @@ type pageView struct {
 	URL   string `json:"url"`
 }
 
+// knownTitles are the titles of the task's pages, read with them already,
+// for naming the pages its text points at (viewer.readTitles).
+func (d taskDetail) knownTitles() pageTitles {
+	titles := pageTitles{}
+	for _, page := range d.Pages {
+		titles[page.ID] = oneLine(page.Title, 0)
+	}
+	return titles
+}
+
 // pageURL is where people open a page.
 func (who *viewer) pageURL(docID string) string {
 	return who.baseURL + "/" + who.ws.Slug + "/docs/" + docID
@@ -544,7 +554,7 @@ func (d taskDetail) text() string {
 		}
 	}
 	for _, page := range d.Pages {
-		fmt.Fprintf(&b, "page %s  (doc %s)\n", page.Title, page.ID)
+		fmt.Fprintf(&b, "page %s  (doc %s)\n", oneLine(page.Title, 0), page.ID)
 	}
 	for _, dv := range d.Decisions {
 		b.WriteString(dv.text())
@@ -597,7 +607,7 @@ func (who *viewer) eventLine(ctx context.Context, ev core.Event, names *nameLook
 		case "decision":
 			on = " on a decision"
 		}
-		what = fmt.Sprintf("%s %s%s: %s  (id=%s)", kind, key, on, oneLine(who.namePages(ctx, cm.Body), 240), cm.ID)
+		what = fmt.Sprintf("%s %s%s: %s  (id=%s)", kind, key, on, oneLine(cm.Body, 240), cm.ID)
 	case "decision.opened", "decision.picked", "decision.unclear":
 		var decision core.Decision
 		data.ReadRow(&decision)
@@ -670,7 +680,7 @@ func (who *viewer) eventLine(ctx context.Context, ev core.Event, names *nameLook
 		data.ReadRow(&note)
 		what = fmt.Sprintf("inbox %s: %s", note.Type, oneLine(note.Title, 100))
 		if note.Snippet != "" {
-			what += " — " + oneLine(who.namePages(ctx, note.Snippet), 160)
+			what += " — " + oneLine(note.Snippet, 160)
 		}
 		what += who.refsOf(ctx, note).text()
 	default:

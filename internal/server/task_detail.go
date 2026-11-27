@@ -181,24 +181,21 @@ func (who *viewer) taskPages(ctx context.Context, t core.Task) ([]pageView, erro
 	if err := who.db.List(ctx, &back, store.Where(store.Eq("to_id", t.ID), store.Eq("from_scope_type", "doc"))); err != nil {
 		return nil, err
 	}
-	docIDs := map[string]bool{}
+	var docIDs []string
 	for _, r := range refs {
-		docIDs[r.ToID] = true
+		docIDs = append(docIDs, r.ToID)
 	}
 	for _, r := range back {
-		docIDs[r.FromScopeID] = true
+		docIDs = append(docIDs, r.FromScopeID)
 	}
-	var seen []core.Doc
-	for docID := range docIDs {
-		var doc core.Doc
-		there, err := store.Find(ctx, who.db, &doc, store.Eq("id", docID), store.Live)
-		if err != nil {
-			return nil, err
-		}
-		if there && who.canSeeDoc(doc) {
-			seen = append(seen, doc)
-		}
+	if len(docIDs) == 0 {
+		return nil, nil
 	}
+	var docs []core.Doc
+	if err := who.db.List(ctx, &docs, store.Where(store.In("id", docIDs), store.Live)); err != nil {
+		return nil, err
+	}
+	seen := keep(docs, who.canSeeDoc)
 	slices.SortFunc(seen, func(a, b core.Doc) int { return cmp.Or(cmp.Compare(a.Title, b.Title), cmp.Compare(a.ID, b.ID)) })
 	pages := make([]pageView, len(seen))
 	for i, doc := range seen {
@@ -259,7 +256,10 @@ func (s *Server) handleShowTask(x *c) error {
 		return err
 	}
 	if x.wantText() {
-		return x.text(x.namePages(x.ctx(), detail.text()))
+		text := detail.text()
+		titles := detail.knownTitles()
+		x.readTitles(x.ctx(), titles, text)
+		return x.text(titles.named(text))
 	}
 	return x.ok(detail)
 }

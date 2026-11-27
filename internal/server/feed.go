@@ -48,6 +48,12 @@ func (x *c) events(page eventPage) error {
 	for i, ev := range page.events {
 		eventLines[i] = x.eventLine(x.ctx(), ev, names)
 	}
+	// The pages the lines point at, named once for all of them.
+	titles := pageTitles{}
+	x.readTitles(x.ctx(), titles, eventLines...)
+	for i, line := range eventLines {
+		eventLines[i] = titles.named(line)
+	}
 	if !x.wantText() {
 		return x.ok(page.answer(eventLines))
 	}

@@ -90,7 +90,9 @@ func (s *Server) handleListPages(x *c) error {
 	if since := int64(x.intParam("since", -1)); since >= 0 && x.wantText() {
 		// Only the pages changed after that position, as a flat list.
 		changed := keep(docs, func(d core.Doc) bool { return d.UpdatedSeq > since })
-		return x.text(lines(changed, func(d core.Doc) string { return fmt.Sprintf("%s  %s  (changed at %d)", d.ID, d.Title, d.UpdatedSeq) }, "no page changed since "+strconv.FormatInt(since, 10)))
+		return x.text(lines(changed, func(d core.Doc) string {
+			return fmt.Sprintf("%s  %s  (changed at %d)", d.ID, oneLine(d.Title, 0), d.UpdatedSeq)
+		}, "no page changed since "+strconv.FormatInt(since, 10)))
 	}
 	if !x.wantText() {
 		return x.ok(map[string]any{"docs": docs})
@@ -164,7 +166,7 @@ func pageOutline(docs []core.Doc, projects map[string]core.Project) string {
 			if d.ProjectID != byID[parent].ProjectID {
 				note += " [" + firstNonEmpty(projects[d.ProjectID].Key, "no project") + "]"
 			}
-			fmt.Fprintf(&b, "%s%s%s  (%s)\n", indent, firstNonEmpty(d.Title, "Untitled"), note, d.ID)
+			fmt.Fprintf(&b, "%s%s%s  (%s)\n", indent, firstNonEmpty(oneLine(d.Title, 0), "Untitled"), note, d.ID)
 			walk(d.ID, indent+"  ")
 		}
 	}
@@ -224,7 +226,7 @@ func pageText(page core.Doc, blocks []core.Block, format string, maxChars int) s
 	if format == "md" {
 		return text
 	}
-	return fmt.Sprintf("# %s\n(doc %s, seq %d)\n\n%s", firstNonEmpty(page.Title, "Untitled"), page.ID, page.ContentSeq, text)
+	return fmt.Sprintf("# %s\n(doc %s, seq %d)\n\n%s", firstNonEmpty(oneLine(page.Title, 0), "Untitled"), page.ID, page.ContentSeq, text)
 }
 
 // pageAnswer is a page as the editor reads it: with its blocks, its
