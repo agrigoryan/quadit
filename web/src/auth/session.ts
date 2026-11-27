@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { registerServiceWorker } from "@/auth/pwa";
 import { getPasskey } from "@/auth/webauthn";
 import { api, ApiError, onUnauthorized } from "@/data/api";
+import { clearCommentDrafts } from "@/data/comment-drafts";
 import { clearOutbox } from "@/data/mutate";
 import { clearUndo } from "@/data/undo";
 import { clearStore } from "@/data/store";
@@ -39,6 +40,8 @@ export const useSession = create<SessionState>(() => ({ status: "unknown", user:
 function signedOut() {
   stopSync();
   clearStore();
+  // What was being written is the person's who signed out, not the next one's here.
+  clearCommentDrafts();
   useSession.setState({ status: "out", user: null, workspaces: [] });
 }
 
