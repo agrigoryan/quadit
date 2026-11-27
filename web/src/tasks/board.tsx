@@ -8,6 +8,7 @@ import {
   DragOverlay,
   type DragStartEvent,
   type ClientRect,
+  type CollisionDetection,
   type KeyboardCoordinateGetter,
   type UniqueIdentifier,
   KeyboardSensor,
@@ -91,6 +92,45 @@ export const boardCoordinates: KeyboardCoordinateGetter = (event, args) => {
   return { x: to.left, y: to.top };
 };
 
+/**
+ * What a dragged card is over. The column is the one under the pointer (from
+ * the keyboard, under the card's middle), or the nearer of the two it is
+ * between; within it, the card nearest the dragged one, or the column itself
+ * when it has none. Outside the board, nothing.
+ *
+ * The column comes from the pointer alone because the cards move under it:
+ * once over another column the card is put there (Board's onDragOver). Asked
+ * of every card on the board, as dnd-kit's closestCorners does, the answer
+ * halfway between two columns was the card's neighbour in the column it had
+ * just left, which took its place there; it was moved back, and forth again,
+ * with every drawing, until React gave up (error #185). And a tall column
+ * with few cards was never nearer than the card's own place, so the card
+ * could not be dropped in the column beside.
+ */
+export const boardCollision: CollisionDetection = (args) => {
+  const { collisionRect, droppableContainers, droppableRects } = args;
+  const point = args.pointerCoordinates ?? {
+    x: collisionRect.left + collisionRect.width / 2,
+    y: collisionRect.top + collisionRect.height / 2,
+  };
+  const columns = droppableContainers.flatMap((entry) => {
+    const rect = droppableRects.get(entry.id);
+    return rect && !hasSortableData(entry) ? [{ entry, rect }] : [];
+  });
+  const inBoard =
+    columns.some(({ rect }) => rect.left <= point.x) &&
+    columns.some(({ rect }) => point.x <= rect.right) &&
+    columns.some(({ rect }) => rect.top <= point.y && point.y <= rect.bottom);
+  if (!inBoard) return [];
+  const away = ({ rect }: { rect: ClientRect }) => Math.max(rect.left - point.x, point.x - rect.right, 0);
+  const column = columns.reduce((best, next) => (away(next) < away(best) ? next : best));
+  const cards = droppableContainers.filter(
+    (entry) => hasSortableData(entry) && entry.data.current.sortable.containerId === column.entry.id,
+  );
+  if (cards.length === 0) return [{ id: column.entry.id, data: { droppableContainer: column.entry, value: 0 } }];
+  return closestCorners({ ...args, droppableContainers: cards });
+};
+
 /** Grouped by label a task can be in two columns, so a card is a task in a column. */
 const cardId = (group: TaskGroup, task: Task) => `${group.id}|${task.id}`;
 
@@ -170,9 +210,12 @@ export function Board({ groups, project }: Props) {
     const from = columnOf(order, id);
     const to = columnOf(order, overId);
     if (!from || !to || from === to) return;
-    // Crossing into another column: put the card where the pointer is.
+    // Crossing into another column: put the card where it is, before the card it is over, or after
+    // it when it is all below it (below the column's last card).
     const target = order[to] ?? [];
-    const at = overId === to ? target.length : Math.max(0, target.indexOf(overId));
+    const dragged = e.active.rect.current.translated;
+    const below = !!dragged && dragged.top > e.over.rect.bottom;
+    const at = overId === to ? target.length : Math.max(0, target.indexOf(overId)) + (below ? 1 : 0);
     setOrder({
       ...order,
       [from]: (order[from] ?? []).filter((v) => v !== id),
@@ -243,7 +286,7 @@ export function Board({ groups, project }: Props) {
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={boardCollision}
       onDragStart={start}
       onDragOver={over}
       onDragEnd={end}

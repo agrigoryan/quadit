@@ -129,6 +129,8 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
 
   return (
     <section
+      // The whole column takes a card, its header too.
+      ref={setNodeRef}
       aria-label={group.title}
       className="flex h-full w-72 shrink-0 flex-col rounded-lg bg-sunken max-sm:w-[82vw]"
     >
@@ -179,12 +181,10 @@ export const BoardColumn = memo(function BoardColumn({ group, cards, project, ac
         </form>
       )}
 
-      <SortableContext items={shownIds} strategy={verticalListSortingStrategy}>
+      {/* Named after the column: the board tells a column's cards from the others' by it. */}
+      <SortableContext id={group.id} items={shownIds} strategy={verticalListSortingStrategy}>
         <div
-          ref={(el) => {
-            scroller.current = el;
-            setNodeRef(el);
-          }}
+          ref={scroller}
           className={cx(
             "min-h-16 flex-1 overflow-y-auto px-2 pt-1.5 pb-2 transition-colors", // room above the first card for its focus ring
             isOver && cards.length === 0 && "bg-hover",
