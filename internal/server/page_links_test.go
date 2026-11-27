@@ -224,3 +224,35 @@ func TestWritingANewPageGivesTheLinkToIt(t *testing.T) {
 		}
 	})
 }
+
+// TestATaskLeavesOutAPageLinkedToItThatIsInTheTrash: a page linked to a
+// task and then moved to the trash is not named on the task, among its
+// links no more than among its pages; back from the trash, it is there
+// again. (The task's rows keep the link's row, which names no page: the
+// web app's copy shows the page as gone, and as back when it is restored.)
+func TestATaskLeavesOutAPageLinkedToItThatIsInTheTrash(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		oneProjectOnly(t, s)
+		plan := s.change(t, s.owner, "", "doc.create", M{"title": "Secret plan", "markdown": "first try\n"})["ref"].(string)
+		s.change(t, s.owner, "", "link.set", M{"task": "SVA-1", "kind": "doc", "ref": plan})
+		reads := func() map[string]string {
+			return map[string]string{
+				"the task":         s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1", nil, 200, nil),
+				"the task as text": s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil),
+				"the context pack": s.call(t, s.owner, "", "GET", w+"/tasks/SVA-1/context", nil, 200, nil),
+			}
+		}
+		s.change(t, s.owner, "", "doc.delete", M{"id": plan})
+		for read, out := range reads() {
+			if strings.Contains(out, plan) || strings.Contains(out, "Secret plan") {
+				t.Errorf("%s names the page in the trash: %s", read, out)
+			}
+		}
+		s.change(t, s.owner, "", "doc.restore", M{"id": plan})
+		if out := reads()["the task"]; !strings.Contains(out, "Secret plan") {
+			t.Errorf("the page back from the trash is not on the task: %s", out)
+		}
+	})
+}

@@ -138,10 +138,15 @@ func (who *viewer) buildTaskDetail(ctx context.Context, t core.Task, maxChars in
 	for _, l := range visibleLinks(ctx, who, links) {
 		view := linkView{ID: l.ID, Kind: l.Kind, Ref: l.Ref, Repo: l.Repo, Title: l.Title, URL: l.URL, State: l.State, Checks: l.Checks, Data: l.Data}
 		if l.Kind == core.LinkDoc {
-			// A page is shown as it is called now, at its address.
+			// A page is shown as it is called now, at its address; one in
+			// the trash is left out, as it is of the pages below.
 			var page core.Doc
-			if err := who.db.Get(ctx, &page, store.Eq("id", l.Ref)); err != nil {
+			there, err := store.Find(ctx, who.db, &page, store.Eq("id", l.Ref), store.Live)
+			if err != nil {
 				return d, err
+			}
+			if !there {
+				continue
 			}
 			view.Title, view.URL = page.Title, who.pageURL(page.ID)
 		}
