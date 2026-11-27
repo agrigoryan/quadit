@@ -124,14 +124,21 @@ func (r *runner) printRead(path string, q url.Values) error {
 
 // change applies a change and prints one line about it.
 func (r *runner) change(typ string, args map[string]any, approval string) error {
+	_, err := r.changed(typ, args, approval)
+	return err
+}
+
+// changed is change, giving back the server's answer for a command that
+// says more about it.
+func (r *runner) changed(typ string, args map[string]any, approval string) (*Result, error) {
 	res, err := r.c.Change(r.ctx, typ, args, ChangeOptions{Approval: approval, DryRun: r.dry})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if r.json {
 		raw := plainjson.Marshal(res)
 		fmt.Fprintln(r.out, string(raw))
-		return nil
+		return res, nil
 	}
 	line := "ok " + typ
 	if r.dry {
@@ -147,7 +154,7 @@ func (r *runner) change(typ string, args map[string]any, approval string) error 
 	for _, warning := range res.Warnings {
 		fmt.Fprintf(r.out, "warning: %s\n", warning)
 	}
-	return nil
+	return res, nil
 }
 
 // send sends a JSON body to a path that is not a change (a cursor, a note

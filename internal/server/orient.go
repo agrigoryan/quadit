@@ -276,7 +276,7 @@ func (s *Server) handleListInbox(x *c) error {
 		items = keep(items, func(item inboxItem) bool { return item.Seq > since })
 	}
 	if x.wantText() {
-		return x.text(lines(items, inboxItem.line, "inbox is empty"))
+		return x.text(x.namePages(x.ctx(), lines(items, inboxItem.line, "inbox is empty")))
 	}
 	return x.ok(map[string]any{"inbox": items})
 }

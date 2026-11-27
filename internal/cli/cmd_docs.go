@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+// linkWords escapes what would end a Markdown link's words early.
+var linkWords = strings.NewReplacer(`\`, `\\`, `[`, `\[`, `]`, `\]`)
+
 // write writes a page from stdin: a new one under the title given
 // (write new TITLE), or the one named by its id.
 func (r *runner) write(in input) error {
@@ -20,8 +23,15 @@ func (r *runner) write(in input) error {
 		return err
 	}
 	if in.pos[0] == "new" {
-		a["title"], a["markdown"] = strings.Join(in.pos[1:], " "), markdown
-		return r.change("doc.create", a, in.approval)
+		title := strings.TrimSpace(strings.Join(in.pos[1:], " "))
+		a["title"], a["markdown"] = title, markdown
+		res, err := r.changed("doc.create", a, in.approval)
+		if err == nil && !r.dry && !r.json {
+			// What points a person at the page, ready to paste into a
+			// comment or a result: they see its title, and open it.
+			fmt.Fprintf(r.out, "link: [%s](doc:%s)\n", linkWords.Replace(title), res.Ref)
+		}
+		return err
 	}
 	a["doc"], a["markdown"] = in.pos[0], markdown
 	return r.change("doc.write", a, in.approval)

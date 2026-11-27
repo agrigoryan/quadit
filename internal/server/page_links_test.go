@@ -1,6 +1,9 @@
 package server_test
 
 import (
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -130,6 +133,94 @@ func TestAnAgentLinksAPageFromTheCommandLine(t *testing.T) {
 		}
 		if out, _ := s.quadit(t, narrow, "show", "SVA-1"); !strings.Contains(out, "page Runbook") {
 			t.Fatalf("the task does not show the page linked from the page's side: %s", out)
+		}
+	})
+}
+
+// TestATaskListsEachPageItAndThePageMentionOnce: quadit show lists, as
+// "page TITLE  (doc ID)", every page the task and a page point at each
+// other through, once each: one linked to it, one its description or a
+// comment mentions, one whose text mentions the task. A page the reader may
+// not see is left out.
+func TestATaskListsEachPageItAndThePageMentionOnce(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		narrow := oneProjectOnly(t, s)
+		handbook := s.change(t, s.owner, "", "doc.create", M{"title": "Handbook", "markdown": "how we work\n"})["ref"].(string)
+		runbook := s.change(t, s.owner, "", "doc.create", M{"title": "Vault runbook", "project": "OPS", "markdown": "rotate\n"})["ref"].(string)
+		notes := s.change(t, s.owner, "", "doc.create", M{"title": "Boss notes", "markdown": "Three phases, see SVA-1.\n"})["ref"].(string)
+		review := s.change(t, s.owner, "", "doc.create", M{"title": "Meta rework review", "markdown": "what we found\n"})["ref"].(string)
+		s.change(t, s.owner, "", "link.set", M{"task": "SVA-1", "kind": "doc", "ref": handbook})
+		s.change(t, s.owner, "", "task.update", M{"id": "SVA-1", "description": "Follow [Handbook](doc:" + handbook + ")."})
+		s.change(t, s.owner, "", "comment.create", M{"task": "SVA-1", "body": "Again doc:" + handbook + ", and [Meta rework review](doc:" + review + ") and doc:" + runbook})
+
+		lines := map[string]string{
+			"the linked page, also mentioned": "page Handbook  (doc " + handbook + ")\n",
+			"a page a comment mentions":       "page Meta rework review  (doc " + review + ")\n",
+			"a page that mentions the task":   "page Boss notes  (doc " + notes + ")\n",
+		}
+		for reader, token := range map[string]string{"the owner": "", "a reader of SVA": narrow} {
+			client := s.owner
+			if token != "" {
+				client = nil
+			}
+			out := s.call(t, client, token, "GET", w+"/tasks/SVA-1?format=text", nil, 200, nil)
+			for what, line := range lines {
+				if n := strings.Count(out, line); n != 1 {
+					t.Errorf("%s is shown %s %d times, not once: %s", reader, what, n, out)
+				}
+			}
+			ops := strings.Contains(out, "page Vault runbook  (doc "+runbook+")")
+			if ops != (token == "") {
+				t.Errorf("%s is shown the page of OPS a comment mentions: %v, wrongly: %s", reader, ops, out)
+			}
+		}
+
+		var detail struct {
+			Pages []struct{ ID, Title, URL string }
+		}
+		s.call(t, nil, narrow, "GET", w+"/tasks/SVA-1", nil, 200, &detail)
+		var titles []string
+		for _, p := range detail.Pages {
+			titles = append(titles, p.Title)
+			if !strings.HasSuffix(p.URL, "/docs/"+p.ID) {
+				t.Errorf("the page %s is not given at its address: %s", p.Title, p.URL)
+			}
+		}
+		if got := strings.Join(titles, ", "); got != "Boss notes, Handbook, Meta rework review" {
+			t.Errorf("the task's pages, by title, are %q", got)
+		}
+	})
+}
+
+// TestWritingANewPageGivesTheLinkToIt: quadit write new TITLE prints, after
+// the page's id, the Markdown that points a person at the page, ready to
+// paste into a comment or a result.
+func TestWritingANewPageGivesTheLinkToIt(t *testing.T) {
+	// Not in parallel: the command line it runs reads the process's environment (t.Setenv) and stdin.
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		agent := s.agentToken(t, "writer")
+		body := filepath.Join(t.TempDir(), "review.md")
+		if err := os.WriteFile(body, []byte("what we found\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		f, err := os.Open(body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		was := os.Stdin
+		os.Stdin = f
+		out, code := s.quadit(t, agent, "write", "new", "Meta [rework] review")
+		os.Stdin = was
+		f.Close()
+		made := regexp.MustCompile(`ok doc.create id=(\S+)`).FindStringSubmatch(out)
+		if code != 0 || made == nil {
+			t.Fatalf("quadit write new failed (%d): %s", code, out)
+		}
+		if want := `link: [Meta \[rework\] review](doc:` + made[1] + ")\n"; !strings.Contains(out, want) {
+			t.Fatalf("quadit write new does not print %q: %s", want, out)
 		}
 	})
 }

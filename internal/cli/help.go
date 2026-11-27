@@ -40,6 +40,8 @@ act       new PROJECT TITLE [field=value ...]      description=- reads it from s
                                      a file= on a comment, a reply or a result is shown with it: pictures, clips, any file
           resolve COMMENT_ID | reopen COMMENT_ID       a thread, through any of its comments
           result KEY TEXT [checked=...] [measured=...] [not_verified=...] [file=PATH ...]
+                                     to point at a page, write [Title](doc:PAGE_ID) (ids from quadit docs): the person
+                                     sees its title and opens it in one click; link KEY page=PAGE_ID ties it to the task for good
           ask KEY QUESTION option=A [file=PATH ...] option=B [file=PATH ...] [recommended=2] [why=...] [ask=@WHO]
                                      a file= is shown on the option before it; before any option, on the question
           approval KEY QUESTION [action=task.delete [args=JSON]] [ask=@WHO] [file=PATH ...]

@@ -3114,6 +3114,13 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
    "url": "https://git.example.com/games/sva/pull/12"
   }
  ],
+ "pages": [
+  {
+   "id": "<doc Plans sub-page>",
+   "title": "Quarter one",
+   "url": "http://quadit.test/games/docs/<doc Plans sub-page>"
+  }
+ ],
  "relations": [
   {
    "hidden": true,
@@ -3195,6 +3202,7 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
 relates to a task you can't see
 blocks SVA-2 [Todo] Explosion effect
 pr 12 open passing https://git.example.com/games/sva/pull/12
+page Quarter one  (doc <doc Plans sub-page>)
 --- decision 1 (picked, asked @aram by @artist) id=<decision SVA-1 explosion>
 Which explosion?
 It is seen from far away.
@@ -3511,6 +3519,13 @@ How many phases?
    "task_id": "<task SVA-2>"
   }
  ],
+ "pages": [
+  {
+   "id": "<doc For Bea>",
+   "title": "For Bea",
+   "url": "http://quadit.test/games/docs/<doc For Bea>"
+  }
+ ],
  "relations": [
   {
    "id": "<relation SVA-1 blocks SVA-2>",
@@ -3553,6 +3568,7 @@ SVA-2  Explosion effect
 status: Todo   assignee: @bea   waits on: @bea (answer: Which color?)
 labels: art   epic: Boss fight   parent: SVA-1   seq: 286
 blocked by SVA-1 [In Progress] Boss design
+page For Bea  (doc <doc For Bea>)
 --- decision 1 (open, asked @bea by @aram) id=<decision SVA-2 color>
 Which color?
   1) Red
@@ -3749,6 +3765,13 @@ seq: 286
 === GET /api/v1/w/games/tasks/SVA-5
 200
 {
+ "pages": [
+  {
+   "id": "<doc Salary notes>",
+   "title": "Salary notes",
+   "url": "http://quadit.test/games/docs/<doc Salary notes>"
+  }
+ ],
  "seq": 286,
  "task": {
   "archived": true,
@@ -3773,6 +3796,7 @@ seq: 286
 SVA-5  Shelved sketch
 status: Todo (archived)
 seq: 286
+page Salary notes  (doc <doc Salary notes>)
 
 === GET /api/v1/w/games/tasks/SVA-5?raw=1
 200
@@ -4032,6 +4056,13 @@ seq: 286
    "state": "open",
    "title": "Boss phases",
    "url": "https://git.example.com/games/sva/pull/12"
+  }
+ ],
+ "pages": [
+  {
+   "id": "<doc Plans sub-page>",
+   "title": "Quarter one",
+   "url": "http://quadit.test/games/docs/<doc Plans sub-page>"
   }
  ],
  "relations": [
@@ -4821,6 +4852,13 @@ seq: 282
    "url": "https://git.example.com/games/sva/pull/12"
   }
  ],
+ "pages": [
+  {
+   "id": "<doc Plans sub-page>",
+   "title": "Quarter one",
+   "url": "http://quadit.test/games/docs/<doc Plans sub-page>"
+  }
+ ],
  "relations": [
   {
    "hidden": true,
@@ -4903,6 +4941,7 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
 relates to a task you can't see
 blocks SVA-2 [Todo] Explosion effect
 pr 12 open passing https://git.example.com/games/sva/pull/12
+page Quarter one  (doc <doc Plans sub-page>)
 --- decision 1 (picked, asked @aram by @artist) id=<decision SVA-1 explosion>
 Which explosion?
 It is seen from far away.
@@ -5103,6 +5142,13 @@ How many phases?
     "url": "https://git.example.com/games/sva/pull/12"
    }
   ],
+  "pages": [
+   {
+    "id": "<doc Plans sub-page>",
+    "title": "Quarter one",
+    "url": "http://quadit.test/games/docs/<doc Plans sub-page>"
+   }
+  ],
   "relations": [
    {
     "hidden": true,
@@ -5185,6 +5231,7 @@ SVA-2  [Todo]  @bea  waits on @bea  Explosion effect  #art  in SVA-1
 relates to a task you can't see
 blocks SVA-2 [Todo] Explosion effect
 pr 12 open passing https://git.example.com/games/sva/pull/12
+page Quarter one  (doc <doc Plans sub-page>)
 --- decision 1 (picked, asked @aram by @artist) id=<decision SVA-1 explosion>
 Which explosion?
 It is seen from far away.
@@ -5324,6 +5371,13 @@ Quarter one  (doc <doc Plans sub-page>)
     "task_id": "<task SVA-2>"
    }
   ],
+  "pages": [
+   {
+    "id": "<doc For Bea>",
+    "title": "For Bea",
+    "url": "http://quadit.test/games/docs/<doc For Bea>"
+   }
+  ],
   "relations": [
    {
     "id": "<relation SVA-1 blocks SVA-2>",
@@ -5367,6 +5421,7 @@ SVA-2  Explosion effect
 status: Todo   assignee: @bea   waits on: @bea (answer: Which color?)
 labels: art   epic: Boss fight   parent: SVA-1   seq: 286
 blocked by SVA-1 [In Progress] Boss design
+page For Bea  (doc <doc For Bea>)
 --- decision 1 (open, asked @bea by @aram) id=<decision SVA-2 color>
 Which color?
   1) Red
@@ -5528,6 +5583,13 @@ For Bea  (doc <doc For Bea>)
   "Write short."
  ],
  "task": {
+  "pages": [
+   {
+    "id": "<doc Salary notes>",
+    "title": "Salary notes",
+    "url": "http://quadit.test/games/docs/<doc Salary notes>"
+   }
+  ],
   "seq": 286,
   "task": {
    "archived": true,

@@ -3,8 +3,10 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 
 	"github.com/agrigoryan/quadit/internal/core"
@@ -141,9 +143,12 @@ func (who *viewer) buildTaskDetail(ctx context.Context, t core.Task, maxChars in
 			if err := who.db.Get(ctx, &page, store.Eq("id", l.Ref)); err != nil {
 				return d, err
 			}
-			view.Title, view.URL = page.Title, who.baseURL+"/"+who.ws.Slug+"/docs/"+page.ID
+			view.Title, view.URL = page.Title, who.pageURL(page.ID)
 		}
 		d.Links = append(d.Links, view)
+	}
+	if d.Pages, err = who.taskPages(ctx, t); err != nil {
+		return d, err
 	}
 
 	// Who watches it, by handle.
@@ -156,6 +161,45 @@ func (who *viewer) buildTaskDetail(ctx context.Context, t core.Task, maxChars in
 	}
 	sort.Strings(d.Watchers)
 	return d, nil
+}
+
+// taskPages are the pages a task and a page point at each other through,
+// each once, by title: linked to the task, mentioned in its text or its
+// comments, or mentioning it in their own text. Only pages the reader may
+// see, and not in the trash.
+func (who *viewer) taskPages(ctx context.Context, t core.Task) ([]pageView, error) {
+	var refs []core.Ref
+	if err := who.db.List(ctx, &refs, store.Where(store.Eq("from_scope_id", t.ID), store.Eq("to_type", "doc"))); err != nil {
+		return nil, err
+	}
+	var back []core.Ref
+	if err := who.db.List(ctx, &back, store.Where(store.Eq("to_id", t.ID), store.Eq("from_scope_type", "doc"))); err != nil {
+		return nil, err
+	}
+	docIDs := map[string]bool{}
+	for _, r := range refs {
+		docIDs[r.ToID] = true
+	}
+	for _, r := range back {
+		docIDs[r.FromScopeID] = true
+	}
+	var seen []core.Doc
+	for docID := range docIDs {
+		var doc core.Doc
+		there, err := store.Find(ctx, who.db, &doc, store.Eq("id", docID), store.Live)
+		if err != nil {
+			return nil, err
+		}
+		if there && who.canSeeDoc(doc) {
+			seen = append(seen, doc)
+		}
+	}
+	slices.SortFunc(seen, func(a, b core.Doc) int { return cmp.Or(cmp.Compare(a.Title, b.Title), cmp.Compare(a.ID, b.ID)) })
+	pages := make([]pageView, len(seen))
+	for i, doc := range seen {
+		pages[i] = pageView{ID: doc.ID, Title: doc.Title, URL: who.pageURL(doc.ID)}
+	}
+	return pages, nil
 }
 
 // taskByRef loads a task the caller may read.
@@ -210,7 +254,7 @@ func (s *Server) handleShowTask(x *c) error {
 		return err
 	}
 	if x.wantText() {
-		return x.text(detail.text())
+		return x.text(x.namePages(x.ctx(), detail.text()))
 	}
 	return x.ok(detail)
 }

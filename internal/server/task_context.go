@@ -3,7 +3,6 @@
 package server
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -25,7 +24,7 @@ func (s *Server) handleShowTaskContext(x *c) error {
 		return err
 	}
 	if x.wantText() {
-		return x.text(pack.text.String())
+		return x.text(x.namePages(x.ctx(), pack.text.String()))
 	}
 	return x.ok(pack.out)
 }
@@ -38,7 +37,7 @@ func (who *viewer) contextPack(ctx context.Context, t core.Task, maxChars int) (
 	if err != nil {
 		return nil, err
 	}
-	pack := &contextPack{who: who, ctx: ctx, t: t, out: map[string]any{"task": detail}}
+	pack := &contextPack{who: who, ctx: ctx, t: t, detail: detail, out: map[string]any{"task": detail}}
 	pack.text.WriteString(detail.text())
 	for _, part := range []func() error{pack.parents, pack.epic, pack.preferences, pack.recentDecisions, pack.docs} {
 		if err := part(); err != nil {
@@ -52,11 +51,12 @@ func (who *viewer) contextPack(ctx context.Context, t core.Task, maxChars int) (
 // each part adds to the answer and to the text. It is one run of work, made
 // and finished inside viewer.contextPack, which is why it holds a ctx.
 type contextPack struct {
-	who  *viewer
-	ctx  context.Context
-	t    core.Task
-	out  map[string]any
-	text strings.Builder
+	who    *viewer
+	ctx    context.Context
+	t      core.Task
+	detail taskDetail
+	out    map[string]any
+	text   strings.Builder
 }
 
 // The pack stays a size an agent reads in one go: how far up the chain of
@@ -193,45 +193,15 @@ func (pack *contextPack) recentDecisions() error {
 	return nil
 }
 
-// docs adds the docs this task mentions, or that mention it, by title.
+// docs adds the pages the task and a page point at each other through
+// (taskDetail.Pages): the linked docs.
 func (pack *contextPack) docs() error {
-	who, ctx, t := pack.who, pack.ctx, pack.t
-	var refs []core.Ref
-	if err := who.db.List(ctx, &refs, store.Where(store.Eq("from_scope_id", t.ID), store.Eq("to_type", "doc"))); err != nil {
-		return err
-	}
-	var back []core.Ref
-	if err := who.db.List(ctx, &back, store.Where(store.Eq("to_id", t.ID), store.Eq("from_scope_type", "doc"))); err != nil {
-		return err
-	}
-	docIDs := map[string]bool{}
-	for _, r := range refs {
-		docIDs[r.ToID] = true
-	}
-	for _, r := range back {
-		docIDs[r.FromScopeID] = true
-	}
-	var linked []core.Doc
-	for docID := range docIDs {
-		var doc core.Doc
-		there, err := store.Find(ctx, who.db, &doc, store.Eq("id", docID), store.Live)
-		if err != nil {
-			return err
-		}
-		if there && who.canSeeDoc(doc) {
-			linked = append(linked, doc)
-		}
-	}
-	slices.SortFunc(linked, func(a, b core.Doc) int { return cmp.Or(cmp.Compare(a.Title, b.Title), cmp.Compare(a.ID, b.ID)) })
-	var docs []map[string]any
-	for _, doc := range linked {
-		docs = append(docs, map[string]any{"id": doc.ID, "title": doc.Title, "url": who.baseURL + "/" + who.ws.Slug + "/docs/" + doc.ID})
-	}
-	if len(docs) > 0 {
-		pack.out["docs"] = docs
+	pages := pack.detail.Pages
+	if len(pages) > 0 {
+		pack.out["docs"] = pages
 		pack.text.WriteString("=== linked docs\n")
-		for _, doc := range docs {
-			fmt.Fprintf(&pack.text, "%s  (doc %s)\n", doc["title"], doc["id"])
+		for _, page := range pages {
+			fmt.Fprintf(&pack.text, "%s  (doc %s)\n", page.Title, page.ID)
 		}
 	}
 	return nil

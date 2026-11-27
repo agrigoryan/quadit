@@ -422,6 +422,19 @@ type linkView struct {
 	Data json.RawMessage `json:"data,omitempty"`
 }
 
+// pageView is a page as a task names it: its title as it is now, and its
+// address.
+type pageView struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
+// pageURL is where people open a page.
+func (who *viewer) pageURL(docID string) string {
+	return who.baseURL + "/" + who.ws.Slug + "/docs/" + docID
+}
+
 // taskDetail is one task with everything in it, as GET /tasks/KEY gives it.
 type taskDetail struct {
 	Task        taskView         `json:"task"`
@@ -431,7 +444,10 @@ type taskDetail struct {
 	Relations   []relationView   `json:"relations,omitempty"`
 	Links       []linkView       `json:"links,omitempty"`
 	Attachments []attachmentView `json:"attachments,omitempty"`
-	Watchers    []string         `json:"watchers,omitempty"`
+	// Pages are the pages the task and a page point at each other through
+	// (viewer.taskPages); a linked one is also among Links, with its link's id.
+	Pages    []pageView `json:"pages,omitempty"`
+	Watchers []string   `json:"watchers,omitempty"`
 	// Seq is the workspace's position when this was read: ask for
 	// "since=Seq" later to get only what changed.
 	Seq int64 `json:"seq"`
@@ -440,7 +456,7 @@ type taskDetail struct {
 // text is the task in full as text, in this order: the title, a line of
 // status and people, a line of everything else it has (labels, epic,
 // hand-off limit, dates, the feed position), the description, files, sub-tasks,
-// relations, links, decisions and comments.
+// relations, links, pages, decisions and comments.
 func (d taskDetail) text() string {
 	var b strings.Builder
 	t := d.Task
@@ -523,11 +539,12 @@ func (d taskDetail) text() string {
 		}
 	}
 	for _, l := range d.Links {
-		if l.Kind == core.LinkDoc {
-			fmt.Fprintf(&b, "page %s  (doc %s)\n", l.Title, l.Ref)
-			continue
+		if l.Kind != core.LinkDoc { // a linked page is among the pages below
+			fmt.Fprintf(&b, "%s %s %s %s %s\n", l.Kind, l.Ref, l.State, l.Checks, l.URL)
 		}
-		fmt.Fprintf(&b, "%s %s %s %s %s\n", l.Kind, l.Ref, l.State, l.Checks, l.URL)
+	}
+	for _, page := range d.Pages {
+		fmt.Fprintf(&b, "page %s  (doc %s)\n", page.Title, page.ID)
 	}
 	for _, dv := range d.Decisions {
 		b.WriteString(dv.text())
@@ -580,7 +597,7 @@ func (who *viewer) eventLine(ctx context.Context, ev core.Event, names *nameLook
 		case "decision":
 			on = " on a decision"
 		}
-		what = fmt.Sprintf("%s %s%s: %s  (id=%s)", kind, key, on, oneLine(cm.Body, 240), cm.ID)
+		what = fmt.Sprintf("%s %s%s: %s  (id=%s)", kind, key, on, oneLine(who.namePages(ctx, cm.Body), 240), cm.ID)
 	case "decision.opened", "decision.picked", "decision.unclear":
 		var decision core.Decision
 		data.ReadRow(&decision)
@@ -653,7 +670,7 @@ func (who *viewer) eventLine(ctx context.Context, ev core.Event, names *nameLook
 		data.ReadRow(&note)
 		what = fmt.Sprintf("inbox %s: %s", note.Type, oneLine(note.Title, 100))
 		if note.Snippet != "" {
-			what += " — " + oneLine(note.Snippet, 160)
+			what += " — " + oneLine(who.namePages(ctx, note.Snippet), 160)
 		}
 		what += who.refsOf(ctx, note).text()
 	default:

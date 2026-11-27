@@ -7493,6 +7493,13 @@ OPS-1 "Which vault?" -> Ours
   "Explosions are ring-shaped."
  ],
  "task": {
+  "pages": [
+   {
+    "id": "<doc OPS runbook>",
+    "title": "OPS runbook",
+    "url": "http://quadit.test/games/docs/<doc OPS runbook>"
+   }
+  ],
   "seq": 286,
   "task": {
    "category": "started",
@@ -7522,6 +7529,7 @@ OPS-1 "Which vault?" -> Ours
 SVA-6  Review me
 status: Review   waits on: @bea (needs a look)
 labels: art   seq: 286
+page OPS runbook  (doc <doc OPS runbook>)
 === standing preferences
 - Write short.
 - Explosions are ring-shaped.
@@ -7576,6 +7584,13 @@ OPS runbook  (doc <doc OPS runbook>)
   "Rotate keys monthly."
  ],
  "task": {
+  "pages": [
+   {
+    "id": "<doc Handbook>",
+    "title": "Handbook",
+    "url": "http://quadit.test/games/docs/<doc Handbook>"
+   }
+  ],
   "seq": 286,
   "task": {
    "category": "done",
