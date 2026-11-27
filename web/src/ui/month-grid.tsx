@@ -130,16 +130,16 @@ export function MonthGrid({ month, onMonthChange, picked, onPick, today, week, s
           },
         }}
         classNames={{
-          root: "w-fit",
+          root: "w-fit max-sm:w-full",
           months: "",
           month: "",
           month_caption: "sr-only",
-          month_grid: "border-collapse",
+          month_grid: "border-collapse max-sm:w-full",
           weekdays: "",
           weekday: "h-7 p-0 text-2xs font-medium text-ink-3",
           weeks: "",
           week: "",
-          day: "p-0 text-center",
+          day: "p-0 text-center [&>button]:mx-auto",
           day_button:
             "flex size-8 items-center justify-center rounded-full text-sm tnum transition-colors duration-100 " +
             "outline-offset-0 disabled:pointer-events-none max-md:size-9",

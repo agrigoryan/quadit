@@ -95,7 +95,7 @@ export function DatePanel({ label, value, onChange, clearable, quick = [], stret
   }
 
   return (
-    <div ref={panel} className="flex w-max max-w-[calc(100vw-1rem)] flex-col">
+    <div ref={panel} className="flex w-max max-w-[calc(100vw-1rem)] flex-col max-sm:w-[calc(100vw-1rem)]">
       <div className="border-b border-line">
         <input
           autoFocus
@@ -115,7 +115,11 @@ export function DatePanel({ label, value, onChange, clearable, quick = [], stret
         <p
           id={lineId}
           aria-live="polite"
-          className={cx("h-6 truncate px-3 text-xs leading-4 tnum", read && !refusal ? "text-ink-2" : "text-ink-3")}
+          className={cx(
+            // On a phone an empty line gives its room to the month.
+            "h-6 truncate px-3 text-xs leading-4 tnum max-sm:empty:hidden",
+            read && !refusal ? "text-ink-2" : "text-ink-3",
+          )}
         >
           {line}
         </p>
@@ -123,7 +127,8 @@ export function DatePanel({ label, value, onChange, clearable, quick = [], stret
 
       <div className="flex max-sm:flex-col">
         {quick.length > 0 && (
-          // A toolbar: one Tab stop, on its first button; the arrows move among them.
+          // A toolbar: one Tab stop, on its first button; the arrows move among them. On a phone it is
+          // one row above the month, scrolled sideways, so the whole picker fits the screen.
           <div
             data-quick
             role="toolbar"
@@ -131,7 +136,7 @@ export function DatePanel({ label, value, onChange, clearable, quick = [], stret
             aria-orientation="vertical"
             aria-label={t("date.quick")}
             onKeyDown={moveAmong}
-            className="flex w-52 flex-col gap-px border-r border-line p-1 max-sm:grid max-sm:w-auto max-sm:grid-cols-2 max-sm:border-r-0 max-sm:border-b"
+            className="flex w-52 flex-col gap-px border-r border-line p-1 no-scrollbar max-sm:w-auto max-sm:flex-row max-sm:gap-1 max-sm:overflow-x-auto max-sm:border-r-0 max-sm:border-b max-sm:p-2"
           >
             {quick.map((pick, i) => (
               <button
@@ -142,17 +147,18 @@ export function DatePanel({ label, value, onChange, clearable, quick = [], stret
                 onClick={() => onChange(pick.day)}
                 className={cx(
                   "flex min-h-7 items-center gap-2 rounded-sm px-2 py-1 text-left text-sm select-none max-md:min-h-9",
+                  "max-sm:shrink-0 max-sm:flex-col max-sm:items-start max-sm:gap-0 max-sm:rounded-md max-sm:border max-sm:border-line",
                   "hover:bg-hover focus-visible:bg-hover disabled:opacity-40",
                   pick.day === value && "text-accent-text",
                 )}
               >
-                <span className="min-w-0 flex-1 truncate">{pick.label}</span>
+                <span className="min-w-0 flex-1 truncate max-sm:flex-none">{pick.label}</span>
                 <span className="shrink-0 text-xs text-ink-3 tnum">{weekdayAndDay(pick.day)}</span>
               </button>
             ))}
           </div>
         )}
-        <div className="p-2">
+        <div className="p-2 max-sm:w-full">
           <MonthGrid
             month={month}
             onMonthChange={setMonth}
