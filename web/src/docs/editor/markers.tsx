@@ -28,16 +28,22 @@ interface Props {
   pointed?: string;
   /** Starts a thread on a block. Missing where none may be started. */
   onAddThread?: (blockId: string) => void;
+  /** Whether a block's count of threads shows (it does not where they are cards beside the text). */
+  counts?: boolean;
 }
 
-export function Markers({ editor, wrap, others, threads, onOpenThread, pointed, onAddThread }: Props) {
+export function Markers({ editor, wrap, others, threads, onOpenThread, pointed, onAddThread, counts = true }: Props) {
   const members = useLookupEvenIfGone("members");
   const [boxes, setBoxes] = useState<Record<string, Box>>({});
   // The block whose button the pointer is on: the editor lets go of a block
   // when the pointer leaves the text for something drawn over it.
   const [held, setHeld] = useState<string | null>(null);
-  const offered = onAddThread ? (held ?? pointed) : undefined;
-  const ids = [...new Set([...others.map((o) => o.block ?? ""), ...Object.keys(threads), offered ?? ""])]
+  // The button held counts only while the editor has no other block under the pointer: one that went
+  // without the pointer leaving it (its block gained a thread) does not keep the others from theirs.
+  const kept = held && (!pointed || pointed === held) && !threads[held] ? held : undefined;
+  const offered = onAddThread ? (kept ?? pointed) : undefined;
+  const counted = counts ? Object.keys(threads) : [];
+  const ids = [...new Set([...others.map((o) => o.block ?? ""), ...counted, offered ?? ""])]
     .filter(Boolean)
     .sort()
     .join(" ");
@@ -90,13 +96,15 @@ export function Markers({ editor, wrap, others, threads, onOpenThread, pointed, 
           </div>
         );
       })}
-      {Object.entries(threads).map(([id, count]) => {
+      {counted.map((id) => {
         const box = boxes[id];
+        const count = threads[id] ?? 0;
         if (!box || count === 0) return null;
         return (
           <button
             key={id}
             type="button"
+            data-block={id}
             className="qd-thread-mark pointer-events-auto"
             style={{ top: box.top }}
             aria-label={t("docs.comment.threadsOnBlock", { n: count })}
