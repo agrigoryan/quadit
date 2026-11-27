@@ -9,9 +9,16 @@ const DAY_MS = 86_400_000;
 export const isDay = (value: unknown): value is string =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 
+/** The moment a year, a month (0 to 11, or beyond, counting on) and a day begin in UTC; Date.UTC would read a year below 100 as one of the 1900s. */
+function utcAt(year: number, month: number, date: number): number {
+  const at = new Date(0);
+  at.setUTCFullYear(year, month, date);
+  return at.getTime();
+}
+
 /** The moment a day begins in UTC, in milliseconds. */
 export const utcMidnight = (day: string) =>
-  Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)));
+  utcAt(Number(day.slice(0, 4)), Number(day.slice(5, 7)) - 1, Number(day.slice(8, 10)));
 
 /** The day a moment falls on in UTC: the day as the server counts it. */
 export const utcDayOf = (ms: number) => new Date(ms).toISOString().slice(0, 10);
@@ -50,7 +57,7 @@ export const monthStart = (day: string) => `${monthOf(day)}-01`;
 /** The first day of the month `n` months after (or before) the one a day is in. */
 export function addMonths(day: string, n: number): string {
   const first = new Date(utcMidnight(day));
-  return utcDayOf(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + n, 1));
+  return utcDayOf(utcAt(first.getUTCFullYear(), first.getUTCMonth() + n, 1));
 }
 
 /** The last day of the month a day is in. */

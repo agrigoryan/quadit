@@ -141,6 +141,14 @@ describe("DatePanel", () => {
     expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
   });
 
+  it("keeps a day of a year below 100 as it is", () => {
+    const onChange = panel({ value: "0099-03-15" });
+    const picked = screen.getByRole("button", { name: /, selected$/ });
+    expect(cellOf(picked)).toHaveAttribute("data-day", "0099-03-15");
+    fireEvent.click(picked);
+    expect(onChange).toHaveBeenCalledWith("0099-03-15");
+  });
+
   it("refuses a day before the first it may be, typed or clicked, and tints the range", () => {
     const onChange = panel({ min: "2026-11-20", stretch: { from: "2026-11-20", to: "2026-11-24" } });
     expect(day("Thursday, November 19, 2026")).toBeDisabled();

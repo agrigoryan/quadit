@@ -131,6 +131,12 @@ describe.each(["Europe/Berlin", "America/New_York"])("in %s", (tz) => {
     expect(yearOf("2027-12-05")).toBe(2027);
   });
 
+  it("keeps a year below 100 as written, not as one of the 1900s", () => {
+    expect(addDays("0099-03-15", 1)).toBe("0099-03-16");
+    expect(addDays("0001-01-01", -1)).toBe("0000-12-31");
+    expect(dayFromNumber(dayNumber("0099-03-15"))).toBe("0099-03-15");
+  });
+
   it("counts days since 1970 both ways", () => {
     expect(dayNumber("1970-01-01")).toBe(0);
     expect(dayNumber("1969-12-31")).toBe(-1);
