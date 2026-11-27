@@ -452,3 +452,45 @@ func TestAPageTellsOfMentionsOnlyWhatTheReaderMaySee(t *testing.T) {
 		}
 	})
 }
+
+// TestAPageBringsTheFilesOfItsComments: a page read for the editor brings
+// the files on its comments and replies, with where to fetch them, beside
+// those on the page itself, so its threads show them as soon as it opens.
+func TestAPageBringsTheFilesOfItsComments(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		upload := func(name string) string {
+			var f struct{ ID string }
+			s.call(t, s.owner, "", "POST", w+"/files?name="+name, []byte("the bytes of "+name), 201, &f)
+			return f.ID
+		}
+		page := s.change(t, s.owner, "", "doc.create", M{"title": "Plan", "markdown": "Ship it.\n"})["ref"].(string)
+		other := s.change(t, s.owner, "", "doc.create", M{"title": "Other"})["ref"].(string)
+		s.change(t, s.owner, "", "attachment.add", M{"doc": page, "file": upload("cover.txt")})
+		root := s.change(t, s.owner, "", "comment.create", M{"doc": page, "body": "see", "attachments": []M{{"file": upload("sketch.png")}}})["ref"].(string)
+		reply := s.change(t, s.owner, "", "comment.create", M{"parent": root, "body": "and this"})["ref"].(string)
+		s.change(t, s.owner, "", "attachment.add", M{"comment": reply, "file": upload("answer.txt")})
+		s.change(t, s.owner, "", "comment.create", M{"doc": other, "body": "elsewhere", "attachments": []M{{"file": upload("other.txt")}}})
+
+		var got struct {
+			Attachments []struct {
+				SubjectType string `json:"subject_type"`
+				SubjectID   string `json:"subject_id"`
+				File        struct{ Name, URL string }
+			}
+		}
+		s.call(t, s.owner, "", "GET", w+"/docs/"+page, nil, 200, &got)
+		on := map[string]string{}
+		for _, a := range got.Attachments {
+			if a.File.URL == "" {
+				t.Errorf("%s comes without its address", a.File.Name)
+			}
+			on[a.File.Name] = a.SubjectType + " " + a.SubjectID
+		}
+		want := map[string]string{"cover.txt": "doc " + page, "sketch.png": "comment " + root, "answer.txt": "comment " + reply}
+		if fmt.Sprint(on) != fmt.Sprint(want) {
+			t.Fatalf("the page brings the files %v, want %v", on, want)
+		}
+	})
+}

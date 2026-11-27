@@ -231,8 +231,8 @@ func pageText(page core.Doc, blocks []core.Block, format string, maxChars int) s
 
 // pageAnswer is a page as the editor reads it: with its blocks, its
 // sub-pages, a database's properties, views and rows, its comments, what
-// mentions it and what it mentions, its files, and the source it is synced
-// from.
+// mentions it and what it mentions, its files and its comments' files, and
+// the source it is synced from.
 func (who *viewer) pageAnswer(ctx context.Context, page core.Doc, blocks []core.Block) (map[string]any, error) {
 	out := map[string]any{"doc": page, "blocks": blocks}
 	var children []core.Doc
@@ -276,7 +276,12 @@ func (who *viewer) pageAnswer(ctx context.Context, page core.Doc, blocks []core.
 		return nil, err
 	}
 	out["mentioned_in"], out["mentions"] = back, who.seenMentioned(ctx, fwd)
-	_, atts, err := who.attachments(ctx, store.Eq("subject_id", page.ID))
+	// The files on the page and on its comments: its threads show theirs.
+	on := []string{page.ID}
+	for _, cm := range comments {
+		on = append(on, cm.ID)
+	}
+	_, atts, err := who.attachments(ctx, store.In("subject_id", on))
 	if err != nil {
 		return nil, err
 	}
