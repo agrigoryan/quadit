@@ -1,7 +1,7 @@
 // Pages, their blocks and databases as the server sends them
 // (internal/core/pages.go; Ref in internal/core/tasks.go).
 
-import type { Comment } from "@/types/core";
+import type { Attachment, Comment } from "@/types/core";
 
 export type DocKind = "page" | "database" | "row";
 
@@ -216,6 +216,8 @@ export interface PageData {
   blocks: BlockRow[];
   children: Doc[];
   comments: DocComment[];
+  /** The files on the page and on its comments. */
+  attachments?: Attachment[];
   mentioned_in: DocRef[];
   mentions: DocRef[];
   source?: DocSource;

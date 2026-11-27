@@ -58,6 +58,17 @@ function typingAt(text: string, caret: number): Typing | null {
   return page ? { kind: "page", start: page.index, query: (page[1] ?? "").toLowerCase() } : null;
 }
 
+/**
+ * Starts a mention at the cursor of a MentionTextarea, as typing "@" would,
+ * so the box offers whom to mention: for a button beside the box. A space
+ * goes first where the "@" would stick to a word.
+ */
+export function startMention(box: HTMLTextAreaElement) {
+  box.focus();
+  const before = box.value.slice(0, box.selectionStart);
+  typeText(box, box.selectionStart, box.selectionEnd, before === "" || /[\s(]$/.test(before) ? "@" : " @");
+}
+
 /** One thing offered: what picking it writes, and how it shows in the list. */
 interface Offer {
   id: string;

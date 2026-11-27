@@ -193,8 +193,8 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
               placeholder={t(draftWords ? "docs.comment.placeholderWords" : "docs.comment.placeholder")}
               submitLabel={t("docs.comment.send")}
               onCancel={pageUi.endDraft}
-              onSubmit={(body) => {
-                addComment({ docId, blockId: draftBlock, words: draftWords ?? undefined, body });
+              onSubmit={(comment) => {
+                addComment({ docId, blockId: draftBlock, words: draftWords ?? undefined, ...comment });
                 pageUi.endDraft();
               }}
             />
@@ -227,7 +227,7 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
             ref={pageBox}
             placeholder={t("docs.comment.onPage")}
             submitLabel={t("docs.comment.send")}
-            onSubmit={(body) => addComment({ docId, body })}
+            onSubmit={(comment) => addComment({ docId, ...comment })}
           />
         </footer>
       )}

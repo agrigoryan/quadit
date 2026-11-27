@@ -62,7 +62,7 @@ export interface PageContent {
 
 /**
  * Fetches one page with everything around it and files it: the page, its
- * sub-pages, rows and comments into the workspace copy, the rest here. The
+ * sub-pages, rows, comments and files into the workspace copy, the rest here. The
  * blocks are the answer; only an open editor holds them. A page refused as
  * not there that was shared with this person is taken out of the copy.
  */
@@ -78,6 +78,7 @@ async function fetchPage(slug: string, id: string, signal: AbortSignal): Promise
   if (getState().slug !== slug) return { blocks: data.blocks ?? [], seq: data.doc.content_seq ?? 0 };
   mergeRows("docs", [data.doc, ...(data.children ?? []), ...(data.rows ?? [])] as never[]);
   mergeRows("comments", (data.comments ?? []) as never[]);
+  mergeRows("attachments", data.attachments ?? []);
   mergeRows("properties", data.properties ?? []);
   mergeRows("dbviews", data.views ?? []);
   useDocsStore.setState((s) => ({

@@ -3,15 +3,17 @@ import { type ReactNode, useEffect, useRef } from "react";
 import { useCan } from "@/data/access";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useMember } from "@/data/selectors";
+import { useAttachmentsBySubject, useMember } from "@/data/selectors";
 import { exact } from "@/lib/time";
 import { addComment, deleteComment, resolveComment } from "@/docs/actions";
 import { Composer } from "@/docs/comments/composer";
 import type { ThreadData } from "@/docs/comments/panel";
 import { pageUi } from "@/docs/page/state";
+import type { Attached } from "@/types/core";
 import type { DocComment } from "@/types/docs";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
+import { FileGrid } from "@/ui/file-grid";
 import { Markdown } from "@/ui/markdown";
 import { Ago } from "@/ui/ago";
 
@@ -31,14 +33,15 @@ interface Props {
 }
 
 /**
- * One comment thread: the first comment, its replies, a box to reply, and
- * "resolve". The pointer on it lights its words in the page; asked for, it
+ * One comment thread: the first comment, its replies, each with its files,
+ * a box to reply, and "resolve". The pointer on it lights its words in the page; asked for, it
  * comes into view.
  */
 export function Thread({ thread, docId, projectId, quote, active, lit, onLocate }: Props) {
   const { root, replies } = thread;
   const done = !!root.resolved_at;
   const readOnly = !useCan().edit(projectId);
+  const files = useAttachmentsBySubject("comment");
   const card = useRef<HTMLElement>(null);
   useEffect(() => {
     if (active) card.current?.scrollIntoView?.({ block: "nearest" });
@@ -55,7 +58,9 @@ export function Thread({ thread, docId, projectId, quote, active, lit, onLocate 
         onLocate && "cursor-pointer hover:border-line-strong",
       )}
       onClick={(e) => {
-        if (!(e.target as HTMLElement).closest("button, a, textarea")) onLocate?.();
+        const target = e.target as HTMLElement;
+        // A click in a file shown over the screen comes through React from outside the thread.
+        if (card.current?.contains(target) && !target.closest("button, a, textarea")) onLocate?.();
       }}
       onMouseEnter={() => pageUi.lightThread(root.id)}
       onMouseLeave={() => pageUi.lightThread(null)}
@@ -77,16 +82,16 @@ export function Thread({ thread, docId, projectId, quote, active, lit, onLocate 
           </IconButton>
         )}
       </div>
-      <CommentBody comment={root} projectId={projectId} />
+      <CommentBody comment={root} files={files[root.id]} projectId={projectId} />
       {replies.map((reply) => (
-        <CommentBody key={reply.id} comment={reply} projectId={projectId} reply />
+        <CommentBody key={reply.id} comment={reply} files={files[reply.id]} projectId={projectId} reply />
       ))}
       {!done && !readOnly && (
         <div className="mt-2">
           <Composer
             placeholder={t("docs.comment.reply")}
             submitLabel={t("docs.comment.replySend")}
-            onSubmit={(body) => addComment({ docId, parentId: root.id, body })}
+            onSubmit={(comment) => addComment({ docId, parentId: root.id, ...comment })}
           />
         </div>
       )}
@@ -96,10 +101,12 @@ export function Thread({ thread, docId, projectId, quote, active, lit, onLocate 
 
 function CommentBody({
   comment,
+  files = [],
   projectId,
   reply,
 }: {
   comment: DocComment;
+  files?: Attached[];
   projectId: string | undefined;
   reply?: boolean;
 }) {
@@ -127,6 +134,7 @@ function CommentBody({
           )}
         </div>
         <Markdown text={comment.body} tight />
+        <FileGrid files={files} small className="mt-1.5" />
       </div>
     </div>
   );

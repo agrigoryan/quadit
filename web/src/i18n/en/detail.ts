@@ -251,6 +251,7 @@ export const detail = {
   "comment.send": "Send",
   "comment.attach": "Attach files",
   "comment.removeFile": "Remove {name}",
+  "comment.mention": "Mention someone",
   "comment.handTo": "Then hand to…",
   "comment.handToNobody": "Nobody: leave as it is",
   "comment.willWaitOn": "Then waits on {name}",

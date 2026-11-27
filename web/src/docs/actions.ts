@@ -7,6 +7,7 @@
 import type { Changes } from "@/types/changes.gen";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
+import { commentFiles } from "@/data/comment-files";
 import { mutate, send, type Tx } from "@/data/mutate";
 import { type Batch, forget, remember, sendUndoable, undo } from "@/data/undo";
 import { rankBetween } from "@/lib/rank";
@@ -18,6 +19,7 @@ import { sameProjectBelow } from "@/docs/data";
 import { forgetLink, loadPage } from "@/docs/store";
 import type { Words } from "@/docs/editor/words";
 import { type Doc, type DocComment, type DocKind, OPTION_COLORS } from "@/types/docs";
+import type { FileRow } from "@/types/core";
 
 type Fields = Record<string, unknown>;
 
@@ -338,11 +340,15 @@ export interface NewDocComment {
   words?: Words;
   parentId?: string;
   body: string;
+  /** Uploaded files, attached to the comment. */
+  files?: FileRow[];
 }
 
-export function addComment({ docId, blockId, words, parentId, body }: NewDocComment) {
+/** Posts a comment on a page, a block or words of it, or a reply. It shows at once, with its files. */
+export function addComment({ docId, blockId, words, parentId, body, files = [] }: NewDocComment) {
   const { me } = getState();
   const id = newId();
+  const attached = commentFiles(files, id);
   const args: Changes["comment.create"] = { id, doc: docId, body };
   const block = words?.block ?? blockId;
   if (block) args.block = block;
@@ -353,7 +359,8 @@ export function addComment({ docId, blockId, words, parentId, body }: NewDocComm
     if (words.endBlock) args.end_block = words.endBlock;
   }
   if (parentId) args.parent = parentId;
-  send({ type: "comment.create", args }, (tx) =>
+  if (attached.args) args.attachments = attached.args;
+  send({ type: "comment.create", args }, (tx) => {
     tx.insert("comments", {
       id,
       doc_id: docId,
@@ -365,8 +372,9 @@ export function addComment({ docId, blockId, words, parentId, body }: NewDocComm
       body,
       quote: words?.quote,
       created_at: Date.now(),
-    }),
-  );
+    });
+    attached.show(tx);
+  });
 }
 
 export function resolveComment(comment: DocComment, resolved: boolean) {
