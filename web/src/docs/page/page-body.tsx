@@ -39,13 +39,17 @@ const NO_OTHERS: never[] = [];
 
 /**
  * How wide the page must be for a margin of comments beside its text: the
- * text column (52rem, the last 1.5rem of its right padding under the cards,
- * where the marks beside blocks would be), the cards (16rem) and a gutter
- * after them (1rem). Measured on the page itself, not the window: the
- * sidebar, the tree of pages and the comments column take their share of
- * the window first.
+ * text column at its narrowest (40rem, padding included: some 70
+ * characters a line, still easy to read), the cards (16rem, laid over the
+ * last 1rem of the column's right padding) and a gutter after them (1rem).
+ * As Notion does, a page with threads beside it gives up some of its
+ * width for them, down to that narrowest; a page without keeps all of it
+ * (52rem). Measured on the page itself, not the window: the sidebar, the
+ * tree of pages and the comments column take their share of the window
+ * first. The column's width follows from the room by CSS alone, so it
+ * changes as the window is resized, never as the page is typed in.
  */
-const ROOM_FOR_MARGIN_REM = 67.5;
+const ROOM_FOR_MARGIN_REM = 40 + 16 - 1 + 1;
 
 /** Whether an element is at least `rem` wide, followed as it is resized; known before the page is first painted. */
 function useAtLeast(element: RefObject<HTMLElement | null>, rem: number): boolean {
@@ -121,9 +125,11 @@ export function PageBody({ doc, compact }: Props) {
       <div ref={scroller} className="min-w-0 flex-1 overflow-y-auto" data-page={doc.id}>
         {!compact && <PageCover doc={doc} readOnly={headReadOnly} />}
         <div
+          data-margin={beside || undefined}
           className={cx(
             "mx-auto flex w-full",
-            isDatabase ? "max-w-none" : beside ? "max-w-[67.5rem]" : "max-w-[52rem]",
+            // Beside the margin, the text column takes what the cards leave, up to its usual 52rem.
+            isDatabase ? "max-w-none" : beside ? "max-w-[68rem]" : "max-w-[52rem]",
           )}
         >
           <div ref={textColumn} className="min-w-0 flex-1">
@@ -163,8 +169,7 @@ export function PageBody({ doc, compact }: Props) {
                       readOnly={readOnly}
                       handle={compact ? undefined : pageUi.setEditor}
                       others={others}
-                      // Beside the text, each thread's card shows where it is: no marks.
-                      threads={compact || beside ? undefined : threads.perBlock}
+                      threads={compact ? undefined : threads.perBlock}
                       onFocusBlock={setBlock}
                       onSaveState={(state) => pageUi.setSaving(doc.id, state)}
                       onComment={compact || !mayEdit ? undefined : pageUi.startThread}
@@ -186,7 +191,7 @@ export function PageBody({ doc, compact }: Props) {
             )}
           </div>
           {beside && (
-            <Margin docId={doc.id} projectId={doc.project_id} text={textColumn} className="-ml-6 mr-4 w-64 shrink-0" />
+            <Margin docId={doc.id} projectId={doc.project_id} text={textColumn} className="-ml-4 mr-4 w-64 shrink-0" />
           )}
         </div>
       </div>

@@ -1,9 +1,12 @@
 // Comment threads beside a page's text, on a window wide enough for them:
 // each card level with its words, none over another, the open one where
-// its words are; cards that follow the text as it is typed; the
-// Discussions list in the header that scrolls to a thread, highlights its
-// words and puts the cursor in its reply box; and, where the page has no
-// room for a margin, the comments column as before.
+// its words are; cards that follow the text as it is typed; a picture
+// given with a reply in a card; the button that starts a thread on a
+// block, clear of the cards; the text giving up some width for the cards
+// on a laptop's window; the Discussions list in the header that scrolls to
+// a thread, highlights its words and puts the cursor in its reply box;
+// and, where the page has no room for a margin, the comments column as
+// before.
 
 import type { Locator, Page } from "@playwright/test";
 import { expect, type Quadit, test } from "./quadit";
@@ -27,6 +30,16 @@ const card = (page: Page, text: string) => comments(page).getByRole("article").f
 const pageText = (page: Page) => page.getByRole("textbox", { name: "Page text" });
 const marked = (page: Page, words: string) =>
   pageText(page).locator('[data-style-type="comment"]').filter({ hasText: words });
+
+/** A picture of one dot. */
+const dot = (name: string) => ({
+  name,
+  mimeType: "image/png",
+  buffer: Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+    "base64",
+  ),
+});
 
 const topOf = async (el: Locator) => (await el.boundingBox())?.y ?? NaN;
 const bottomOf = async (el: Locator) => {
@@ -108,6 +121,84 @@ test("the cards follow their words as lines are typed above them", async ({ page
   await expect.poll(level).toBeLessThan(8);
 });
 
+test("a card in the margin takes a picture with a reply and shows it, open or not", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const doc = await newPage(quadit, project.key, "Moodboard", "The colours of the menu.\n");
+  const block = doc.blocks.get("The colours of the menu.") ?? "";
+  await quadit.cli("comment", `page=${doc.id}`, `block=${block}`, "quote=colours", "Too dark?");
+  await page.goto(`/e2e/docs/${doc.id}`);
+  const dark = card(page, "Too dark?");
+  await dark.getByRole("button", { name: "Reply…" }).click();
+  await dark.getByRole("textbox", { name: "Reply…" }).fill("Like this.");
+  const chooser = page.waitForEvent("filechooser");
+  await dark.getByRole("button", { name: "Attach files" }).click();
+  await (await chooser).setFiles(dot("lighter.png"));
+  await expect(dark.getByRole("button", { name: "Remove lighter.png" })).toBeVisible();
+  await dark.getByRole("button", { name: "Reply", exact: true }).click();
+  await expect(dark.getByRole("img", { name: "lighter.png" })).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(dark).not.toHaveAttribute("aria-current", "true");
+  await expect(dark.getByRole("img", { name: "lighter.png" })).toBeVisible();
+});
+
+test("the button to comment on a block sits between the text and the cards, and starts a thread beside it", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const doc = await newPage(quadit, project.key, "Menus", "The main menu.\n\nThe pause menu.\n");
+  const main = doc.blocks.get("The main menu.") ?? "";
+  await quadit.cli("comment", `page=${doc.id}`, `block=${main}`, "Needs a quit button.");
+  await page.goto(`/e2e/docs/${doc.id}`);
+  const quit = card(page, "Needs a quit button.");
+  await expect(quit).toBeVisible();
+
+  await pageText(page).getByText("The pause menu.").hover();
+  const add = page.getByRole("button", { name: "Comment on this block" });
+  await expect(add).toBeVisible();
+  const button = await add.boundingBox();
+  const cards = await comments(page).boundingBox();
+  const line = await pageText(page).getByText("The pause menu.").boundingBox();
+  if (!button || !cards || !line) throw new Error("not laid out");
+  expect(button.x + button.width).toBeLessThanOrEqual(cards.x);
+  expect(button.x).toBeGreaterThanOrEqual(line.x + line.width);
+
+  await add.click();
+  await expect(comments(page).getByRole("textbox", { name: "Comment on this block…" })).toBeFocused();
+  await expect(page.locator("[data-comments]")).toBeHidden();
+});
+
+test("on a laptop's window the text gives up some width for the cards; a page without comments keeps all of it", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const plain = await newPage(quadit, project.key, "Plain", "Nothing to say here.\n");
+  const talked = await newPage(quadit, project.key, "Talked", "Something to say here.\n");
+  const block = talked.blocks.get("Something to say here.") ?? "";
+  await quadit.cli("comment", `page=${talked.id}`, `block=${block}`, "Say what?");
+
+  await page.goto(`/e2e/docs/${plain.id}`);
+  const width = async () => (await pageText(page).boundingBox())?.width ?? NaN;
+  await expect.poll(width).toBe(52 * 16);
+
+  await page.goto(`/e2e/docs/${talked.id}`);
+  await expect(card(page, "Say what?")).toBeVisible();
+  const narrowed = await width();
+  expect(narrowed).toBeLessThan(52 * 16);
+  expect(narrowed).toBeGreaterThanOrEqual(40 * 16);
+  await expect
+    .poll(async () =>
+      Math.abs((await topOf(card(page, "Say what?"))) - (await topOf(pageText(page).getByText("Something")))),
+    )
+    .toBeLessThan(8);
+});
+
 test("Discussions lists the open threads; one picked is scrolled to, highlighted, and its reply box takes the cursor", async ({
   page,
   project,
@@ -154,7 +245,7 @@ test("where the page has no room for a margin, a click on the words opens the th
   project,
   quadit,
 }) => {
-  await page.setViewportSize({ width: 1180, height: 800 });
+  await page.setViewportSize({ width: 1280, height: 800 });
   const doc = await newPage(quadit, project.key, "Narrow", "The boss has three phases.\n");
   const block = doc.blocks.get("The boss has three phases.") ?? "";
   await quadit.cli("comment", `page=${doc.id}`, `block=${block}`, "quote=three phases", "Still three?");

@@ -357,6 +357,16 @@
   }
 }
 
+/* Threads in the margin beside the text (comments/margin.tsx), whose cards lie over the last 1rem of
+   the right padding: a block's threads are its cards there, so no count; the button to start one on a
+   block without any sits in the 2rem left between the text and the cards. */
+[data-margin] .qd-thread-mark {
+  display: none;
+}
+[data-margin] .qd-thread-add {
+  right: 1.3125rem;
+}
+
 @media (max-width: 640px) {
   .qd-editor .bn-editor {
     padding-inline: 1rem;

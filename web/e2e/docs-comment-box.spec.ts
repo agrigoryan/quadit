@@ -31,6 +31,14 @@ async function readPage(quadit: Quadit, id: string) {
 }
 
 const column = (page: Page) => page.getByRole("complementary", { name: "Comments" });
+/** Opens the comments column: the header's comments button, then "See all" in its Discussions list. */
+async function seeAll(page: Page) {
+  await page.getByRole("button", { name: "Comments" }).click();
+  const list = page.getByRole("dialog", { name: "Discussions" });
+  await list.getByRole("button", { name: "See all" }).click();
+  // Gone, not still on its way out, where it would take the next Esc for itself.
+  await expect(list).toBeHidden();
+}
 const thread = (page: Page, text: string) => column(page).getByRole("article").filter({ hasText: text });
 const pageText = (page: Page) => page.getByRole("textbox", { name: "Page text" });
 
@@ -85,7 +93,7 @@ test("a picture given with a comment on the page and with a reply is kept and sh
 }) => {
   const doc = await newPage(quadit, project.key, "Moodboard", "Colours.\n");
   await page.goto(`/e2e/docs/${doc.id}`);
-  await page.getByRole("button", { name: "Comments" }).click();
+  await seeAll(page);
 
   await column(page).getByRole("textbox", { name: "Comment on the page…" }).fill("This palette.");
   const chooser = page.waitForEvent("filechooser");
@@ -106,7 +114,7 @@ test("a picture given with a comment on the page and with a reply is kept and sh
   await expect.poll(async () => (await readPage(quadit, doc.id)).commentFiles).toEqual(["darker.png", "palette.png"]);
   // Opened afresh, the page brings them with its comments.
   await page.reload();
-  await page.getByRole("button", { name: "Comments" }).click();
+  await seeAll(page);
   await expect(thread(page, "This palette.").getByRole("img", { name: "palette.png" })).toBeVisible();
   await thread(page, "This palette.").getByRole("button", { name: "Open darker.png" }).click();
   await expect(page.getByRole("dialog", { name: "darker.png" }).getByRole("img", { name: "darker.png" })).toBeVisible();
