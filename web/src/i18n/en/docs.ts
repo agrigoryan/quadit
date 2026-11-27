@@ -4,6 +4,7 @@
 export const docs = {
   "docs.title": "Docs",
   "docs.untitled": "Untitled",
+  "docs.pageCard.changed": "Changed",
   "docs.title.label": "Page title",
   "docs.body.label": "Page text",
   "docs.copyLink": "Copy link",

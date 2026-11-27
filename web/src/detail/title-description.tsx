@@ -125,6 +125,7 @@ export function Description({ task, loading }: { task: Task; loading: boolean })
           autoFocus
           aria-label={t("detail.description")}
           value={draft}
+          projectId={task.project_id}
           onChange={setDraft}
           onSubmit={save}
           onFocus={caretToEnd}

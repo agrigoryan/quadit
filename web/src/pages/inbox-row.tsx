@@ -18,15 +18,19 @@ import {
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { useMember, useRowEvenIfGone } from "@/data/selectors";
+import { useLookup, useMember, useRowEvenIfGone } from "@/data/selectors";
+import type { Dict } from "@/data/store";
+import { pageIdOf, pageRefInText } from "@/lib/page-refs";
 import { exact } from "@/lib/time";
 import type { Notification, NotificationType } from "@/types/core";
+import type { Doc } from "@/types/docs";
 import { anchorOf, archive, markOpened, markRead, markUnread, sentenceOf, splitTitle } from "@/pages/inbox-actions";
 import { useTaskLink } from "@/nav/task-link";
 import { Avatar } from "@/ui/avatar";
 import { IconButton } from "@/ui/button";
 import { DecisionMark } from "@/ui/icons";
 import { Ago } from "@/ui/ago";
+import { docTitle } from "@/ui/page-name";
 
 const icons: Record<NotificationType, LucideIcon | null> = {
   assigned: UserPlus,
@@ -50,8 +54,22 @@ const icons: Record<NotificationType, LucideIcon | null> = {
 const snippetOf = (item: Notification) =>
   item.type === "not_needed" ? (item.snippet ?? "").replace(/^no longer needed:?\s*/, "") : (item.snippet ?? "");
 
-/** A snippet is the start of a Markdown text; shown on one line, its bold and code marks are only noise. */
-const plain = (snippet: string) => snippet.replace(/(\*\*|~~|`)(.+?)\1/g, "$2");
+/**
+ * A snippet is the start of a Markdown text, shown on one line inside the
+ * row's link: its bold and code marks are only noise, and a link is its
+ * words. A page it names is said as Markdown shows it (ui/page-mention.tsx):
+ * by its title as it is now, when the copy has the page.
+ */
+function plain(snippet: string, docs: Dict<Doc>): string {
+  const titleOf = (id: string | undefined) => {
+    const doc = id ? docs[id] : undefined;
+    return doc ? docTitle(doc) : undefined;
+  };
+  return snippet
+    .replace(/(\*\*|~~|`)(.+?)\1/g, "$2")
+    .replace(/\[([^\]\n]*)\]\(([^)\s]*)\)/g, (_, words: string, href: string) => titleOf(pageIdOf(href)) ?? words)
+    .replace(pageRefInText, (ref, id: string | undefined, title: string | undefined) => title ?? titleOf(id) ?? ref);
+}
 
 interface Props {
   item: Notification;
@@ -72,7 +90,8 @@ export const InboxRow = memo(function InboxRow({ item, focused, onOpen, readOnly
   const Icon = icons[item.type] ?? MessageSquare;
   const who = actor ? `@${actor.handle}` : t("common.someone");
   const sentence = sentenceOf(item, who);
-  const snippet = item.snippet ? plain(snippetOf(item)) : "";
+  const docs = useLookup("docs");
+  const snippet = item.snippet ? plain(snippetOf(item), docs) : "";
   // The row is a link to its task, so it opens in a new tab like any link; one about no task is a plain button.
   // A task in the trash too: its page shows it as trashed.
   const taskKey = useRowEvenIfGone("tasks", item.task_id)?.key ?? key;

@@ -74,6 +74,7 @@ export function Composer({ task }: { task: Task }) {
         aria-label={t("comment.label")}
         placeholder={t("comment.placeholder")}
         value={draft.body}
+        projectId={task.project_id}
         onChange={(body) => editDraft(task.id, (d) => ({ ...d, body }))}
         onSubmit={submit}
         onFiles={(files) => addDraftFiles(task.id, files)}

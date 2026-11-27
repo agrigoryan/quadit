@@ -220,3 +220,48 @@
 .task-mention.is-gone .task-mention-key {
   text-decoration: line-through;
 }
+
+/* A page named in text (ui/page-mention.tsx), the task's mention's sibling. */
+
+.page-mention {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.3em;
+  border-radius: 5px;
+  padding: 0 0.3em;
+  vertical-align: baseline;
+  line-height: 1.45;
+  white-space: nowrap;
+  font-size: 0.93em;
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+.md a.page-mention {
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.md a.page-mention:hover {
+  background: var(--press);
+}
+
+.page-mention-icon {
+  width: 0.95em;
+  height: 0.95em;
+  font-size: 0.95em;
+}
+
+.page-mention-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 28em;
+  font-weight: 550;
+}
+
+/* One the reader does not have: the words written, quiet, and nothing to click. */
+.page-mention.is-gone {
+  color: var(--ink-3);
+}

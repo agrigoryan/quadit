@@ -177,6 +177,7 @@ export function NewDecisionDialog({ taskId, onClose }: { taskId: string; onClose
           <MentionTextarea
             id={ids.details}
             value={draft.details}
+            projectId={task?.project_id}
             onChange={(details) => set({ details })}
             rows={2}
             placeholder={t("decision.new.detailsPlaceholder")}

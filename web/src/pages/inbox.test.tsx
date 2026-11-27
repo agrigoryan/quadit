@@ -13,6 +13,7 @@ import { clearOutbox } from "@/data/mutate";
 import { clearStore, loadBootstrap } from "@/data/store";
 import { InboxPage } from "@/pages/inbox";
 import type { Member, Notification, User, Workspace } from "@/types/core";
+import type { Doc } from "@/types/docs";
 import { TooltipProvider } from "@/ui/tooltip";
 
 type Sent = { type: string; args: Record<string, unknown> };
@@ -32,7 +33,7 @@ const item = (id: string, over: Partial<Notification>): Notification => ({
   ...over,
 });
 
-function show(notifications: Notification[]) {
+function show(notifications: Notification[], docs: Doc[] = []) {
   cleanup();
   clearStore();
   loadBootstrap("acme", {
@@ -42,6 +43,7 @@ function show(notifications: Notification[]) {
     workspace: { id: "w", slug: "acme" } as Workspace,
     members: [me, bea],
     notifications,
+    docs,
   });
   render(
     <MemoryRouter>
@@ -126,6 +128,18 @@ describe("the inbox's two tabs", () => {
     show([item("n7", { type: "not_needed", addressed: true, snippet: "no longer needed: We cut the double jump." })]);
     expect(rows()).toEqual([expect.stringMatching(/^@bea marked your question no longer needed\./)]);
     expect(screen.getAllByText("We cut the double jump.").length).toBeGreaterThan(0);
+  });
+
+  it("quotes a page the item names by the page's title, and a link by its words", () => {
+    const review = "01a21abf-0000-7000-8000-000000000001";
+    const snippet = `See [the notes](doc:${review}), doc:${review}, [[Plan]] and [their site](https://example.com).`;
+    show(
+      [item("n8", { type: "mentioned", addressed: true, snippet })],
+      [{ id: review, title: "Meta rework review", kind: "page", rank: "a" } as Doc],
+    );
+    expect(
+      screen.getAllByText("See Meta rework review, Meta rework review, Plan and their site.").length,
+    ).toBeGreaterThan(0);
   });
 
   it("opens again on the tab last shown, for this session", () => {

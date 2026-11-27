@@ -2,15 +2,19 @@ import { type ComponentProps, createContext, memo, useContext } from "react";
 import ReactMarkdown, { defaultUrlTransform, type ExtraProps } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cx } from "@/lib/cx";
+import { pageIdOf, pageRefInText } from "@/lib/page-refs";
 import { getProjectByKey, useRows } from "@/data/selectors";
 import { useStore } from "@/data/store";
 import { MemberMention } from "@/ui/member-mention";
+import { PageMention } from "@/ui/page-mention";
 import { TaskMention } from "@/ui/task-mention";
 
-// Markdown as the server stores it, with two additions: @handle of a real
-// member, and a task key such as SVA-12, shown as the task it names
-// (ui/task-mention.tsx). Where the text may be changed, the boxes of a task
-// list ("- [ ] milk") can be ticked.
+// Markdown as the server stores it, with three additions: @handle of a real
+// member; a task key such as SVA-12, shown as the task it names
+// (ui/task-mention.tsx); and a page, named in any of the ways the server
+// reads (lib/page-refs.ts), shown as the page (ui/page-mention.tsx). Where
+// the text may be changed, the boxes of a task list ("- [ ] milk") can be
+// ticked.
 
 interface Node {
   type: string;
@@ -21,8 +25,26 @@ interface Node {
 
 const refPattern = /(^|[^A-Za-z0-9_@/])(@[a-z0-9][a-z0-9_-]{1,31}|[A-Z][A-Z0-9]{1,9}-\d+)\b/g;
 
-/** Splits a text node around mentions and task keys. */
+/** Splits a text node around pages named in it (doc:ID, [[Title]]), then around mentions and task keys. */
 function splitText(value: string): Node[] {
+  const out: Node[] = [];
+  let last = 0;
+  for (const m of value.matchAll(pageRefInText)) {
+    if (m.index > last) out.push(...splitMentions(value.slice(last, m.index)));
+    const url = m[1] ? `doc:${m[1]}` : TITLED + encodeURIComponent(m[2] ?? "");
+    out.push({ type: "link", url, children: [{ type: "text", value: m[0] }] });
+    last = m.index + m[0].length;
+  }
+  if (last === 0) return splitMentions(value);
+  if (last < value.length) out.push(...splitMentions(value.slice(last)));
+  return out;
+}
+
+/** The address a [[Title]] is given in the tree, its title encoded as the address must be, for RefLink to find the page by. */
+const TITLED = "page-titled:";
+
+/** Splits text around mentions and task keys. */
+function splitMentions(value: string): Node[] {
   const out: Node[] = [];
   let last = 0;
   for (const m of value.matchAll(refPattern)) {
@@ -52,7 +74,7 @@ function walk(node: Node) {
 const remarkRefs = () => (tree: Node) => walk(tree);
 
 const allowRefs = (url: string) =>
-  url.startsWith("mention:") || url.startsWith("task:") ? url : defaultUrlTransform(url);
+  ["mention:", "task:", "doc:", TITLED].some((scheme) => url.startsWith(scheme)) ? url : defaultUrlTransform(url);
 
 function RefLink({ href, children }: { href?: string; children?: React.ReactNode }) {
   const handle = href?.startsWith("mention:") ? href.slice(8) : undefined;
@@ -77,6 +99,10 @@ function RefLink({ href, children }: { href?: string; children?: React.ReactNode
     );
   }
   if (href?.startsWith("task:")) return <TaskMention taskKey={href.slice(5)} />;
+  if (href?.startsWith(TITLED))
+    return <PageMention title={decodeURIComponent(href.slice(TITLED.length))}>{children}</PageMention>;
+  const docId = href ? pageIdOf(href) : undefined;
+  if (docId) return <PageMention docId={docId}>{children}</PageMention>;
   return (
     <a href={href} target="_blank" rel="noreferrer noopener">
       {children}
