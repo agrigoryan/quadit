@@ -34,8 +34,8 @@ interface Props {
 
 /**
  * One comment thread: the first comment, its replies, each with its files,
- * a box to reply, and "resolve". The pointer on it lights its words in the page; asked for, it
- * comes into view.
+ * a box to reply, and "resolve". The pointer on it lights its words in the
+ * page; asked for, it comes into view.
  */
 export function Thread({ thread, docId, projectId, quote, active, lit, onLocate }: Props) {
   const { root, replies } = thread;
