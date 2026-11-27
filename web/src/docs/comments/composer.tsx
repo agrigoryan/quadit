@@ -1,14 +1,13 @@
-import { ArrowUp, AtSign, X } from "lucide-react";
+import { X } from "lucide-react";
 import { type Ref, useRef, useState } from "react";
 import { readyFiles, uploadWaiting, type WaitingFile } from "@/data/comment-files";
-import { MOD } from "@/hooks/hotkeys";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import type { FileRow } from "@/types/core";
 import { IconButton } from "@/ui/button";
-import { AttachButton, useDropFiles, WaitingFiles } from "@/ui/comment-files";
-import { MentionTextarea, startMention } from "@/ui/mention-textarea";
-import { Tooltip } from "@/ui/tooltip";
+import { CommentButtons } from "@/ui/comment-buttons";
+import { useDropFiles, WaitingFiles } from "@/ui/comment-files";
+import { MentionTextarea } from "@/ui/mention-textarea";
 
 interface Props {
   placeholder: string;
@@ -92,31 +91,7 @@ export function Composer({ placeholder, submitLabel, onSubmit, onCancel, autoFoc
               <X className="size-3.5" />
             </IconButton>
           )}
-          <AttachButton size="sm" onFiles={addFiles} className="max-md:size-9" />
-          <IconButton
-            size="sm"
-            label={t("comment.mention")}
-            className="max-md:size-9"
-            // The cursor stays where it is in the text, for the "@" to go there.
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => box.current && startMention(box.current)}
-          >
-            <AtSign className="size-3.5" />
-          </IconButton>
-          <Tooltip label={submitLabel} hint={`${MOD} Enter`}>
-            <button
-              type="button"
-              aria-label={submitLabel}
-              disabled={!canSend}
-              onClick={send}
-              className={cx(
-                "ml-0.5 flex size-6 shrink-0 items-center justify-center rounded-full transition-colors max-md:size-9",
-                canSend ? "bg-accent text-accent-ink hover:bg-accent-hover" : "bg-sunken text-ink-3",
-              )}
-            >
-              <ArrowUp className="size-3.5" />
-            </button>
-          </Tooltip>
+          <CommentButtons box={box} onFiles={addFiles} sendLabel={submitLabel} canSend={canSend} onSend={send} />
         </div>
       )}
     </div>
