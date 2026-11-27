@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Comment, Member, User, Workspace } from "@/types/core";
 import { Discussions } from "@/docs/comments/discussions";
+import { useThreadReadings } from "@/docs/comments/threads";
 import type { EditorHandle } from "@/docs/editor/editor";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -30,21 +31,24 @@ const comment = (id: string, block: string, body: string, at: number, more: Part
     ...more,
   }) as Comment;
 
-const editor: EditorHandle = {
-  scrollToBlock: vi.fn(),
-  scrollToThread: vi.fn(),
-  blockText: (id) => ({ b1: "Ship by Friday", b2: "Goals" })[id],
-  threadText: (id) => ({ c3: "by Friday" })[id],
-  selectedWords: () => undefined,
-  onChange: () => () => {},
-  order: () => ["b2", "b1"],
-  caretBlock: () => null,
+/** The page's editor, of which only scrolling is asked here. */
+const editor = { scrollToBlock: vi.fn(), scrollToThread: vi.fn() } as unknown as EditorHandle; // a partial fake
+
+/** The page's text as read for its threads: b2 above b1, the words of c3 in b1. */
+const reading = {
+  order: ["b2", "b1"],
+  texts: new Map([
+    ["b1", "Ship by Friday"],
+    ["b2", "Goals"],
+  ]),
+  words: new Map([["c3", "by Friday"]]),
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
   pageUi.reset();
-  pageUi.setEditor(editor);
+  pageUi.setEditor("d1", editor);
+  useThreadReadings.setState({ byPage: { d1: reading } });
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
@@ -95,7 +99,7 @@ describe("Discussions", () => {
     expect(editor.scrollToThread).toHaveBeenCalledWith("c3");
     const state = usePageUi.getState();
     expect(state.focusThread).toBe("c3");
-    expect(state.replyAsked?.thread).toBe("c3");
+    expect(state.cursorAsked).toBe("reply c3");
     expect(state.commentsOpen).toBe(false);
     expect(screen.queryByRole("dialog", { name: "Discussions" })).toBeNull();
   });

@@ -15,7 +15,7 @@ import { createRef } from "react";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Comment, Member, User, Workspace } from "@/types/core";
-import { useCommentDrafts } from "@/docs/comments/drafts";
+import { clearCommentDrafts } from "@/data/comment-drafts";
 import { Margin } from "@/docs/comments/margin";
 import type { EditorHandle } from "@/docs/editor/editor";
 import { pageUi, usePageUi } from "@/docs/page/state";
@@ -83,8 +83,8 @@ beforeEach(() => {
     },
   );
   pageUi.reset();
-  useCommentDrafts.setState({ drafts: {} });
-  pageUi.setEditor(editor);
+  clearCommentDrafts();
+  pageUi.setEditor("d1", editor);
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
@@ -219,7 +219,7 @@ describe("the margin", () => {
     const words = card("Comment by Aram on “three phases”");
     await user.click(within(words).getByRole("button", { name: "Reply…" }));
     const reply = within(words).getByRole("textbox", { name: "Reply…" });
-    expect(reply).toHaveFocus();
+    await vi.waitFor(() => expect(reply).toHaveFocus());
     await user.keyboard("{Escape}");
     expect(usePageUi.getState().focusThread).toBeNull();
     expect(within(words).getByRole("button", { name: "Reply…" })).toHaveFocus();
@@ -236,10 +236,23 @@ describe("the margin", () => {
     expect(usePageUi.getState().focusThread).toBeNull();
   });
 
+  it("keeps the open thread open when the click is in the page's discussion under the title, not in the text", async () => {
+    const user = userEvent.setup();
+    const { text } = show();
+    const discussion = document.createElement("section");
+    discussion.setAttribute("data-page-discussion", "");
+    discussion.append(Object.assign(document.createElement("textarea"), { ariaLabel: "Reply…" }));
+    text.current?.prepend(discussion);
+    await frame();
+    act(() => pageUi.showWordsThread("words"));
+    await user.click(discussion.querySelector("textarea") as HTMLTextAreaElement);
+    expect(usePageUi.getState().focusThread).toBe("words");
+  });
+
   it("writes a new thread beside its block, and puts its box away on Esc", async () => {
     const user = userEvent.setup();
     show();
-    act(() => pageUi.startThread("b2"));
+    act(() => pageUi.startThread("d1", "b2"));
     await frame();
     const draft = screen.getByRole("textbox", { name: "Comment on this block…" });
     expect(draft).toHaveFocus();
@@ -252,13 +265,13 @@ describe("the margin", () => {
   it("keeps a new thread's draft with its block: another block's box is empty, and the first comes back", async () => {
     const user = userEvent.setup();
     show();
-    act(() => pageUi.startThread("b2"));
+    act(() => pageUi.startThread("d1", "b2"));
     await frame();
     await user.keyboard("About the run");
-    act(() => pageUi.startThread("b1"));
+    act(() => pageUi.startThread("d1", "b1"));
     await frame();
     expect(screen.getByRole("textbox", { name: "Comment on this block…" })).toHaveValue("");
-    act(() => pageUi.startThread("b2"));
+    act(() => pageUi.startThread("d1", "b2"));
     await frame();
     expect(screen.getByRole("textbox", { name: "Comment on this block…" })).toHaveValue("About the run");
   });
@@ -271,6 +284,7 @@ describe("the margin", () => {
     const open = () =>
       user.click(within(card("Comment by Aram on “three phases”")).getByRole("button", { name: /Reply…|Not sure/ }));
     await open();
+    await vi.waitFor(() => expect(within(words).getByRole("textbox", { name: "Reply…" })).toHaveFocus());
     await user.keyboard("Not sure");
     await user.click(screen.getByText("Then it runs."));
     expect(within(words).getByRole("button", { name: "Not sure" })).toBeInTheDocument();

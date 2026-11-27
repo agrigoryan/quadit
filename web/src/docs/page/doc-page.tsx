@@ -12,6 +12,7 @@ import { useDocsArea } from "@/docs/area";
 import { docTitle } from "@/ui/page-name";
 import { PageBody } from "@/docs/page/page-body";
 import { PageHeader } from "@/docs/page/page-header";
+import { useLeaveGoneThread } from "@/docs/comments/threads";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { pageQuery } from "@/docs/store";
 import { Button } from "@/ui/button";
@@ -33,6 +34,7 @@ export function DocPage({ id }: { id: string }) {
 
   // Comments of another page are not this page's.
   useEffect(() => pageUi.reset, [id]);
+  useLeaveGoneThread();
 
   if (!doc) return <Unknown key={id} id={id} />;
   if (doc.deleted_at) {

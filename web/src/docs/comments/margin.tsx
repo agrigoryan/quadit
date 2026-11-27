@@ -51,20 +51,19 @@ export function Margin({ docId, projectId, text, onCards, className }: Props) {
   const comments = useDocComments(docId);
   const threads = useMemo(() => threadsOf(comments).filter((th) => !th.root.resolved_at && inText(th)), [comments]);
   const mayEdit = useCan().edit(projectId);
-  const editor = usePageUi((s) => s.editor);
+  const editor = usePageUi((s) => s.editors[docId]);
   const focusThread = usePageUi((s) => s.focusThread);
   const focusBlock = usePageUi((s) => s.focusBlock);
   const litThread = usePageUi((s) => s.litThread);
-  const draftBlock = usePageUi((s) => s.draftBlock);
+  const draftBlock = usePageUi((s) => (s.draftDoc === docId ? s.draftBlock : null));
   const draftWords = usePageUi((s) => s.draftWords);
-  const replyAsked = usePageUi((s) => s.replyAsked);
+  const cursorAsked = usePageUi((s) => s.cursorAsked);
   const draft = mayEdit ? draftBlock : null;
   const firstOnBlock = threads.find((th) => th.blockId === focusBlock)?.root.id;
   const active = draft ? DRAFT : (focusThread ?? firstOnBlock ?? null);
   const draftKey = draft ? draftFor.thread(draft, draftWords) : "";
 
   const aside = useRef<HTMLElement>(null);
-  const draftBox = useRef<HTMLTextAreaElement>(null);
   /** Where each card is, by id (a card not in here has not been measured yet), and which slide there. */
   const [layout, setLayout] = useState<{ places: Record<string, Place>; sliding: string[] }>({
     places: {},
@@ -138,18 +137,15 @@ export function Margin({ docId, projectId, text, onCards, className }: Props) {
     };
   }, [anchors, active, editor, text]);
 
-  // A new thread's box takes the cursor where it is, without the page jumping to it before it is placed.
-  useEffect(() => {
-    if (draftKey) draftBox.current?.focus({ preventScroll: true });
-  }, [draftKey]);
-
   // A click in the text away from the open thread's words leaves the thread; Esc does too.
   const leaving = !!active && active !== DRAFT;
   useEffect(() => {
     if (!leaving) return;
     const onDown = (e: PointerEvent) => {
       const target = e.target instanceof Element ? e.target : null;
-      if (!target || !text.current?.contains(target) || target.closest('[data-style-type="comment"]')) return;
+      // Only a click in the text: not in the page's discussion, a box, a popover, the pane or a file shown.
+      const inText = target?.closest(".qd-editor") && text.current?.contains(target);
+      if (!inText || target?.closest('[data-style-type="comment"]')) return;
       pageUi.leaveThread();
     };
     document.addEventListener("pointerdown", onDown);
@@ -196,7 +192,7 @@ export function Margin({ docId, projectId, text, onCards, className }: Props) {
                 active={open}
                 lit={id === litThread}
                 compact={!open}
-                askReply={replyAsked && (replyAsked.thread ?? firstOnBlock) === id && open ? replyAsked.n : 0}
+                askReply={open && (cursorAsked === `reply ${id}` || (cursorAsked === "block" && id === firstOnBlock))}
                 onOpen={open ? undefined : () => pageUi.openThread(id)}
                 onLeave={open ? pageUi.leaveThread : undefined}
                 onResolved={() => {
@@ -207,7 +203,10 @@ export function Margin({ docId, projectId, text, onCards, className }: Props) {
             ) : (
               <div className="rounded-lg border border-accent bg-surface p-2">
                 <Composer
-                  ref={draftBox}
+                  // The cursor when it was asked for just now (not when drawn again, as the page is laid
+                  // out anew), where the box is, without the page jumping to it before it is placed.
+                  takeFocus={cursorAsked === "draft"}
+                  onFocusTaken={pageUi.cursorTaken}
                   draft={draftKey}
                   projectId={projectId}
                   placeholder={t(draftWords ? "docs.comment.placeholderWords" : "docs.comment.placeholder")}
@@ -221,9 +220,12 @@ export function Margin({ docId, projectId, text, onCards, className }: Props) {
                     backToText();
                   }}
                   onSubmit={(comment) => {
-                    if (draft) addComment({ docId, blockId: draft, words: draftWords ?? undefined, ...comment });
+                    const sent = draft
+                      ? addComment({ docId, blockId: draft, words: draftWords ?? undefined, ...comment })
+                      : undefined;
                     pageUi.endDraft();
                     backToText();
+                    return sent;
                   }}
                 />
               </div>

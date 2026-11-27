@@ -10,7 +10,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Comment, Member, User, Workspace } from "@/types/core";
-import { useCommentDrafts } from "@/docs/comments/drafts";
+import { clearCommentDrafts } from "@/data/comment-drafts";
+import { useThreadReadings } from "@/docs/comments/threads";
 import { CommentsPanel } from "@/docs/comments/panel";
 import type { EditorHandle } from "@/docs/editor/editor";
 import { pageUi, usePageUi } from "@/docs/page/state";
@@ -32,22 +33,26 @@ const onBlock = (id: string, block: string, body: string, at: number, more: Part
     ...more,
   }) as Comment;
 
-/** An editor that shows two blocks, b2 above b1. */
-const editor: EditorHandle = {
-  scrollToBlock: vi.fn(),
-  scrollToThread: vi.fn(),
-  blockText: (id) => ({ b1: "Ship by Friday, with the docs", b2: "Goals" })[id],
-  threadText: (id) => ({ c4: "with the docs" })[id],
-  selectedWords: () => undefined,
-  onChange: () => () => {},
-  order: () => ["b2", "b1"],
-  caretBlock: () => null,
+/** The page's editor, of which only scrolling is asked here. */
+const editor = { scrollToBlock: vi.fn(), scrollToThread: vi.fn() } as unknown as EditorHandle; // a partial fake
+
+/** The page's text as read for its threads: b2 above b1, the words of c4 in b1; the block "gone" is not there. */
+const reading = {
+  order: ["b2", "b1"],
+  texts: new Map([
+    ["b1", "Ship by Friday, with the docs"],
+    ["b2", "Goals"],
+    ["gone", undefined],
+  ]),
+  words: new Map([["c4", "with the docs"]]),
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useCommentDrafts.setState({ drafts: {} });
+  clearCommentDrafts();
   pageUi.reset();
+  pageUi.setEditor("d1", editor);
+  useThreadReadings.setState({ byPage: { d1: reading } });
   pageUi.openComments();
   clearStore();
   loadBootstrap("acme", {
@@ -71,7 +76,7 @@ beforeEach(() => {
 const pane = () =>
   render(
     <TooltipProvider>
-      <CommentsPanel docId="d1" projectId={undefined} editor={editor} />
+      <CommentsPanel docId="d1" projectId={undefined} />
     </TooltipProvider>,
   );
 
@@ -104,7 +109,7 @@ describe("the comments pane", () => {
     pane();
     await user.click(await screen.findByText("Which docs?"));
     expect(editor.scrollToThread).toHaveBeenCalledWith("c4");
-    expect(usePageUi.getState()).toMatchObject({ focusThread: "c4", replyAsked: { thread: "c4" } });
+    expect(usePageUi.getState()).toMatchObject({ focusThread: "c4", cursorAsked: "reply c4" });
     await user.click(screen.getByText("Which goals?"));
     expect(editor.scrollToBlock).toHaveBeenCalledWith("b2");
   });
@@ -147,8 +152,18 @@ describe("the comments pane", () => {
     button.remove();
   });
 
+  it("takes the cursor again when See all is chosen while it is open", async () => {
+    const user = userEvent.setup();
+    pane();
+    const aside = screen.getByRole("complementary", { name: "Comments" });
+    await user.click(screen.getByRole("radio", { name: /Resolved/ }));
+    expect(aside).not.toHaveFocus();
+    act(() => pageUi.openComments());
+    expect(aside).toHaveFocus();
+  });
+
   it("has no box for a new comment: those are written where they go", () => {
-    act(() => pageUi.startThread("b1"));
+    act(() => pageUi.startThread("d1", "b1"));
     pane();
     expect(screen.queryByRole("textbox", { name: /Comment on/ })).toBeNull();
   });

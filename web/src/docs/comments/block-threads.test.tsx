@@ -13,8 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Comment, Member, User, Workspace } from "@/types/core";
 import { BlockThreads } from "@/docs/comments/block-threads";
-import type { EditorHandle } from "@/docs/editor/editor";
-import { useCommentDrafts } from "@/docs/comments/drafts";
+import { useThreadReadings } from "@/docs/comments/threads";
+import { clearCommentDrafts } from "@/data/comment-drafts";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { TooltipProvider } from "@/ui/tooltip";
 import { WithQuery } from "@/test/query";
@@ -36,17 +36,19 @@ const comment = (id: string, body: string, at: number, more: Partial<Comment> = 
 
 let phone = false;
 
-/** An editor showing b1 and b2, the words of "first" in b1. */
-const editor = {
-  scrollToBlock: () => {},
-  scrollToThread: () => {},
-  blockText: (id: string) => ({ b1: "The boss has three phases", b2: "Then it runs" })[id],
-  threadText: (id: string) => ({ first: "three phases" })[id],
-  selectedWords: () => undefined,
-  onChange: () => () => {},
-  order: () => ["b1", "b2"],
-  caretBlock: () => null,
-} satisfies EditorHandle;
+/** The page's text as read for its threads: b1 and b2, the words of "first" in b1; the block "gone" is not there. */
+const reading = {
+  order: ["b1", "b2"],
+  texts: new Map([
+    ["b1", "The boss has three phases"],
+    ["b2", "Then it runs"],
+    ["gone", undefined],
+  ]),
+  words: new Map([
+    ["first", "three phases"],
+    ["third", "The boss"],
+  ]),
+};
 
 beforeEach(() => {
   phone = false;
@@ -55,9 +57,9 @@ beforeEach(() => {
     addEventListener() {},
     removeEventListener() {},
   }));
-  useCommentDrafts.setState({ drafts: {} });
+  clearCommentDrafts();
   pageUi.reset();
-  pageUi.setEditor(editor);
+  useThreadReadings.setState({ byPage: { d1: reading } });
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
@@ -71,6 +73,7 @@ beforeEach(() => {
       comment("reply", "Yes, three.", 3, { parent_id: "first" }),
       comment("elsewhere", "Which gate?", 4, { subject_id: "b2" }),
       comment("lost", "On a block taken out", 5, { subject_id: "gone" }),
+      comment("third", "Which boss is this?", 6, { quote: "The boss" }),
     ],
   });
 });
@@ -142,13 +145,13 @@ describe("BlockThreads", () => {
   it("writes a new thread there, its draft kept with its block when another opens, and back with it", async () => {
     const user = userEvent.setup();
     show();
-    act(() => pageUi.startThread("b1"));
+    act(() => pageUi.startThread("d1", "b1"));
     const box = within(popover()).getByRole("textbox", { name: "Comment on this block…" });
     await vi.waitFor(() => expect(box).toHaveFocus());
     await user.keyboard("About the boss");
-    act(() => pageUi.startThread("b2"));
+    act(() => pageUi.startThread("d1", "b2"));
     expect(within(popover()).getByRole("textbox", { name: "Comment on this block…" })).toHaveValue("");
-    act(() => pageUi.startThread("b1"));
+    act(() => pageUi.startThread("d1", "b1"));
     expect(within(popover()).getByRole("textbox", { name: "Comment on this block…" })).toHaveValue("About the boss");
   });
 
@@ -156,6 +159,51 @@ describe("BlockThreads", () => {
     show();
     act(() => pageUi.openThread("lost"));
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("quotes the words as they read now, in the thread's name too", () => {
+    useThreadReadings.setState({
+      byPage: { d1: { ...reading, words: new Map([...reading.words, ["first", "four phases"]]) } },
+    });
+    show();
+    act(() => pageUi.showWordsThread("first"));
+    const card = within(popover()).getByRole("article", { name: "Comment by Aram on “four phases”" });
+    expect(within(card).getByText("four phases")).toBeInTheDocument();
+  });
+
+  it("closes again at once when a mark's threads have nothing left in the text, so Esc is the page's", () => {
+    useThreadReadings.setState({
+      byPage: { d1: { ...reading, texts: new Map([["b2", undefined]]) } },
+    });
+    show();
+    act(() => pageUi.showThread("b2"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(usePageUi.getState().focusBlock).toBeNull();
+  });
+
+  it("does not take the cursor for a new thread when drawn again later, after its box had it", () => {
+    act(() => pageUi.startThread("d1", "b1"));
+    // Another box took the cursor (the margin, before the window narrowed).
+    act(() => pageUi.cursorTaken());
+    const text = document.createElement("button");
+    document.body.append(text);
+    text.focus();
+    show();
+    expect(within(popover()).getByRole("textbox", { name: "Comment on this block…" })).not.toHaveFocus();
+    expect(text).toHaveFocus();
+    text.remove();
+  });
+
+  it("on a phone, puts the cursor in the reply box of the thread whose words were tapped, and back on the mark when closed", async () => {
+    phone = true;
+    const user = userEvent.setup();
+    show();
+    act(() => pageUi.showWordsThread("third"));
+    const sheet = screen.getByRole("dialog", { name: "Comments" });
+    const third = within(sheet).getByRole("article", { name: /The boss/ });
+    await vi.waitFor(() => expect(within(third).getByRole("textbox", { name: "Reply…" })).toHaveFocus());
+    await user.click(within(sheet).getByRole("button", { name: "Close" }));
+    await vi.waitFor(() => expect(document.querySelector(".qd-thread-mark")).toHaveFocus());
   });
 
   it("opens in a sheet on a phone", () => {

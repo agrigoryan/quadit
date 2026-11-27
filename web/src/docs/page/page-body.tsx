@@ -8,7 +8,7 @@
 // in the comments pane, when asked for.
 
 import { GitBranch, Sparkles } from "lucide-react";
-import { lazy, type ReactNode, Suspense, useRef, useState } from "react";
+import { lazy, type ReactNode, Suspense, useCallback, useRef, useState } from "react";
 import { useCan } from "@/data/access";
 import { useReadWhenSeen } from "@/data/inbox-read";
 import { overlayOpen, useHotkeys } from "@/hooks/hotkeys";
@@ -19,7 +19,9 @@ import { BlockThreads } from "@/docs/comments/block-threads";
 import { Margin } from "@/docs/comments/margin";
 import { PageDiscussion } from "@/docs/comments/page-discussion";
 import { CommentsPanel } from "@/docs/comments/panel";
-import { useOpenThreads } from "@/docs/comments/threads";
+import { useOpenThreads, useReadThreads } from "@/docs/comments/threads";
+import type { EditorHandle } from "@/docs/editor/editor";
+import type { Words } from "@/docs/editor/words";
 import { PageCover } from "@/docs/page/cover";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { PageTitle } from "@/docs/page/title";
@@ -68,8 +70,13 @@ export function PageBody({ doc, compact }: Props) {
   const drafting = usePageUi((s) => !!s.draftBlock);
   // Whether the margin has a card to show, once measured: threads whose blocks are gone take no room.
   const [cards, setCards] = useState(true);
-  const editor = usePageUi((s) => s.editor);
+  const editor = usePageUi((s) => s.editors[doc.id]);
+  // The page's editor known by the page's id, whoever shows its threads: the page shown, or a row's side peek.
+  const handle = useCallback((h: EditorHandle | null) => pageUi.setEditor(doc.id, h), [doc.id]);
+  const comment = useCallback((blockId: string, words?: Words) => pageUi.startThread(doc.id, blockId, words), [doc.id]);
   const threads = useOpenThreads(doc.id);
+  // Read once for all that show this page's threads, and only while one is on its text.
+  useReadThreads(doc.id, editor, threads.inText > 0);
   const scroller = useRef<HTMLDivElement>(null);
   const textColumn = useRef<HTMLDivElement>(null);
   const [block, setBlock] = useState<string | null>(null);
@@ -101,8 +108,8 @@ export function PageBody({ doc, compact }: Props) {
         // thread is on, as with the toolbar's Comment, in a page that cannot be edited too.
         const words = editor?.selectedWords();
         const at = words?.block ?? editor?.caretBlock() ?? null;
-        if (at && mayEdit && !isDatabase) pageUi.startThread(at, words);
-        else pageUi.commentOnPage();
+        if (at && mayEdit && !isDatabase) pageUi.startThread(doc.id, at, words);
+        else pageUi.commentOnPage(doc.id);
       },
     },
     { enabled: !compact },
@@ -136,7 +143,6 @@ export function PageBody({ doc, compact }: Props) {
                 <PageDiscussion
                   docId={doc.id}
                   projectId={doc.project_id}
-                  answersKeys={!compact}
                   className="opacity-0 group-focus-within/top:opacity-100 group-hover/top:opacity-100"
                 />
               )}
@@ -170,14 +176,14 @@ export function PageBody({ doc, compact }: Props) {
                       rows={page.blocks}
                       seq={page.seq}
                       readOnly={readOnly}
-                      handle={compact ? undefined : pageUi.setEditor}
+                      handle={handle}
                       others={others}
                       threads={threads.perBlock}
                       // Beside the text, each thread's card shows where it is: no counts.
                       countThreads={!margin}
                       onFocusBlock={setBlock}
                       onSaveState={(state) => pageUi.setSaving(doc.id, state)}
-                      onComment={mayEdit ? pageUi.startThread : undefined}
+                      onComment={mayEdit ? comment : undefined}
                       onOpenThread={pageUi.showThread}
                       wordThreads={threads.onWords}
                       litThread={litThread}
@@ -208,7 +214,7 @@ export function PageBody({ doc, compact }: Props) {
           )}
         </div>
       </div>
-      {commentsOpen && <CommentsPanel docId={doc.id} projectId={doc.project_id} editor={editor} />}
+      {commentsOpen && <CommentsPanel docId={doc.id} projectId={doc.project_id} />}
     </div>
   );
 }

@@ -15,7 +15,7 @@ import { Composer } from "@/docs/comments/composer";
 import { draftFor } from "@/docs/comments/drafts";
 import { Quote } from "@/docs/comments/quote";
 import { Thread } from "@/docs/comments/thread";
-import { inText, onWords, type ThreadData, threadsOf, usePageThreads } from "@/docs/comments/threads";
+import { aboutText, inText, onWords, threadsOf, usePageThreads } from "@/docs/comments/threads";
 import { useDocComments } from "@/docs/data";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { Dialog } from "@/ui/dialog";
@@ -46,27 +46,40 @@ export function BlockThreads({ docId, projectId, text }: Props) {
   const mayEdit = useCan().edit(projectId);
   const focusThread = usePageUi((s) => s.focusThread);
   const focusBlock = usePageUi((s) => s.focusBlock);
-  const draftBlock = usePageUi((s) => s.draftBlock);
+  const draftBlock = usePageUi((s) => (s.draftDoc === docId ? s.draftBlock : null));
   const draftWords = usePageUi((s) => s.draftWords);
-  const replyAsked = usePageUi((s) => s.replyAsked);
+  const cursorAsked = usePageUi((s) => s.cursorAsked);
   const litThread = usePageUi((s) => s.litThread);
   const phone = useMedia("(max-width: 640px)");
   const draft = mayEdit ? draftBlock : null;
   const asked = focusThread ? threads.find((th) => th.root.id === focusThread) : undefined;
   const block = draft ?? asked?.blockId ?? focusBlock;
-  // Read from the editor while something is open: a thread whose block is gone is not here but under the
-  // page's title (page-discussion.tsx). A row's side peek has no editor handle; there, the stored block.
-  const editor = usePageUi((s) => s.editor);
-  const { open: read } = usePageThreads(docId, block ? editor : null);
-  const onBlock = (th: ThreadData) => th.blockId === block;
-  const shown = !block ? [] : editor ? read.filter((th) => th.at && onBlock(th)) : threads.filter(onBlock);
+  // As the page's text reads now: a thread whose block is gone is not here but under the page's title
+  // (page-discussion.tsx), and one whose words are gone, nowhere until the server says so.
+  const { open: read, read: known } = usePageThreads(docId);
+  const shown = block ? read.filter((th) => th.at && th.blockId === block) : [];
   const first = shown[0]?.root.id;
   const open = !!block && (!!draft || shown.length > 0);
   const content = useRef<HTMLDivElement>(null);
+  // A virtual anchor at the block's mark, within the page's text: the popover follows it as the page scrolls.
   const anchor = useMemo(
-    () => ({ current: { getBoundingClientRect: () => markOf(text.current, block ?? "") } }),
+    () => ({
+      current: {
+        getBoundingClientRect: () => markOf(text.current, block ?? ""),
+        get contextElement() {
+          return text.current ?? undefined;
+        },
+      },
+    }),
     [text, block],
   );
+
+  // A mark clicked whose threads turn out to have nothing left in the text (their words taken out a
+  // moment ago): nothing is open, and Esc is the page's again.
+  const nothingThere = !!block && !draft && known && shown.length === 0 && !!focusBlock;
+  useEffect(() => {
+    if (nothingThere) pageUi.leaveThread();
+  }, [nothingThere]);
 
   const close = () => {
     pageUi.endDraft();
@@ -77,22 +90,22 @@ export function BlockThreads({ docId, projectId, text }: Props) {
   useEffect(() => {
     if (block) lastBlock.current = block;
   }, [block]);
-  /** Back where the person was: the block's mark when there is one, else the text. */
-  const back = () =>
-    (
-      text.current?.querySelector<HTMLElement>(
-        `.qd-thread-mark[data-block="${CSS.escape(lastBlock.current ?? "")}"]`,
-      ) ?? text.current?.querySelector<HTMLElement>(".bn-editor")
-    )?.focus();
+  /** Where the person was: the block's mark when there is one, else the text. */
+  const backTo = () =>
+    text.current?.querySelector<HTMLElement>(`.qd-thread-mark[data-block="${CSS.escape(lastBlock.current ?? "")}"]`) ??
+    text.current?.querySelector<HTMLElement>(".bn-editor");
 
   const draftKey = draft ? draftFor.thread(draft, draftWords) : "";
+
   const body = (
     <div className="space-y-2">
       {draft && (
-        <div key={draftKey} className="rounded-lg border border-accent bg-surface p-2">
+        <div key={draftKey} data-draft className="rounded-lg border border-accent bg-surface p-2">
           {draftWords && <Quote about={{ on: "text", text: draftWords.quote }} />}
           <Composer
-            autoFocus
+            // The cursor when it was asked for just now, not when the box is drawn again later.
+            takeFocus={cursorAsked === "draft"}
+            onFocusTaken={pageUi.cursorTaken}
             draft={draftKey}
             projectId={projectId}
             placeholder={t(draftWords ? "docs.comment.placeholderWords" : "docs.comment.placeholder")}
@@ -100,8 +113,9 @@ export function BlockThreads({ docId, projectId, text }: Props) {
             onClose={pageUi.endDraft}
             onCancel={pageUi.endDraft}
             onSubmit={(comment) => {
-              addComment({ docId, blockId: draft, words: draftWords ?? undefined, ...comment });
+              const sent = addComment({ docId, blockId: draft, words: draftWords ?? undefined, ...comment });
               pageUi.endDraft();
+              return sent;
             }}
           />
         </div>
@@ -115,12 +129,12 @@ export function BlockThreads({ docId, projectId, text }: Props) {
             thread={th}
             docId={docId}
             projectId={projectId}
-            // Words quoted, as several threads may be on one block; a thread on the block needs none.
-            quote={onWords(th.root) && <Quote about={{ on: "text", text: th.root.quote }} />}
-            subject={th.root.quote}
+            // The words as they read now, as several threads may be on one block; a thread on the block needs none.
+            quote={onWords(th.root) && <Quote about={th.about} />}
+            subject={onWords(th.root) ? aboutText(th.about) : undefined}
             active={active}
             lit={id === litThread}
-            askReply={replyAsked && (replyAsked.thread ?? first) === id ? replyAsked.n : 0}
+            askReply={cursorAsked === `reply ${id}` || (cursorAsked === "block" && id === first)}
             onResolved={shown.length === 1 && !draft ? close : undefined}
           />
         );
@@ -130,7 +144,19 @@ export function BlockThreads({ docId, projectId, text }: Props) {
 
   if (phone)
     return (
-      <Dialog open={open} onOpenChange={(to) => !to && close()} title={t("docs.comment.title")}>
+      <Dialog
+        open={open}
+        onOpenChange={(to) => !to && close()}
+        title={t("docs.comment.title")}
+        // The thread shown takes the cursor (its reply box, or itself for one who may not reply), not
+        // whichever box comes first; closed, it goes back where the person was.
+        initialFocus={(root) =>
+          root.querySelector<HTMLElement>("[data-draft] textarea") ??
+          root.querySelector<HTMLElement>("[aria-current] textarea") ??
+          root.querySelector<HTMLElement>("[aria-current]")
+        }
+        finalFocus={backTo}
+      >
         <div className="px-4 pb-4">{body}</div>
       </Dialog>
     );
@@ -152,7 +178,7 @@ export function BlockThreads({ docId, projectId, text }: Props) {
           // Closed for good, not opened again at once on another block (this comes a moment later).
           const { focusThread, focusBlock, draftBlock } = usePageUi.getState();
           const reopened = !!(focusThread || focusBlock || draftBlock);
-          if (!reopened && (!document.activeElement || document.activeElement === document.body)) back();
+          if (!reopened && (!document.activeElement || document.activeElement === document.body)) backTo()?.focus();
         }}
         // Esc closing the @ list in a box closes only that list.
         onEscapeKeyDown={(e) => {
@@ -162,6 +188,9 @@ export function BlockThreads({ docId, projectId, text }: Props) {
         // block's mark or highlighted words, clicked, say for themselves what opens next.
         onInteractOutside={(e) => {
           const target = e.target instanceof Element ? e.target : null;
+          // Another dialog opened over the page (its versions, a file shown): the popover gives way, its
+          // draft kept, rather than stay over that dialog.
+          if (target?.closest('[role="dialog"]')) return;
           if (draft || target?.closest('.qd-thread-mark, [data-style-type="comment"]')) e.preventDefault();
         }}
       >

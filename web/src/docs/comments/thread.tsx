@@ -8,7 +8,8 @@ import { exact } from "@/lib/time";
 import { addComment, deleteComment, resolveComment } from "@/docs/actions";
 import { scrollBehavior } from "@/lib/motion";
 import { Composer } from "@/docs/comments/composer";
-import { draftFor, useCommentDrafts } from "@/docs/comments/drafts";
+import { useCommentDraft } from "@/data/comment-drafts";
+import { draftFor } from "@/docs/comments/drafts";
 import type { ThreadData } from "@/docs/comments/threads";
 import { pageUi } from "@/docs/page/state";
 import type { Attached } from "@/types/core";
@@ -37,8 +38,8 @@ interface Props {
    * a card in the margin that is not the one open.
    */
   compact?: boolean;
-  /** Asks for the cursor in its reply box: each new number is an ask; 0 for none. */
-  askReply?: number;
+  /** The cursor was asked for in its reply box, just now (state.ts, cursorAsked): it takes it. */
+  askReply?: boolean;
   /** Shows its words or its block in the page. */
   onLocate?: () => void;
   /** Opens it (a compact card): a click on it, or on its reply box. */
@@ -68,7 +69,7 @@ export function Thread({
   active,
   lit,
   compact,
-  askReply = 0,
+  askReply = false,
   onLocate,
   onOpen,
   onLeave,
@@ -89,13 +90,14 @@ export function Thread({
 
   useEffect(() => {
     if (!askReply) return;
-    // One who may not reply is put on the thread itself. The page may still be on its way to the
-    // thread's words: the box is brought into view, as little as it takes, once that has begun.
-    const target = box.current ?? card.current;
-    target?.focus({ preventScroll: true });
-    const frame = requestAnimationFrame(() =>
-      target?.scrollIntoView?.({ block: "nearest", behavior: scrollBehavior() }),
-    );
+    // One who may not reply is put on the thread itself. Once the page is on its way to the thread's
+    // words, the box is brought into view, as little as it takes, and then given the cursor.
+    const frame = requestAnimationFrame(() => {
+      const target = box.current ?? card.current;
+      target?.scrollIntoView?.({ block: "nearest", behavior: scrollBehavior() });
+      target?.focus({ preventScroll: true });
+      pageUi.cursorTaken();
+    });
     return () => cancelAnimationFrame(frame);
   }, [askReply]);
   useEffect(() => {
@@ -106,7 +108,7 @@ export function Thread({
 
   const onlyReply = replies.length === 1 ? replies[0] : undefined;
   const draft = draftFor.reply(root.id);
-  const drafted = useCommentDrafts((s) => s.drafts[draft]?.body);
+  const drafted = useCommentDraft(draft).body;
 
   return (
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a click on the thread is the mouse's way to open it or to its words; the keyboard has the thread's own buttons, and Esc in it is handled here for every control inside
@@ -188,7 +190,7 @@ export function Thread({
               onClick={onOpen}
               className={cx(
                 "mt-2 flex h-8 w-full items-center rounded-md border border-line px-2 text-left text-sm hover:border-line-strong",
-                drafted ? "text-ink-2" : "text-ink-3",
+                drafted ? "text-ink" : "text-ink-2",
               )}
             >
               <span className="truncate">{drafted || t("docs.comment.reply")}</span>
@@ -249,7 +251,7 @@ function CommentBody({
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-1.5">
           <span className="truncate text-sm font-medium">{author?.name ?? t("common.someone")}</span>
-          <time className="shrink-0 text-xs text-ink-3" title={exact(comment.created_at)}>
+          <time className="shrink-0 text-xs text-ink-2" title={exact(comment.created_at)}>
             <Ago ms={comment.created_at} />
           </time>
           {can.editMadeBy(comment.author_id, projectId) && (

@@ -7,11 +7,12 @@
 
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Comment, Member, User, Workspace } from "@/types/core";
-import { useCommentDrafts } from "@/docs/comments/drafts";
+import { clearCommentDrafts } from "@/data/comment-drafts";
 import { PageDiscussion } from "@/docs/comments/page-discussion";
+import { useThreadReadings } from "@/docs/comments/threads";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { TooltipProvider } from "@/ui/tooltip";
 import { WithQuery } from "@/test/query";
@@ -32,6 +33,15 @@ const comment = (id: string, body: string, at: number, more: Partial<Comment> = 
   }) as Comment;
 
 function seed(member: Member) {
+  load(member, [
+    comment("page", "Keep it short.", 1),
+    comment("answer", "Agreed.", 2, { parent_id: "page" }),
+    comment("cut", "Why cut?", 3, { quote: "the old plan", detached_at: 4 }),
+    comment("words", "On words", 5, { subject_type: "doc_block", subject_id: "b1", quote: "phases" }),
+  ]);
+}
+
+function load(member: Member, comments: Comment[]) {
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
@@ -39,17 +49,13 @@ function seed(member: Member) {
     user: { id: "u1" } as User,
     workspace: { id: "w", slug: "acme", name: "Acme" } as Workspace,
     members: [member],
-    comments: [
-      comment("page", "Keep it short.", 1),
-      comment("answer", "Agreed.", 2, { parent_id: "page" }),
-      comment("cut", "Why cut?", 3, { quote: "the old plan", detached_at: 4 }),
-      comment("words", "On words", 5, { subject_type: "doc_block", subject_id: "b1", quote: "phases" }),
-    ],
+    comments,
   });
 }
 
 beforeEach(() => {
-  useCommentDrafts.setState({ drafts: {} });
+  useThreadReadings.setState({ byPage: {} });
+  clearCommentDrafts();
   pageUi.reset();
   seed(me);
 });
@@ -58,7 +64,7 @@ const show = () =>
   render(
     <WithQuery>
       <TooltipProvider>
-        <PageDiscussion docId="d1" projectId={undefined} answersKeys />
+        <PageDiscussion docId="d1" projectId={undefined} />
       </TooltipProvider>
     </WithQuery>,
   );
@@ -80,7 +86,7 @@ describe("PageDiscussion", () => {
     show();
     await user.click(screen.getAllByRole("button", { name: "Reply…" })[0] as HTMLElement);
     const box = screen.getByRole("textbox", { name: "Reply…" });
-    expect(box).toHaveFocus();
+    await vi.waitFor(() => expect(box).toHaveFocus());
     await user.keyboard("{Escape}");
     expect(usePageUi.getState().focusThread).toBeNull();
     expect(screen.queryByRole("textbox", { name: "Reply…" })).toBeNull();
@@ -94,9 +100,34 @@ describe("PageDiscussion", () => {
     expect(box).toHaveFocus();
     await user.keyboard("Half a thought{Escape}");
     expect(screen.queryByRole("textbox", { name: "Comment on the page…" })).toBeNull();
-    act(() => pageUi.commentOnPage());
+    act(() => pageUi.commentOnPage("d1"));
     expect(screen.getByRole("textbox", { name: "Comment on the page…" })).toHaveValue("Half a thought");
     expect(screen.getByRole("textbox", { name: "Comment on the page…" })).toHaveFocus();
+  });
+
+  it("opens only for its own page: asked for another (a row's side peek, its database), it stays shut", () => {
+    show();
+    act(() => pageUi.commentOnPage("another"));
+    expect(screen.queryByRole("textbox", { name: "Comment on the page…" })).toBeNull();
+    act(() => pageUi.commentOnPage("d1"));
+    expect(screen.getByRole("textbox", { name: "Comment on the page…" })).toBeInTheDocument();
+  });
+
+  it("gives the cursor back to Add comment when its box is put away, not to nothing", async () => {
+    const user = userEvent.setup();
+    show();
+    await user.click(screen.getByRole("button", { name: "Add comment" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "Add comment" })).toHaveFocus();
+  });
+
+  it("shows a thread whose block is gone, as the page's text was last read", () => {
+    load(me, [comment("lost", "On a block taken out", 7, { subject_type: "doc_block", subject_id: "gone" })]);
+    useThreadReadings.setState({
+      byPage: { d1: { order: ["b1"], texts: new Map([["gone", undefined]]), words: new Map() } },
+    });
+    show();
+    expect(screen.getByText("The block this was on is gone")).toBeInTheDocument();
   });
 
   it("offers a reader who may not comment no box", () => {

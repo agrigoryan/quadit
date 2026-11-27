@@ -72,8 +72,8 @@ export function Discussions({ docId }: { docId: string }) {
 
 /** The list itself: read from the page only while it is open. */
 function List({ docId, onPicked, onSeeAll }: { docId: string; onPicked: () => void; onSeeAll: () => void }) {
-  const editor = usePageUi((s) => s.editor);
-  const { open: inPageOrder } = usePageThreads(docId, editor);
+  const editor = usePageUi((s) => s.editors[docId]) ?? null;
+  const { open: inPageOrder } = usePageThreads(docId);
   // Those last written in first, as Notion lists them.
   const open = [...inPageOrder].sort((a, b) => lastActivity(b) - lastActivity(a));
 

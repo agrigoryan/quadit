@@ -19,7 +19,7 @@ import { type Ref, useEffect, useImperativeHandle, useMemo, useRef, useState } f
 import { uploadFile } from "@/data/files";
 import { t } from "@/lib/i18n";
 import { scrollBehavior } from "@/lib/motion";
-import { type BlockSchemaLike, type EdBlock, plainText, rowsToEditor } from "@/docs/editor/convert";
+import { type BlockSchemaLike, type EdBlock, rowsToEditor } from "@/docs/editor/convert";
 import { Highlights } from "@/docs/editor/highlights";
 import { Markers } from "@/docs/editor/markers";
 import {
@@ -40,23 +40,19 @@ import { schema } from "@/docs/editor/schema";
 import { DocSync, type SaveState } from "@/docs/editor/sync";
 import { chipTyped } from "@/docs/editor/task-keys";
 import { useThemeName } from "@/docs/editor/use-theme";
-import { selectedWords, threadText, type Words } from "@/docs/editor/words";
+import { readThreads, selectedWords, type ThreadReading, type Words } from "@/docs/editor/words";
 import type { BlockRow, PresenceEntry } from "@/types/docs";
 
 export interface EditorHandle {
   scrollToBlock: (id: string) => void;
   /** Scrolls to the words a comment thread is on, and flashes them. */
   scrollToThread: (threadId: string) => void;
-  /** A block's text, for the quote above a comment thread; undefined when the block is gone. */
-  blockText: (id: string) => string | undefined;
-  /** The words a comment thread is on as they read now; undefined when they are not in the page. */
-  threadText: (threadId: string) => string | undefined;
+  /** What the comment threads on these blocks and words read as now, in one walk of the page (words.ts). */
+  read: (blocks: string[], threads: string[]) => ThreadReading;
   /** The words selected in the text this moment, for a thread on them; undefined for none, or a selection elsewhere. */
   selectedWords: () => Words | undefined;
   /** Calls `listener` after each change of the page's text; gives what stops it. */
   onChange: (listener: () => void) => () => void;
-  /** Block ids in reading order. */
-  order: () => string[];
   /**
    * The block the caret is in, as the browser has it this moment; null when
    * the text does not have the focus. A key pressed right after the caret
@@ -213,12 +209,8 @@ export default function Editor({
             easing: "ease-out",
           });
       },
-      blockText(id) {
-        const block = editor.getBlock(id) as unknown as EdBlock | undefined;
-        return block ? plainText(block.content) : undefined;
-      },
-      threadText(threadId) {
-        return threadText(editor.document as unknown as EdBlock[], threadId); // BlockNote types blocks by schema generics
+      read(blocks, threads) {
+        return readThreads(editor.document as unknown as EdBlock[], blocks, threads); // BlockNote types blocks by schema generics
       },
       onChange(listener) {
         return editor.onChange(listener);
@@ -229,14 +221,6 @@ export default function Editor({
         const shown = document.getSelection();
         if (!shown || shown.isCollapsed || !editor.domElement?.contains(shown.anchorNode)) return undefined;
         return selectedWords(editor);
-      },
-      order() {
-        const out: string[] = [];
-        editor.forEachBlock((b) => {
-          out.push(b.id);
-          return true;
-        });
-        return out;
       },
       caretBlock() {
         const at = document.getSelection()?.focusNode;

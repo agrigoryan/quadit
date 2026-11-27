@@ -1,10 +1,14 @@
 // A page's comments as threads, and where each is in the page as it reads
 // now: what the margin, the comments column and the Discussions list show.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { create } from "zustand";
 import { scrollBehavior } from "@/lib/motion";
+import { useRowEvenIfGone } from "@/data/selectors";
 import { useDocComments } from "@/docs/data";
+import { pageUi, usePageUi } from "@/docs/page/state";
 import type { EditorHandle } from "@/docs/editor/editor";
+import type { ThreadReading } from "@/docs/editor/words";
 import type { DocComment } from "@/types/docs";
 
 export interface ThreadData {
@@ -61,6 +65,20 @@ export function useOpenThreads(docId: string): {
   }, [comments]);
 }
 
+/**
+ * Leaves the thread open when it is resolved or deleted meanwhile (by
+ * someone else, or from another place): nothing shows it any more, and
+ * nothing should still hold Esc for it.
+ */
+export function useLeaveGoneThread() {
+  const focusThread = usePageUi((s) => s.focusThread);
+  const thread = useRowEvenIfGone("comments", focusThread ?? undefined);
+  const gone = !!focusThread && (!thread || !!thread.resolved_at || !!thread.deleted_at);
+  useEffect(() => {
+    if (gone) pageUi.leaveThread();
+  }, [gone]);
+}
+
 /** What a thread is about, as the page reads now. */
 export type About =
   /** The page as a whole. */
@@ -78,40 +96,30 @@ export interface PageThread extends ThreadData {
   at?: { words: string } | { block: string };
 }
 
+/** What a page's text reads as for its threads, by page id: read once for all that show them (useReadThreads). */
+export const useThreadReadings = create<{ byPage: Record<string, ThreadReading> }>(() => ({ byPage: {} }));
+
 /**
- * The page's threads, open and resolved, in the order the page reads (the
- * page's own last), each with what it is about and where it is. The
- * editor is read once it has drawn and again, once a frame at most, as
- * the text changes; never while rendering. `draftBlock`, a block a new
- * thread is being started on, has its text read too (`draftText`).
+ * Keeps what a page's text reads as for its threads current while the page
+ * is open: the blocks' order, the text of each block a thread is on, the
+ * words of each thread on words. One subscription for the page, whoever
+ * shows its threads (the page's discussion, the popover at a block, the
+ * Discussions list, the pane): read in one walk of the text (words.ts), once
+ * a frame at most as it changes, and not at all while no open thread is on
+ * the text (`wanted`).
  */
-export function usePageThreads(
-  docId: string,
-  editor: EditorHandle | null,
-  draftBlock: string | null = null,
-): { open: PageThread[]; resolved: PageThread[]; draftText: string | undefined } {
+export function useReadThreads(docId: string, editor: EditorHandle | undefined, wanted: boolean) {
   const comments = useDocComments(docId);
-  /**
-   * What the editor shows: the blocks' order, the text of each block a
-   * thread is on (undefined: the block is gone), and the words each thread
-   * on words is on as they read now.
-   */
-  const [page, setPage] = useState<{
-    order: string[];
-    texts: Map<string, string | undefined>;
-    words: Map<string, string | undefined>;
-  }>(() => ({ order: [], texts: new Map(), words: new Map() }));
+  const roots = comments.filter((c) => !c.parent_id);
+  const blocks = [...new Set(roots.flatMap((c) => (c.subject_type === "doc_block" ? [c.subject_id] : [])))].join(" ");
+  const threads = roots.flatMap((c) => (onWords(c) ? [c.id] : [])).join(" ");
   useEffect(() => {
-    // Not drawn yet: nothing is read, so no block is called gone.
-    if (!editor) return;
-    const read = () => {
-      const blocks = [draftBlock, ...comments.map((c) => (c.subject_type === "doc_block" ? c.subject_id : null))];
-      const texts = new Map<string, string | undefined>();
-      for (const id of blocks) if (id) texts.set(id, editor.blockText(id));
-      const words = new Map<string, string | undefined>();
-      for (const c of comments) if (!c.parent_id && onWords(c)) words.set(c.id, editor.threadText(c.id));
-      setPage({ order: editor.order(), texts, words });
-    };
+    if (!editor || !wanted) return;
+    const asked = { blocks: blocks.split(" ").filter(Boolean), threads: threads.split(" ").filter(Boolean) };
+    const read = () =>
+      useThreadReadings.setState((s) => ({
+        byPage: { ...s.byPage, [docId]: editor.read(asked.blocks, asked.threads) },
+      }));
     read();
     let frame = 0;
     const stop = editor.onChange(() => {
@@ -122,8 +130,21 @@ export function usePageThreads(
       cancelAnimationFrame(frame);
       stop();
     };
-  }, [editor, comments, draftBlock]);
+  }, [docId, editor, wanted, blocks, threads]);
+}
 
+const NOT_READ: ThreadReading = { order: [], texts: new Map(), words: new Map() };
+
+/**
+ * The page's threads, open and resolved, in the order the page reads (the
+ * page's own last), each with what it is about and where it is, as the
+ * page's text was last read (useReadThreads). `read` is false until it has
+ * been, and no block is called gone before.
+ */
+export function usePageThreads(docId: string): { open: PageThread[]; resolved: PageThread[]; read: boolean } {
+  const comments = useDocComments(docId);
+  const reading = useThreadReadings((s) => s.byPage[docId]);
+  const page = reading ?? NOT_READ;
   return useMemo(() => {
     const { order, texts, words } = page;
     // A block not read yet is not called gone.
@@ -151,9 +172,9 @@ export function usePageThreads(
     return {
       open: all.filter((th) => !th.root.resolved_at),
       resolved: all.filter((th) => th.root.resolved_at),
-      draftText: draftBlock ? texts.get(draftBlock) : undefined,
+      read: !!reading,
     };
-  }, [comments, page, draftBlock]);
+  }, [comments, page, reading]);
 }
 
 /** The words or block text a thread is about, for its label; undefined for the page, or a block gone. */

@@ -13,7 +13,6 @@ import { t } from "@/lib/i18n";
 import { Quote } from "@/docs/comments/quote";
 import { Thread } from "@/docs/comments/thread";
 import { aboutText, lastActivity, type PageThread, showInPage, usePageThreads } from "@/docs/comments/threads";
-import type { EditorHandle } from "@/docs/editor/editor";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { IconButton } from "@/ui/button";
 import { Menu, MenuContent, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "@/ui/menu";
@@ -23,8 +22,6 @@ interface Props {
   docId: string;
   /** The page's project: who may not change it may read its comments, not answer them. */
   projectId: string | undefined;
-  /** The page's editor, read for what each thread is on; null until it has drawn. */
-  editor: EditorHandle | null;
 }
 
 const ANYONE = "";
@@ -33,7 +30,8 @@ const ANYONE = "";
 const wroteIn = (th: PageThread, userId: string) =>
   th.root.author_id === userId || th.replies.some((r) => r.author_id === userId);
 
-export function CommentsPanel({ docId, projectId, editor }: Props) {
+export function CommentsPanel({ docId, projectId }: Props) {
+  const editor = usePageUi((s) => s.editors[docId]) ?? null;
   const focusThread = usePageUi((s) => s.focusThread);
   const litThread = usePageUi((s) => s.litThread);
   const showResolved = usePageUi((s) => s.showResolved);
@@ -41,10 +39,16 @@ export function CommentsPanel({ docId, projectId, editor }: Props) {
   const [person, setPerson] = useState(ANYONE);
   const list = useRef<HTMLDivElement>(null);
   const aside = useRef<HTMLElement>(null);
-  // Opened, the pane has the cursor; closed, the cursor goes back to the comments button, not nowhere.
+  // Asked for (See all, open or not), the pane has the cursor; closed, the cursor goes back to the
+  // comments button, not nowhere.
+  const asked = usePageUi((s) => s.cursorAsked === "pane");
+  useLayoutEffect(() => {
+    if (!asked) return;
+    aside.current?.focus({ preventScroll: true });
+    pageUi.cursorTaken();
+  }, [asked]);
   useLayoutEffect(() => {
     const el = aside.current;
-    el?.focus({ preventScroll: true });
     return () => {
       const at = document.activeElement;
       if (!at || at === document.body || el?.contains(at))
@@ -53,7 +57,7 @@ export function CommentsPanel({ docId, projectId, editor }: Props) {
   }, []);
   // Esc in a comment box leaves the box (composer.tsx); away from one, it closes the pane.
   useHotkeys({ Escape: pageUi.closeComments });
-  const { open, resolved } = usePageThreads(docId, editor);
+  const { open, resolved } = usePageThreads(docId);
 
   // The thread open in the page is shown here too.
   useEffect(() => {
@@ -69,6 +73,8 @@ export function CommentsPanel({ docId, projectId, editor }: Props) {
   const locate = (th: PageThread) => {
     if (!th.root.resolved_at)
       return () => {
+        // Over the page (a phone, a narrow window), the pane goes first: the thread opens where it can be seen.
+        if (aside.current && getComputedStyle(aside.current).position !== "static") pageUi.closeComments();
         pageUi.openThread(th.root.id);
         showInPage(th, editor);
       };
