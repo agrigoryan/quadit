@@ -11,7 +11,9 @@
 
 import { useMemo } from "react";
 import { useMe } from "@/data/selectors";
+import { getState } from "@/data/store";
 import type { Member, Task } from "@/types/core";
+import type { Doc } from "@/types/docs";
 
 export interface Access {
   /** May change anything at all: not read-only, not suspended. */
@@ -81,3 +83,22 @@ export function useCan(): Access {
   const me = useMe();
   return useMemo(() => can(me), [me]);
 }
+
+/**
+ * True unless the person is limited to some projects and the page is tied
+ * to another. The server sends such a person no page of another project; one
+ * that is moved out of theirs while they look is still in the copy.
+ */
+function withinMyProjects(doc: Doc): boolean {
+  const mine = getState().me?.scope?.projects;
+  return !doc.project_id || !mine?.length || mine.includes(doc.project_id);
+}
+
+/**
+ * Whether this person may see a page: a private one shows to its owner and
+ * those it is shared with, a project's to those who see the project. Asked
+ * of every page the copy holds before it is shown: one whose access changed
+ * while the app was open stays in the copy.
+ */
+export const canSeePage = (doc: Doc, userId: string) =>
+  (!doc.owner_id || doc.owner_id === userId || !!doc.shared_with?.includes(userId)) && withinMyProjects(doc);

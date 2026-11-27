@@ -27,7 +27,8 @@ import { t } from "@/lib/i18n";
 import { getLookupEvenIfGone, getRows } from "@/data/selectors";
 import { getState } from "@/data/store";
 import { decisionStateText } from "@/docs/editor/chips";
-import { canSee, pathTo } from "@/docs/data";
+import { canSeePage } from "@/data/access";
+import { pathTo } from "@/docs/data";
 import { PageIcon, docTitle } from "@/ui/page-name";
 import { mentionable } from "@/docs/editor/decision-refs";
 import type { AnyEditor } from "@/docs/editor/sync";
@@ -148,7 +149,7 @@ export function pageTitleItems(editor: AnyEditor, query: string, self?: string):
   const q = query.trim().toLowerCase();
   const docs = getLookupEvenIfGone("docs");
   const pages = getRows("docs")
-    .filter((d) => d.id !== self && d.kind !== "row" && (!me || canSee(d, me.user_id)) && !!d.title.trim())
+    .filter((d) => d.id !== self && d.kind !== "row" && (!me || canSeePage(d, me.user_id)) && !!d.title.trim())
     .filter((d) => !q || d.title.toLowerCase().includes(q))
     // Titles that start with what was typed come first.
     .sort(

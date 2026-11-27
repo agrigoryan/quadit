@@ -3,26 +3,13 @@
 
 import { useMemo } from "react";
 import { useLookup, useMe, useRows as useLiveRows } from "@/data/selectors";
-import { type Dict, getState } from "@/data/store";
+import { canSeePage } from "@/data/access";
+import type { Dict } from "@/data/store";
 import type { DBProperty, DBView, Doc, DocComment } from "@/types/docs";
 import { docTitle } from "@/ui/page-name";
 
 export const byRank = (a: { rank: string; id: string }, b: { rank: string; id: string }) =>
   a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : a.id < b.id ? -1 : 1;
-
-/**
- * True unless the person is limited to some projects and the page is tied
- * to another. The server sends such a person no page of another project; one
- * that is moved out of theirs while they look is still in the copy.
- */
-function withinMyProjects(doc: Doc): boolean {
-  const mine = getState().me?.scope?.projects;
-  return !doc.project_id || !mine?.length || mine.includes(doc.project_id);
-}
-
-/** Whether this person may see a page: a private one shows to its owner and those it is shared with, a project's to those who see the project. */
-export const canSee = (doc: Doc, userId: string) =>
-  (!doc.owner_id || doc.owner_id === userId || !!doc.shared_with?.includes(userId)) && withinMyProjects(doc);
 
 export type Section = "team" | "private" | "memory" | "generated";
 
@@ -44,7 +31,7 @@ export interface DocTree {
 function buildTree(docs: Dict<Doc>, userId: string): DocTree {
   const roots: DocTree["roots"] = { team: [], private: [], memory: [], generated: [] };
   const children: Dict<Doc[]> = {};
-  const shown = (d: Doc | undefined): d is Doc => !!d && d.kind !== "row" && canSee(d, userId);
+  const shown = (d: Doc | undefined): d is Doc => !!d && d.kind !== "row" && canSeePage(d, userId);
   for (const doc of Object.values(docs)) {
     if (!shown(doc)) continue;
     const parent = doc.parent_id ? docs[doc.parent_id] : undefined;
@@ -186,7 +173,7 @@ export function useLinkablePages(): Doc[] {
   return useMemo(
     () =>
       docs
-        .filter((d) => d.kind !== "row" && canSee(d, me.user_id))
+        .filter((d) => d.kind !== "row" && canSeePage(d, me.user_id))
         .sort((a, b) => docTitle(a).localeCompare(docTitle(b))),
     [docs, me.user_id],
   );

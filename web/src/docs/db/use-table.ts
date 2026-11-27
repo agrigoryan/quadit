@@ -5,7 +5,8 @@ import { useQueries } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useLookup, useLookupEvenIfGone, useMe, useSlug } from "@/data/selectors";
 import type { Dict } from "@/data/store";
-import { byRank, canSee } from "@/docs/data";
+import { canSeePage } from "@/data/access";
+import { byRank } from "@/docs/data";
 import { type Cells, computeCells, type TableData, type World } from "@/docs/db/compute";
 import { pageQuery } from "@/docs/store";
 import type { DBProperty, DBView, Doc } from "@/types/docs";
@@ -33,7 +34,7 @@ export function useEnsureDatabases(databaseIds: (string | undefined)[]) {
 /** A database and its rows, out of the live pages. */
 function tableOf(docs: Dict<Doc>, props: Dict<DBProperty>, databaseId: string, userId: string): TableData | null {
   const doc = docs[databaseId];
-  if (!doc || !canSee(doc, userId)) return null;
+  if (!doc || !canSeePage(doc, userId)) return null;
   return {
     doc,
     props: Object.values(props)

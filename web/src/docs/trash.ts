@@ -9,7 +9,7 @@ import { api, workspacePath } from "@/data/api";
 import { queryClient } from "@/data/query";
 import { getRowEvenIfGone, useLookupEvenIfGone, useMe, useSlug, useTrashed as useTrashedRows } from "@/data/selectors";
 import { getState, mergeRows } from "@/data/store";
-import { canSee } from "@/docs/data";
+import { canSeePage } from "@/data/access";
 import { docsKeys } from "@/docs/store";
 import type { Doc } from "@/types/docs";
 
@@ -46,7 +46,7 @@ export function useTrashed(projectId?: string): Trashed[] {
   return useMemo(() => {
     const out: Trashed[] = [];
     for (const doc of trashed) {
-      if (!doc.deleted_at || doc.kind === "row" || !canSee(doc, me.user_id)) continue;
+      if (!doc.deleted_at || doc.kind === "row" || !canSeePage(doc, me.user_id)) continue;
       if (projectId && doc.project_id !== projectId) continue;
       const parent = doc.parent_id ? docs[doc.parent_id] : undefined;
       if (parent?.deleted_at === doc.deleted_at) continue;
