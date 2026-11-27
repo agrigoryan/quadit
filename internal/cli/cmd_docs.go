@@ -8,8 +8,13 @@ import (
 	"strings"
 )
 
-// linkWords escapes what would end a Markdown link's words early.
-var linkWords = strings.NewReplacer(`\`, `\\`, `[`, `\[`, `]`, `\]`)
+// linkWords are a title as the words of a Markdown link, which end at a
+// bracket, and in a table at a cell's bar: those escaped, and the title on
+// one line.
+func linkWords(title string) string {
+	escaped := strings.NewReplacer(`\`, `\\`, `[`, `\[`, `]`, `\]`, `|`, `\|`).Replace(title)
+	return strings.Join(strings.Fields(escaped), " ")
+}
 
 // write writes a page from stdin: a new one under the title given
 // (write new TITLE), or the one named by its id.
@@ -29,7 +34,7 @@ func (r *runner) write(in input) error {
 		if err == nil && !r.dry && !r.json {
 			// What points a person at the page, ready to paste into a
 			// comment or a result: they see its title, and open it.
-			fmt.Fprintf(r.out, "link: [%s](doc:%s)\n", linkWords.Replace(title), res.Ref)
+			fmt.Fprintf(r.out, "link: [%s](doc:%s)\n", linkWords(title), res.Ref)
 		}
 		return err
 	}

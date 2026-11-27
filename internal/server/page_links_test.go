@@ -196,7 +196,8 @@ func TestATaskListsEachPageItAndThePageMentionOnce(t *testing.T) {
 
 // TestWritingANewPageGivesTheLinkToIt: quadit write new TITLE prints, after
 // the page's id, the Markdown that points a person at the page, ready to
-// paste into a comment or a result.
+// paste into a comment or a result, anywhere in it: on one line, with what
+// would end its words or a table's cell escaped.
 func TestWritingANewPageGivesTheLinkToIt(t *testing.T) {
 	// Not in parallel: the command line it runs reads the process's environment (t.Setenv) and stdin.
 	testdb.Each(t, func(t *testing.T, st store.Store) {
@@ -212,14 +213,14 @@ func TestWritingANewPageGivesTheLinkToIt(t *testing.T) {
 		}
 		was := os.Stdin
 		os.Stdin = f
-		out, code := s.quadit(t, agent, "write", "new", "Meta [rework] review")
+		out, code := s.quadit(t, agent, "write", "new", "Meta [rework] | review\nfinal")
 		os.Stdin = was
 		f.Close()
 		made := regexp.MustCompile(`ok doc.create id=(\S+)`).FindStringSubmatch(out)
 		if code != 0 || made == nil {
 			t.Fatalf("quadit write new failed (%d): %s", code, out)
 		}
-		if want := `link: [Meta \[rework\] review](doc:` + made[1] + ")\n"; !strings.Contains(out, want) {
+		if want := `link: [Meta \[rework\] \| review final](doc:` + made[1] + ")\n"; !strings.Contains(out, want) {
 			t.Fatalf("quadit write new does not print %q: %s", want, out)
 		}
 	})
