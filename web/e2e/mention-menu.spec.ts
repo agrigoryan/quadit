@@ -100,7 +100,8 @@ test("the task's comment box has the paperclip, @ and the send arrow, and @ open
   await mention.click();
   await expect(box).toHaveValue("Ask @");
   await expect(box).toBeFocused();
-  await expect(section(page, "People").getByRole("option", { name: /Coder.*@coder/ })).toBeVisible();
+  // With nothing typed yet: the people first (which five depends on who else the run made), then the project's tasks.
+  await expect(section(page, "People").getByRole("option").first()).toBeVisible();
   await expect(section(page, "Tasks").getByRole("option", { name: `${key} Choose a logo` })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("listbox")).toBeHidden();
