@@ -142,6 +142,17 @@ describe("the inbox's two tabs", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("quotes a link's words once unescaped, and a page the reader may not see by the words written", () => {
+    const secret = "01a21abf-0000-7000-8000-000000000002";
+    const gone = "01a21abf-0000-7000-8000-000000000003";
+    const snippet = `See [Review \\[draft\\] \\| v2](doc:${gone}) and [the plan](doc:${secret}).`;
+    show(
+      [item("n9", { type: "mentioned", addressed: true, snippet })],
+      [{ id: secret, title: "Bea's salaries", kind: "page", rank: "a", owner_id: "u2" } as Doc],
+    );
+    expect(screen.getAllByText("See Review [draft] | v2 and the plan.").length).toBeGreaterThan(0);
+  });
+
   it("opens again on the tab last shown, for this session", () => {
     show([item("n3", {})]);
     fireEvent.click(screen.getByRole("button", { name: "Show 1 unread update" }));
