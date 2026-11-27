@@ -196,7 +196,7 @@ Download it from [Releases](https://github.com/agrigoryan/quadit/releases), unde
 - macOS: the app is signed, and Apple checks each build (notarization). A pre-release can be out before Apple has answered, and until then macOS says it could not verify the app. Allow it under System Settings → Privacy & Security, "Open Anyway", or run `xattr -dr com.apple.quarantine /Applications/Quadit.app` once. The warning stops by itself once Apple has accepted that build.
 - Windows: the app is not signed, and SmartScreen says it protected the PC. Choose "More info", then "Run anyway".
 
-The app does the same on Windows as on macOS and Linux: it runs Quadit on the computer, connects agents, and runs Claude Code and Codex for each task. Windows support is new: it was checked by automated tests on Windows with stand-in agents, not yet on a person's own Windows computer, nor with the real Claude Code and Codex there.
+The app does the same on Windows as on macOS and Linux: it runs Quadit on the computer, connects agents, and runs Claude Code and Codex for each task. Windows support is new: besides the automated tests on Windows, it has been used on a person's own Windows computer with Codex. Claude Code has not been run there yet.
 
 **Inside WSL.** The Windows app finds and runs agents installed for Windows; an agent installed inside WSL is not found. If you work inside WSL, install the Linux `quadit` there (the install script, in the [README](../README.md#on-a-server)) and run everything inside WSL: the server and the agents. A browser on Windows reaches a server in WSL at `http://localhost:4780`. A program inside WSL does not reach a server on Windows' `127.0.0.1` by default: that needs WSL's mirrored networking (Windows 11 22H2 or later).
 
