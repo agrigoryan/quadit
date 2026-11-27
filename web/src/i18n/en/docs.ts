@@ -175,6 +175,7 @@ export const docs = {
 
   "docs.comment.title": "Comments",
   "docs.comment.add": "Comment",
+  "docs.comment.addOnBlock": "Comment on this block",
   "docs.comment.open": "Open",
   "docs.comment.resolved": "Resolved",
   "docs.comment.which": "Which comments",

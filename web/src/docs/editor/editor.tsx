@@ -5,7 +5,7 @@
 import "@blocknote/mantine/style.css";
 import "@/docs/editor/theme.css";
 
-import { filterSuggestionItems } from "@blocknote/core/extensions";
+import { filterSuggestionItems, FormattingToolbarExtension, SideMenuExtension } from "@blocknote/core/extensions";
 import { BlockNoteView } from "@blocknote/mantine";
 import {
   FormattingToolbarController,
@@ -13,6 +13,7 @@ import {
   SideMenuController,
   SuggestionMenuController,
   useCreateBlockNote,
+  useExtensionState,
 } from "@blocknote/react";
 import { type Ref, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { uploadFile } from "@/data/files";
@@ -240,6 +241,14 @@ export default function Editor({
     [editor],
   );
 
+  // The block the pointer is on, as the block's handle has it (none while typing or in a page that
+  // cannot be edited), offered a thread unless words are selected: the selection's Comment is for those.
+  const pointed = useExtensionState(SideMenuExtension, {
+    editor,
+    selector: (state) => (state?.show ? state.block.id : undefined),
+  });
+  const selecting = useExtensionState(FormattingToolbarExtension, { editor });
+
   const canComment = !!onComment;
   const actions = useMemo<EditorActions>(
     () => ({
@@ -310,7 +319,15 @@ export default function Editor({
           <SideMenuController sideMenu={BlockSideMenu} />
         </BlockNoteView>
       </ActionsContext.Provider>
-      <Markers editor={editor} wrap={wrap} others={others ?? []} threads={threads ?? {}} onOpenThread={onOpenThread} />
+      <Markers
+        editor={editor}
+        wrap={wrap}
+        others={others ?? []}
+        threads={threads ?? {}}
+        onOpenThread={onOpenThread}
+        pointed={selecting ? undefined : pointed}
+        onAddThread={actions.comment}
+      />
       <Highlights
         editor={editor}
         open={wordThreads ?? []}

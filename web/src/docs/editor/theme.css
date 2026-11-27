@@ -315,6 +315,33 @@
   filter: brightness(0.96);
 }
 
+/* Where a block's count would be, on the block the pointer is on: quiet until pointed at. */
+.qd-thread-add {
+  position: absolute;
+  right: 0.5rem;
+  display: inline-flex;
+  width: 1.375rem;
+  height: 1.375rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: var(--ink-3);
+}
+.qd-thread-add:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.qd-thread-add:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* No pointer to hover with: the block's menu and the selection offer it. Nor a margin wide enough to keep it off the text. */
+@media (hover: none), (max-width: 640px) {
+  .qd-thread-add {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   .qd-editor .bn-editor {
     padding-inline: 1rem;

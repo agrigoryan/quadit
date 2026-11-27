@@ -1,7 +1,10 @@
 // Small marks beside blocks: who else is in a block (a coloured line with
-// their name) and how many open comment threads a block has.
+// their name), and at a block's right how many open comment threads it has
+// or, on the block the pointer is on that has none, a button to start one.
+// One place for both: a block shows its count, which leads to its threads,
+// or the button, never two marks side by side in the narrow margin.
 
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, MessageSquarePlus } from "lucide-react";
 import { type RefObject, useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
 import { useLookupEvenIfGone } from "@/data/selectors";
@@ -20,12 +23,20 @@ interface Props {
   others: PresenceEntry[];
   threads: Record<string, number>;
   onOpenThread?: (blockId: string) => void;
+  /** The block the pointer is on, while one may start a thread there. */
+  pointed?: string;
+  /** Starts a thread on a block. Missing where none may be started. */
+  onAddThread?: (blockId: string) => void;
 }
 
-export function Markers({ editor, wrap, others, threads, onOpenThread }: Props) {
+export function Markers({ editor, wrap, others, threads, onOpenThread, pointed, onAddThread }: Props) {
   const members = useLookupEvenIfGone("members");
   const [boxes, setBoxes] = useState<Record<string, Box>>({});
-  const ids = [...new Set([...others.map((o) => o.block ?? ""), ...Object.keys(threads)])]
+  // The block whose button the pointer is on: the editor lets go of a block
+  // when the pointer leaves the text for something drawn over it.
+  const [held, setHeld] = useState<string | null>(null);
+  const offered = onAddThread ? (held ?? pointed) : undefined;
+  const ids = [...new Set([...others.map((o) => o.block ?? ""), ...Object.keys(threads), offered ?? ""])]
     .filter(Boolean)
     .sort()
     .join(" ");
@@ -61,7 +72,10 @@ export function Markers({ editor, wrap, others, threads, onOpenThread }: Props) 
   }, [editor, wrap, ids]);
 
   return (
-    <div className="pointer-events-none absolute inset-0" aria-hidden={others.length === 0 && !onOpenThread}>
+    <div
+      className="pointer-events-none absolute inset-0"
+      aria-hidden={others.length === 0 && !onOpenThread && !offered}
+    >
       {others.map((o) => {
         const box = o.block ? boxes[o.block] : undefined;
         const member = members[o.user_id];
@@ -92,6 +106,20 @@ export function Markers({ editor, wrap, others, threads, onOpenThread }: Props) 
           </button>
         );
       })}
+      {offered && !threads[offered] && boxes[offered] && (
+        <button
+          type="button"
+          className="qd-thread-add pointer-events-auto"
+          style={{ top: boxes[offered].top }}
+          aria-label={t("docs.comment.addOnBlock")}
+          title={t("docs.comment.addOnBlock")}
+          onPointerEnter={() => setHeld(offered)}
+          onPointerLeave={() => setHeld(null)}
+          onClick={() => onAddThread?.(offered)}
+        >
+          <MessageSquarePlus className="size-3.5" />
+        </button>
+      )}
     </div>
   );
 }
