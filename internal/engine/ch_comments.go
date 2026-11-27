@@ -663,7 +663,8 @@ func commentUpdate(c *cx, a commentUpdateArgs) error {
 	return nil
 }
 
-// commentDelete moves a comment to the trash. The thread a first comment
+// commentDelete moves a comment to the trash, and takes away what it
+// mentioned. The thread a first comment
 // started goes on without it: its first reply heads it, resolved or not as
 // the thread was, and the other replies answer that one.
 func commentDelete(c *cx, a idArgs) error {
@@ -682,6 +683,11 @@ func commentDelete(c *cx, a idArgs) error {
 		return err
 	}
 	if err := c.trash(row); err != nil {
+		return err
+	}
+	// What it mentioned is mentioned no more: linked to an empty text, it
+	// keeps no reference.
+	if _, err := c.link("comment", cm.ID, row.place.scopeType, row.place.scopeID, ""); err != nil {
 		return err
 	}
 	if cm.ParentID != "" {

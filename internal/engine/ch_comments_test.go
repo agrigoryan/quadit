@@ -549,3 +549,46 @@ func TestAnInboxItemsWordsAreCutByCharacters(t *testing.T) {
 		}
 	})
 }
+
+// TestADeletedCommentMentionsNothing: what a comment mentions (a member, a
+// task, a page, a decision) is no longer mentioned once the comment is
+// deleted, on a task and on a page alike; what another comment mentions
+// stays.
+func TestADeletedCommentMentionsNothing(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		me := w.owner.ID
+		w.agent("coder")
+		w.do(me, "project.create", M{"key": "SVA", "name": "Samurai vs Aliens"})
+		w.do(me, "task.create", M{"project": "SVA", "title": "Boss fight"})
+		w.do(me, "task.create", M{"project": "SVA", "title": "Arena"})
+		w.do(me, "decision.open", M{"task": "SVA-2", "question": "Which arena?", "options": []M{{"label": "Old"}, {"label": "New"}}})
+		page := w.do(me, "doc.create", M{"title": "Handbook", "markdown": "how we work\n"}).Ref
+		body := "@coder see SVA-2, SVA-2#1 and doc:" + page
+		mentions := func(fromID string) int {
+			t.Helper()
+			var refs []core.Ref
+			if err := w.db().List(context.Background(), &refs, store.Where(store.Eq("from_id", fromID))); err != nil {
+				t.Fatal(err)
+			}
+			return len(refs)
+		}
+		for name, args := range map[string]M{"on a task": {"task": "SVA-1", "body": body}, "on a page": {"doc": page, "body": body}} {
+			t.Run(name, func(t *testing.T) {
+				gone := w.do(me, "comment.create", args).Ref
+				kept := w.do(me, "comment.create", args).Ref
+				if n := mentions(gone); n == 0 {
+					t.Fatal("the comment mentions nothing to begin with")
+				}
+				w.do(me, "comment.delete", M{"id": gone})
+				if n := mentions(gone); n != 0 {
+					t.Errorf("the deleted comment still mentions %d things", n)
+				}
+				if mentions(kept) == 0 {
+					t.Error("deleting one comment took away what another mentions")
+				}
+			})
+		}
+	})
+}
