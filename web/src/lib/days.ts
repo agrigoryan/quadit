@@ -52,3 +52,22 @@ export function addMonths(day: string, n: number): string {
   const first = new Date(utcMidnight(day));
   return utcDayOf(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + n, 1));
 }
+
+/** The last day of the month a day is in. */
+export const monthEnd = (day: string) => addDays(addMonths(day, 1), -1);
+
+/** The same day of the month `n` months later (or earlier), or that month's last day where it is shorter: 31 January and a month is 28 February. */
+export function shiftMonths(day: string, n: number): string {
+  const first = addMonths(day, n);
+  return addDays(first, Math.min(dayOfMonth(day), dayOfMonth(monthEnd(first))) - 1);
+}
+
+/** The year a day is in. */
+export const yearOf = (day: string) => Number(day.slice(0, 4));
+
+/** The day of a year, a month (1 to 12) and a day of the month; undefined where there is no such day (30 February). */
+export function dayFromParts(year: number, month: number, date: number): string | undefined {
+  if (![year, month, date].every(Number.isInteger) || year < 1000 || year > 9999) return undefined;
+  const day = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(date).padStart(2, "0")}`;
+  return isDay(day) && dayFromNumber(dayNumber(day)) === day ? day : undefined;
+}

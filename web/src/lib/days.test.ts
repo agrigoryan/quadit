@@ -8,15 +8,19 @@ import {
   addDays,
   addMonths,
   dayFromNumber,
+  dayFromParts,
   dayNumber,
   dayOfMonth,
   daysBetween,
   daysFrom,
   isDay,
+  monthEnd,
   monthStart,
   sameMonth,
+  shiftMonths,
   startOfWeek,
   weekday,
+  yearOf,
 } from "@/lib/days";
 
 const HOUR = 3_600_000;
@@ -71,6 +75,17 @@ const ADD_MONTHS: [string, number, string][] = [
   ["2024-02-29", 12, "2025-02-01"],
 ];
 
+const SHIFT_MONTHS: [string, number, string][] = [
+  ["2026-01-31", 1, "2026-02-28"],
+  ["2024-01-31", 1, "2024-02-29"],
+  ["2026-03-31", -1, "2026-02-28"],
+  ["2026-11-26", 1, "2026-12-26"],
+  ["2026-12-15", 1, "2027-01-15"],
+  ["2026-11-30", 3, "2027-02-28"],
+  ["2024-02-29", 12, "2025-02-28"],
+  ["2026-05-31", 0, "2026-05-31"],
+];
+
 const zone = process.env.TZ;
 afterAll(() => void (process.env.TZ = zone));
 
@@ -93,6 +108,28 @@ describe.each(["Europe/Berlin", "America/New_York"])("in %s", (tz) => {
   });
 
   it.each(ADD_MONTHS)("addMonths(%s, %i) is %s", (day, n, want) => expect(addMonths(day, n)).toBe(want));
+
+  it.each(SHIFT_MONTHS)("shiftMonths(%s, %i) is %s", (day, n, want) => expect(shiftMonths(day, n)).toBe(want));
+
+  it("gives a month's last day", () => {
+    expect(monthEnd("2026-11-26")).toBe("2026-11-30");
+    expect(monthEnd("2026-12-01")).toBe("2026-12-31");
+    expect(monthEnd("2024-02-10")).toBe("2024-02-29");
+    expect(monthEnd("2100-02-10")).toBe("2100-02-28");
+  });
+
+  it("makes a day of its parts, and none of parts that name no day", () => {
+    expect(dayFromParts(2027, 12, 5)).toBe("2027-12-05");
+    expect(dayFromParts(2024, 2, 29)).toBe("2024-02-29");
+    expect(dayFromParts(2026, 2, 29)).toBeUndefined();
+    expect(dayFromParts(2026, 13, 1)).toBeUndefined();
+    expect(dayFromParts(2026, 4, 31)).toBeUndefined();
+    expect(dayFromParts(2026, 0, 1)).toBeUndefined();
+    expect(dayFromParts(2026, 1, 0)).toBeUndefined();
+    expect(dayFromParts(2026, 1.5, 1)).toBeUndefined();
+    expect(dayFromParts(99, 1, 1)).toBeUndefined();
+    expect(yearOf("2027-12-05")).toBe(2027);
+  });
 
   it("counts days since 1970 both ways", () => {
     expect(dayNumber("1970-01-01")).toBe(0);

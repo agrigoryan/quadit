@@ -9,6 +9,7 @@ import {
   exact,
   formatDay,
   fullDate,
+  fullDay,
   localDay,
   localMidnight,
   monthAndYear,
@@ -17,6 +18,7 @@ import {
   timeOfDay,
   today,
   toTheSecond,
+  weekdayAndDay,
   weekdayName,
 } from "@/lib/time";
 
@@ -124,6 +126,16 @@ describe("formatters", () => {
     expect(formatDay("2026-12-01")).toBe("Dec 1");
     expect(formatDay("2025-12-31")).toBe("Dec 31, 2025");
     expect(formatDay("2026-03-29")).toBe("Mar 29");
+  });
+
+  it("weekdayAndDay: the weekday and the day, with the year only when it is not this year", () => {
+    vi.useFakeTimers({ now: new Date(2026, 5, 15, 12) });
+    expect(weekdayAndDay("2026-12-04")).toBe("Fri, Dec 4");
+    expect(weekdayAndDay("2027-12-05")).toBe("Sun, Dec 5, 2027");
+  });
+
+  it("fullDay: every part of a day, for a screen reader", () => {
+    expect(fullDay("2026-12-04")).toBe("Friday, December 4, 2026");
   });
 });
 

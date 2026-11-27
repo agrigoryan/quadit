@@ -28,6 +28,9 @@ const moment = {
 const calendar = {
   dayAndMonth: utc({ month: "short", day: "numeric" }),
   dayMonthAndYear: utc({ month: "short", day: "numeric", year: "numeric" }),
+  weekdayDayAndMonth: utc({ weekday: "short", month: "short", day: "numeric" }),
+  weekdayDayMonthAndYear: utc({ weekday: "short", month: "short", day: "numeric", year: "numeric" }),
+  full: utc({ dateStyle: "full" }),
   monthAndYear: utc({ month: "long", year: "numeric" }),
   shortMonthAndYear: utc({ month: "short", year: "numeric" }),
   shortMonthAndTwoDigitYear: utc({ month: "short", year: "2-digit" }),
@@ -107,6 +110,17 @@ export function formatDay(day: string): string {
     ? calendar.dayAndMonth.format(at)
     : calendar.dayMonthAndYear.format(at);
 }
+
+/** A calendar day with its weekday: "Fri, Dec 5", or "Sun, Dec 5, 2027" when it is not this year. */
+export function weekdayAndDay(day: string): string {
+  const at = utcMidnight(day);
+  return new Date(at).getUTCFullYear() === new Date().getFullYear()
+    ? calendar.weekdayDayAndMonth.format(at)
+    : calendar.weekdayDayMonthAndYear.format(at);
+}
+
+/** Every part of a calendar day, for a screen reader: "Friday, December 5, 2026". */
+export const fullDay = (day: string) => calendar.full.format(utcMidnight(day));
 
 /** The month a day is in: "November 2026". */
 export const monthAndYear = (day: string) => calendar.monthAndYear.format(utcMidnight(day));

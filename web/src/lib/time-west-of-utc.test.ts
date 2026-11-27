@@ -4,7 +4,15 @@
 // day, month or year before.
 
 import { afterAll, describe, expect, it, vi } from "vitest";
-import { formatDay, monthAndYear, shortMonthAndTwoDigitYear, shortMonthAndYear, weekdayName } from "@/lib/time";
+import {
+  formatDay,
+  fullDay,
+  monthAndYear,
+  shortMonthAndTwoDigitYear,
+  shortMonthAndYear,
+  weekdayAndDay,
+  weekdayName,
+} from "@/lib/time";
 
 // The zone and the language are fixed before lib/time.ts builds its formats.
 const before = vi.hoisted(() => {
@@ -34,6 +42,9 @@ describe("calendar days in Los Angeles", () => {
     expect(shortMonthAndTwoDigitYear("2027-01-01")).toBe("Jan 27");
     expect(weekdayName("2026-11-16")).toBe("Mon");
     expect(weekdayName("2026-11-16", "long")).toBe("Monday");
+    expect(weekdayAndDay("2026-12-04")).toBe("Fri, Dec 4");
+    expect(weekdayAndDay("2027-01-01")).toBe("Fri, Jan 1, 2027");
+    expect(fullDay("2027-01-01")).toBe("Friday, January 1, 2027");
     vi.useRealTimers();
   });
 });
