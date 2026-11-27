@@ -21,7 +21,7 @@ import { NotFoundPage } from "@/ui/not-found";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
-import { Input } from "@/ui/input";
+import { DateField } from "@/ui/date-picker";
 import { Tooltip } from "@/ui/tooltip";
 
 /** A project's cycles: the stretches of days its work is planned into. */
@@ -209,29 +209,27 @@ function NewCycle({ project, cycles }: { project: Project; cycles: Cycle[] }) {
 
   return (
     <form onSubmit={submit} className="flex flex-wrap items-center gap-2 max-sm:flex-1">
-      <label className="flex items-center gap-1.5 text-xs text-ink-2">
-        {t("cycles.starts")}
-        <Input
-          type="date"
-          required
+      <span className="flex items-center gap-1.5 text-xs text-ink-2">
+        <span aria-hidden>{t("cycles.starts")}</span>
+        <DateField
+          label={t("cycles.starts")}
           value={start}
-          onChange={(e) =>
-            setEdited({ start: e.target.value, end: e.target.value ? addDays(e.target.value, length - 1) : end })
-          }
-          className="h-7 w-36 tnum"
+          stretch={{ from: start, to: end }}
+          onChange={(day) => day && setEdited({ start: day, end: addDays(day, length - 1) })}
+          className="w-36"
         />
-      </label>
-      <label className="flex items-center gap-1.5 text-xs text-ink-2">
-        {t("cycles.ends")}
-        <Input
-          type="date"
-          required
-          min={start}
+      </span>
+      <span className="flex items-center gap-1.5 text-xs text-ink-2">
+        <span aria-hidden>{t("cycles.ends")}</span>
+        <DateField
+          label={t("cycles.ends")}
           value={end}
-          onChange={(e) => setEdited({ start, end: e.target.value })}
-          className="h-7 w-36 tnum"
+          min={start}
+          stretch={{ from: start, to: end }}
+          onChange={(day) => day && setEdited({ start, end: day })}
+          className="w-36"
         />
-      </label>
+      </span>
       <Button type="submit" disabled={!start || !end}>
         <Plus className="size-4" aria-hidden />
         {t("cycles.create")}

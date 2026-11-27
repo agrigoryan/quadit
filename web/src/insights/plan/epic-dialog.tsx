@@ -10,6 +10,7 @@ import { EPIC_STATES, epicStateName } from "@/insights/plan/stats";
 import { Avatar } from "@/ui/avatar";
 import { FormField, useFieldErrors } from "@/ui/form";
 import { FormDialog } from "@/ui/form-dialog";
+import { DateField } from "@/ui/date-picker";
 import { Input, Textarea } from "@/ui/input";
 import { Select } from "@/ui/picker";
 
@@ -37,6 +38,8 @@ export function EpicDialog({ projectId, epic, onClose, onCreated }: Props) {
   const set = (patch: Partial<EpicFields>) => setF((cur) => ({ ...cur, ...patch }));
   const backwards = !!f.startOn && !!f.targetOn && f.targetOn < f.startOn;
   const ok = f.name.trim() !== "" && !backwards;
+  // Each of the two dates' months shows the days the epic runs between.
+  const span = f.startOn && f.targetOn && !backwards ? { from: f.startOn, to: f.targetOn } : undefined;
 
   async function submit() {
     if (epic) {
@@ -51,7 +54,9 @@ export function EpicDialog({ projectId, epic, onClose, onCreated }: Props) {
       updateEpic(epic, args);
       return;
     }
-    onCreated?.(await createEpic(projectId, f));
+    // Made whether or not anyone asks for its id: an optional call would leave out its argument.
+    const id = await createEpic(projectId, f);
+    onCreated?.(id);
   }
 
   return (
@@ -108,13 +113,15 @@ export function EpicDialog({ projectId, epic, onClose, onCreated }: Props) {
           />
         </FormField>
         <FormField label={t("epic.start")} htmlFor="epic-start">
-          <Input
+          <DateField
             id="epic-start"
-            type="date"
-            value={f.startOn}
+            label={t("epic.start")}
+            value={f.startOn || undefined}
             max={f.targetOn || undefined}
-            onChange={(e) => set({ startOn: e.target.value })}
-            className="tnum"
+            stretch={span}
+            clearable
+            onChange={(day) => set({ startOn: day ?? "" })}
+            className="h-8 w-full"
           />
         </FormField>
         <FormField
@@ -122,13 +129,15 @@ export function EpicDialog({ projectId, epic, onClose, onCreated }: Props) {
           htmlFor="epic-target"
           hint={backwards ? t("epic.datesBackwards") : undefined}
         >
-          <Input
+          <DateField
             id="epic-target"
-            type="date"
-            value={f.targetOn}
+            label={t("epic.target")}
+            value={f.targetOn || undefined}
             min={f.startOn || undefined}
-            onChange={(e) => set({ targetOn: e.target.value })}
-            className="tnum"
+            stretch={span}
+            clearable
+            onChange={(day) => set({ targetOn: day ?? "" })}
+            className="h-8 w-full"
           />
         </FormField>
       </div>

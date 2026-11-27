@@ -1,6 +1,7 @@
 // One editable value of a row. Reading, it is a CellValue; editing, it is
-// the editor for its kind of property: a text box in place, or a list that
-// opens beside it. The table, a row's property list and the form all use it.
+// the editor for its kind of property: a text box in place, or a list or
+// the date picker that opens beside it. The table, a row's property list and
+// the form all use it.
 
 import { type KeyboardEvent, useMemo, useRef, useState } from "react";
 import { cx } from "@/lib/cx";
@@ -15,6 +16,7 @@ import { OptionPicker } from "@/docs/db/option-picker";
 import { isComputed } from "@/docs/db/prop-meta";
 import type { DBProperty } from "@/types/docs";
 import { Avatar } from "@/ui/avatar";
+import { DatePanel } from "@/ui/date-picker";
 import { PickerList } from "@/ui/picker";
 import { Popover, PopoverAnchor, PopoverContent } from "@/ui/popover";
 
@@ -36,7 +38,7 @@ export interface CellProps {
   readOnly?: boolean;
 }
 
-const INPUT_TYPES = ["text", "number", "url", "date"];
+const INPUT_TYPES = ["text", "number", "url"];
 
 /** Whether typing on a cell of this kind should start writing into it. */
 export const takesTyping = (prop: DBProperty) => prop.type === "text" || prop.type === "number" || prop.type === "url";
@@ -79,11 +81,10 @@ export function CellInput({ kind, initial, seed, label, onCommit, onCancel }: In
     <input
       autoFocus
       aria-label={label}
-      type={kind === "date" ? "date" : "text"}
       inputMode={kind === "number" ? "decimal" : kind === "url" ? "url" : undefined}
       value={text}
       onChange={(e) => setText(e.target.value)}
-      onFocus={(e) => !seed && kind !== "date" && e.target.select()}
+      onFocus={(e) => !seed && e.target.select()}
       onBlur={() => finish(true)}
       onKeyDown={onKeyDown}
       onClick={(e) => e.stopPropagation()}
@@ -100,7 +101,6 @@ function parseInput(prop: DBProperty, text: string): unknown {
     const n = Number(s.replace(",", "."));
     return Number.isFinite(n) ? n : undefined;
   }
-  if (prop.type === "date") return isDay(s) ? s : undefined;
   return prop.type === "text" ? text : s;
 }
 
@@ -239,7 +239,19 @@ export function Cell({
         // A click on the cell itself closes the list by its own handler.
         onInteractOutside={(e) => anchor.current?.contains(e.target as Node) && e.preventDefault()}
       >
-        <ListEditor prop={prop} stored={stored} onChange={onChange} onClose={() => onEditing(false)} />
+        {prop.type === "date" ? (
+          <DatePanel
+            label={prop.name}
+            value={isDay(stored) ? stored : undefined}
+            clearable
+            onChange={(day) => {
+              onChange(day);
+              onEditing(false);
+            }}
+          />
+        ) : (
+          <ListEditor prop={prop} stored={stored} onChange={onChange} onClose={() => onEditing(false)} />
+        )}
       </PopoverContent>
     </Popover>
   );

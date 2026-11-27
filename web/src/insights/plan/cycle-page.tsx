@@ -31,7 +31,7 @@ import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { StatusIcon } from "@/ui/icons";
-import { Input } from "@/ui/input";
+import { DateField } from "@/ui/date-picker";
 import { Spinner } from "@/ui/spinner";
 import { Radio, RadioGroup } from "@/ui/radio-group";
 
@@ -118,34 +118,30 @@ function CycleView({ project, cycle }: { project: Project; cycle: Cycle }) {
             )}
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-x-5 gap-y-3">
-            <label className="flex flex-col gap-1 text-xs font-medium text-ink-3">
-              {t("cycles.starts")}
-              <Input
-                type="date"
-                required
+            <div className="flex flex-col gap-1 text-xs font-medium text-ink-3">
+              <span aria-hidden>{t("cycles.starts")}</span>
+              <DateField
+                label={t("cycles.starts")}
                 value={cycle.starts_on}
                 max={cycle.ends_on}
+                stretch={{ from: cycle.starts_on, to: cycle.ends_on }}
                 disabled={readOnly}
-                onChange={(e) =>
-                  e.target.value && e.target.value <= cycle.ends_on && updateCycle(cycle, { starts_on: e.target.value })
-                }
-                className="w-[9rem] tnum"
+                onChange={(day) => day && day <= cycle.ends_on && updateCycle(cycle, { starts_on: day })}
+                className="h-8 w-[9rem]"
               />
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-ink-3">
-              {t("cycles.ends")}
-              <Input
-                type="date"
-                required
+            </div>
+            <div className="flex flex-col gap-1 text-xs font-medium text-ink-3">
+              <span aria-hidden>{t("cycles.ends")}</span>
+              <DateField
+                label={t("cycles.ends")}
                 value={cycle.ends_on}
                 min={cycle.starts_on}
+                stretch={{ from: cycle.starts_on, to: cycle.ends_on }}
                 disabled={readOnly}
-                onChange={(e) =>
-                  e.target.value && e.target.value >= cycle.starts_on && updateCycle(cycle, { ends_on: e.target.value })
-                }
-                className="w-[9rem] tnum"
+                onChange={(day) => day && day >= cycle.starts_on && updateCycle(cycle, { ends_on: day })}
+                className="h-8 w-[9rem]"
               />
-            </label>
+            </div>
             <div className="min-w-56 flex-1 pb-1 sm:max-w-md">
               <div className="mb-1 flex flex-wrap items-baseline gap-x-3 text-xs text-ink-2 tnum">
                 <span>

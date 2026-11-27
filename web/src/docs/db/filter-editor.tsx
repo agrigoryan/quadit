@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
+import { isDay } from "@/lib/days";
 import { t } from "@/lib/i18n";
 import { getRowEvenIfGone, useMembers } from "@/data/selectors";
 import { usePausedWrite } from "@/hooks/paused-write";
@@ -12,6 +13,7 @@ import { optionsOf } from "@/docs/db/options";
 import { PropIcon } from "@/docs/db/prop-meta";
 import type { DBProperty, DBView, FilterOp, RowFilter, RowSort } from "@/types/docs";
 import { Button } from "@/ui/button";
+import { DateField } from "@/ui/date-picker";
 import { Select } from "@/ui/picker";
 
 const TITLE = "title";
@@ -114,8 +116,20 @@ function ValueInput({
       />
     );
   }
+  if (prop?.type === "date") {
+    return (
+      <DateField
+        label={t("db.filter.value")}
+        placeholder={t("db.filter.pick")}
+        value={isDay(filter.value) ? filter.value : undefined}
+        clearable
+        onChange={(day) => onChange(day ?? "")}
+        className="min-w-0 flex-1"
+      />
+    );
+  }
   const numeric = prop?.type === "number" || prop?.type === "rollup";
-  const type = numeric ? "number" : prop?.type === "date" ? "date" : "text";
+  const type = numeric ? "number" : "text";
   // A value typed or picked here is a string; one read back from the page may be a number or a boolean.
   const value = filter.value;
   const text =

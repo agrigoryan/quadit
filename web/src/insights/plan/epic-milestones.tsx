@@ -20,6 +20,7 @@ import { TaskPropertyPicker } from "@/tasks/property-picker";
 import type { useTaskRowKeys } from "@/tasks/row-keys";
 import { keyColumn, TaskRow } from "@/tasks/task-row";
 import { Button, IconButton } from "@/ui/button";
+import { DateField } from "@/ui/date-picker";
 import { Input } from "@/ui/input";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/ui/menu";
 
@@ -129,16 +130,20 @@ function Group({ epic, milestone, ordered, tasks, readOnly, rowProps }: GroupPro
           )}
         </div>
         {milestone && (
-          <label className="flex shrink-0 items-center gap-1.5 text-xs text-ink-3 max-sm:pl-5.5">
-            <span className="max-sm:sr-only">{t("epic.milestoneDate")}</span>
-            <Input
-              type="date"
-              value={milestone.target_on ?? ""}
+          <span className="flex shrink-0 items-center gap-1.5 text-xs text-ink-3 max-sm:pl-5.5">
+            <span aria-hidden className="max-sm:hidden">
+              {t("epic.milestoneDate")}
+            </span>
+            <DateField
+              label={t("epic.milestoneDate")}
+              value={milestone.target_on}
+              clearable
               disabled={readOnly}
-              onChange={(e) => updateMilestone(milestone, { target_on: e.target.value || null })}
-              className="h-6 w-[7.75rem] px-1.5 text-xs tnum"
+              onChange={(day) => updateMilestone(milestone, { target_on: day })}
+              size="sm"
+              className="w-[7.75rem] px-1.5"
             />
-          </label>
+          </span>
         )}
         <span className="flex-1 sm:hidden" />
         <ProgressCount done={tally.done} started={tally.started} total={tally.total} />
@@ -223,15 +228,13 @@ function NewMilestone({ epic, last }: { epic: Epic; last: Milestone | undefined 
         aria-label={t("epic.milestonePlaceholder")}
         className="h-7 min-w-40 flex-1 basis-40 sm:max-w-72"
       />
-      <span className="w-36 shrink-0">
-        <Input
-          type="date"
-          value={day}
-          onChange={(e) => setDay(e.target.value)}
-          aria-label={t("epic.milestoneDate")}
-          className="h-7 tnum"
-        />
-      </span>
+      <DateField
+        label={t("epic.milestoneDate")}
+        value={day || undefined}
+        clearable
+        onChange={(picked) => setDay(picked ?? "")}
+        className="w-36"
+      />
       <Button type="submit" disabled={!name.trim()}>
         <Plus className="size-4" aria-hidden />
         {t("epic.addMilestone")}

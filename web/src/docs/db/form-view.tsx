@@ -1,5 +1,6 @@
 import { type FormEvent, useRef, useState } from "react";
 import { Check } from "lucide-react";
+import { isDay } from "@/lib/days";
 import { t } from "@/lib/i18n";
 import { docTitle } from "@/docs/data";
 import { setViewConfig } from "@/docs/db/actions";
@@ -9,6 +10,7 @@ import { isComputed, PropIcon } from "@/docs/db/prop-meta";
 import type { ViewProps } from "@/docs/db/use-table";
 import type { DBProperty, DBView } from "@/types/docs";
 import { Button } from "@/ui/button";
+import { DateField } from "@/ui/date-picker";
 import { Input } from "@/ui/input";
 
 /** The properties a form asks for: the ones chosen for it, or every one that can be filled in. */
@@ -45,11 +47,13 @@ function Field({ prop, value, onChange }: { prop: DBProperty; value: unknown; on
     );
   } else if (prop.type === "date") {
     control = (
-      <Input
+      <DateField
         id={id}
-        type="date"
-        value={typeof value === "string" ? value : ""}
-        onChange={(e) => onChange(e.target.value || null)}
+        label={prop.name}
+        value={isDay(value) ? value : undefined}
+        clearable
+        onChange={onChange}
+        className="h-8 w-full"
       />
     );
   } else {

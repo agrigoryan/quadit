@@ -25,7 +25,7 @@ import { useTaskRowKeys } from "@/tasks/row-keys";
 import { NotFoundPage } from "@/ui/not-found";
 import { Avatar } from "@/ui/avatar";
 import { Button, IconButton } from "@/ui/button";
-import { Input } from "@/ui/input";
+import { DateField } from "@/ui/date-picker";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/ui/menu";
 import { Select } from "@/ui/picker";
 
@@ -64,6 +64,8 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
   // Escape lets go of a selection first.
   useEscapeBack(list, rows.selected.length === 0);
   const backwards = (start: string, target: string) => !!start && !!target && target < start;
+  // Each of the two dates' months shows the days the epic runs between.
+  const span = epic.start_on && epic.target_on ? { from: epic.start_on, to: epic.target_on } : undefined;
 
   return (
     <div className="relative flex h-full flex-col">
@@ -140,29 +142,27 @@ function EpicView({ project, epic }: { project: Project; epic: Epic }) {
               />
             </Labelled>
             <Labelled label={t("epic.start")}>
-              <Input
-                type="date"
-                value={epic.start_on ?? ""}
+              <DateField
+                label={t("epic.start")}
+                value={epic.start_on}
                 max={epic.target_on}
+                stretch={span}
+                clearable
                 disabled={readOnly}
-                onChange={(e) =>
-                  !backwards(e.target.value, epic.target_on ?? "") &&
-                  updateEpic(epic, { start_on: e.target.value || null })
-                }
-                className="w-[9rem] tnum"
+                onChange={(day) => !backwards(day ?? "", epic.target_on ?? "") && updateEpic(epic, { start_on: day })}
+                className="h-8 w-[9rem]"
               />
             </Labelled>
             <Labelled label={t("epic.target")}>
-              <Input
-                type="date"
-                value={epic.target_on ?? ""}
+              <DateField
+                label={t("epic.target")}
+                value={epic.target_on}
                 min={epic.start_on}
+                stretch={span}
+                clearable
                 disabled={readOnly}
-                onChange={(e) =>
-                  !backwards(epic.start_on ?? "", e.target.value) &&
-                  updateEpic(epic, { target_on: e.target.value || null })
-                }
-                className="w-[9rem] tnum"
+                onChange={(day) => !backwards(epic.start_on ?? "", day ?? "") && updateEpic(epic, { target_on: day })}
+                className="h-8 w-[9rem]"
               />
             </Labelled>
           </div>

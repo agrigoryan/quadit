@@ -13,7 +13,7 @@ import { readDay } from "@/lib/day-words";
 import { t } from "@/lib/i18n";
 import { formatDay, localDay, weekdayAndDay } from "@/lib/time";
 import { personWeek } from "@/lib/week";
-import { Button } from "@/ui/button";
+import { Button, type ButtonProps } from "@/ui/button";
 import { MonthGrid, type MonthGridProps } from "@/ui/month-grid";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/ui/popover";
 
@@ -216,16 +216,18 @@ export interface DateFieldProps extends Omit<DatePickerProps, "children" | "anch
   /** Shown while no day is set. */
   placeholder?: string;
   disabled?: boolean;
+  size?: ButtonProps["size"];
   className?: string;
 }
 
 /** A form's day: a button that shows it as the app writes days and opens the picker. */
-export function DateField({ id, placeholder, disabled, className, ...picker }: DateFieldProps) {
+export function DateField({ id, placeholder, disabled, size, className, ...picker }: DateFieldProps) {
   const shown = picker.value ? formatDay(picker.value) : (placeholder ?? t("date.none"));
   return (
     <DatePicker {...picker}>
       <Button
         id={id}
+        size={size}
         disabled={disabled}
         aria-label={`${picker.label}: ${shown}`}
         className={cx("justify-start gap-2 tnum", className)}

@@ -6,6 +6,7 @@ import { addDays } from "@/lib/days";
 import { t } from "@/lib/i18n";
 import { localMidnight } from "@/lib/time";
 import { Button } from "@/ui/button";
+import { DateField } from "@/ui/date-picker";
 import { Input } from "@/ui/input";
 import { FormField, NativeSelect } from "@/ui/form";
 
@@ -69,6 +70,8 @@ interface Props {
 export function AuditFilterBar({ value, onChange, actors, workspaces }: Props) {
   const id = useId();
   const set = (patch: Partial<AuditFilters>) => onChange({ ...value, ...patch });
+  // Each end's month shows the days between them.
+  const range = value.from && value.to ? { from: value.from, to: value.to } : undefined;
   return (
     <div className="grid grid-cols-2 items-end gap-x-3 gap-y-2.5 sm:flex sm:flex-wrap">
       <FormField label={t("audit.filter.action")} htmlFor={`${id}-action`} className="col-span-2 sm:w-48">
@@ -113,23 +116,27 @@ export function AuditFilterBar({ value, onChange, actors, workspaces }: Props) {
         </FormField>
       )}
       <FormField label={t("audit.filter.from")} htmlFor={`${id}-from`} className="min-w-0">
-        <Input
+        <DateField
           id={`${id}-from`}
-          type="date"
-          value={value.from}
+          label={t("audit.filter.from")}
+          value={value.from || undefined}
           max={value.to || undefined}
-          onChange={(e) => set({ from: e.target.value })}
-          className="tnum"
+          stretch={range}
+          clearable
+          onChange={(day) => set({ from: day ?? "" })}
+          className="h-8 w-full"
         />
       </FormField>
       <FormField label={t("audit.filter.to")} htmlFor={`${id}-to`} className="min-w-0">
-        <Input
+        <DateField
           id={`${id}-to`}
-          type="date"
-          value={value.to}
+          label={t("audit.filter.to")}
+          value={value.to || undefined}
           min={value.from || undefined}
-          onChange={(e) => set({ to: e.target.value })}
-          className="tnum"
+          stretch={range}
+          clearable
+          onChange={(day) => set({ to: day ?? "" })}
+          className="h-8 w-full"
         />
       </FormField>
       {anyFilter(value) && (

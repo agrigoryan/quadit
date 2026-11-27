@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 // A view's filters (docs/db/filter-editor.tsx) have no id of their own. A
 // row's text box, and the value it waits to save, stay with its filter when
-// a filter above it is taken away.
+// a filter above it is taken away. A date's value is picked in the date
+// picker.
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/data/api";
 import { clearOutbox } from "@/data/mutate";
@@ -11,7 +12,9 @@ import { getRow, useRow } from "@/data/selectors";
 import { clearStore, loadBootstrap, mergeRows } from "@/data/store";
 import { FilterEditor } from "@/docs/db/filter-editor";
 import type { Member, User, Workspace } from "@/types/core";
-import type { DBView } from "@/types/docs";
+import { formatDay } from "@/lib/time";
+import type { DBProperty, DBView } from "@/types/docs";
+import { TooltipProvider } from "@/ui/tooltip";
 
 const view: DBView = {
   id: "v1",
@@ -79,5 +82,25 @@ describe("the filter editor", () => {
       { prop: "title", op: "contains", value: "three" },
     ]);
     expect(boxes().map((box) => box.value)).toEqual(["two", "three"]);
+  });
+
+  it("picks a date's value in the date picker", async () => {
+    const due: DBProperty = { id: "due", database_id: "db1", name: "Due", type: "date", rank: "a" };
+    mergeRows("dbviews", [{ ...view, config: { filters: [{ prop: "due", op: "is", value: "2026-12-01" }] } }]);
+    function DateEditor() {
+      const now = useRow("dbviews", "v1");
+      return now ? <FilterEditor view={now} props={[due]} /> : null;
+    }
+    render(
+      <TooltipProvider>
+        <DateEditor />
+      </TooltipProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: `Value: ${formatDay("2026-12-01")}` }));
+    const box = within(screen.getByRole("dialog", { name: "Value" })).getByRole("textbox", { name: "Value" });
+    fireEvent.change(box, { target: { value: "2026-12-05" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(getRow("dbviews", "v1")?.config?.filters).toEqual([{ prop: "due", op: "is", value: "2026-12-05" }]);
   });
 });

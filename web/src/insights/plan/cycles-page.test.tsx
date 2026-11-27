@@ -3,13 +3,15 @@
 // scope against what the latest ended cycles completed, in points where the
 // project estimates and in tasks where it does not, marked when it is more;
 // nothing while no cycle has ended or the finished tasks are still coming.
+// A new cycle's dates are picked in the date picker: the start moves the end
+// a cycle's length on, and the end may not go before the start.
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import { addDays } from "@/lib/days";
-import { serverDay } from "@/lib/time";
+import { formatDay, serverDay } from "@/lib/time";
 import type { Member, ProjectSettings, Task, User, Workspace } from "@/types/core";
 import { CyclesPage } from "@/insights/plan/cycles-page";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -96,5 +98,28 @@ describe("a cycle's capacity", () => {
   it("is not shown while the finished tasks are still coming", () => {
     show({ estimates: true }, { restComing: true });
     expect(screen.queryByText(/of about/)).toBeNull();
+  });
+});
+
+describe("a new cycle's dates", () => {
+  it("start the day after the last cycle ends, and run the project's cycle length", () => {
+    show({ cycle_days: 14 });
+    expect(screen.getByRole("button", { name: `Starts: ${formatDay(day(22))}` })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `Ends: ${formatDay(day(35))}` })).toBeInTheDocument();
+  });
+
+  it("move the end with the start, and keep the end from going before the start", () => {
+    show({ cycle_days: 14 });
+    fireEvent.click(screen.getByRole("button", { name: `Starts: ${formatDay(day(22))}` }));
+    const starts = screen.getByRole("dialog", { name: "Starts" });
+    fireEvent.change(within(starts).getByRole("textbox"), { target: { value: day(40) } });
+    fireEvent.keyDown(within(starts).getByRole("textbox"), { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: `Ends: ${formatDay(day(53))}` }));
+    const ends = screen.getByRole("dialog", { name: "Ends" });
+    const box = within(ends).getByRole("textbox");
+    fireEvent.change(box, { target: { value: day(39) } });
+    expect(box).toHaveAccessibleDescription(`Not before ${formatDay(day(40))}`);
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(screen.getByRole("dialog", { name: "Ends" })).toBeInTheDocument();
   });
 });
