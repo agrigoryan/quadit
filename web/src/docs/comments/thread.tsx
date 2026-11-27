@@ -98,7 +98,7 @@ export function Thread({
       ref={mayReply ? undefined : opener}
       type="button"
       onClick={onOpen}
-      className="mt-1.5 text-xs font-medium text-ink-2 hover:text-ink hover:underline"
+      className="mt-1.5 ml-7 text-xs font-medium text-ink-2 hover:text-ink hover:underline"
     >
       {t("docs.comment.replies", { n: replies.length })}
     </button>
@@ -115,7 +115,7 @@ export function Thread({
       aria-current={active || undefined}
       data-thread={root.id}
       className={cx(
-        "rounded-lg border bg-surface p-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent",
+        "relative rounded-lg border bg-surface p-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent",
         active ? "border-move" : lit ? "border-line-strong" : "border-line",
         (onOpen ?? onLocate) && "cursor-pointer hover:border-line-strong",
       )}
@@ -138,8 +138,9 @@ export function Thread({
       onMouseLeave={() => pageUi.lightThread(null)}
     >
       {!compact && (
-        <div className="flex items-start gap-1">
-          <div className="min-w-0 flex-1">{quote}</div>
+        // Beside its words, with nothing quoted, the buttons sit in the corner instead of a row of their own.
+        <div className={quote ? "flex items-start gap-1" : "absolute top-1.5 right-1.5 flex gap-1"}>
+          {quote && <div className="min-w-0 flex-1">{quote}</div>}
           {onLocate && (
             <IconButton size="sm" label={t("docs.comment.locate")} onClick={onLocate}>
               <LocateFixed className="size-3.5" />
@@ -180,7 +181,9 @@ export function Thread({
         </>
       ) : (
         <>
-          <CommentBody comment={root} files={files[root.id]} projectId={projectId} />
+          <div className={cx(!quote && (onLocate || mayEdit) && "pr-7")}>
+            <CommentBody comment={root} files={files[root.id]} projectId={projectId} />
+          </div>
           {replies.map((reply) => (
             <CommentBody key={reply.id} comment={reply} files={files[reply.id]} projectId={projectId} reply />
           ))}

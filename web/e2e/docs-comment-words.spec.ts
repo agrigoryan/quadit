@@ -33,6 +33,11 @@ async function blocksOf(quadit: Quadit, page: string) {
 }
 
 const column = (page: Page) => page.getByRole("complementary", { name: "Comments" });
+/** Opens the comments column: the header's comments button, then "See all" in its Discussions list. */
+async function seeAll(page: Page) {
+  await page.getByRole("button", { name: "Comments" }).click();
+  await page.getByRole("dialog", { name: "Discussions" }).getByRole("button", { name: "See all" }).click();
+}
 const thread = (page: Page, text: string) => column(page).getByRole("article").filter({ hasText: text });
 const pageText = (page: Page) => page.getByRole("textbox", { name: "Page text" });
 /** The words a thread is on, as the page shows them. */
@@ -100,15 +105,20 @@ test("a person comments on words; typing in and around them keeps them marked, a
   await expect(card.getByText("three short phases", { exact: true })).toBeVisible();
   await expect.poll(() => quadit.cli("comments", doc.id)).toContain(`on words of block ${block} "three short phases"`);
 
-  // A click on the words shows their thread; the pointer on its card lights them.
+  // The pointer on its card lights the words; a click on them shows their thread, its words highlighted strongest.
+  const shade = () => marked(page, "three short phases").evaluate((el) => getComputedStyle(el).backgroundColor);
+  await column(page).getByRole("button", { name: "Close" }).click();
+  await seeAll(page);
+  await page.mouse.move(0, 0);
+  const tint = await shade();
+  await thread(page, "Still three?").hover();
+  await expect.poll(shade).not.toBe(tint);
+  const lit = await shade();
   await column(page).getByRole("button", { name: "Close" }).click();
   await marked(page, "three short phases").click();
   await expect(thread(page, "Still three?")).toHaveAttribute("aria-current", "true");
-  const before = await marked(page, "three short phases").evaluate((el) => getComputedStyle(el).backgroundColor);
-  await thread(page, "Still three?").hover();
-  await expect
-    .poll(() => marked(page, "three short phases").evaluate((el) => getComputedStyle(el).backgroundColor))
-    .not.toBe(before);
+  await expect.poll(shade).not.toBe(lit);
+  await expect.poll(shade).not.toBe(tint);
 });
 
 test("taking the words out detaches the thread onto the page, and an undo puts it back on them", async ({
@@ -130,7 +140,7 @@ test("taking the words out detaches the thread onto the page, and an undo puts i
   await expect
     .poll(() => quadit.cli("comments", doc.id))
     .toContain('on the page, its words taken out of it: "pans left"');
-  await page.getByRole("button", { name: "Comments" }).click();
+  await seeAll(page);
   const card = thread(page, "Right instead?");
   await expect(card.getByText("The text it was on was removed")).toBeVisible();
   await expect(card.locator("del")).toHaveText("pans left");
@@ -168,7 +178,7 @@ test("an agent comments on words with quote=, its rewrite keeps them marked, and
   await expect(marked(page, "four drones")).toHaveCSS("border-bottom-width", "2px");
   expect(await quadit.cli("comments", doc.id)).toContain('"four drones"');
 
-  await page.getByRole("button", { name: "Comments" }).click();
+  await seeAll(page);
   await thread(page, "Too many?").getByRole("button", { name: "Resolve" }).click();
   await expect(marked(page, "four drones")).toHaveCSS("border-bottom-width", "0px");
   await column(page)

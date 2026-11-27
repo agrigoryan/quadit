@@ -19,6 +19,11 @@ async function newPage(quadit: Quadit, project: string, title: string, markdown:
 }
 
 const column = (page: Page) => page.getByRole("complementary", { name: "Comments" });
+/** Opens the comments column: the header's comments button, then "See all" in its Discussions list. */
+async function seeAll(page: Page) {
+  await page.getByRole("button", { name: "Comments" }).click();
+  await page.getByRole("dialog", { name: "Discussions" }).getByRole("button", { name: "See all" }).click();
+}
 const thread = (page: Page, text: string) => column(page).getByRole("article").filter({ hasText: text });
 const pageText = (page: Page) => page.getByRole("textbox", { name: "Page text" });
 
@@ -110,7 +115,7 @@ test("the menu on a block's handle starts a thread; the mark beside the block op
 test("a comment on the page as a whole, and on a database page", async ({ page, project, quadit }) => {
   const doc = await newPage(quadit, project.key, "Retro", "What went well.\n");
   await page.goto(`/e2e/docs/${doc.id}`);
-  await page.getByRole("button", { name: "Comments" }).click();
+  await seeAll(page);
   const onPage = column(page).getByRole("textbox", { name: "Comment on the page…" });
   await onPage.fill("Let us keep this short.");
   await column(page).getByRole("button", { name: "Comment", exact: true }).click();
@@ -119,7 +124,7 @@ test("a comment on the page as a whole, and on a database page", async ({ page, 
 
   const database = await newPage(quadit, project.key, "Vendors", "", "database");
   await page.goto(`/e2e/docs/${database.id}`);
-  await page.getByRole("button", { name: "Comments" }).click();
+  await seeAll(page);
   await column(page).getByRole("textbox", { name: "Comment on the page…" }).fill("Add a column for the contract.");
   await column(page).getByRole("button", { name: "Comment", exact: true }).click();
   await expect(thread(page, "Add a column for the contract.")).toBeVisible();
@@ -134,7 +139,7 @@ test("a thread whose block was taken out of the page says so, and still opens", 
 
   await page.goto(`/e2e/docs/${doc.id}`);
   await expect(pageText(page).getByText("Keep this.")).toBeVisible();
-  await page.getByRole("button", { name: "Comments" }).click();
+  await seeAll(page);
   const gone = thread(page, "Why is this here?");
   await expect(gone.getByText("The block this was on is gone")).toBeVisible();
   await expect(gone.getByRole("button", { name: "Show in the page" })).toBeHidden();
@@ -248,7 +253,7 @@ test("Esc on a database's cell lets go of the cell and leaves the comments open"
   const database = await newPage(quadit, project.key, "Vendors", "", "database");
   await quadit.cli("row", database.id, "Acme paints");
   await page.goto(`/e2e/docs/${database.id}`);
-  await page.getByRole("button", { name: "Comments" }).click();
+  await seeAll(page);
   const grid = page.getByRole("grid");
   await grid.focus();
   await expect(grid).toHaveAttribute("aria-activedescendant", /.+/);

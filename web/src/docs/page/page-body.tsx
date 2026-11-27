@@ -5,7 +5,7 @@
 // there is room for one, else in the comments column.
 
 import { GitBranch, Sparkles } from "lucide-react";
-import { lazy, type ReactNode, type RefObject, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, type ReactNode, type RefObject, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useCan } from "@/data/access";
 import { useReadWhenSeen } from "@/data/inbox-read";
 import { overlayOpen, useHotkeys } from "@/hooks/hotkeys";
@@ -39,21 +39,24 @@ const NO_OTHERS: never[] = [];
 
 /**
  * How wide the page must be for a margin of comments beside its text: the
- * text column (52rem, its right padding the gap to the cards), the cards
- * (16rem) and a gutter after them (1rem). Measured on the page itself, not
- * the window: the sidebar, folded or not, and the comments column take
- * their share of the window first.
+ * text column (52rem, the last 1.5rem of its right padding under the cards,
+ * where the marks beside blocks would be), the cards (16rem) and a gutter
+ * after them (1rem). Measured on the page itself, not the window: the
+ * sidebar, the tree of pages and the comments column take their share of
+ * the window first.
  */
-const ROOM_FOR_MARGIN_REM = 69;
+const ROOM_FOR_MARGIN_REM = 67.5;
 
-/** Whether an element is at least `rem` wide, followed as it is resized. */
+/** Whether an element is at least `rem` wide, followed as it is resized; known before the page is first painted. */
 function useAtLeast(element: RefObject<HTMLElement | null>, rem: number): boolean {
   const [wide, setWide] = useState(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = element.current;
     if (!el) return;
     const px = rem * parseFloat(getComputedStyle(document.documentElement).fontSize);
-    const sizes = new ResizeObserver(() => setWide(el.clientWidth >= px));
+    const measure = () => setWide(el.clientWidth >= px);
+    measure();
+    const sizes = new ResizeObserver(measure);
     sizes.observe(el);
     return () => sizes.disconnect();
   }, [element, rem]);
@@ -118,7 +121,10 @@ export function PageBody({ doc, compact }: Props) {
       <div ref={scroller} className="min-w-0 flex-1 overflow-y-auto" data-page={doc.id}>
         {!compact && <PageCover doc={doc} readOnly={headReadOnly} />}
         <div
-          className={cx("mx-auto flex w-full", isDatabase ? "max-w-none" : beside ? "max-w-[69rem]" : "max-w-[52rem]")}
+          className={cx(
+            "mx-auto flex w-full",
+            isDatabase ? "max-w-none" : beside ? "max-w-[67.5rem]" : "max-w-[52rem]",
+          )}
         >
           <div ref={textColumn} className="min-w-0 flex-1">
             <div className={cx(compact ? "px-4" : isDatabase ? "px-4 sm:px-8" : "px-4 sm:px-12")}>
@@ -180,7 +186,7 @@ export function PageBody({ doc, compact }: Props) {
             )}
           </div>
           {beside && (
-            <Margin docId={doc.id} projectId={doc.project_id} text={textColumn} className="mr-4 w-64 shrink-0" />
+            <Margin docId={doc.id} projectId={doc.project_id} text={textColumn} className="-ml-6 mr-4 w-64 shrink-0" />
           )}
         </div>
       </div>

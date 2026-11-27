@@ -50,6 +50,20 @@ describe("stackCards", () => {
   it("keeps the active card level with its words and moves the cards above it up, those below down", () => {
     const placed = stackCards(
       [
+        { id: "a", want: 100, height: 40 },
+        { id: "b", want: 130, height: 40 },
+        { id: "c", want: 150, height: 120 },
+        { id: "d", want: 160, height: 40 },
+      ],
+      "c",
+      8,
+    );
+    expect(tops(placed)).toEqual({ a: 54, b: 102, c: 150, d: 278 });
+  });
+
+  it("moves the active card down as little as it must when the cards above it would go past the top", () => {
+    const placed = stackCards(
+      [
         { id: "a", want: 0, height: 40 },
         { id: "b", want: 30, height: 40 },
         { id: "c", want: 50, height: 120 },
@@ -58,7 +72,7 @@ describe("stackCards", () => {
       "c",
       8,
     );
-    expect(tops(placed)).toEqual({ a: -46, b: 2, c: 50, d: 178 });
+    expect(tops(placed)).toEqual({ a: 0, b: 48, c: 96, d: 224 });
   });
 
   it("leaves cards above the active one where they are when they do not reach it", () => {

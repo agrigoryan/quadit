@@ -85,7 +85,7 @@ function List({ docId, onPicked, onSeeAll }: { docId: string; onPicked: () => vo
       {open.length === 0 ? (
         <p className="px-2 pb-2 text-sm text-ink-2">{t("docs.comment.none")}</p>
       ) : (
-        <ul className="max-h-[min(24rem,60vh)] overflow-y-auto">
+        <ul className="max-h-[min(28rem,60vh)] overflow-y-auto">
           {open.map((th) => (
             <li key={th.root.id}>
               <Row thread={th} onPick={() => pick(th)} />
