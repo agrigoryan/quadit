@@ -2,10 +2,13 @@
 // A comment thread on a page (docs/comments/thread.tsx): one who may change
 // the page answers, resolves and deletes their own; a read-only member, whose
 // every change the server refuses, is offered none of it. Each comment shows
-// its files, a picture as a picture.
+// its files, a picture as a picture. It is named after who started it and
+// what it is on; compact, it shows its replies in short; asked, its reply
+// box takes the cursor; Esc in the box leaves the cursor on the thread.
 
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Attachment, Comment, Member, User, Workspace } from "@/types/core";
 import { Thread } from "@/docs/comments/thread";
@@ -51,7 +54,7 @@ function seed(me: Member, attachments: Attachment[] = []) {
 const show = (replies: Comment[] = []) =>
   render(
     <TooltipProvider>
-      <Thread thread={{ root: comment, replies }} docId="d1" projectId={undefined} quote={null} active={false} />
+      <Thread thread={{ root: comment, replies }} docId="d1" projectId={undefined} active={false} />
     </TooltipProvider>,
   );
 
@@ -65,6 +68,69 @@ describe("Thread", () => {
     expect(screen.getByRole("button", { name: "Resolve" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Delete comment" })).toBeTruthy();
     expect(screen.getByPlaceholderText("Reply…")).toBeTruthy();
+  });
+
+  it("is named after who started it and the words it is on", () => {
+    render(
+      <TooltipProvider>
+        <Thread thread={{ root: comment, replies: [] }} docId="d1" projectId={undefined} subject="the plan" active />
+      </TooltipProvider>,
+    );
+    expect(screen.getByRole("article", { name: "Comment by Me on “the plan”" })).toBeTruthy();
+  });
+
+  it("compact, shows its one reply, or how many there are, and a reply box that opens it", async () => {
+    const reply = (id: string, body: string) => ({ ...comment, id, body, parent_id: "c1" });
+    const onOpen = vi.fn();
+    const { rerender } = render(
+      <TooltipProvider>
+        <Thread
+          thread={{ root: comment, replies: [reply("r1", "Agreed")] }}
+          docId="d1"
+          projectId={undefined}
+          active={false}
+          compact
+          onOpen={onOpen}
+        />
+      </TooltipProvider>,
+    );
+    expect(screen.getByText("Agreed")).toBeTruthy();
+    rerender(
+      <TooltipProvider>
+        <Thread
+          thread={{ root: comment, replies: [reply("r1", "Agreed"), reply("r2", "Me too")] }}
+          docId="d1"
+          projectId={undefined}
+          active={false}
+          compact
+          onOpen={onOpen}
+        />
+      </TooltipProvider>,
+    );
+    expect(screen.queryByText("Me too")).toBeNull();
+    expect(screen.getByRole("button", { name: "2 replies" })).toBeTruthy();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Reply…" }));
+    expect(onOpen).toHaveBeenCalled();
+  });
+
+  it("puts the cursor in its reply box when asked, and on the thread when Esc leaves the box", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <TooltipProvider>
+        <Thread thread={{ root: comment, replies: [] }} docId="d1" projectId={undefined} active askReply={0} />
+      </TooltipProvider>,
+    );
+    const box = screen.getByRole("textbox", { name: "Reply…" });
+    expect(box).not.toHaveFocus();
+    rerender(
+      <TooltipProvider>
+        <Thread thread={{ root: comment, replies: [] }} docId="d1" projectId={undefined} active askReply={1} />
+      </TooltipProvider>,
+    );
+    expect(box).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("article")).toHaveFocus();
   });
 
   it("offers a read-only member none of it", () => {

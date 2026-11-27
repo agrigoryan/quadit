@@ -196,6 +196,11 @@ export const docs = {
   "docs.comment.locate": "Show in the page",
   "docs.comment.reopen": "Reopen",
   "docs.comment.delete": "Delete comment",
+  "docs.comment.label": "Comment by {name} on “{words}”",
+  "docs.comment.labelBare": "Comment by {name}",
+  "docs.comment.replies": "{n} reply | {n} replies",
+  "docs.comment.discussions": "Discussions",
+  "docs.comment.seeAll": "See all",
   "docs.comment.threadsOnBlock": "{n} open comment thread on this block | {n} open comment threads on this block",
 
   // ---- databases ----

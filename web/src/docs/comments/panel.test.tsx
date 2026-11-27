@@ -29,17 +29,15 @@ const onBlock = (id: string, block: string, body: string, at: number) =>
   }) as Comment;
 
 /** An editor that shows two blocks, b2 above b1. */
-const editor: { current: EditorHandle } = {
-  current: {
-    scrollToBlock: () => {},
-    scrollToThread: vi.fn(),
-    blockText: (id) => ({ b1: "Ship by Friday, with the docs", b2: "Goals" })[id],
-    threadText: (id) => ({ c4: "with the docs" })[id],
-    selectedWords: () => undefined,
-    onChange: () => () => {},
-    order: () => ["b2", "b1"],
-    caretBlock: () => null,
-  },
+const editor: EditorHandle = {
+  scrollToBlock: () => {},
+  scrollToThread: vi.fn(),
+  blockText: (id) => ({ b1: "Ship by Friday, with the docs", b2: "Goals" })[id],
+  threadText: (id) => ({ c4: "with the docs" })[id],
+  selectedWords: () => undefined,
+  onChange: () => () => {},
+  order: () => ["b2", "b1"],
+  caretBlock: () => null,
 };
 
 beforeEach(() => {
@@ -83,20 +81,18 @@ describe("CommentsPanel", () => {
     const card = (await screen.findByText("Which docs?")).closest("article") as HTMLElement;
     expect(within(card).getByText("with the docs")).toBeInTheDocument();
     await userEvent.setup().click(within(card).getByRole("button", { name: "Show in the page" }));
-    expect(editor.current.scrollToThread).toHaveBeenCalledWith("c4");
+    expect(editor.scrollToThread).toHaveBeenCalledWith("c4");
   });
 
   it("follows a thread's words as they are typed", async () => {
     let changed = () => {};
     const words = { c4: "with the docs" } as Record<string, string>;
-    const live = {
-      current: {
-        ...editor.current,
-        threadText: (id: string) => words[id],
-        onChange: (listener: () => void) => {
-          changed = listener;
-          return () => {};
-        },
+    const live: EditorHandle = {
+      ...editor,
+      threadText: (id: string) => words[id],
+      onChange: (listener: () => void) => {
+        changed = listener;
+        return () => {};
       },
     };
     render(

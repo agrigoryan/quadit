@@ -83,9 +83,10 @@ interface Props {
   /** Open comment threads per block. */
   threads?: Record<string, number>;
   onOpenThread?: (blockId: string) => void;
-  /** The open threads on words, whose words are highlighted, and the one the pointer is on. */
+  /** The open threads on words, whose words are highlighted, the one the pointer is on and the one shown. */
   wordThreads?: string[];
   litThread?: string | null;
+  activeThread?: string | null;
   /** Shows the thread whose words were clicked. */
   onShowThread?: (threadId: string) => void;
   /** The pointer came onto the words of a thread, or left them (null). */
@@ -94,6 +95,10 @@ interface Props {
 }
 
 const blockSchema = schema.blockSchema as unknown as BlockSchemaLike;
+
+/** How to scroll to something asked for: smoothly, unless the person has asked for less motion. */
+const scrolling = (): ScrollBehavior =>
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 
 async function upload(file: File) {
   const row = await uploadFile(file);
@@ -113,6 +118,7 @@ export default function Editor({
   onOpenThread,
   wordThreads,
   litThread,
+  activeThread,
   onShowThread,
   onLightThread,
   others,
@@ -185,7 +191,7 @@ export default function Editor({
       scrollToBlock(id) {
         const el = wrap.current?.querySelector<HTMLElement>(`.bn-block-outer[data-id="${CSS.escape(id)}"]`);
         if (!el) return;
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
+        el.scrollIntoView({ block: "center", behavior: scrolling() });
         // The flash is an animation, not a class: the editor puts back any
         // attribute changed on its blocks from outside, at once.
         el.querySelector(":scope > .bn-block > .bn-block-content")?.animate(
@@ -199,9 +205,10 @@ export default function Editor({
         );
         const first = marked?.[0];
         if (!first) return;
-        first.scrollIntoView({ block: "center", behavior: "smooth" });
+        first.scrollIntoView({ block: "center", behavior: scrolling() });
+        // A ring, not a background: the words of the thread shown have the highlighter already.
         for (const el of marked)
-          el.animate([{ background: "var(--move)" }, { background: "transparent" }], {
+          el.animate([{ boxShadow: "0 0 0 3px var(--move)" }, { boxShadow: "0 0 0 3px transparent" }], {
             duration: 1600,
             easing: "ease-out",
           });
@@ -332,6 +339,7 @@ export default function Editor({
         editor={editor}
         open={wordThreads ?? []}
         lit={litThread}
+        active={activeThread}
         onShow={onShowThread}
         onLight={onLightThread}
       />

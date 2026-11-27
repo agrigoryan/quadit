@@ -2,7 +2,7 @@
 // whether edits are saved, comments, sharing and everything else to do
 // with the page as a whole.
 
-import { ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Fragment } from "react";
 import { Link } from "react-router";
 import { cx } from "@/lib/cx";
@@ -10,17 +10,16 @@ import { t } from "@/lib/i18n";
 import { useLookupEvenIfGone } from "@/data/selectors";
 import { useDocsArea } from "@/docs/area";
 import { docTitle } from "@/ui/page-name";
-import { useOpenThreads } from "@/docs/comments/panel";
+import { Discussions } from "@/docs/comments/discussions";
 import { pathTo } from "@/docs/data";
 import { tintOf } from "@/docs/presence-tint";
 import { PageMenu } from "@/docs/page/page-menu";
 import { ProjectField } from "@/docs/page/project-field";
 import { SharePopover } from "@/docs/page/share-popover";
-import { pageUi, usePageUi } from "@/docs/page/state";
+import { usePageUi } from "@/docs/page/state";
 import { useDocsStore } from "@/docs/store";
 import type { Doc } from "@/types/docs";
 import { Avatar } from "@/ui/avatar";
-import { Button } from "@/ui/button";
 import { ProjectGlyph } from "@/ui/project-glyph";
 import { Tooltip } from "@/ui/tooltip";
 
@@ -41,8 +40,6 @@ export function PageHeader({ doc }: { doc: Doc }) {
   const path = pathIn(pathTo(docs, doc.id), project?.id);
   const others = useDocsStore((s) => s.presence[doc.id]) ?? NO_OTHERS;
   const saving = usePageUi((s) => s.saving[doc.id]);
-  const commentsOpen = usePageUi((s) => s.commentsOpen);
-  const threads = useOpenThreads(doc.id);
   const parent = path[path.length - 1];
 
   return (
@@ -108,20 +105,7 @@ export function PageHeader({ doc }: { doc: Doc }) {
         </div>
       )}
 
-      <Button
-        variant="ghost"
-        aria-pressed={commentsOpen}
-        onClick={pageUi.toggleComments}
-        className={cx("gap-1 px-2", commentsOpen && "bg-hover text-ink")}
-      >
-        <MessageSquare className="size-4" />
-        <span className="max-sm:sr-only">{t("docs.comment.title")}</span>
-        {threads.total > 0 && (
-          <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-move px-1 text-2xs font-semibold text-move-ink tnum">
-            {threads.total}
-          </span>
-        )}
-      </Button>
+      <Discussions docId={doc.id} />
       {doc.kind !== "row" && !doc.memory_of && <ProjectField doc={doc} />}
       {doc.kind !== "row" && !doc.memory_of && <SharePopover doc={doc} />}
       <PageMenu doc={doc} />

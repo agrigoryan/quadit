@@ -3,7 +3,8 @@
 // value (editor/schema.tsx); a resolved thread keeps its marker and is not
 // highlighted, so opening it again brings the highlight back. A click on
 // highlighted words shows their thread; the pointer on them lights it, here
-// and in the comments column.
+// and in the margin or the comments column; the words of the thread shown
+// are highlighted strongest. The colours are theme.css's.
 
 import { useEffect, useRef } from "react";
 import type { AnyEditor } from "@/docs/editor/sync";
@@ -13,8 +14,10 @@ interface Props {
   editor: AnyEditor;
   /** The open threads on words, the ones highlighted. */
   open: string[];
-  /** The thread the pointer is on, here or in the column. */
+  /** The thread the pointer is on, here or beside the text. */
   lit?: string | null;
+  /** The thread shown, in the margin or the column. */
+  active?: string | null;
   onShow?: (threadId: string) => void;
   onLight?: (threadId: string | null) => void;
 }
@@ -23,7 +26,7 @@ interface Props {
 const wordsOf = (id: string) => `.qd-editor [data-style-type="comment"][data-value~="${id}"]`;
 const safe = (id: string) => /^[\w-]+$/.test(id);
 
-export function Highlights({ editor, open, lit, onShow, onLight }: Props) {
+export function Highlights({ editor, open, lit, active, onShow, onLight }: Props) {
   // What the listeners below read when the pointer moves: the props of the last render.
   const latest = useRef({ open, onShow, onLight });
   useEffect(() => {
@@ -57,7 +60,9 @@ export function Highlights({ editor, open, lit, onShow, onLight }: Props) {
 
   const shown = open.filter(safe);
   if (shown.length === 0) return null;
-  let css = `${shown.map(wordsOf).join(",")}{background:var(--move-soft);border-bottom:2px solid var(--move);cursor:pointer}`;
-  if (lit && shown.includes(lit)) css += `${wordsOf(lit)}{background:color-mix(in srgb,var(--move) 55%,transparent)}`;
+  let css = `${shown.map(wordsOf).join(",")}{background:var(--qd-comment);border-bottom:2px solid var(--move);cursor:pointer}`;
+  if (lit && shown.includes(lit)) css += `${wordsOf(lit)}{background:var(--qd-comment-lit)}`;
+  if (active && shown.includes(active))
+    css += `${wordsOf(active)}{background:var(--qd-comment-active)}${wordsOf(active)},${wordsOf(active)} *{color:var(--qd-comment-active-ink)}`;
   return <style>{css}</style>;
 }

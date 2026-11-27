@@ -1,0 +1,160 @@
+// A page's comments as threads, and where each is in the page as it reads
+// now: what the margin, the comments column and the Discussions list show.
+
+import { useEffect, useMemo, useState } from "react";
+import { useDocComments } from "@/docs/data";
+import type { EditorHandle } from "@/docs/editor/editor";
+import type { DocComment } from "@/types/docs";
+
+export interface ThreadData {
+  root: DocComment;
+  replies: DocComment[];
+  /** The block it is on (the first its words are in); undefined for a comment on the page itself. */
+  blockId?: string;
+}
+
+/** Comments grouped into threads: each top-level comment with its replies. */
+export function threadsOf(comments: DocComment[]): ThreadData[] {
+  const byRoot = new Map<string, ThreadData>();
+  for (const c of comments) {
+    if (!c.parent_id)
+      byRoot.set(c.id, { root: c, replies: [], blockId: c.subject_type === "doc_block" ? c.subject_id : undefined });
+  }
+  for (const c of comments) {
+    if (c.parent_id) byRoot.get(c.parent_id)?.replies.push(c);
+  }
+  return [...byRoot.values()];
+}
+
+/** Whether a thread is on words of the page that are still there: those words carry its marker. */
+export const onWords = (root: DocComment) => !!root.quote && !root.detached_at;
+
+/** Whether a thread is on words or a block of the page, rather than the page as a whole or words taken out. */
+export const inText = (th: ThreadData) => !!th.blockId && (!th.root.quote || onWords(th.root));
+
+/**
+ * The page's open threads: how many each block has, how many in all, how
+ * many are on its text (words or a block), and the ids of those on words,
+ * whose words are highlighted.
+ */
+export function useOpenThreads(docId: string): {
+  perBlock: Record<string, number>;
+  total: number;
+  inText: number;
+  onWords: string[];
+} {
+  const comments = useDocComments(docId);
+  return useMemo(() => {
+    const perBlock: Record<string, number> = {};
+    const words: string[] = [];
+    let total = 0;
+    let text = 0;
+    for (const th of threadsOf(comments)) {
+      if (th.root.resolved_at) continue;
+      total++;
+      if (inText(th)) text++;
+      if (th.blockId) perBlock[th.blockId] = (perBlock[th.blockId] ?? 0) + 1;
+      if (onWords(th.root)) words.push(th.root.id);
+    }
+    return { perBlock, total, inText: text, onWords: words };
+  }, [comments]);
+}
+
+/** What a thread is about, as the page reads now. */
+export type About =
+  /** The page as a whole. */
+  | { on: "page" }
+  /** Words or a block of the page: their text (undefined while the editor has not been read). */
+  | { on: "text"; text: string | undefined }
+  /** Words taken out of the page since: the words as they were. */
+  | { on: "removed"; text: string }
+  /** A block taken out of the page. */
+  | { on: "gone" };
+
+export interface PageThread extends ThreadData {
+  about: About;
+  /** Where it is in the page while its words or its block are there: what to scroll to. */
+  at?: { words: string } | { block: string };
+}
+
+/**
+ * The page's threads, open and resolved, in the order the page reads (the
+ * page's own last), each with what it is about and where it is. The
+ * editor is read once it has drawn and again, once a frame at most, as
+ * the text changes; never while rendering. `draftBlock`, a block a new
+ * thread is being started on, has its text read too (`draftText`).
+ */
+export function usePageThreads(
+  docId: string,
+  editor: EditorHandle | null,
+  draftBlock: string | null = null,
+): { open: PageThread[]; resolved: PageThread[]; draftText: string | undefined } {
+  const comments = useDocComments(docId);
+  /**
+   * What the editor shows: the blocks' order, the text of each block a
+   * thread is on (undefined: the block is gone), and the words each thread
+   * on words is on as they read now.
+   */
+  const [page, setPage] = useState<{
+    order: string[];
+    texts: Map<string, string | undefined>;
+    words: Map<string, string | undefined>;
+  }>(() => ({ order: [], texts: new Map(), words: new Map() }));
+  useEffect(() => {
+    // Not drawn yet: nothing is read, so no block is called gone.
+    if (!editor) return;
+    const read = () => {
+      const blocks = [draftBlock, ...comments.map((c) => (c.subject_type === "doc_block" ? c.subject_id : null))];
+      const texts = new Map<string, string | undefined>();
+      for (const id of blocks) if (id) texts.set(id, editor.blockText(id));
+      const words = new Map<string, string | undefined>();
+      for (const c of comments) if (!c.parent_id && onWords(c)) words.set(c.id, editor.threadText(c.id));
+      setPage({ order: editor.order(), texts, words });
+    };
+    read();
+    let frame = 0;
+    const stop = editor.onChange(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(read);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      stop();
+    };
+  }, [editor, comments, draftBlock]);
+
+  return useMemo(() => {
+    const { order, texts, words } = page;
+    // A block not read yet is not called gone.
+    const gone = (blockId: string) => texts.has(blockId) && texts.get(blockId) === undefined;
+    const place = new Map(order.map((id, i) => [id, i]));
+    const rank = (th: ThreadData) => (th.blockId ? (place.get(th.blockId) ?? order.length) : order.length + 1);
+    const all = threadsOf(comments)
+      .sort((a, b) => rank(a) - rank(b) || a.root.created_at - b.root.created_at)
+      .map((th): PageThread => {
+        const { root, blockId } = th;
+        if (root.quote && root.detached_at) return { ...th, about: { on: "removed", text: root.quote } };
+        if (root.quote) {
+          // The words as they read now; the words it was started on until the editor has them.
+          const now = words.get(root.id);
+          return {
+            ...th,
+            about: { on: "text", text: now ?? root.quote },
+            at: now === undefined ? undefined : { words: root.id },
+          };
+        }
+        if (!blockId) return { ...th, about: { on: "page" } };
+        if (gone(blockId)) return { ...th, about: { on: "gone" } };
+        return { ...th, about: { on: "text", text: texts.get(blockId) }, at: { block: blockId } };
+      });
+    return {
+      open: all.filter((th) => !th.root.resolved_at),
+      resolved: all.filter((th) => th.root.resolved_at),
+      draftText: draftBlock ? texts.get(draftBlock) : undefined,
+    };
+  }, [comments, page, draftBlock]);
+}
+
+/** The words or block text a thread is about, for its label; undefined for the page, or a block gone. */
+export const aboutText = (about: About): string | undefined =>
+  about.on === "text" || about.on === "removed" ? about.text : undefined;

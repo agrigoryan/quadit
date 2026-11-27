@@ -275,6 +275,21 @@
   color: var(--ink-3);
 }
 
+/* ---- words with a comment thread (editor/highlights.tsx) ----
+ * Open threads' words are tinted; the pointer on them or on their card tints
+ * them more; the thread shown has the highlighter itself, with its own ink.
+ * Each keeps the page's ink at 4.5:1 or more on both themes. */
+
+.qd-editor {
+  --qd-comment: var(--move-soft);
+  --qd-comment-lit: color-mix(in srgb, var(--move) 50%, var(--surface));
+  --qd-comment-active: var(--move);
+  --qd-comment-active-ink: var(--move-ink);
+}
+:root[data-theme="dark"] .qd-editor {
+  --qd-comment-lit: color-mix(in srgb, var(--move) 28%, var(--surface));
+}
+
 /* ---- who else is here, and comment marks ---- */
 
 .qd-presence {

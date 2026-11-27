@@ -1,77 +1,36 @@
 // The comments of a page, in a column beside it: one thread per comment on
 // words of the page, a block, or the page as a whole, with its replies.
-// Threads follow the order of the blocks they are on.
+// Threads follow the order of the blocks they are on. Where the page has no
+// room for its margin (comments/margin.tsx), this is where threads open; it
+// is also "See all" in the Discussions list, with the resolved threads.
 
 import { MessageSquare, X } from "lucide-react";
-import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useCan } from "@/data/access";
 import { useHotkeys } from "@/hooks/hotkeys";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { addComment } from "@/docs/actions";
 import { Composer } from "@/docs/comments/composer";
+import { Quote } from "@/docs/comments/quote";
 import { Thread } from "@/docs/comments/thread";
-import { useDocComments } from "@/docs/data";
+import { aboutText, type PageThread, usePageThreads } from "@/docs/comments/threads";
 import type { EditorHandle } from "@/docs/editor/editor";
 import { pageUi, usePageUi } from "@/docs/page/state";
-import type { DocComment } from "@/types/docs";
 import { IconButton } from "@/ui/button";
 import { Radio, RadioGroup } from "@/ui/radio-group";
-
-export interface ThreadData {
-  root: DocComment;
-  replies: DocComment[];
-  /** The block it is on (the first its words are in); undefined for a comment on the page itself. */
-  blockId?: string;
-}
-
-/** Comments grouped into threads: each top-level comment with its replies. */
-function threadsOf(comments: DocComment[]): ThreadData[] {
-  const byRoot = new Map<string, ThreadData>();
-  for (const c of comments) {
-    if (!c.parent_id)
-      byRoot.set(c.id, { root: c, replies: [], blockId: c.subject_type === "doc_block" ? c.subject_id : undefined });
-  }
-  for (const c of comments) {
-    if (c.parent_id) byRoot.get(c.parent_id)?.replies.push(c);
-  }
-  return [...byRoot.values()];
-}
-
-/** Whether a thread is on words of the page that are still there: those words carry its marker. */
-const onWords = (root: DocComment) => !!root.quote && !root.detached_at;
-
-/**
- * The page's open threads: how many each block has, how many in all, and
- * the ids of those on words, whose words are highlighted.
- */
-export function useOpenThreads(docId: string): { perBlock: Record<string, number>; total: number; onWords: string[] } {
-  const comments = useDocComments(docId);
-  return useMemo(() => {
-    const perBlock: Record<string, number> = {};
-    const words: string[] = [];
-    let total = 0;
-    for (const th of threadsOf(comments)) {
-      if (th.root.resolved_at) continue;
-      total++;
-      if (th.blockId) perBlock[th.blockId] = (perBlock[th.blockId] ?? 0) + 1;
-      if (onWords(th.root)) words.push(th.root.id);
-    }
-    return { perBlock, total, onWords: words };
-  }, [comments]);
-}
 
 interface Props {
   docId: string;
   /** The page's project: who may not change it may read its comments, not add to them. */
   projectId: string | undefined;
-  editor: RefObject<EditorHandle | null>;
+  /** The page's editor, read for the threads' order and quotes; null until it has drawn. */
+  editor: EditorHandle | null;
   /** The page cannot take comments on blocks (no editor shown). */
   pageOnly?: boolean;
 }
 
 export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
-  const comments = useDocComments(docId);
   const readOnly = !useCan().edit(projectId);
   const draftBlock = usePageUi((s) => s.draftBlock);
   const draftWords = usePageUi((s) => s.draftWords);
@@ -80,80 +39,35 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
   const litThread = usePageUi((s) => s.litThread);
   const showResolved = usePageUi((s) => s.showResolved);
   const pageBoxAsked = usePageUi((s) => s.pageBoxAsked);
+  const replyAsked = usePageUi((s) => s.replyAsked);
   const pageBox = useRef<HTMLTextAreaElement>(null);
+  const list = useRef<HTMLDivElement>(null);
   // Esc in a comment box leaves the box (composer.tsx); away from one, it closes the column.
   useHotkeys({ Escape: pageUi.closeComments });
-  /**
-   * What the editor shows: the blocks' order, to list threads the way the
-   * page reads, the text of each block a thread is on (undefined: the
-   * block is gone), and the words each thread on words is on as they read
-   * now. Read once the editor has drawn, never while rendering.
-   */
-  const [page, setPage] = useState<{
-    order: string[];
-    texts: Map<string, string | undefined>;
-    words: Map<string, string | undefined>;
-  }>(() => ({ order: [], texts: new Map(), words: new Map() }));
-  useEffect(() => {
-    const handle = editor.current;
-    // Read from the editor, outside React, once it has drawn, and again as the text changes.
-    const read = () => {
-      const blocks = [draftBlock, ...comments.map((c) => (c.subject_type === "doc_block" ? c.subject_id : null))];
-      const texts = new Map<string, string | undefined>();
-      for (const id of blocks) if (id) texts.set(id, handle?.blockText(id));
-      const words = new Map<string, string | undefined>();
-      for (const c of comments) if (!c.parent_id && onWords(c)) words.set(c.id, handle?.threadText(c.id));
-      setPage({ order: handle?.order() ?? [], texts, words });
-    };
-    read();
-    // The quotes follow the text as it is typed, once a frame at most.
-    let frame = 0;
-    const stop = handle?.onChange(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(read);
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-      stop?.();
-    };
-  }, [editor, comments, draftBlock, focusBlock, focusThread]);
-  const { order } = page;
+  const { open, resolved, draftText } = usePageThreads(docId, editor, draftBlock);
 
   useEffect(() => {
     if (pageBoxAsked) pageBox.current?.focus();
   }, [pageBoxAsked]);
 
-  const { open, resolved } = useMemo(() => {
-    const place = new Map(order.map((id, i) => [id, i]));
-    const rank = (th: ThreadData) => (th.blockId ? (place.get(th.blockId) ?? order.length) : order.length + 1);
-    const all = threadsOf(comments).sort((a, b) => rank(a) - rank(b) || a.root.created_at - b.root.created_at);
-    return { open: all.filter((th) => !th.root.resolved_at), resolved: all.filter((th) => th.root.resolved_at) };
-  }, [comments, order]);
+  // The thread asked for comes into view in the list.
+  useEffect(() => {
+    if (focusThread || focusBlock)
+      list.current?.querySelector("[aria-current]")?.scrollIntoView?.({ block: "nearest" });
+  }, [focusThread, focusBlock]);
 
   const shown = showResolved ? resolved : open;
-  const quote = (blockId: string | undefined) => (blockId ? page.texts.get(blockId) : undefined);
-  // A block not read yet is not called gone.
-  const gone = (blockId: string | undefined) => !!blockId && page.texts.has(blockId) && quote(blockId) === undefined;
-  /** What a thread is about, above its first comment. */
-  const about = ({ root, blockId }: ThreadData) => {
-    if (root.quote && root.detached_at) return <Quote text={root.quote} removed />;
-    // The words as they read now; the words it was started on until the editor has them.
-    if (root.quote) return <Quote text={page.words.get(root.id) ?? root.quote} />;
-    return <Quote text={quote(blockId)} gone={gone(blockId)} page={!blockId} />;
-  };
   /** Shows a thread's words or block in the page, while they are there. */
-  const locate = ({ root, blockId }: ThreadData) => {
-    if (root.quote && !root.detached_at)
-      return page.words.get(root.id) === undefined ? undefined : () => editor.current?.scrollToThread(root.id);
-    if (root.quote || !blockId || gone(blockId)) return undefined;
-    return () => editor.current?.scrollToBlock(blockId);
+  const locate = ({ at }: PageThread) => {
+    if (!at || !editor) return undefined;
+    return "words" in at ? () => editor.scrollToThread(at.words) : () => editor.scrollToBlock(at.block);
   };
 
   return (
     <aside
       data-comments
       aria-label={t("docs.comment.title")}
-      className="absolute inset-y-0 right-0 z-20 flex w-[min(22rem,100%)] shrink-0 flex-col border-l border-line bg-surface shadow-panel animate-panel xl:static xl:z-auto xl:w-80 xl:animate-none xl:shadow-none"
+      className="absolute inset-y-0 right-0 z-20 flex w-[min(22rem,100%)] shrink-0 flex-col border-l border-line bg-surface shadow-panel animate-panel max-sm:w-full max-sm:border-l-0 xl:static xl:z-auto xl:w-80 xl:animate-none xl:shadow-none"
     >
       <header className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-3">
         <h2 className="flex-1 text-sm font-semibold">{t("docs.comment.title")}</h2>
@@ -184,10 +98,10 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
         </IconButton>
       </header>
 
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
+      <div ref={list} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
         {draftBlock && !showResolved && !readOnly && (
           <div className="rounded-lg border border-accent bg-surface p-2">
-            <Quote text={draftWords?.quote ?? quote(draftBlock)} />
+            <Quote about={{ on: "text", text: draftWords?.quote ?? draftText }} />
             <Composer
               autoFocus
               placeholder={t(draftWords ? "docs.comment.placeholderWords" : "docs.comment.placeholder")}
@@ -206,9 +120,11 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
             thread={th}
             docId={docId}
             projectId={projectId}
-            quote={about(th)}
+            quote={<Quote about={th.about} />}
+            subject={aboutText(th.about)}
             active={th.root.id === focusThread || (!!th.blockId && th.blockId === focusBlock)}
             lit={th.root.id === litThread}
+            askReply={replyAsked?.thread === th.root.id ? replyAsked.n : 0}
             onLocate={locate(th)}
           />
         ))}
@@ -233,34 +149,4 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
       )}
     </aside>
   );
-}
-
-/**
- * What a thread is about: the page, a block gone, the words or the block's
- * text; words taken out of the page since are struck through, with a note.
- */
-function Quote({
-  text,
-  gone,
-  page,
-  removed,
-}: {
-  text: string | undefined;
-  gone?: boolean;
-  page?: boolean;
-  removed?: boolean;
-}) {
-  if (page) return <p className="mb-1.5 text-xs font-medium text-ink-3">{t("docs.comment.aboutPage")}</p>;
-  if (gone) return <p className="mb-1.5 text-xs text-ink-3 italic">{t("docs.comment.blockGone")}</p>;
-  if (!text) return null;
-  if (removed)
-    return (
-      <div className="mb-1.5">
-        <p className="line-clamp-2 border-l-2 border-line-strong pl-2 text-xs text-ink-3">
-          <del>{text}</del>
-        </p>
-        <p className="mt-0.5 text-2xs text-ink-3 italic">{t("docs.comment.wordsGone")}</p>
-      </div>
-    );
-  return <p className="mb-1.5 line-clamp-2 border-l-2 border-move pl-2 text-xs text-ink-2">{text}</p>;
 }
