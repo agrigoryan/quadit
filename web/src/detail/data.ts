@@ -4,12 +4,8 @@
 
 import { useMemo } from "react";
 import { t } from "@/lib/i18n";
-import { getRowEvenIfGone, sortByRank, useRows } from "@/data/selectors";
-import type { Dict } from "@/data/store";
-import type { Attachment, FileRow, Member, Relation, SubjectType, Task, TaskLink } from "@/types/core";
-
-/** An attachment whose file is known (every one the panel draws). */
-export type Attached = Attachment & { file: FileRow };
+import { getRowEvenIfGone, sortByRank, useAttachmentsBySubject, useRows } from "@/data/selectors";
+import type { Attached, Member, Relation, Task, TaskLink } from "@/types/core";
 
 export function useSubtasks(taskId: string): Task[] {
   const tasks = useRows("tasks");
@@ -30,20 +26,6 @@ export function useTaskLinks(taskId: string): TaskLink[] {
     () => links.filter((l) => l.task_id === taskId).sort((a, b) => (a.id < b.id ? -1 : 1)),
     [links, taskId],
   );
-}
-
-const hasFile = (a: Attachment): a is Attached => !!a.file;
-
-/** Live attachments of one kind of subject, grouped by the subject they are on, in order. */
-export function useAttachmentsBySubject(subjectType: SubjectType): Dict<Attached[]> {
-  const attachments = useRows("attachments");
-  return useMemo(() => {
-    const out: Dict<Attached[]> = {};
-    for (const a of sortByRank(attachments)) {
-      if (a.subject_type === subjectType && hasFile(a)) (out[a.subject_id] ??= []).push(a);
-    }
-    return out;
-  }, [attachments, subjectType]);
 }
 
 const NO_FILES: Attached[] = [];

@@ -326,6 +326,9 @@ export type Attachment = {
   file?: FileRow;
 };
 
+/** An attachment whose file is known: every one that is drawn. */
+export type Attached = Attachment & { file: FileRow };
+
 /** A session's state (core.AgentSession*): waiting and running are open, every other ends it. */
 export type SessionState = "waiting" | "running" | "done" | "failed" | "stopped" | "not_started";
 

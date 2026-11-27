@@ -3,12 +3,11 @@
 import { Paperclip } from "lucide-react";
 import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
-import type { Task } from "@/types/core";
-import type { Attached } from "@/detail/data";
-import { FileGrid } from "@/detail/file-grid";
+import type { Attached, Task } from "@/types/core";
 import { Section } from "@/detail/section";
-import { type PendingUpload, removeAttachment } from "@/detail/uploads";
+import { removeAttachment } from "@/detail/uploads";
 import { Button } from "@/ui/button";
+import { FileGrid, type PendingUpload } from "@/ui/file-grid";
 
 interface Props {
   task: Task;

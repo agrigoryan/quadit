@@ -4,23 +4,22 @@
 // leaves the box with the draft kept, so the next key is the task's (Escape
 // again closes it); Ctrl+M comes back to it (detail/comment-box.ts).
 
-import { useRef, useState } from "react";
-import { CircleSlash, CornerDownRight, Paperclip, X } from "lucide-react";
+import { CircleSlash, CornerDownRight } from "lucide-react";
 import { cx } from "@/lib/cx";
 import { MOD } from "@/hooks/hotkeys";
 import { t } from "@/lib/i18n";
 import { mayBeGivenWork } from "@/data/access";
 import { useMe, useMember, useMembers } from "@/data/selectors";
-import type { FileRow, Task } from "@/types/core";
+import { readyFiles } from "@/data/comment-files";
+import type { Task } from "@/types/core";
 import { addDraftFiles, createComment, editDraft, EMPTY_DRAFT, useDrafts } from "@/detail/comment-actions";
 import { nameOf } from "@/detail/data";
-import { carriesFiles } from "@/detail/uploads";
 import { memberItems } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
-import { Button, IconButton } from "@/ui/button";
+import { Button } from "@/ui/button";
+import { AttachButton, useDropFiles, WaitingFiles } from "@/ui/comment-files";
 import { MentionTextarea } from "@/ui/mention-textarea";
 import { Picker } from "@/ui/picker";
-import { Spinner } from "@/ui/spinner";
 import { Tooltip } from "@/ui/tooltip";
 
 const NOBODY = "none";
@@ -31,39 +30,20 @@ export function Composer({ task }: { task: Task }) {
   const members = useMembers().filter((m) => mayBeGivenWork(m, task.project_id));
   const draft = useDrafts((s) => s.drafts[task.id]) ?? EMPTY_DRAFT;
   const handTo = useMember(draft.handTo ?? undefined);
-  const chooser = useRef<HTMLInputElement>(null);
-  const [over, setOver] = useState(false);
+  const { over, drop } = useDropFiles((files) => addDraftFiles(task.id, files));
 
-  const uploading = draft.files.some((f) => !f.file);
+  const { files, uploading } = readyFiles(draft.files);
   const canSend = draft.body.trim() !== "" && !uploading;
 
   function submit() {
     if (!canSend) return;
-    createComment({
-      task,
-      body: draft.body.trim(),
-      files: draft.files.map((f) => f.file).filter((f): f is FileRow => !!f),
-      handTo: draft.handTo,
-    });
+    createComment({ task, body: draft.body.trim(), files, handTo: draft.handTo });
     editDraft(task.id, () => EMPTY_DRAFT);
   }
 
   return (
     <div
-      onDragOver={(e) => {
-        if (!carriesFiles(e)) return;
-        e.preventDefault();
-        e.stopPropagation();
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        if (!carriesFiles(e)) return;
-        e.preventDefault();
-        e.stopPropagation();
-        setOver(false);
-        addDraftFiles(task.id, [...e.dataTransfer.files]);
-      }}
+      {...drop}
       className={cx(
         "rounded-lg border bg-surface transition-colors focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25",
         over ? "border-accent ring-2 ring-accent/25" : "border-line-strong",
@@ -85,46 +65,14 @@ export function Composer({ task }: { task: Task }) {
         className="block min-h-16 px-3 pt-2.5 pb-1 text-sm leading-[1.375rem]"
       />
 
-      {draft.files.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5 px-3 pb-1.5">
-          {draft.files.map((f) => (
-            <li
-              key={f.key}
-              className="flex h-6 max-w-full items-center gap-1.5 rounded-sm border border-line bg-sunken pr-0.5 pl-1.5 text-xs text-ink-2 max-md:h-8"
-            >
-              {f.file ? (
-                <Paperclip className="size-3 shrink-0" aria-hidden />
-              ) : (
-                <Spinner className="size-3" label={t("detail.files.uploading", { name: f.name })} />
-              )}
-              <span className="max-w-40 truncate">{f.name}</span>
-              <button
-                type="button"
-                aria-label={t("comment.removeFile", { name: f.name })}
-                onClick={() => editDraft(task.id, (d) => ({ ...d, files: d.files.filter((x) => x.key !== f.key) }))}
-                className="flex size-5 items-center justify-center rounded-xs text-ink-3 hover:bg-hover hover:text-ink max-md:size-7"
-              >
-                <X className="size-3" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <WaitingFiles
+        files={draft.files}
+        onRemove={(key) => editDraft(task.id, (d) => ({ ...d, files: d.files.filter((f) => f.key !== key) }))}
+        className="px-3 pb-1.5"
+      />
 
       <div className="flex flex-wrap items-center gap-1 px-1.5 pb-1.5">
-        <input
-          ref={chooser}
-          type="file"
-          multiple
-          hidden
-          onChange={(e) => {
-            addDraftFiles(task.id, [...(e.target.files ?? [])]);
-            e.target.value = "";
-          }}
-        />
-        <IconButton label={t("comment.attach")} className="max-md:size-10" onClick={() => chooser.current?.click()}>
-          <Paperclip className="size-4" />
-        </IconButton>
+        <AttachButton onFiles={(files) => addDraftFiles(task.id, files)} className="max-md:size-10" />
         <Picker
           label={t("comment.handTo")}
           placeholder={t("comment.handTo")}

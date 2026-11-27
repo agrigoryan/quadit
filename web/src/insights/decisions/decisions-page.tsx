@@ -12,7 +12,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useCan } from "@/data/access";
 import { usePageTitle } from "@/lib/ui-state";
-import { useAttachmentsBySubject } from "@/detail/data";
+import { useAttachmentsBySubject } from "@/data/selectors";
 import { Button } from "@/ui/button";
 import { EmptyState } from "@/ui/empty";
 import {

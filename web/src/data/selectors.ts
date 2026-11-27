@@ -16,6 +16,8 @@
 import { useMemo } from "react";
 import { type Collections, type Dict, getState, type StoreState, useStore } from "@/data/store";
 import {
+  type Attached,
+  type Attachment,
   type Cycle,
   type Decision,
   type Epic,
@@ -26,6 +28,7 @@ import {
   type Notification,
   type Project,
   type Status,
+  type SubjectType,
   type Task,
   type Template,
   type View,
@@ -348,6 +351,20 @@ export function useUnreadCounts(): { needs: number; updates: number } {
 }
 
 export const sortByRank = <T extends { rank?: string }>(rows: T[]): T[] => [...rows].sort(byRank);
+
+const hasFile = (a: Attachment): a is Attached => !!a.file;
+
+/** Live attachments of one kind of subject, grouped by the subject they are on, in order. */
+export function useAttachmentsBySubject(subjectType: SubjectType): Dict<Attached[]> {
+  const attachments = useRows("attachments");
+  return useMemo(() => {
+    const out: Dict<Attached[]> = {};
+    for (const a of sortByRank(attachments)) {
+      if (a.subject_type === subjectType && hasFile(a)) (out[a.subject_id] ??= []).push(a);
+    }
+    return out;
+  }, [attachments, subjectType]);
+}
 
 /** Remembers the last answer for the last input, so per-row lookups cost one pass per change. */
 function memoLast<In, Out>(compute: (input: In) => Out): (input: In) => Out {

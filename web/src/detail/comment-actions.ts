@@ -8,18 +8,11 @@ import { newId } from "@/lib/ids";
 import { send } from "@/data/mutate";
 import { getState } from "@/data/store";
 import type { Comment, FileRow, Task } from "@/types/core";
-import { uploadOrToast } from "@/detail/uploads";
-
-interface DraftFile {
-  key: string;
-  name: string;
-  /** Missing while the file is still uploading. */
-  file?: FileRow;
-}
+import { commentFiles, uploadWaiting, type WaitingFile } from "@/data/comment-files";
 
 export interface Draft {
   body: string;
-  files: DraftFile[];
+  files: WaitingFile[];
   /** Who the task should wait on once the comment is sent. */
   handTo: string | null;
 }
@@ -34,18 +27,7 @@ export function editDraft(taskId: string, change: (draft: Draft) => Draft) {
 
 /** Uploads files into a task's draft; each shows as a chip that fills in when it lands. */
 export function addDraftFiles(taskId: string, files: File[]) {
-  for (const file of files) {
-    const key = newId();
-    editDraft(taskId, (d) => ({ ...d, files: [...d.files, { key, name: file.name }] }));
-    void uploadOrToast(file).then((row) =>
-      editDraft(taskId, (d) => ({
-        ...d,
-        files: row
-          ? d.files.map((f) => (f.key === key ? { ...f, file: row } : f))
-          : d.files.filter((f) => f.key !== key),
-      })),
-    );
-  }
+  uploadWaiting(files, (change) => editDraft(taskId, (d) => ({ ...d, files: change(d.files) })));
 }
 
 interface NewComment {
@@ -63,10 +45,10 @@ export function createComment({ task, body, parentId, files = [], handTo }: NewC
   if (!me) return;
   const id = newId();
   const now = Date.now();
-  const attachments = files.map((file) => ({ id: newId(), file }));
+  const attached = commentFiles(files, id, task.id);
   const args: Changes["comment.create"] = { id, task: task.id, body };
   if (parentId) args.parent = parentId;
-  if (attachments.length) args.attachments = attachments.map((a) => ({ id: a.id, file: a.file.id }));
+  if (attached.args) args.attachments = attached.args;
   if (handTo) args.waiting_on = handTo;
 
   send({ type: "comment.create", args }, (tx) => {
@@ -81,19 +63,7 @@ export function createComment({ task, body, parentId, files = [], handTo }: NewC
       body,
       created_at: now,
     });
-    attachments.forEach((a, i) =>
-      tx.insert("attachments", {
-        id: a.id,
-        file_id: a.file.id,
-        subject_type: "comment",
-        subject_id: id,
-        task_id: task.id,
-        rank: String(i).padStart(4, "0") + "1",
-        created_by: me.user_id,
-        created_at: now,
-        file: a.file,
-      }),
-    );
+    attached.show(tx);
     if (handTo) tx.patch("tasks", task.id, { waiting_on_id: handTo, waiting_on_note: null });
   });
 }

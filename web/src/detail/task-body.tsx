@@ -24,7 +24,8 @@ import { Subtasks } from "@/detail/subtasks";
 import { Timeline } from "@/detail/timeline";
 import { useFamilyKeys } from "@/detail/family-keys";
 import { Description, EditableTitle } from "@/detail/title-description";
-import { attachToTask, type PendingUpload, useUploads } from "@/detail/uploads";
+import { attachToTask, useUploads } from "@/detail/uploads";
+import type { PendingUpload } from "@/ui/file-grid";
 import { plainLinks, TaskWork } from "@/insights/task-work";
 import { Button } from "@/ui/button";
 

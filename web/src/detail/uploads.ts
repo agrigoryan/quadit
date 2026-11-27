@@ -3,41 +3,20 @@
 // the panel can show it as "uploading".
 
 import { create } from "zustand";
-import { errorMessage } from "@/data/api";
-import { uploadFile, type UploadOptions } from "@/data/files";
-import { t } from "@/lib/i18n";
+import { uploadOrToast } from "@/data/files";
 import { newId } from "@/lib/ids";
 import { send } from "@/data/mutate";
 import { rankBetween } from "@/lib/rank";
 import { getRows } from "@/data/selectors";
 import { getState } from "@/data/store";
-import { toast } from "@/lib/toast";
 import type { Task } from "@/types/core";
-
-export interface PendingUpload {
-  id: string;
-  name: string;
-  /** How much of the file the server has, 0 to 100. */
-  percent?: number;
-  /** The connection is away; the upload carries on by itself when it is back. */
-  waiting?: boolean;
-}
+import type { PendingUpload } from "@/ui/file-grid";
 
 /** Files still uploading, by the task they will be attached to. */
 export const useUploads = create<{ pending: Record<string, PendingUpload[]> }>(() => ({ pending: {} }));
 
 function setPending(taskId: string, change: (list: PendingUpload[]) => PendingUpload[]) {
   useUploads.setState((s) => ({ pending: { ...s.pending, [taskId]: change(s.pending[taskId] ?? []) } }));
-}
-
-/** Uploads one file, saying so if it fails. Resolves with nothing when it did. */
-export async function uploadOrToast(file: File, opts?: UploadOptions) {
-  try {
-    return await uploadFile(file, opts);
-  } catch (err) {
-    toast.error(t("detail.files.failed", { name: file.name, reason: errorMessage(err) }));
-    return undefined;
-  }
 }
 
 async function attachOne(task: Task, file: File) {
@@ -94,6 +73,3 @@ export function attachToTask(task: Task, files: File[]) {
 export function removeAttachment(id: string) {
   send({ type: "attachment.remove", args: { id } }, (tx) => tx.patch("attachments", id, { deleted_at: Date.now() }));
 }
-
-/** True when a drag carries files (and not text or a link from the page). */
-export const carriesFiles = (e: { dataTransfer: DataTransfer | null }) => !!e.dataTransfer?.types.includes("Files");

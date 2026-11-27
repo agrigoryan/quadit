@@ -9,7 +9,7 @@
 // only: reloading the page drops it, so the browser asks before leaving.
 
 import { create } from "zustand";
-import { api, ApiError, calledOff, NetworkError, whenReachable, workspacePath } from "@/data/api";
+import { api, ApiError, calledOff, errorMessage, NetworkError, whenReachable, workspacePath } from "@/data/api";
 import { t } from "@/lib/i18n";
 import { newId } from "@/lib/ids";
 import { toast } from "@/lib/toast";
@@ -186,6 +186,19 @@ export async function uploadFile(file: File, opts: UploadOptions = {}): Promise<
     useTransfers.setState((s) => ({ items: s.items.filter((it) => it.id !== id) }));
   }
 }
+
+/** Uploads one file, saying so if it fails. Resolves with nothing when it did. */
+export async function uploadOrToast(file: File, opts?: UploadOptions): Promise<FileRow | undefined> {
+  try {
+    return await uploadFile(file, opts);
+  } catch (err) {
+    toast.error(t("detail.files.failed", { name: file.name, reason: errorMessage(err) }));
+    return undefined;
+  }
+}
+
+/** True when a drag carries files (and not text or a link from the page). */
+export const carriesFiles = (e: { dataTransfer: DataTransfer | null }) => !!e.dataTransfer?.types.includes("Files");
 
 export const isImage = (f: Pick<FileRow, "content_type"> | undefined) => !!f?.content_type.startsWith("image/");
 export const isVideo = (f: Pick<FileRow, "content_type"> | undefined) => !!f?.content_type.startsWith("video/");

@@ -6,7 +6,8 @@ import { type DragEvent, type ReactNode, useRef, useState } from "react";
 import { useCan } from "@/data/access";
 import { t } from "@/lib/i18n";
 import type { Task } from "@/types/core";
-import { attachToTask, carriesFiles } from "@/detail/uploads";
+import { carriesFiles } from "@/data/files";
+import { attachToTask } from "@/detail/uploads";
 
 interface FileDrop {
   handlers: {
