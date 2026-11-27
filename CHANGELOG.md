@@ -4,6 +4,8 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-27
+
 The server upgrades its database when it starts (migrations 0031 and 0032), copying it first; `quadit upgrade --undo` goes back ([upgrades](docs/install.md#upgrades)). It changes the feed's older events: an estimate cleared, or set where there was none, said that none as 0, and now says it as `null`, as the feed does from this version on. And a comment deleted before no longer mentions what its text named: a task stops listing a page only that comment named.
 
 ### Added
@@ -19,6 +21,7 @@ The server upgrades its database when it starts (migrations 0031 and 0032), copy
 
 ### Changed
 
+- Every date in the web app (a task's due date, a cycle's, an epic's and a milestone's, the audit log's and a database's) is picked in a date picker of the app's own, in place of the browser's: type a day in words ("fri", "next week", "in 3 days", "dec 5"), pick one of the days offered (today, tomorrow, the end of the week, next week, in two weeks, and the end of the cycle or the epic's target where there is one), or pick it in the month, where today and the current cycle's days are marked.
 - Points follow Linear's rule everywhere they are added up (a cycle's chart, an epic's progress): a task counts its estimate, and a task without one counts 1 point, or 0 where the project's settings say so. In a project that already had estimates on, its tasks without an estimate now count 1 each, so its cycles' and epics' points go up. A project that does not estimate counts each task as 1. An epic's progress has `points` and `points_done`, 0 included, when one of its tasks is in a project that estimates, and neither otherwise.
 
 ### Fixed
@@ -208,7 +211,8 @@ The first public release.
 - A desktop app for macOS, Windows and Linux (pre-release, not signed yet): a window for each server, sign-in through the browser, answers from a notification or the menu bar, quick capture, and Connect, which sets up Claude Code, Codex and other agent harnesses to work in Quadit.
 - Install with the install script, Homebrew, Docker (`ghcr.io/agrigoryan/quadit`), `.deb` and `.rpm` packages with a systemd service, or the archives on GitHub Releases.
 
-[Unreleased]: https://github.com/agrigoryan/quadit/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/agrigoryan/quadit/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.9.0
 [0.8.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.8.0
 [0.7.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.7.0
 [0.6.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.6.0
