@@ -119,7 +119,11 @@ test("@ in a page's comment offers the tasks too, and a task picked shows in the
   const doc = await newPage(quadit, `Roadmap ${project.key}`, project.key);
 
   await page.goto(`/e2e/docs/${doc}`);
+  // The page's own comment box is in the column: the header's comments button, then "See all" in its list.
   await page.getByRole("button", { name: "Comments" }).click();
+  const discussions = page.getByRole("dialog", { name: "Discussions" });
+  await discussions.getByRole("button", { name: "See all" }).click();
+  await expect(discussions).toBeHidden();
   const column = page.getByRole("complementary", { name: "Comments" });
   const box = column.getByRole("textbox", { name: "Comment on the page…" });
   await box.click();
