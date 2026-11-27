@@ -7,7 +7,7 @@ import { BlockNoteEditor } from "@blocknote/core";
 import { describe, expect, it } from "vitest";
 import type { EdBlock } from "@/docs/editor/convert";
 import { schema } from "@/docs/editor/schema";
-import { selectedWords, threadText } from "@/docs/editor/words";
+import { readThreads, selectedWords } from "@/docs/editor/words";
 
 const make = () =>
   BlockNoteEditor.create({
@@ -77,12 +77,12 @@ describe("the marker of a thread", () => {
       ] as never[],
     });
     expect(editor.document[0]?.content).toEqual([{ type: "text", text: "boss", styles: { comment: "t1 t2" } }]);
-    expect(threadText(editor.document as unknown as EdBlock[], "t2")).toBe("boss"); // BlockNote types blocks by schema generics
+    expect(readThreads(editor.document as unknown as EdBlock[], [], ["t2"]).words.get("t2")).toBe("boss"); // BlockNote types blocks by schema generics
   });
 });
 
-describe("threadText", () => {
-  it("reads the words a thread is on, a stretch apart elsewhere joined", () => {
+describe("readThreads", () => {
+  it("reads in one walk the blocks' order, the blocks asked for, and the words each thread is on, a stretch apart elsewhere joined", () => {
     const doc = [
       {
         id: "b1",
@@ -105,8 +105,20 @@ describe("threadText", () => {
         ],
       },
     ] as EdBlock[];
-    expect(threadText(doc, "t1")).toBe("boss has … phases");
-    expect(threadText(doc, "t2")).toBe("boss");
-    expect(threadText(doc, "t3")).toBeUndefined();
+    const read = readThreads(doc, ["b2", "gone"], ["t1", "t2", "t3"]);
+    expect(read.order).toEqual(["b1", "b2"]);
+    expect(read.texts).toEqual(
+      new Map([
+        ["b2", "phases"],
+        ["gone", undefined],
+      ]),
+    );
+    expect(read.words).toEqual(
+      new Map([
+        ["t1", "boss has … phases"],
+        ["t2", "boss"],
+        ["t3", undefined],
+      ]),
+    );
   });
 });

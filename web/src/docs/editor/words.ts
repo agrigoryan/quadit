@@ -5,7 +5,7 @@
 // are read back from the style that marks them (editor/schema.tsx).
 
 import type { AnyEditor } from "@/docs/editor/sync";
-import type { EdBlock } from "@/docs/editor/convert";
+import { type EdBlock, plainText } from "@/docs/editor/convert";
 
 /** Words of a page: where they start in one block and end in the same or a later one, and the words themselves. */
 export interface Words {
@@ -102,15 +102,32 @@ export function selectedWords(editor: AnyEditor): Words | undefined {
 export const threadsIn = (value: unknown): string[] =>
   typeof value === "string" ? value.split(" ").filter(Boolean) : [];
 
+/** What the page reads for its threads (readThreads). */
+export interface ThreadReading {
+  /** Every block's id, in reading order. */
+  order: string[];
+  /** The text of each block asked for; undefined for one not in the page. */
+  texts: Map<string, string | undefined>;
+  /** The words each thread asked for is on now, each stretch apart joined with an ellipsis; undefined when they are nowhere in the page. */
+  words: Map<string, string | undefined>;
+}
+
 /**
- * The words a thread is on as the page reads them now, each stretch apart
- * joined with an ellipsis; undefined when they are nowhere in the page.
+ * Reads, in one walk of the page's blocks, what its comment threads need:
+ * the blocks' order, the text of the blocks asked for, and the words of the
+ * threads asked for. Done once a frame at most while the page is typed in,
+ * for all the threads at once.
  */
-export function threadText(document: EdBlock[], thread: string): string | undefined {
-  const stretches: string[] = [];
-  const walk = (blocks: EdBlock[]) => {
-    for (const block of blocks) {
-      let open = false;
+export function readThreads(document: EdBlock[], blocks: string[], threads: string[]): ThreadReading {
+  const order: string[] = [];
+  const texts = new Map<string, string | undefined>(blocks.map((id) => [id, undefined]));
+  const stretches = new Map<string, string[]>(threads.map((id) => [id, []]));
+  const walk = (list: EdBlock[]) => {
+    for (const block of list) {
+      order.push(block.id);
+      if (texts.has(block.id)) texts.set(block.id, plainText(block.content));
+      // The threads whose stretch the last piece of text carried on.
+      let open = new Set<string>();
       const inline = (items: unknown) => {
         if (!Array.isArray(items)) return;
         for (const item of items as {
@@ -124,11 +141,13 @@ export function threadText(document: EdBlock[], thread: string): string | undefi
             continue;
           }
           if (item.type !== "text") continue; // a chip between two stretches does not break them
-          if (threadsIn(item.styles?.comment).includes(thread)) {
-            if (open) stretches[stretches.length - 1] += item.text ?? "";
-            else stretches.push(item.text ?? "");
-            open = true;
-          } else if (item.text) open = false;
+          const on = new Set(threadsIn(item.styles?.comment).filter((id) => stretches.has(id)));
+          for (const id of on) {
+            const found = stretches.get(id) ?? [];
+            if (open.has(id)) found[found.length - 1] += item.text ?? "";
+            else found.push(item.text ?? "");
+          }
+          if (on.size || item.text) open = on;
         }
       };
       inline(block.content);
@@ -136,5 +155,6 @@ export function threadText(document: EdBlock[], thread: string): string | undefi
     }
   };
   walk(document);
-  return stretches.length ? stretches.join(" … ") : undefined;
+  const words = new Map([...stretches].map(([id, found]) => [id, found.length ? found.join(" … ") : undefined]));
+  return { order, texts, words };
 }
