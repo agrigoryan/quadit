@@ -144,6 +144,7 @@ quadit take SVA-12        # you are working on it; nobody else can take it. Take
 
 - If work comes up in conversation that is not a task yet, create it first: `quadit new SVA "Title" description=-` (the description is read from stdin).
 - Keep the task current as you go: `quadit update SVA-12 status="In Progress"`, `quadit comment SVA-12 "…"`. `quadit assign SVA-12 none` unassigns it.
+- To point at a page, write `[Title](doc:PAGE_ID)` (ids from `quadit docs`); the person sees the page's title and opens it in one click. To tie the page to the task for good, also `quadit link SVA-12 page=PAGE_ID`.
 - When you are done, post a result and say how it was checked. Put what you could not check in `not_verified`; do not bury it in prose:
 
 ```bash
