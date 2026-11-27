@@ -312,6 +312,17 @@ describe("the Shift keys of the task properties", () => {
     expect([due("t1"), due("t3")]).toEqual(["2026-12-01", "2026-12-01"]);
   });
 
+  it("clear the due dates of a selection whose tasks are due on different days", async () => {
+    seed(undefined, [task(1, { due_on: "2026-12-01" }), task(3, { due_on: "2026-12-03" })]);
+    render(<Keys ids={["t1", "t3"]} />);
+    press("D", "KeyD", { shiftKey: true });
+    const picker = screen.getByRole("dialog", { name: "Set due date…" });
+    fireEvent.click(within(picker).getByRole("button", { name: "Clear" }));
+    await waitFor(() => expect(picker).not.toBeInTheDocument());
+    const due = (id: string) => getState().collections.tasks[id]?.due_on;
+    expect([due("t1"), due("t3")]).toEqual([undefined, undefined]);
+  });
+
   it("open the estimate's form where the project counts estimates", () => {
     seed(undefined, [task(1)], { estimates: true });
     render(<Keys ids={["t1"]} />);

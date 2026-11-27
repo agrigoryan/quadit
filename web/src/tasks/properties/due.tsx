@@ -78,6 +78,7 @@ function DueList({ tasks, close }: PickerListProps) {
       {...days}
       label={tasks.length === 1 ? t("prop.due") : t("bulk.due.label", { n: tasks.length })}
       value={shared(tasks, (task) => task.due_on)}
+      someSet={tasks.some((task) => !!task.due_on)}
       clearable
       onChange={(day) => {
         setDue(tasks, day);

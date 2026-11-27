@@ -26,8 +26,10 @@ export interface QuickDay {
 export interface DatePanelProps extends Pick<MonthGridProps, "stretch" | "min" | "max"> {
   /** What the day is: "Due date". It names the box and the panel. */
   label: string;
-  /** The day set now, if any. */
+  /** The day set now, if any; none where several things are set to different days. */
   value: string | undefined;
+  /** Something has a day to clear though `value` names none: several things set to different days. */
+  someSet?: boolean;
   /** A day picked, typed or chosen by name; null for Clear. */
   onChange: (day: string | null) => void;
   /** The value may be empty: the panel offers Clear. */
@@ -54,7 +56,17 @@ function moveAmong(e: KeyboardEvent<HTMLDivElement>) {
  * The box has the focus; what is typed is read as a day as it is typed,
  * shown under it and in the month, and Enter takes it.
  */
-export function DatePanel({ label, value, onChange, clearable, quick = [], stretch, min, max }: DatePanelProps) {
+export function DatePanel({
+  label,
+  value,
+  someSet,
+  onChange,
+  clearable,
+  quick = [],
+  stretch,
+  min,
+  max,
+}: DatePanelProps) {
   const today = localDay(useNow());
   const reading = { today, week: personWeek };
   const [text, setText] = useState("");
@@ -175,7 +187,13 @@ export function DatePanel({ label, value, onChange, clearable, quick = [], stret
 
       {clearable && (
         <div className="flex border-t border-line p-1">
-          <Button variant="ghost" size="sm" disabled={!value} onClick={() => onChange(null)} className="max-md:h-8">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!value && !someSet}
+            onClick={() => onChange(null)}
+            className="max-md:h-8"
+          >
             {t("date.clear")}
           </Button>
         </div>
