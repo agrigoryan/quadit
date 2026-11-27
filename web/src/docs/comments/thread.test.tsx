@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Attachment, Comment, Member, User, Workspace } from "@/types/core";
+import { draftFor, editDraft, useCommentDrafts } from "@/docs/comments/drafts";
 import { Thread } from "@/docs/comments/thread";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -61,7 +62,10 @@ const show = (replies: Comment[] = []) =>
 const member = { user_id: "u1", role: "member", name: "Me", kind: "person", handle: "me" } as Member;
 
 describe("Thread", () => {
-  beforeEach(() => seed(member));
+  beforeEach(() => {
+    useCommentDrafts.setState({ drafts: {} });
+    seed(member);
+  });
 
   it("offers a member who may write a reply, resolve and deleting their own comment", () => {
     show();
@@ -108,7 +112,7 @@ describe("Thread", () => {
       </TooltipProvider>,
     );
     expect(screen.queryByText("Me too")).toBeNull();
-    expect(screen.getByRole("button", { name: "2 replies" })).toBeTruthy();
+    expect(screen.getByText("2 replies")).toBeTruthy();
     expect(screen.queryByRole("textbox")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Reply…" }));
     expect(onOpen).toHaveBeenCalled();
@@ -130,6 +134,32 @@ describe("Thread", () => {
     );
     expect(box).toHaveFocus();
     await user.keyboard("{Escape}");
+    expect(screen.getByRole("article")).toHaveFocus();
+  });
+
+  it("shows the reply begun and not sent in a compact thread's box", () => {
+    editDraft(draftFor.reply("c1"), () => ({ body: "Half an answer", files: [] }));
+    render(
+      <TooltipProvider>
+        <Thread thread={{ root: comment, replies: [] }} docId="d1" projectId={undefined} active={false} compact />
+      </TooltipProvider>,
+    );
+    expect(screen.getByRole("button", { name: "Half an answer" })).toBeTruthy();
+  });
+
+  it("gives a read-only member a button to open a compact thread, and the cursor on the thread when it is asked for", () => {
+    seed({ ...member, scope: { read_only: true } });
+    const { rerender } = render(
+      <TooltipProvider>
+        <Thread thread={{ root: comment, replies: [] }} docId="d1" projectId={undefined} active={false} compact />
+      </TooltipProvider>,
+    );
+    expect(screen.getByRole("button", { name: "Show the whole thread" })).toBeTruthy();
+    rerender(
+      <TooltipProvider>
+        <Thread thread={{ root: comment, replies: [] }} docId="d1" projectId={undefined} active askReply={1} />
+      </TooltipProvider>,
+    );
     expect(screen.getByRole("article")).toHaveFocus();
   });
 

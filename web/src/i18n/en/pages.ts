@@ -235,7 +235,7 @@ export const pages = {
   "shortcuts.leavePageBox": "Leave the comment box, keeping what you typed; a new thread's box is put away",
   "shortcuts.openChip": "Open the task, decision, page or person beside the cursor",
   "shortcuts.commentOnPage": "Comment on the words selected, the block at the cursor, or the page",
-  "shortcuts.closeComments": "Close the comments, away from a comment box",
+  "shortcuts.closeComments": "Close the open comment, or the comments pane, away from a comment box",
   "shortcuts.focusOption": "Move between options; one at a time, through every picture",
   "shortcuts.stepFile": "The option's next or previous file",
   "shortcuts.compareLayout": "Side by side or one at a time",

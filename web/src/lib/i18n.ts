@@ -12,7 +12,8 @@
 // The lib folder: small modules that know neither the server's data, the
 // router nor any screen, and import only types and i18n: words (this file),
 // days and times, ranks, ids, class names, file addresses, what this
-// browser remembers (kept.ts), colour swatches, Cmd-Enter, downloads; and
+// browser remembers (kept.ts), colour swatches, Cmd-Enter, downloads, how
+// to scroll for one who asked for less motion (motion.ts); and
 // the three app-wide bits of screen state any part may set: toasts, the
 // theme and what is open (ui-state.ts).
 

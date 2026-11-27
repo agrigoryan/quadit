@@ -2,6 +2,7 @@
 // now: what the margin, the comments column and the Discussions list show.
 
 import { useEffect, useMemo, useState } from "react";
+import { scrollBehavior } from "@/lib/motion";
 import { useDocComments } from "@/docs/data";
 import type { EditorHandle } from "@/docs/editor/editor";
 import type { DocComment } from "@/types/docs";
@@ -158,3 +159,21 @@ export function usePageThreads(
 /** The words or block text a thread is about, for its label; undefined for the page, or a block gone. */
 export const aboutText = (about: About): string | undefined =>
   about.on === "text" || about.on === "removed" ? about.text : undefined;
+
+/** When a thread was last written in: its last reply, or its first comment (milliseconds). */
+export const lastActivity = ({ root, replies }: ThreadData) =>
+  Math.max(root.created_at, ...replies.map((r) => r.created_at));
+
+/**
+ * Brings a thread into view where the page shows it: its words or its block
+ * in the text (scrolled to the middle and flashed), or its card in the
+ * page's discussion under the title.
+ */
+export function showInPage({ root, at }: PageThread, editor: EditorHandle | null) {
+  if (at && "words" in at) editor?.scrollToThread(at.words);
+  else if (at) editor?.scrollToBlock(at.block);
+  else
+    document
+      .querySelector(`[data-page-discussion] [data-thread="${CSS.escape(root.id)}"]`)
+      ?.scrollIntoView({ block: "nearest", behavior: scrollBehavior() });
+}

@@ -25,11 +25,14 @@ export function DocPage({ id }: { id: string }) {
   const doc = useRowEvenIfGone("docs", id);
   const can = useCan();
   usePageTitle(doc ? docTitle(doc) : t("docs.title"));
-  // Escape is the comments column's own while it is open, and the open thread's in the margin.
-  useEscapeBack(useDocsArea().base, !usePageUi((s) => s.commentsOpen || !!s.focusThread || !!s.focusBlock));
+  // Escape is the comments pane's own while it is open, and an open thread's or a new one's.
+  useEscapeBack(
+    useDocsArea().base,
+    !usePageUi((s) => s.commentsOpen || !!s.focusThread || !!s.focusBlock || !!s.draftBlock),
+  );
 
   // Comments of another page are not this page's.
-  useEffect(() => pageUi.closeComments, [id]);
+  useEffect(() => pageUi.reset, [id]);
 
   if (!doc) return <Unknown key={id} id={id} />;
   if (doc.deleted_at) {

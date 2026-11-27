@@ -1,17 +1,23 @@
 // A page from its title down: icon and title, a row's properties, the note
 // on pages that cannot be edited here, then the editor and the tasks the
-// page points at and that point at it (or, for a database, its views), with
-// its comment threads beside it: in a margin level with their words where
-// there is room for one, else in the comments column.
+// page points at and that point at it (or, for a database, its views). Its
+// comments are where they belong, as in Notion: the page's own discussion
+// under the title; threads on its text as cards in a margin level with their
+// words where there is room for one, else behind a mark at the end of their
+// block that opens them in a popover (a sheet on a phone); and every thread
+// in the comments pane, when asked for.
 
 import { GitBranch, Sparkles } from "lucide-react";
-import { lazy, type ReactNode, type RefObject, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, type ReactNode, Suspense, useRef, useState } from "react";
 import { useCan } from "@/data/access";
 import { useReadWhenSeen } from "@/data/inbox-read";
 import { overlayOpen, useHotkeys } from "@/hooks/hotkeys";
+import { useAtLeast } from "@/hooks/use-at-least";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
+import { BlockThreads } from "@/docs/comments/block-threads";
 import { Margin } from "@/docs/comments/margin";
+import { PageDiscussion } from "@/docs/comments/page-discussion";
 import { CommentsPanel } from "@/docs/comments/panel";
 import { useOpenThreads } from "@/docs/comments/threads";
 import { PageCover } from "@/docs/page/cover";
@@ -31,7 +37,7 @@ const RowProperties = lazy(() => import("@/docs/db/row-properties").then((m) => 
 
 interface Props {
   doc: Doc;
-  /** Narrow margins, a smaller title and no comments column: for the side peek of a database row. */
+  /** Narrow margins, a smaller title, no cover and no margin of comments: for the side peek of a database row. */
   compact?: boolean;
 }
 
@@ -51,22 +57,6 @@ const NO_OTHERS: never[] = [];
  */
 const ROOM_FOR_MARGIN_REM = 40 + 16 - 1 + 1;
 
-/** Whether an element is at least `rem` wide, followed as it is resized; known before the page is first painted. */
-function useAtLeast(element: RefObject<HTMLElement | null>, rem: number): boolean {
-  const [wide, setWide] = useState(false);
-  useLayoutEffect(() => {
-    const el = element.current;
-    if (!el) return;
-    const px = rem * parseFloat(getComputedStyle(document.documentElement).fontSize);
-    const measure = () => setWide(el.clientWidth >= px);
-    measure();
-    const sizes = new ResizeObserver(measure);
-    sizes.observe(el);
-    return () => sizes.disconnect();
-  }, [element, rem]);
-  return wide;
-}
-
 /** A page's title, icon, properties (for a row) and its editor. */
 export function PageBody({ doc, compact }: Props) {
   const page = usePage(doc.id);
@@ -76,6 +66,8 @@ export function PageBody({ doc, compact }: Props) {
   const litThread = usePageUi((s) => s.litThread);
   const focusThread = usePageUi((s) => s.focusThread);
   const drafting = usePageUi((s) => !!s.draftBlock);
+  // Whether the margin has a card to show, once measured: threads whose blocks are gone take no room.
+  const [cards, setCards] = useState(true);
   const editor = usePageUi((s) => s.editor);
   const threads = useOpenThreads(doc.id);
   const scroller = useRef<HTMLDivElement>(null);
@@ -87,12 +79,10 @@ export function PageBody({ doc, compact }: Props) {
   const mayEdit = useCan().edit(doc.project_id);
   const readOnly = !!doc.generated || mirrorsReadOnly || !!doc.deleted_at || !mayEdit;
   const headReadOnly = !!doc.generated || !!doc.deleted_at || !mayEdit;
-  // A row's side peek and a database have no margin; nor has the page while the column is open.
-  const roomy = useAtLeast(scroller, ROOM_FOR_MARGIN_REM) && !compact && !isDatabase;
-  useEffect(() => {
-    if (!compact) pageUi.setMargin(roomy);
-  }, [compact, roomy]);
-  const beside = roomy && !commentsOpen && page.status === "ready" && (threads.inText > 0 || (drafting && mayEdit));
+  // A row's side peek has no margin: its threads open from their marks, as on a narrow window.
+  const roomy = useAtLeast(scroller, ROOM_FOR_MARGIN_REM, 1) && !compact;
+  const margin = roomy && !isDatabase && page.status === "ready" && (threads.inText > 0 || (drafting && mayEdit));
+  const beside = margin && cards;
 
   usePresence(doc.id, block, page.status === "ready" && !isDatabase);
   // Loaded and looked at for a moment, its inbox items are read.
@@ -104,8 +94,8 @@ export function PageBody({ doc, compact }: Props) {
         // The task panel over the page has Ctrl+M for the task's own comment box.
         if (!e.ctrlKey || e.metaKey || overlayOpen() || document.querySelector("[data-task-panel]")) return;
         e.preventDefault();
-        // Already writing a comment: a new thread's draft would be thrown away.
-        if (e.target instanceof Element && e.target.closest("[data-comments]")) return;
+        // Already writing in a comment box (or any other field outside the text): it is left alone.
+        if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
         // Asked of the editor, not of `block`: that is the caret as of the last render, and a key pressed
         // right after the caret moved would comment on the block it left. Words selected are what a
         // thread is on, as with the toolbar's Comment, in a page that cannot be edited too.
@@ -133,7 +123,7 @@ export function PageBody({ doc, compact }: Props) {
           )}
         >
           <div ref={textColumn} className="min-w-0 flex-1">
-            <div className={cx(compact ? "px-4" : isDatabase ? "px-4 sm:px-8" : "px-4 sm:px-12")}>
+            <div className={cx("group/top", compact ? "px-4" : isDatabase ? "px-4 sm:px-8" : "px-4 sm:px-12")}>
               <PageTitle doc={doc} readOnly={headReadOnly} compact={compact} onEnter={focusText} />
               {doc.kind === "row" && (
                 <Suspense fallback={null}>
@@ -142,6 +132,14 @@ export function PageBody({ doc, compact }: Props) {
               )}
               {doc.generated && <Note icon={<Sparkles />}>{t("docs.readOnly.generated")}</Note>}
               {mirrorsReadOnly && <Note icon={<GitBranch />}>{t("docs.readOnly.source")}</Note>}
+              {!doc.deleted_at && (
+                <PageDiscussion
+                  docId={doc.id}
+                  projectId={doc.project_id}
+                  answersKeys={!compact}
+                  className="opacity-0 group-focus-within/top:opacity-100 group-hover/top:opacity-100"
+                />
+              )}
             </div>
             {page.status === "error" ? (
               <EmptyState title={t("docs.loadFailed")} hint={page.error} />
@@ -160,7 +158,12 @@ export function PageBody({ doc, compact }: Props) {
                 {isDatabase ? (
                   <DatabaseView doc={doc} readOnly={headReadOnly} />
                 ) : (
-                  <div className={cx("pt-2 pb-40", compact && "[&_.bn-editor]:!px-4")}>
+                  <div
+                    className={cx(
+                      "pt-2 pb-40",
+                      compact && "[&_.qd-editor]:[--qd-pad-end:2.25rem] [&_.qd-editor]:[--qd-pad-start:1rem]",
+                    )}
+                  >
                     <Editor
                       key={doc.id}
                       docId={doc.id}
@@ -169,14 +172,16 @@ export function PageBody({ doc, compact }: Props) {
                       readOnly={readOnly}
                       handle={compact ? undefined : pageUi.setEditor}
                       others={others}
-                      threads={compact ? undefined : threads.perBlock}
+                      threads={threads.perBlock}
+                      // Beside the text, each thread's card shows where it is: no counts.
+                      countThreads={!margin}
                       onFocusBlock={setBlock}
                       onSaveState={(state) => pageUi.setSaving(doc.id, state)}
-                      onComment={compact || !mayEdit ? undefined : pageUi.startThread}
+                      onComment={mayEdit ? pageUi.startThread : undefined}
                       onOpenThread={pageUi.showThread}
-                      wordThreads={compact ? undefined : threads.onWords}
+                      wordThreads={threads.onWords}
                       litThread={litThread}
-                      activeThread={compact ? undefined : focusThread}
+                      activeThread={focusThread}
                       onShowThread={pageUi.showWordsThread}
                       onLightThread={pageUi.lightThread}
                     />
@@ -190,14 +195,20 @@ export function PageBody({ doc, compact }: Props) {
               </Suspense>
             )}
           </div>
-          {beside && (
-            <Margin docId={doc.id} projectId={doc.project_id} text={textColumn} className="-ml-4 mr-4 w-64 shrink-0" />
+          {margin ? (
+            <Margin
+              docId={doc.id}
+              projectId={doc.project_id}
+              text={textColumn}
+              onCards={setCards}
+              className={beside ? "-ml-4 mr-4 w-64 shrink-0" : "w-0"}
+            />
+          ) : (
+            !roomy && !isDatabase && <BlockThreads docId={doc.id} projectId={doc.project_id} text={textColumn} />
           )}
         </div>
       </div>
-      {commentsOpen && (
-        <CommentsPanel docId={doc.id} projectId={doc.project_id} editor={editor} pageOnly={isDatabase} />
-      )}
+      {commentsOpen && <CommentsPanel docId={doc.id} projectId={doc.project_id} editor={editor} />}
     </div>
   );
 }

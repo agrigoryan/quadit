@@ -4,8 +4,10 @@
 // threads on the page, on words taken out and resolved ones are not there;
 // a card opens with its replies and the cursor in its reply box, Esc closes
 // it again with the cursor on the card, a click in the text away from its
-// words does too; a new thread is written beside its block. jsdom lays
-// nothing out: each element's place is its data-top, each card 60px tall.
+// words does too; a new thread is written beside its block; what was
+// written stays with what it is for; a page whose threads' blocks are gone
+// is told there is no card to make room for. jsdom lays nothing out: each
+// element's place is its data-top, each card 60px tall.
 
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -13,6 +15,7 @@ import { createRef } from "react";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Comment, Member, User, Workspace } from "@/types/core";
+import { useCommentDrafts } from "@/docs/comments/drafts";
 import { Margin } from "@/docs/comments/margin";
 import type { EditorHandle } from "@/docs/editor/editor";
 import { pageUi, usePageUi } from "@/docs/page/state";
@@ -79,9 +82,9 @@ beforeEach(() => {
       disconnect() {}
     },
   );
-  pageUi.closeComments();
+  pageUi.reset();
+  useCommentDrafts.setState({ drafts: {} });
   pageUi.setEditor(editor);
-  pageUi.setMargin(true);
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
@@ -104,7 +107,7 @@ beforeEach(() => {
 });
 
 /** The page's text: words of two threads on one line of b1, then b2 lower down, and b4 folded in the toggle b3. */
-function show() {
+function show(onCards?: (any: boolean) => void) {
   const text = createRef<HTMLDivElement>();
   const view = render(
     <TooltipProvider>
@@ -142,7 +145,7 @@ function show() {
           </div>
         </div>
       </div>
-      <Margin docId="d1" projectId={undefined} text={text} />
+      <Margin docId="d1" projectId={undefined} text={text} onCards={onCards} />
     </TooltipProvider>,
   );
   return { ...view, text };
@@ -238,13 +241,72 @@ describe("the margin", () => {
     show();
     act(() => pageUi.startThread("b2"));
     await frame();
-    expect(usePageUi.getState().commentsOpen).toBe(false);
     const draft = screen.getByRole("textbox", { name: "Comment on this block…" });
     expect(draft).toHaveFocus();
     expect(top(draft)).toBe(400);
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("textbox", { name: "Comment on this block…" })).toBeNull();
     expect(usePageUi.getState().draftBlock).toBeNull();
+  });
+
+  it("keeps a new thread's draft with its block: another block's box is empty, and the first comes back", async () => {
+    const user = userEvent.setup();
+    show();
+    act(() => pageUi.startThread("b2"));
+    await frame();
+    await user.keyboard("About the run");
+    act(() => pageUi.startThread("b1"));
+    await frame();
+    expect(screen.getByRole("textbox", { name: "Comment on this block…" })).toHaveValue("");
+    act(() => pageUi.startThread("b2"));
+    await frame();
+    expect(screen.getByRole("textbox", { name: "Comment on this block…" })).toHaveValue("About the run");
+  });
+
+  it("keeps a reply begun in a card when the card closes, by a click away, Esc or another card", async () => {
+    const user = userEvent.setup();
+    show();
+    await frame();
+    const words = card("Comment by Aram on “three phases”");
+    const open = () =>
+      user.click(within(card("Comment by Aram on “three phases”")).getByRole("button", { name: /Reply…|Not sure/ }));
+    await open();
+    await user.keyboard("Not sure");
+    await user.click(screen.getByText("Then it runs."));
+    expect(within(words).getByRole("button", { name: "Not sure" })).toBeInTheDocument();
+    await open();
+    expect(within(words).getByRole("textbox", { name: "Reply…" })).toHaveValue("Not sure");
+    await user.keyboard("{Escape}");
+    await open();
+    await user.click(within(card("Comment by Aram on “phases”")).getByRole("button", { name: "Reply…" }));
+    await open();
+    expect(within(words).getByRole("textbox", { name: "Reply…" })).toHaveValue("Not sure");
+  });
+
+  it("opens the first thread on a block whose mark was clicked, the cursor in its reply box", async () => {
+    show();
+    await frame();
+    act(() => pageUi.showThread("b2"));
+    await frame();
+    const block = card("Comment by Aram on “Then it runs.”");
+    expect(block).toHaveAttribute("aria-current", "true");
+    expect(within(block).getByRole("textbox", { name: "Reply…" })).toHaveFocus();
+  });
+
+  it("tells the page it has no card when the threads' blocks are all gone", async () => {
+    clearStore();
+    loadBootstrap("acme", {
+      seq: 1,
+      me,
+      user: { id: "u1" } as User,
+      workspace: { id: "w", slug: "acme", name: "Acme" } as Workspace,
+      members: [me],
+      comments: [comment("lost", "On a block taken out", 1, { subject_id: "gone" })],
+    });
+    const onCards = vi.fn();
+    show(onCards);
+    await frame();
+    expect(onCards).toHaveBeenLastCalledWith(false);
   });
 
   it("resolved from its open card, the thread leaves the margin and the cursor goes back to the text", async () => {

@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { type Ref, useRef, useState } from "react";
-import { readyFiles, uploadWaiting, type WaitingFile } from "@/data/comment-files";
+import { readyFiles } from "@/data/comment-files";
+import { addDraftFiles, dropDraft, editDraft, EMPTY_DRAFT, useCommentDrafts } from "@/docs/comments/drafts";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import type { FileRow } from "@/types/core";
@@ -10,12 +11,18 @@ import { useDropFiles, WaitingFiles } from "@/ui/comment-files";
 import { MentionTextarea } from "@/ui/mention-textarea";
 
 interface Props {
+  /** What the box writes, as drafts.ts keys it: what is typed and given stays with that, box or no box. */
+  draft: string;
+  /** The page's project: its tasks and pages are offered first after @ and [[, and its pages are named so. */
+  projectId?: string;
   placeholder: string;
   /** What the send arrow is called. */
   submitLabel: string;
   /** What is written, trimmed, and the files given with it, all uploaded. */
   onSubmit: (comment: { body: string; files: FileRow[] }) => void;
-  /** Puts away the box of a new thread: Escape, or its own button. */
+  /** Puts the box away, the draft kept: Escape. Without it, Escape leaves the box. */
+  onClose?: () => void;
+  /** The box's own cancel button: the draft is thrown away. Without it, no such button. */
   onCancel?: () => void;
   autoFocus?: boolean;
   /** The text box, for whoever puts the cursor in it from outside. */
@@ -25,24 +32,39 @@ interface Props {
 /**
  * A small box for a comment or a reply: Markdown, @ to mention, files by the
  * paperclip, a paste or a drop, and Cmd/Ctrl-Enter or the arrow to send.
- * Its buttons show while it is in use; idle, it is one line.
+ * Its buttons show while it is in use; idle, it is one line. What is in it
+ * is its target's draft (drafts.ts).
  */
-export function Composer({ placeholder, submitLabel, onSubmit, onCancel, autoFocus, ref }: Props) {
-  const [body, setBody] = useState("");
-  const [files, setFiles] = useState<WaitingFile[]>([]);
+export function Composer({
+  draft,
+  projectId,
+  placeholder,
+  submitLabel,
+  onSubmit,
+  onClose,
+  onCancel,
+  autoFocus,
+  ref,
+}: Props) {
+  const { body, files } = useCommentDrafts((s) => s.drafts[draft]) ?? EMPTY_DRAFT;
   const [active, setActive] = useState(!!autoFocus);
   const box = useRef<HTMLTextAreaElement | null>(null);
-  const addFiles = (picked: File[]) => uploadWaiting(picked, setFiles);
+  const addFiles = (picked: File[]) => addDraftFiles(draft, picked);
   const { over, drop } = useDropFiles(addFiles);
   const ready = readyFiles(files);
   const canSend = body.trim() !== "" && !ready.uploading;
   const send = () => {
     if (!canSend) return;
     onSubmit({ body: body.trim(), files: ready.files });
-    setBody("");
-    setFiles([]);
+    dropDraft(draft);
     setActive(false);
   };
+  const cancel =
+    onCancel &&
+    (() => {
+      dropDraft(draft);
+      onCancel();
+    });
   const inUse = active || body !== "" || files.length > 0;
 
   return (
@@ -55,13 +77,14 @@ export function Composer({ placeholder, submitLabel, onSubmit, onCancel, autoFoc
     >
       <MentionTextarea
         bare
+        projectId={projectId}
         ref={(el) => {
           box.current = el;
           if (typeof ref === "function") ref(el);
           else if (ref) ref.current = el;
         }}
         value={body}
-        onChange={setBody}
+        onChange={(text) => editDraft(draft, (d) => ({ ...d, body: text }))}
         onSubmit={send}
         onFiles={addFiles}
         autoFocus={autoFocus}
@@ -71,23 +94,23 @@ export function Composer({ placeholder, submitLabel, onSubmit, onCancel, autoFoc
         onFocus={() => setActive(true)}
         onKeyDown={(e) => {
           if (e.key !== "Escape") return;
-          // A box that can be put away is; one that stays is left, with what was typed kept.
-          if (onCancel) {
+          // A box that can be put away is; one that stays is left. Either way, what was typed is kept.
+          if (onClose) {
             e.stopPropagation();
-            onCancel();
+            onClose();
           } else e.currentTarget.blur();
         }}
         className="block px-2.5 py-1.5 text-sm leading-5"
       />
       <WaitingFiles
         files={files}
-        onRemove={(key) => setFiles((list) => list.filter((f) => f.key !== key))}
+        onRemove={(key) => editDraft(draft, (d) => ({ ...d, files: d.files.filter((f) => f.key !== key) }))}
         className="px-2.5 pb-1.5"
       />
       {inUse && (
         <div className="flex items-center justify-end gap-0.5 px-1 pb-1">
-          {onCancel && (
-            <IconButton size="sm" label={t("common.cancel")} className="mr-auto max-md:size-9" onClick={onCancel}>
+          {cancel && (
+            <IconButton size="sm" label={t("common.cancel")} className="mr-auto max-md:size-9" onClick={cancel}>
               <X className="size-3.5" />
             </IconButton>
           )}

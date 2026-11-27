@@ -1,66 +1,67 @@
-// The comments of a page, in a column beside it: one thread per comment on
-// words of the page, a block, or the page as a whole, with its replies.
-// Threads follow the order of the blocks they are on. Where the page has no
-// room for its margin (comments/margin.tsx), this is where threads open; it
-// is also "See all" in the Discussions list, with the resolved threads.
+// The comments pane: every thread of a page in one list, beside it ("See
+// all" in the Discussions list), as Notion's and Google Docs' are. Those
+// last written in come first; the open ones or the resolved, of anyone or
+// of one person. A thread is answered and resolved here, and a click on it
+// brings it into view in the page and opens it there.
 
-import { MessageSquare, X } from "lucide-react";
-import { useEffect, useRef } from "react";
-import { useCan } from "@/data/access";
+import { Check, ChevronDown, MessageSquare, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useLookupEvenIfGone } from "@/data/selectors";
 import { useHotkeys } from "@/hooks/hotkeys";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
-import { addComment } from "@/docs/actions";
-import { Composer } from "@/docs/comments/composer";
 import { Quote } from "@/docs/comments/quote";
 import { Thread } from "@/docs/comments/thread";
-import { aboutText, type PageThread, usePageThreads } from "@/docs/comments/threads";
+import { aboutText, lastActivity, type PageThread, showInPage, usePageThreads } from "@/docs/comments/threads";
 import type { EditorHandle } from "@/docs/editor/editor";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { IconButton } from "@/ui/button";
+import { Menu, MenuContent, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "@/ui/menu";
 import { Radio, RadioGroup } from "@/ui/radio-group";
 
 interface Props {
   docId: string;
-  /** The page's project: who may not change it may read its comments, not add to them. */
+  /** The page's project: who may not change it may read its comments, not answer them. */
   projectId: string | undefined;
-  /** The page's editor, read for the threads' order and quotes; null until it has drawn. */
+  /** The page's editor, read for what each thread is on; null until it has drawn. */
   editor: EditorHandle | null;
-  /** The page cannot take comments on blocks (no editor shown). */
-  pageOnly?: boolean;
 }
 
-export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
-  const readOnly = !useCan().edit(projectId);
-  const draftBlock = usePageUi((s) => s.draftBlock);
-  const draftWords = usePageUi((s) => s.draftWords);
-  const focusBlock = usePageUi((s) => s.focusBlock);
+const ANYONE = "";
+
+/** Whether someone wrote in a thread: its first comment or a reply. */
+const wroteIn = (th: PageThread, userId: string) =>
+  th.root.author_id === userId || th.replies.some((r) => r.author_id === userId);
+
+export function CommentsPanel({ docId, projectId, editor }: Props) {
   const focusThread = usePageUi((s) => s.focusThread);
   const litThread = usePageUi((s) => s.litThread);
   const showResolved = usePageUi((s) => s.showResolved);
-  const pageBoxAsked = usePageUi((s) => s.pageBoxAsked);
-  const replyAsked = usePageUi((s) => s.replyAsked);
-  const pageBox = useRef<HTMLTextAreaElement>(null);
+  const members = useLookupEvenIfGone("members");
+  const [person, setPerson] = useState(ANYONE);
   const list = useRef<HTMLDivElement>(null);
-  // Esc in a comment box leaves the box (composer.tsx); away from one, it closes the column.
+  // Esc in a comment box leaves the box (composer.tsx); away from one, it closes the pane.
   useHotkeys({ Escape: pageUi.closeComments });
-  const { open, resolved, draftText } = usePageThreads(docId, editor, draftBlock);
+  const { open, resolved } = usePageThreads(docId, editor);
 
+  // The thread open in the page is shown here too.
   useEffect(() => {
-    if (pageBoxAsked) pageBox.current?.focus();
-  }, [pageBoxAsked]);
+    if (focusThread) list.current?.querySelector("[aria-current]")?.scrollIntoView?.({ block: "nearest" });
+  }, [focusThread]);
 
-  // The thread asked for comes into view in the list.
-  useEffect(() => {
-    if (focusThread || focusBlock)
-      list.current?.querySelector("[aria-current]")?.scrollIntoView?.({ block: "nearest" });
-  }, [focusThread, focusBlock]);
-
-  const shown = showResolved ? resolved : open;
-  /** Shows a thread's words or block in the page, while they are there. */
-  const locate = ({ at }: PageThread) => {
-    if (!at || !editor) return undefined;
-    return "words" in at ? () => editor.scrollToThread(at.words) : () => editor.scrollToBlock(at.block);
+  const recent = (threads: PageThread[]) => [...threads].sort((a, b) => lastActivity(b) - lastActivity(a));
+  const writers = [
+    ...new Set([...open, ...resolved].flatMap((th) => [th.root, ...th.replies].map((c) => c.author_id))),
+  ];
+  const shown = recent(showResolved ? resolved : open).filter((th) => person === ANYONE || wroteIn(th, person));
+  /** An open thread is opened where the page shows it; a resolved one's words are shown while they are there. */
+  const locate = (th: PageThread) => {
+    if (!th.root.resolved_at)
+      return () => {
+        pageUi.openThread(th.root.id);
+        showInPage(th, editor);
+      };
+    return th.at ? () => showInPage(th, editor) : undefined;
   };
 
   return (
@@ -71,6 +72,11 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
     >
       <header className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-3">
         <h2 className="flex-1 text-sm font-semibold">{t("docs.comment.title")}</h2>
+        <IconButton label={t("common.close")} onClick={pageUi.closeComments}>
+          <X className="size-4" />
+        </IconButton>
+      </header>
+      <div className="flex shrink-0 items-center gap-1.5 border-b border-line px-2 py-1.5">
         <RadioGroup
           label={t("docs.comment.which")}
           value={showResolved ? "resolved" : "open"}
@@ -89,31 +95,32 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
               )}
             >
               {t(`docs.comment.${which}`)}{" "}
-              <span className="text-ink-3 tnum">{which === "resolved" ? resolved.length : open.length}</span>
+              <span className="text-ink-2 tnum">{which === "resolved" ? resolved.length : open.length}</span>
             </Radio>
           ))}
         </RadioGroup>
-        <IconButton label={t("common.close")} onClick={pageUi.closeComments}>
-          <X className="size-4" />
-        </IconButton>
-      </header>
+        <Menu>
+          <MenuTrigger
+            aria-label={t("docs.comment.whose")}
+            className="ml-auto flex h-6 max-w-40 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-ink-2 hover:bg-hover hover:text-ink"
+          >
+            <span className="truncate">{person === ANYONE ? t("docs.comment.anyone") : members[person]?.name}</span>
+            <ChevronDown className="size-3 shrink-0" />
+          </MenuTrigger>
+          <MenuContent align="end">
+            <MenuRadioGroup value={person} onValueChange={setPerson}>
+              <MenuRadioItem value={ANYONE}>{t("docs.comment.anyone")}</MenuRadioItem>
+              {writers.map((id) => (
+                <MenuRadioItem key={id} value={id}>
+                  {members[id]?.name ?? t("common.someone")}
+                </MenuRadioItem>
+              ))}
+            </MenuRadioGroup>
+          </MenuContent>
+        </Menu>
+      </div>
 
       <div ref={list} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
-        {draftBlock && !showResolved && !readOnly && (
-          <div className="rounded-lg border border-accent bg-surface p-2">
-            <Quote about={{ on: "text", text: draftWords?.quote ?? draftText }} />
-            <Composer
-              autoFocus
-              placeholder={t(draftWords ? "docs.comment.placeholderWords" : "docs.comment.placeholder")}
-              submitLabel={t("docs.comment.send")}
-              onCancel={pageUi.endDraft}
-              onSubmit={(comment) => {
-                addComment({ docId, blockId: draftBlock, words: draftWords ?? undefined, ...comment });
-                pageUi.endDraft();
-              }}
-            />
-          </div>
-        )}
         {shown.map((th) => (
           <Thread
             key={th.root.id}
@@ -122,31 +129,19 @@ export function CommentsPanel({ docId, projectId, editor, pageOnly }: Props) {
             projectId={projectId}
             quote={<Quote about={th.about} />}
             subject={aboutText(th.about)}
-            active={th.root.id === focusThread || (!!th.blockId && th.blockId === focusBlock)}
+            active={th.root.id === focusThread}
             lit={th.root.id === litThread}
-            askReply={replyAsked?.thread === th.root.id ? replyAsked.n : 0}
             onLocate={locate(th)}
           />
         ))}
-        {shown.length === 0 && !draftBlock && (
+        {shown.length === 0 && (
           <div className="flex flex-col items-center gap-1 px-4 py-8 text-center">
-            <MessageSquare className="size-5 text-ink-3" />
+            {showResolved ? <Check className="size-5 text-ink-3" /> : <MessageSquare className="size-5 text-ink-3" />}
             <p className="text-sm text-ink-2">{t(showResolved ? "docs.comment.noneResolved" : "docs.comment.none")}</p>
-            {!showResolved && !pageOnly && <p className="text-xs text-ink-3">{t("docs.comment.hint")}</p>}
+            {!showResolved && <p className="text-xs text-ink-2">{t("docs.comment.hint")}</p>}
           </div>
         )}
       </div>
-
-      {!showResolved && !readOnly && (
-        <footer className="shrink-0 border-t border-line p-2">
-          <Composer
-            ref={pageBox}
-            placeholder={t("docs.comment.onPage")}
-            submitLabel={t("docs.comment.send")}
-            onSubmit={(comment) => addComment({ docId, ...comment })}
-          />
-        </footer>
-      )}
     </aside>
   );
 }

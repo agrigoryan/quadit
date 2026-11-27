@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 // The Discussions list in a page's header (docs/comments/discussions.tsx):
-// the open threads in the order the page reads, with who wrote them and
-// what they are on; a thread picked is scrolled to and opens beside its
-// words with the cursor in its reply box, or in the column when it is not
-// on the text or there is no margin; "See all" opens the column.
+// the open threads, those last written in first, with who wrote them and
+// what they are on; a thread picked is brought into view and opens where
+// the page shows it, the cursor asked into its reply box; "See all" opens
+// the comments pane.
 
-import { act, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
@@ -43,9 +43,8 @@ const editor: EditorHandle = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  pageUi.closeComments();
+  pageUi.reset();
   pageUi.setEditor(editor);
-  pageUi.setMargin(true);
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
@@ -75,22 +74,22 @@ const open = async () => {
 };
 
 describe("Discussions", () => {
-  it("counts the open threads on the button, and lists them in the page's order with what they are on", async () => {
+  it("counts the open threads on the button, and lists them last written in first, with what they are on", async () => {
     const { list } = await open();
     expect(screen.getByRole("button", { name: /Comments/ })).toHaveTextContent("4");
     const rows = within(list)
       .getAllByRole("button")
       .map((b) => b.textContent);
     expect(rows).toEqual([
+      expect.stringMatching(/Keep it short\.On the page$/),
+      expect.stringMatching(/Which Friday\?by Friday$/),
       expect.stringMatching(/Aram.*Which goals\?Goals$/),
       expect.stringMatching(/Too soon\?Ship by Friday$/),
-      expect.stringMatching(/Which Friday\?by Friday$/),
-      expect.stringMatching(/Keep it short\.On the page$/),
       "See all",
     ]);
   });
 
-  it("scrolls to a thread on words picked and opens it beside them, the cursor asked into its reply box", async () => {
+  it("brings a thread on words picked into view and opens it there, the cursor asked into its reply box", async () => {
     const { user, list } = await open();
     await user.click(within(list).getByRole("button", { name: /Which Friday\?/ }));
     expect(editor.scrollToThread).toHaveBeenCalledWith("c3");
@@ -101,28 +100,20 @@ describe("Discussions", () => {
     expect(screen.queryByRole("dialog", { name: "Discussions" })).toBeNull();
   });
 
-  it("scrolls to a thread on a block picked", async () => {
+  it("brings a thread on a block picked into view", async () => {
     const { user, list } = await open();
     await user.click(within(list).getByRole("button", { name: /Which goals\?/ }));
     expect(editor.scrollToBlock).toHaveBeenCalledWith("b2");
-    expect(usePageUi.getState().commentsOpen).toBe(false);
+    expect(usePageUi.getState()).toMatchObject({ focusThread: "c2", commentsOpen: false });
   });
 
-  it("opens a thread on the page as a whole in the column", async () => {
+  it("opens a thread on the page as a whole where it is, under the title, not in a list", async () => {
     const { user, list } = await open();
     await user.click(within(list).getByRole("button", { name: /Keep it short\./ }));
-    expect(usePageUi.getState()).toMatchObject({ commentsOpen: true, focusThread: "c4" });
+    expect(usePageUi.getState()).toMatchObject({ commentsOpen: false, focusThread: "c4" });
   });
 
-  it("opens every thread in the column where the page has no margin", async () => {
-    act(() => pageUi.setMargin(false));
-    const { user, list } = await open();
-    await user.click(within(list).getByRole("button", { name: /Which Friday\?/ }));
-    expect(editor.scrollToThread).toHaveBeenCalledWith("c3");
-    expect(usePageUi.getState()).toMatchObject({ commentsOpen: true, focusThread: "c3" });
-  });
-
-  it("See all opens the column", async () => {
+  it("See all opens the comments pane", async () => {
     const { user, list } = await open();
     await user.click(within(list).getByRole("button", { name: "See all" }));
     expect(usePageUi.getState()).toMatchObject({ commentsOpen: true, showResolved: false });

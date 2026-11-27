@@ -18,6 +18,7 @@ import {
 import { type Ref, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { uploadFile } from "@/data/files";
 import { t } from "@/lib/i18n";
+import { scrollBehavior } from "@/lib/motion";
 import { type BlockSchemaLike, type EdBlock, plainText, rowsToEditor } from "@/docs/editor/convert";
 import { Highlights } from "@/docs/editor/highlights";
 import { Markers } from "@/docs/editor/markers";
@@ -82,6 +83,8 @@ interface Props {
   onComment?: (blockId: string, words?: Words) => void;
   /** Open comment threads per block. */
   threads?: Record<string, number>;
+  /** Whether a block's count of threads shows at its end (not where threads are cards beside the text). */
+  countThreads?: boolean;
   onOpenThread?: (blockId: string) => void;
   /** The open threads on words, whose words are highlighted, the one the pointer is on and the one shown. */
   wordThreads?: string[];
@@ -95,10 +98,6 @@ interface Props {
 }
 
 const blockSchema = schema.blockSchema as unknown as BlockSchemaLike;
-
-/** How to scroll to something asked for: smoothly, unless the person has asked for less motion. */
-const scrolling = (): ScrollBehavior =>
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 
 async function upload(file: File) {
   const row = await uploadFile(file);
@@ -115,6 +114,7 @@ export default function Editor({
   onFocusBlock,
   onComment,
   threads,
+  countThreads,
   onOpenThread,
   wordThreads,
   litThread,
@@ -191,7 +191,7 @@ export default function Editor({
       scrollToBlock(id) {
         const el = wrap.current?.querySelector<HTMLElement>(`.bn-block-outer[data-id="${CSS.escape(id)}"]`);
         if (!el) return;
-        el.scrollIntoView({ block: "center", behavior: scrolling() });
+        el.scrollIntoView({ block: "center", behavior: scrollBehavior() });
         // The flash is an animation, not a class: the editor puts back any
         // attribute changed on its blocks from outside, at once.
         el.querySelector(":scope > .bn-block > .bn-block-content")?.animate(
@@ -205,7 +205,7 @@ export default function Editor({
         );
         const first = marked?.[0];
         if (!first) return;
-        first.scrollIntoView({ block: "center", behavior: scrolling() });
+        first.scrollIntoView({ block: "center", behavior: scrollBehavior() });
         // A ring, not a background: the words of the thread shown have the highlighter already.
         for (const el of marked)
           el.animate([{ boxShadow: "0 0 0 3px var(--move)" }, { boxShadow: "0 0 0 3px transparent" }], {
@@ -331,6 +331,7 @@ export default function Editor({
         wrap={wrap}
         others={others ?? []}
         threads={threads ?? {}}
+        counts={countThreads}
         onOpenThread={onOpenThread}
         pointed={selecting ? undefined : pointed}
         onAddThread={actions.comment}

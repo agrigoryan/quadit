@@ -21,6 +21,7 @@ import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { addComment } from "@/docs/actions";
 import { Composer } from "@/docs/comments/composer";
+import { draftFor } from "@/docs/comments/drafts";
 import { stackCards, type Card } from "@/docs/comments/stack";
 import { Thread } from "@/docs/comments/thread";
 import { inText, onWords, threadsOf } from "@/docs/comments/threads";
@@ -33,6 +34,8 @@ interface Props {
   projectId: string | undefined;
   /** The page's text column: where the words are found, and where a click away from them leaves a thread. */
   text: RefObject<HTMLElement | null>;
+  /** Tells whether any card is beside the text, once measured: none, and the page need not make room. */
+  onCards?: (any: boolean) => void;
   className?: string;
 }
 
@@ -44,7 +47,7 @@ const DRAFT = "draft";
 /** A card's place: how far down the margin, and the words or block text it is on (its name). Null: not in the page now. */
 type Place = { top: number; label: string } | null;
 
-export function Margin({ docId, projectId, text, className }: Props) {
+export function Margin({ docId, projectId, text, onCards, className }: Props) {
   const comments = useDocComments(docId);
   const threads = useMemo(() => threadsOf(comments).filter((th) => !th.root.resolved_at && inText(th)), [comments]);
   const mayEdit = useCan().edit(projectId);
@@ -56,7 +59,9 @@ export function Margin({ docId, projectId, text, className }: Props) {
   const draftWords = usePageUi((s) => s.draftWords);
   const replyAsked = usePageUi((s) => s.replyAsked);
   const draft = mayEdit ? draftBlock : null;
-  const active = draft ? DRAFT : (focusThread ?? threads.find((th) => th.blockId === focusBlock)?.root.id ?? null);
+  const firstOnBlock = threads.find((th) => th.blockId === focusBlock)?.root.id;
+  const active = draft ? DRAFT : (focusThread ?? firstOnBlock ?? null);
+  const draftKey = draft ? draftFor.thread(draft, draftWords) : "";
 
   const aside = useRef<HTMLElement>(null);
   const draftBox = useRef<HTMLTextAreaElement>(null);
@@ -66,6 +71,9 @@ export function Margin({ docId, projectId, text, className }: Props) {
     sliding: [],
   });
   const { places } = layout;
+  // Not measured yet counts as there: the page does not shift before it knows.
+  const anyCard = Object.keys(places).length === 0 || Object.values(places).some(Boolean);
+  useEffect(() => onCards?.(anyCard), [onCards, anyCard]);
   /** The open card the places were last worked out for: a new one, and the cards slide to make room for it. */
   const placedFor = useRef(active);
 
@@ -132,8 +140,8 @@ export function Margin({ docId, projectId, text, className }: Props) {
 
   // A new thread's box takes the cursor where it is, without the page jumping to it before it is placed.
   useEffect(() => {
-    if (draft) draftBox.current?.focus({ preventScroll: true });
-  }, [draft]);
+    if (draftKey) draftBox.current?.focus({ preventScroll: true });
+  }, [draftKey]);
 
   // A click in the text away from the open thread's words leaves the thread; Esc does too.
   const leaving = !!active && active !== DRAFT;
@@ -167,7 +175,8 @@ export function Margin({ docId, projectId, text, className }: Props) {
         const th = byId.get(id);
         return (
           <div
-            key={id}
+            // A new thread's card is its target's: another target, another card and another draft.
+            key={id === DRAFT ? draftKey : id}
             data-card={id}
             hidden={place === null}
             className={cx(
@@ -187,8 +196,8 @@ export function Margin({ docId, projectId, text, className }: Props) {
                 active={open}
                 lit={id === litThread}
                 compact={!open}
-                askReply={replyAsked?.thread === id ? replyAsked.n : 0}
-                onOpen={open ? undefined : () => pageUi.openThread(id, true)}
+                askReply={replyAsked && (replyAsked.thread ?? firstOnBlock) === id && open ? replyAsked.n : 0}
+                onOpen={open ? undefined : () => pageUi.openThread(id)}
                 onLeave={open ? pageUi.leaveThread : undefined}
                 onResolved={() => {
                   pageUi.leaveThread();
@@ -199,8 +208,14 @@ export function Margin({ docId, projectId, text, className }: Props) {
               <div className="rounded-lg border border-accent bg-surface p-2">
                 <Composer
                   ref={draftBox}
+                  draft={draftKey}
+                  projectId={projectId}
                   placeholder={t(draftWords ? "docs.comment.placeholderWords" : "docs.comment.placeholder")}
                   submitLabel={t("docs.comment.send")}
+                  onClose={() => {
+                    pageUi.endDraft();
+                    backToText();
+                  }}
                   onCancel={() => {
                     pageUi.endDraft();
                     backToText();

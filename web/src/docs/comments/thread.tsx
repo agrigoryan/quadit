@@ -6,7 +6,9 @@ import { t } from "@/lib/i18n";
 import { useAttachmentsBySubject, useMember } from "@/data/selectors";
 import { exact } from "@/lib/time";
 import { addComment, deleteComment, resolveComment } from "@/docs/actions";
+import { scrollBehavior } from "@/lib/motion";
 import { Composer } from "@/docs/comments/composer";
+import { draftFor, useCommentDrafts } from "@/docs/comments/drafts";
 import type { ThreadData } from "@/docs/comments/threads";
 import { pageUi } from "@/docs/page/state";
 import type { Attached } from "@/types/core";
@@ -86,8 +88,15 @@ export function Thread({
   const refocus = useRef(false);
 
   useEffect(() => {
-    // Not scrolled to: whoever asked has put the thread in view.
-    if (askReply) box.current?.focus({ preventScroll: true });
+    if (!askReply) return;
+    // One who may not reply is put on the thread itself. The page may still be on its way to the
+    // thread's words: the box is brought into view, as little as it takes, once that has begun.
+    const target = box.current ?? card.current;
+    target?.focus({ preventScroll: true });
+    const frame = requestAnimationFrame(() =>
+      target?.scrollIntoView?.({ block: "nearest", behavior: scrollBehavior() }),
+    );
+    return () => cancelAnimationFrame(frame);
   }, [askReply]);
   useEffect(() => {
     if (!compact || !refocus.current) return;
@@ -96,16 +105,8 @@ export function Thread({
   }, [compact]);
 
   const onlyReply = replies.length === 1 ? replies[0] : undefined;
-  const repliesLine = replies.length > 1 && (
-    <button
-      ref={mayReply ? undefined : opener}
-      type="button"
-      onClick={onOpen}
-      className="mt-1.5 ml-7 text-xs font-medium text-ink-2 hover:text-ink hover:underline"
-    >
-      {t("docs.comment.replies", { n: replies.length })}
-    </button>
-  );
+  const draft = draftFor.reply(root.id);
+  const drafted = useCommentDrafts((s) => s.drafts[draft]?.body);
 
   return (
     // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a click on the thread is the mouse's way to open it or to its words; the keyboard has the thread's own buttons, and Esc in it is handled here for every control inside
@@ -173,15 +174,32 @@ export function Thread({
               <CommentBody comment={onlyReply} files={files[onlyReply.id]} projectId={projectId} reply />
             </div>
           )}
-          {repliesLine}
-          {mayReply && (
+          {replies.length > 1 && (
+            <p className="mt-1.5 ml-7 text-xs font-medium text-ink-2">
+              {t("docs.comment.replies", { n: replies.length })}
+            </p>
+          )}
+          {/* What opens it: the reply box for one who may reply (with what they had begun), else a button. */}
+          {mayReply ? (
             <button
               ref={opener}
               type="button"
               onClick={onOpen}
-              className="mt-2 flex h-8 w-full items-center rounded-md border border-line px-2 text-left text-sm text-ink-3 hover:border-line-strong"
+              className={cx(
+                "mt-2 flex h-8 w-full items-center rounded-md border border-line px-2 text-left text-sm hover:border-line-strong",
+                drafted ? "text-ink-2" : "text-ink-3",
+              )}
             >
-              {t("docs.comment.reply")}
+              <span className="truncate">{drafted || t("docs.comment.reply")}</span>
+            </button>
+          ) : (
+            <button
+              ref={opener}
+              type="button"
+              onClick={onOpen}
+              className="mt-1.5 ml-7 text-xs font-medium text-ink-2 hover:text-ink hover:underline"
+            >
+              {t("docs.comment.showThread")}
             </button>
           )}
         </>
@@ -197,6 +215,8 @@ export function Thread({
             <div className="mt-2">
               <Composer
                 ref={box}
+                draft={draft}
+                projectId={projectId}
                 placeholder={t("docs.comment.reply")}
                 submitLabel={t("docs.comment.replySend")}
                 onSubmit={(comment) => addComment({ docId, parentId: root.id, ...comment })}

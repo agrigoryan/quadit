@@ -1,17 +1,18 @@
 // The comments button in a page's header and the Discussions list it opens:
-// the open threads in the order the page reads. A thread picked opens where
-// it is, its words scrolled into view and flashed, the cursor in its reply
-// box: in the margin beside its words, or in the comments column for one on
-// the page as a whole, on words taken out or on a block gone (and wherever
-// the page has no margin). "See all" opens the column, resolved threads and
-// all.
+// the open threads, those last written in first. A thread picked opens where
+// the page shows it, brought into view (its words flashed), the cursor in
+// its reply box: its card beside its words, the popover at its block where
+// there is no margin, or the page's discussion under the title. "See all"
+// opens the comments pane, the one list of every thread, resolved too.
+// Small text here is ink-2, not ink-3: it stays above 4.5:1 on the popover
+// and on a row hovered or focused, in both themes.
 
 import { MessageSquare } from "lucide-react";
 import { useRef, useState } from "react";
 import { cx } from "@/lib/cx";
 import { t } from "@/lib/i18n";
 import { useMember } from "@/data/selectors";
-import { type PageThread, useOpenThreads, usePageThreads } from "@/docs/comments/threads";
+import { lastActivity, type PageThread, showInPage, useOpenThreads, usePageThreads } from "@/docs/comments/threads";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { Ago } from "@/ui/ago";
 import { Avatar } from "@/ui/avatar";
@@ -66,21 +67,21 @@ export function Discussions({ docId }: { docId: string }) {
 /** The list itself: read from the page only while it is open. */
 function List({ docId, onPicked, onSeeAll }: { docId: string; onPicked: () => void; onSeeAll: () => void }) {
   const editor = usePageUi((s) => s.editor);
-  const { open } = usePageThreads(docId, editor);
+  const { open: inPageOrder } = usePageThreads(docId, editor);
+  // Those last written in first, as Notion lists them.
+  const open = [...inPageOrder].sort((a, b) => lastActivity(b) - lastActivity(a));
 
-  const pick = ({ root, at }: PageThread) => {
+  const pick = (th: PageThread) => {
     onPicked();
-    pageUi.openThread(root.id, !!at);
-    if (!at || !editor) return;
-    if ("words" in at) editor.scrollToThread(at.words);
-    else editor.scrollToBlock(at.block);
+    pageUi.openThread(th.root.id);
+    showInPage(th, editor);
   };
 
   return (
     <div>
       <header className="flex items-baseline gap-1.5 px-2 pt-1 pb-1.5">
         <h2 className="text-sm font-semibold">{t("docs.comment.discussions")}</h2>
-        <span className="text-xs text-ink-3 tnum">{open.length}</span>
+        <span className="text-xs text-ink-2 tnum">{open.length}</span>
       </header>
       {open.length === 0 ? (
         <p className="px-2 pb-2 text-sm text-ink-2">{t("docs.comment.none")}</p>
@@ -102,7 +103,8 @@ function List({ docId, onPicked, onSeeAll }: { docId: string; onPicked: () => vo
   );
 }
 
-function Row({ thread: { root, about }, onPick }: { thread: PageThread; onPick: () => void }) {
+function Row({ thread, onPick }: { thread: PageThread; onPick: () => void }) {
+  const { root, about } = thread;
   const author = useMember(root.author_id);
   return (
     <button
@@ -114,22 +116,22 @@ function Row({ thread: { root, about }, onPick }: { thread: PageThread; onPick: 
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-1.5">
           <span className="truncate text-sm font-medium">{author?.name ?? t("common.someone")}</span>
-          <span className="shrink-0 text-xs text-ink-3">
-            <Ago ms={root.created_at} />
+          <span className="shrink-0 text-xs text-ink-2">
+            <Ago ms={lastActivity(thread)} />
           </span>
         </span>
         <span className="line-clamp-2 text-sm text-ink-2">{root.body}</span>
         {about.on === "text" && about.text && (
-          <span className="mt-0.5 line-clamp-1 border-l-2 border-move pl-1.5 text-xs text-ink-3">{about.text}</span>
+          <span className="mt-0.5 line-clamp-1 border-l-2 border-move pl-1.5 text-xs text-ink-2">{about.text}</span>
         )}
         {about.on === "removed" && (
-          <span className="mt-0.5 block text-xs text-ink-3 italic">{t("docs.comment.wordsGone")}</span>
+          <span className="mt-0.5 block text-xs text-ink-2 italic">{t("docs.comment.wordsGone")}</span>
         )}
         {about.on === "gone" && (
-          <span className="mt-0.5 block text-xs text-ink-3 italic">{t("docs.comment.blockGone")}</span>
+          <span className="mt-0.5 block text-xs text-ink-2 italic">{t("docs.comment.blockGone")}</span>
         )}
         {about.on === "page" && (
-          <span className="mt-0.5 block text-xs font-medium text-ink-3">{t("docs.comment.aboutPage")}</span>
+          <span className="mt-0.5 block text-xs font-medium text-ink-2">{t("docs.comment.aboutPage")}</span>
         )}
       </span>
     </button>
