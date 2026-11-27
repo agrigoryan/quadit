@@ -80,7 +80,8 @@ export function DatePanel({
   const today = localDay(useNow());
   const reading = { today, week: personWeek };
   const [text, setText] = useState("");
-  const [month, setMonth] = useState(() => value ?? today);
+  // An empty day opens on today's month, or on the nearest month with days that can be picked.
+  const [month, setMonth] = useState(() => value ?? (min && today < min ? min : max && today > max ? max : today));
   const panel = useRef<HTMLDivElement>(null);
   const lineId = useId();
 

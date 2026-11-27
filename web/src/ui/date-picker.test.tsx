@@ -5,7 +5,7 @@
 // time zone moves a day, however far it is from UTC. Today is Thursday
 // 26 November 2026 at noon, in American English, whose week starts on Sunday.
 
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DateField, DatePanel, type DatePanelProps } from "@/ui/date-picker";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -139,6 +139,14 @@ describe("DatePanel", () => {
   it("has no Clear for a day that must be set", () => {
     panel({ value: "2026-12-01" });
     expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+  });
+
+  it("opens an empty day on the month of the first it may be, or the last, where today is out of reach", () => {
+    panel({ min: "2027-06-10" });
+    expect(screen.getByRole("grid", { name: "June 2027" })).toBeInTheDocument();
+    cleanup();
+    panel({ max: "2026-03-02" });
+    expect(screen.getByRole("grid", { name: "March 2026" })).toBeInTheDocument();
   });
 
   it("keeps a day of a year below 100 as it is", () => {
