@@ -133,6 +133,20 @@ describe("the comments pane", () => {
     expect(usePageUi.getState().commentsOpen).toBe(false);
   });
 
+  it("takes the cursor when it opens, and gives it back to the comments button when it closes", async () => {
+    const user = userEvent.setup();
+    const button = document.createElement("button");
+    button.setAttribute("data-discussions", "");
+    document.body.append(button);
+    const view = pane();
+    expect(screen.getByRole("complementary", { name: "Comments" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(usePageUi.getState().commentsOpen).toBe(false);
+    view.unmount();
+    expect(button).toHaveFocus();
+    button.remove();
+  });
+
   it("has no box for a new comment: those are written where they go", () => {
     act(() => pageUi.startThread("b1"));
     pane();

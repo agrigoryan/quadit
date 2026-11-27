@@ -23,13 +23,17 @@ export function Discussions({ docId }: { docId: string }) {
   const { total } = useOpenThreads(docId);
   const commentsOpen = usePageUi((s) => s.commentsOpen);
   const [open, setOpen] = useState(false);
-  /** A thread was picked: the cursor goes to its reply box, not back to the button. */
+  /** A thread was picked, or See all: the cursor goes to its reply box, or to the pane, not back to the button. */
   const picked = useRef(false);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" className={cx("gap-1 px-2", (open || commentsOpen) && "bg-hover text-ink")}>
+        <Button
+          data-discussions
+          variant="ghost"
+          className={cx("gap-1 px-2", (open || commentsOpen) && "bg-hover text-ink")}
+        >
           <MessageSquare className="size-4" />
           <span className="max-sm:sr-only">{t("docs.comment.title")}</span>
           {total > 0 && (
@@ -55,6 +59,8 @@ export function Discussions({ docId }: { docId: string }) {
             setOpen(false);
           }}
           onSeeAll={() => {
+            // The pane takes the cursor itself.
+            picked.current = true;
             setOpen(false);
             pageUi.openComments();
           }}

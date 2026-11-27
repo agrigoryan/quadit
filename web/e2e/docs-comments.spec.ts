@@ -37,8 +37,9 @@ async function seeAll(page: Page) {
   await page.getByRole("button", { name: "Comments" }).click();
   const list = page.getByRole("dialog", { name: "Discussions" });
   await list.getByRole("button", { name: "See all" }).click();
-  // Gone, not still on its way out, where it would take the next Esc for itself.
+  // Gone, not still on its way out, where it would take the next Esc for itself; the pane has the cursor.
   await expect(list).toBeHidden();
+  await expect(page.locator("[data-comments]")).toBeFocused();
 }
 
 /** Puts the caret at the end of a block's text. */

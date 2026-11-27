@@ -5,7 +5,7 @@
 // brings it into view in the page and opens it there.
 
 import { Check, ChevronDown, MessageSquare, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLookupEvenIfGone } from "@/data/selectors";
 import { useHotkeys } from "@/hooks/hotkeys";
 import { cx } from "@/lib/cx";
@@ -40,6 +40,17 @@ export function CommentsPanel({ docId, projectId, editor }: Props) {
   const members = useLookupEvenIfGone("members");
   const [person, setPerson] = useState(ANYONE);
   const list = useRef<HTMLDivElement>(null);
+  const aside = useRef<HTMLElement>(null);
+  // Opened, the pane has the cursor; closed, the cursor goes back to the comments button, not nowhere.
+  useLayoutEffect(() => {
+    const el = aside.current;
+    el?.focus({ preventScroll: true });
+    return () => {
+      const at = document.activeElement;
+      if (!at || at === document.body || el?.contains(at))
+        document.querySelector<HTMLElement>("[data-discussions]")?.focus({ preventScroll: true });
+    };
+  }, []);
   // Esc in a comment box leaves the box (composer.tsx); away from one, it closes the pane.
   useHotkeys({ Escape: pageUi.closeComments });
   const { open, resolved } = usePageThreads(docId, editor);
@@ -66,9 +77,11 @@ export function CommentsPanel({ docId, projectId, editor }: Props) {
 
   return (
     <aside
+      ref={aside}
+      tabIndex={-1}
       data-comments
       aria-label={t("docs.comment.title")}
-      className="absolute inset-y-0 right-0 z-20 flex w-[min(22rem,100%)] shrink-0 flex-col border-l border-line bg-surface shadow-panel animate-panel max-sm:w-full max-sm:border-l-0 xl:static xl:z-auto xl:w-80 xl:animate-none xl:shadow-none"
+      className="absolute inset-y-0 right-0 z-20 flex outline-none w-[min(22rem,100%)] shrink-0 flex-col border-l border-line bg-surface shadow-panel animate-panel max-sm:w-full max-sm:border-l-0 xl:static xl:z-auto xl:w-80 xl:animate-none xl:shadow-none"
     >
       <header className="flex h-10 shrink-0 items-center gap-1 border-b border-line pr-1.5 pl-3">
         <h2 className="flex-1 text-sm font-semibold">{t("docs.comment.title")}</h2>

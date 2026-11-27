@@ -135,11 +135,13 @@ test("the toolbar over a selection makes text bold and starts a comment on its w
 
   await page.keyboard.press("Shift+Home");
   await toolbar.getByRole("button", { name: "Comment", exact: true }).click();
-  const comments = page.getByRole("complementary", { name: "Comments" });
+  // No room for a margin at this width: the new thread is written in a popover at its block.
+  const comments = page.getByRole("dialog", { name: "Comments" });
   await expect(comments.getByText("Ship on Tuesday after the freeze.")).toBeVisible();
   const box = comments.getByRole("textbox", { name: "Comment on these words…" });
   await expect(box).toBeFocused();
   await box.fill("Which freeze, the code one?");
   await comments.getByRole("button", { name: "Comment", exact: true }).click();
+  await page.getByRole("button", { name: "1 open comment thread on this block" }).click();
   await expect(comments.getByRole("article").filter({ hasText: "Which freeze, the code one?" })).toBeVisible();
 });
