@@ -9,6 +9,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createRef } from "react";
 import { Markers } from "@/docs/editor/markers";
 import type { AnyEditor } from "@/docs/editor/sync";
+import { TooltipProvider } from "@/ui/tooltip";
 
 beforeAll(() => {
   globalThis.ResizeObserver ??= class {
@@ -24,14 +25,16 @@ const editor = { onChange: () => () => {} } as unknown as AnyEditor; // only wha
 function page() {
   const wrap = createRef<HTMLDivElement>();
   const Page = (props: Partial<Parameters<typeof Markers>[0]>) => (
-    <div ref={wrap}>
-      {["b1", "b2"].map((id) => (
-        <div key={id} className="bn-block-outer" data-id={id}>
-          <div className="bn-block-content">{id}</div>
-        </div>
-      ))}
-      <Markers editor={editor} wrap={wrap} others={[]} threads={{}} {...props} />
-    </div>
+    <TooltipProvider>
+      <div ref={wrap}>
+        {["b1", "b2"].map((id) => (
+          <div key={id} className="bn-block-outer" data-id={id}>
+            <div className="bn-block-content">{id}</div>
+          </div>
+        ))}
+        <Markers editor={editor} wrap={wrap} others={[]} threads={{}} {...props} />
+      </div>
+    </TooltipProvider>
   );
   return Page;
 }

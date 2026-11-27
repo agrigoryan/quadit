@@ -11,6 +11,7 @@ import { useLookupEvenIfGone } from "@/data/selectors";
 import { tintOf } from "@/docs/presence-tint";
 import type { AnyEditor } from "@/docs/editor/sync";
 import type { PresenceEntry } from "@/types/docs";
+import { Tooltip } from "@/ui/tooltip";
 
 interface Box {
   top: number;
@@ -107,18 +108,19 @@ export function Markers({ editor, wrap, others, threads, onOpenThread, pointed, 
         );
       })}
       {offered && !threads[offered] && boxes[offered] && (
-        <button
-          type="button"
-          className="qd-thread-add pointer-events-auto"
-          style={{ top: boxes[offered].top }}
-          aria-label={t("docs.comment.addOnBlock")}
-          title={t("docs.comment.addOnBlock")}
-          onPointerEnter={() => setHeld(offered)}
-          onPointerLeave={() => setHeld(null)}
-          onClick={() => onAddThread?.(offered)}
-        >
-          <MessageSquarePlus className="size-3.5" />
-        </button>
+        <Tooltip label={t("docs.comment.addOnBlock")} side="left">
+          <button
+            type="button"
+            className="qd-thread-add pointer-events-auto"
+            style={{ top: boxes[offered].top }}
+            aria-label={t("docs.comment.addOnBlock")}
+            onPointerEnter={() => setHeld(offered)}
+            onPointerLeave={() => setHeld(null)}
+            onClick={() => onAddThread?.(offered)}
+          >
+            <MessageSquarePlus className="size-3.5" />
+          </button>
+        </Tooltip>
       )}
     </div>
   );
