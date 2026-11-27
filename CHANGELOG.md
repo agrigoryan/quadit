@@ -21,6 +21,12 @@ The server upgrades its database when it starts (migrations 0031 and 0032), copy
 
 - Points follow Linear's rule everywhere they are added up (a cycle's chart, an epic's progress): a task counts its estimate, and a task without one counts 1 point, or 0 where the project's settings say so. In a project that already had estimates on, its tasks without an estimate now count 1 each, so its cycles' and epics' points go up. A project that does not estimate counts each task as 1. An epic's progress has `points` and `points_done`, 0 included, when one of its tasks is in a project that estimates, and neither otherwise.
 
+### Fixed
+
+- A comment on a private page told a member it mentioned, or one who followed the page, of the comment and the page's title, even when the page was not shared with them. Only those who may see the page are told now.
+- A deleted comment went on mentioning what its text named: a task listed a page only that comment named, and a page listed the task. Deleting a comment takes its mentions away, and the upgrade takes away those of comments deleted before.
+- A task's `links` (`quadit show KEY --json`, the MCP `task` tool) named a linked page that was in the trash, with its title; it is left out now, as it is of the task's pages.
+
 ## [0.8.0] - 2026-11-26
 
 Windows support is new in this release. It was checked by automated tests on Windows: the server's and the command's tests, the desktop app's, and the app end to end (set up on this computer, Connect, and a run Quadit starts), with stand-in agents. Nobody has run it on a person's own Windows computer yet, the real Claude Code and Codex were not run on Windows, and the Windows installer is not signed, so SmartScreen warns when it is opened.
