@@ -37,7 +37,8 @@ const READS: [string, string][] = [
   ["next fri", "2026-12-04"],
   ["next friday", "2026-12-04"],
   ["next mon", "2026-12-07"],
-  ["next thu", "2026-12-10"],
+  // On the day itself, "next" is a week on.
+  ["next thu", "2026-12-03"],
   ["this thu", "2026-11-26"],
   ["this fri", "2026-11-27"],
   ["this wed", "2026-12-02"],
@@ -155,6 +156,13 @@ describe("readDay", () => {
 
   it("reads 31 as the next month that has a 31st", () => {
     expect(readDay("31", { ...at, today: "2027-04-05" })).toBe("2027-05-31");
+  });
+
+  it("reads next and a weekday on that weekday as a week on, as its bare name is", () => {
+    const friday = { ...at, today: "2026-11-27" };
+    expect(readDay("fri", friday)).toBe("2026-12-04");
+    expect(readDay("next fri", friday)).toBe("2026-12-04");
+    expect(readDay("next sat", friday)).toBe("2026-12-05");
   });
 
   it("reads 29 February with no year as the next one to come", () => {

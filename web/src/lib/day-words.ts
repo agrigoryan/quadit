@@ -8,7 +8,8 @@
 // What each means:
 //   today, tomorrow (tmr, tmrw), yesterday
 //   a weekday, whole or from its first three letters: the next one to come,
-//     never today; "this fri" may be today; "next fri" is the one after
+//     never today; "this fri" may be today; "next fri" is the one after,
+//     except on a Friday, where both are a week on
 //   next week: the first working day of next week; next month: its first day
 //   end of (this) week (eow), end of next week: the week's last working day;
 //     end of (this) month (eom), end of next month: the month's last day
@@ -135,8 +136,9 @@ export function readDay(text: string, { today, week }: ReadingContext): string |
       // How many days on from today that weekday next falls, today being 0.
       const ahead = (at - weekday(today) + 7) % 7;
       if (weekdayWords[1] === "this") return addDays(today, ahead);
-      const next = addDays(today, ahead === 0 ? 7 : ahead);
-      return weekdayWords[1] === "next" ? addDays(next, 7) : next;
+      // Today's own weekday comes next a week on, whether or not "next" is said.
+      if (ahead === 0) return addDays(today, 7);
+      return addDays(today, weekdayWords[1] === "next" ? ahead + 7 : ahead);
     }
   }
 
