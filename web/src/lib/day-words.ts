@@ -22,7 +22,7 @@
 //   2027-12-05: that day
 // Anything else is not read.
 
-import { addDays, addMonths, dayFromParts, monthEnd, shiftMonths, weekday, yearOf } from "@/lib/days";
+import { addDays, addMonths, dayFromParts, isDay, monthEnd, shiftMonths, weekday, yearOf } from "@/lib/days";
 import { endOfWeek, nextWeek, type Week } from "@/lib/week";
 
 /** What a typed word is read against: today, as YYYY-MM-DD, and the week of the person's language. */
@@ -60,13 +60,21 @@ function countOf(word: string): number | undefined {
   return at < 0 ? undefined : at + 1;
 }
 
-/** The days a unit of time moves a day by, `n` of them. */
+/** About ten thousand years in days: a count that goes further names no day a calendar can hold. */
+const FURTHEST = 3_660_000;
+
+/** The day `n` of a unit of time on from a day; none for a unit it does not know, or a day past the years of four digits. */
 function later(day: string, n: number, unit: string): string | undefined {
-  if (/^(d|days?)$/.test(unit)) return addDays(day, n);
-  if (/^(w|wks?|weeks?)$/.test(unit)) return addDays(day, 7 * n);
-  if (/^(mos?|months?)$/.test(unit)) return shiftMonths(day, n);
-  if (/^(y|yrs?|years?)$/.test(unit)) return shiftMonths(day, 12 * n);
-  return undefined;
+  const units: [RegExp, number, (by: number) => string][] = [
+    [/^(d|days?)$/, 1, (by) => addDays(day, by)],
+    [/^(w|wks?|weeks?)$/, 7, (by) => addDays(day, 7 * by)],
+    [/^(mos?|months?)$/, 31, (by) => shiftMonths(day, by)],
+    [/^(y|yrs?|years?)$/, 366, (by) => shiftMonths(day, 12 * by)],
+  ];
+  const known = units.find(([words]) => words.test(unit));
+  if (!known || Math.abs(n * known[1]) > FURTHEST) return undefined;
+  const result = known[2](n);
+  return isDay(result) ? result : undefined;
 }
 
 /** The first of these days, one after the other, that is a day and not before today. */
@@ -107,25 +115,28 @@ export function readDay(text: string, { today, week }: ReadingContext): string |
     .filter((word) => word !== "" && word !== "the" && word !== "of");
   const said = words.join(" ");
 
-  const named: Record<string, () => string> = {
-    today: () => today,
-    tomorrow: () => addDays(today, 1),
-    tmr: () => addDays(today, 1),
-    tmrw: () => addDays(today, 1),
-    yesterday: () => addDays(today, -1),
-    "next week": () => nextWeek(today, week),
-    "next month": () => addMonths(today, 1),
-    "end week": () => endOfWeek(today, week),
-    "end this week": () => endOfWeek(today, week),
-    eow: () => endOfWeek(today, week),
-    // A week after the end of this one: on a weekend, when that is already next week's, the week after.
-    "end next week": () => addDays(endOfWeek(today, week), 7),
-    "end month": () => monthEnd(today),
-    "end this month": () => monthEnd(today),
-    eom: () => monthEnd(today),
-    "end next month": () => monthEnd(addMonths(today, 1)),
-  };
-  const word = named[said];
+  const named = new Map<string, () => string>(
+    Object.entries({
+      today: () => today,
+      tomorrow: () => addDays(today, 1),
+      tmr: () => addDays(today, 1),
+      tmrw: () => addDays(today, 1),
+      yesterday: () => addDays(today, -1),
+      "next week": () => nextWeek(today, week),
+      "next month": () => addMonths(today, 1),
+      "end week": () => endOfWeek(today, week),
+      "end this week": () => endOfWeek(today, week),
+      eow: () => endOfWeek(today, week),
+      // A week after the end of this one: on a weekend, when that is already next week's, the week after.
+      "end next week": () => addDays(endOfWeek(today, week), 7),
+      "end month": () => monthEnd(today),
+      "end this month": () => monthEnd(today),
+      eom: () => monthEnd(today),
+      "end next month": () => monthEnd(addMonths(today, 1)),
+    }),
+  );
+  // A Map, so a word that names something every object has ("constructor") is not one of these.
+  const word = named.get(said);
   if (word) return word();
 
   const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(said);

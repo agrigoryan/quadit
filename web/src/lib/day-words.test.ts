@@ -143,6 +143,15 @@ const UNREAD = [
   "+",
   "3dd",
   "12/5",
+  // Counts past any calendar, and words that are names on every object.
+  "+999999999",
+  "-999999999",
+  "in 99999999 years",
+  "999999999 months ago",
+  "constructor",
+  "toString",
+  "__proto__",
+  "hasOwnProperty",
 ];
 
 describe("readDay", () => {
