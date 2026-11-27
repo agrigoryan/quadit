@@ -1,11 +1,14 @@
 // Days picked in the date picker, where the browser's own date box used to
 // be: a task's due date typed in words on its panel and cleared from the
 // list's row, an epic's start and target (the target not before the start),
-// and a new cycle whose end follows its start. What reached the server is
-// read back through the CLI and the workspace's starting copy.
+// and a new cycle whose end follows its start; and in time zones far either
+// side of UTC, the month the picker names is the month its days are in, and
+// today's ring is on the zone's today. What reached the server is read back
+// through the CLI and the workspace's starting copy.
 
 import type { Page } from "@playwright/test";
 import { expect, type Quadit, test } from "./quadit";
+import { currentRun } from "./run";
 
 /** The task's due date as the server has it; undefined for none. */
 async function dueOf(quadit: Quadit, key: string): Promise<string | undefined> {
@@ -109,4 +112,48 @@ test("a new cycle's end follows the start picked", async ({ page, project, quadi
       ),
     )
     .toMatchObject({ ends_on: "2027-02-14" });
+});
+
+test("in every time zone the picker's month is the month of its days, and today is ringed on the zone's today", async ({
+  browser,
+  project,
+  quadit,
+}) => {
+  const key = await project.newTask("Plan the offsite");
+  await quadit.cli("do", "task.update", JSON.stringify({ id: key, due_on: daysOn(3) }));
+  const months = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  for (const timezoneId of ["Pacific/Kiritimati", "Pacific/Pago_Pago", "America/Los_Angeles", "Asia/Kolkata", "UTC"]) {
+    const context = await browser.newContext({
+      baseURL: currentRun().url,
+      storageState: currentRun().storageState,
+      serviceWorkers: "block",
+      locale: "en-US",
+      timezoneId,
+    });
+    const page = await context.newPage();
+    await page.goto(`/e2e/p/${project.key}/tasks`);
+    await page.getByRole("link", { name: `Open ${key}` }).click();
+    await page
+      .getByRole("complementary", { name: key })
+      .getByRole("button", { name: /^Due date: / })
+      .click();
+    const picker = page.getByRole("dialog", { name: "Set due date…" });
+
+    /** The grid's name, and the month of its first day that is not another month's, written the same way. */
+    const inStep = async () => {
+      const first = await picker.locator('[role="gridcell"]:not([data-outside])').first().getAttribute("data-day");
+      const grid = await picker.getByRole("grid").getAttribute("aria-label");
+      return (
+        grid === months.format(new Date(`${first}T00:00:00Z`)) && (await picker.locator("h3").textContent()) === grid
+      );
+    };
+    const zoneToday = new Intl.DateTimeFormat("en-CA", { timeZone: timezoneId }).format(new Date());
+    await expect(picker.locator("[data-today]"), timezoneId).toHaveAttribute("data-day", zoneToday);
+    expect(await inStep(), timezoneId).toBe(true);
+    for (const step of ["Next month", "Next month", "Previous month", "Previous month", "Previous month"]) {
+      await picker.getByRole("button", { name: step }).click();
+      expect(await inStep(), `${timezoneId}, ${step}`).toBe(true);
+    }
+    await context.close();
+  }
 });
