@@ -11,7 +11,6 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { FileRow, Member, User, Workspace } from "@/types/core";
-import type { Doc } from "@/types/docs";
 import { Composer } from "@/docs/comments/composer";
 import { useCommentDrafts } from "@/docs/comments/drafts";
 import { WithQuery } from "@/test/query";
@@ -46,7 +45,7 @@ beforeEach(() => {
     user: { id: "u1" } as User,
     workspace: { id: "w", slug: "acme", name: "Acme" } as Workspace,
     members: [me, ana],
-    docs: [{ id: "d2", title: "Roadmap", project_id: "p1", kind: "page", updated_at: 1 } as Doc],
+    docs: [{ id: "d2", title: "Roadmap", project_id: "p1", kind: "page", updated_at: 1 }],
   });
 });
 
