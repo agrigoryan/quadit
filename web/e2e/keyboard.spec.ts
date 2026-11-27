@@ -212,11 +212,13 @@ test("the Shift keys change the list's row, and on the open task watch and renam
   await page.keyboard.press("j");
   await expect(open).toHaveAttribute("aria-current", "true");
 
-  // Shift+D: the due date's form beside the row.
+  // Shift+D: the date picker beside the row, the caret in its box of words.
   await page.keyboard.press("Shift+D");
-  await page.getByLabel("Due date for 1 task").fill("2026-12-24");
-  await page.getByRole("button", { name: "Set", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Due date" })).toBeHidden();
+  const dates = page.getByRole("dialog", { name: "Set due date…" });
+  await expect(dates.getByRole("textbox", { name: "Due date" })).toBeFocused();
+  await page.keyboard.type("dec 24 2026");
+  await page.keyboard.press("Enter");
+  await expect(dates).toBeHidden();
   await expect.poll(async () => JSON.stringify(await quadit.task(key))).toContain("2026-12-24");
 
   // Shift+P: the epic's picker, its letter not typed into the search.
