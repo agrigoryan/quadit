@@ -12,9 +12,14 @@ const DAY = 24 * HOUR;
 
 /** A format for moments, in the person's own time zone. */
 const local = (options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(undefined, options);
-/** A format for calendar days: a day is written as its UTC midnight read in UTC, so it is the day it names wherever the person is. */
+/**
+ * A format for calendar days: a day is written as its UTC midnight read in
+ * UTC, so it is the day it names wherever the person is; and in the
+ * Gregorian calendar its YYYY-MM-DD is in, whatever the language's own
+ * calendar, so its month and number agree with a month grid's.
+ */
 const utc = (options: Intl.DateTimeFormatOptions) =>
-  new Intl.DateTimeFormat(undefined, { ...options, timeZone: "UTC" });
+  new Intl.DateTimeFormat(undefined, { ...options, timeZone: "UTC", calendar: "gregory" });
 
 const moment = {
   dayAndMonth: local({ month: "short", day: "numeric" }),
