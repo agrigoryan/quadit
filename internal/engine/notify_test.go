@@ -112,7 +112,7 @@ func TestAPageCommentTellsOnlyThoseWhoMaySeeThePage(t *testing.T) {
 		w.do(me, "comment.create", M{"doc": plain, "body": "@bea @coder read this"})
 		for _, c := range []struct {
 			who, page, what string
-			want        bool
+			want            bool
 		}{
 			{bea, salaries, "a private page shared with them", true},
 			{coder, salaries, "a private page not shared with them", false},
