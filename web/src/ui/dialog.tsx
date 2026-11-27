@@ -21,6 +21,10 @@ interface Props {
   footer?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** What takes the cursor when it opens; by default its first field. */
+  initialFocus?: (root: HTMLElement) => HTMLElement | null | undefined;
+  /** What takes the cursor back when it closes, where nothing opened it (no trigger to go back to). */
+  finalFocus?: () => HTMLElement | null | undefined;
 }
 
 /**
@@ -37,6 +41,8 @@ export function Dialog({
   footer,
   children,
   className,
+  initialFocus,
+  finalFocus,
 }: Props) {
   return (
     <RDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -50,7 +56,13 @@ export function Dialog({
             const root = e.currentTarget as HTMLElement;
             e.preventDefault();
             const first = "[autofocus], input:not([type=hidden]):not([type=file]), textarea";
-            (root.querySelector<HTMLElement>(first) ?? root).focus();
+            (initialFocus?.(root) ?? root.querySelector<HTMLElement>(first) ?? root).focus();
+          }}
+          onCloseAutoFocus={(e) => {
+            const back = finalFocus?.();
+            if (!back) return;
+            e.preventDefault();
+            back.focus();
           }}
           className={cx(
             "fixed z-50 flex flex-col bg-surface text-ink shadow-pop outline-none",
