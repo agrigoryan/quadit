@@ -30,16 +30,12 @@ async function readPage(quadit: Quadit, id: string) {
   };
 }
 
-const column = (page: Page) => page.getByRole("complementary", { name: "Comments" });
-/** Opens the comments column: the header's comments button, then "See all" in its Discussions list. */
-async function seeAll(page: Page) {
-  await page.getByRole("button", { name: "Comments" }).click();
-  const list = page.getByRole("dialog", { name: "Discussions" });
-  await list.getByRole("button", { name: "See all" }).click();
-  // Gone, not still on its way out, where it would take the next Esc for itself.
-  await expect(list).toBeHidden();
-}
-const thread = (page: Page, text: string) => column(page).getByRole("article").filter({ hasText: text });
+/** The threads of a block, opened in place where the page has no margin. */
+const popover = (page: Page) => page.getByRole("dialog", { name: "Comments" });
+/** The page's own discussion, under its title. */
+const onPage = (page: Page) => page.getByRole("region", { name: "Comments on the page" });
+const thread = (where: ReturnType<typeof popover>, text: string) =>
+  where.getByRole("article").filter({ hasText: text });
 const pageText = (page: Page) => page.getByRole("textbox", { name: "Page text" });
 
 /** A picture of one dot. */
@@ -73,14 +69,23 @@ test("the button beside the block the pointer is on starts a thread on that bloc
   await page.keyboard.press("End");
 
   await pageText(page).getByText("Write the docs.").hover();
+  // Just past the end of the text, level with the block's line: not at the far end of the page.
+  const at = await add.boundingBox();
+  const line = await pageText(page).getByText("Write the docs.").boundingBox();
+  const text = await pageText(page).boundingBox();
+  if (!at || !line || !text) throw new Error("not laid out");
+  expect(at.x).toBeLessThan(text.x + text.width);
+  expect(Math.abs(at.y - line.y)).toBeLessThan(12);
   await add.click();
-  const box = column(page).getByRole("textbox", { name: "Comment on this block…" });
+  const box = popover(page).getByRole("textbox", { name: "Comment on this block…" });
   await expect(box).toBeFocused();
   await box.fill("By when?");
-  await column(page).getByRole("button", { name: "Comment", exact: true }).click();
-  await expect(thread(page, "By when?").getByText("Write the docs.")).toBeVisible();
-  // The block shows its count where the button was.
-  await expect(page.getByRole("button", { name: "1 open comment thread on this block" })).toBeVisible();
+  await popover(page).getByRole("button", { name: "Comment", exact: true }).click();
+  // The block shows its count where the button was, and opens the thread there.
+  const count = page.getByRole("button", { name: "1 open comment thread on this block" });
+  await expect(count).toBeVisible();
+  await count.click();
+  await expect(thread(popover(page), "By when?")).toBeVisible();
   await expect
     .poll(async () => (await readPage(quadit, doc.id)).comments.find((c) => c.body === "By when?"))
     .toMatchObject({ subject_type: "doc_block", subject_id: doc.blocks.get("Write the docs.") });
@@ -93,17 +98,19 @@ test("a picture given with a comment on the page and with a reply is kept and sh
 }) => {
   const doc = await newPage(quadit, project.key, "Moodboard", "Colours.\n");
   await page.goto(`/e2e/docs/${doc.id}`);
-  await seeAll(page);
+  await page.getByRole("textbox", { name: "Page title" }).hover();
+  await onPage(page).getByRole("button", { name: "Add comment" }).click();
 
-  await column(page).getByRole("textbox", { name: "Comment on the page…" }).fill("This palette.");
+  await onPage(page).getByRole("textbox", { name: "Comment on the page…" }).fill("This palette.");
   const chooser = page.waitForEvent("filechooser");
-  await column(page).getByRole("button", { name: "Attach files" }).click();
+  await onPage(page).getByRole("button", { name: "Attach files" }).click();
   await (await chooser).setFiles(dot("palette.png"));
-  await expect(column(page).getByRole("button", { name: "Remove palette.png" })).toBeVisible();
-  await column(page).getByRole("button", { name: "Comment", exact: true }).click();
-  const started = thread(page, "This palette.");
+  await expect(onPage(page).getByRole("button", { name: "Remove palette.png" })).toBeVisible();
+  await onPage(page).getByRole("button", { name: "Comment", exact: true }).click();
+  const started = thread(onPage(page), "This palette.");
   await expect(started.getByRole("img", { name: "palette.png" })).toBeVisible();
 
+  await started.getByRole("button", { name: "Reply…" }).click();
   await started.getByRole("textbox", { name: "Reply…" }).fill("Darker, like this.");
   const again = page.waitForEvent("filechooser");
   await started.getByRole("button", { name: "Attach files" }).click();
@@ -114,8 +121,8 @@ test("a picture given with a comment on the page and with a reply is kept and sh
   await expect.poll(async () => (await readPage(quadit, doc.id)).commentFiles).toEqual(["darker.png", "palette.png"]);
   // Opened afresh, the page brings them with its comments.
   await page.reload();
-  await seeAll(page);
-  await expect(thread(page, "This palette.").getByRole("img", { name: "palette.png" })).toBeVisible();
-  await thread(page, "This palette.").getByRole("button", { name: "Open darker.png" }).click();
+  await expect(thread(onPage(page), "This palette.").getByRole("img", { name: "palette.png" })).toBeVisible();
+  await thread(onPage(page), "This palette.").getByRole("button", { name: "Reply…" }).click();
+  await thread(onPage(page), "This palette.").getByRole("button", { name: "Open darker.png" }).click();
   await expect(page.getByRole("dialog", { name: "darker.png" }).getByRole("img", { name: "darker.png" })).toBeVisible();
 });

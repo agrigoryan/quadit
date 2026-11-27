@@ -15,7 +15,7 @@ import { Composer } from "@/docs/comments/composer";
 import { draftFor } from "@/docs/comments/drafts";
 import { Quote } from "@/docs/comments/quote";
 import { Thread } from "@/docs/comments/thread";
-import { inText, onWords, threadsOf } from "@/docs/comments/threads";
+import { inText, onWords, type ThreadData, threadsOf, usePageThreads } from "@/docs/comments/threads";
 import { useDocComments } from "@/docs/data";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { Dialog } from "@/ui/dialog";
@@ -54,7 +54,12 @@ export function BlockThreads({ docId, projectId, text }: Props) {
   const draft = mayEdit ? draftBlock : null;
   const asked = focusThread ? threads.find((th) => th.root.id === focusThread) : undefined;
   const block = draft ?? asked?.blockId ?? focusBlock;
-  const shown = block ? threads.filter((th) => th.blockId === block) : [];
+  // Read from the editor while something is open: a thread whose block is gone is not here but under the
+  // page's title (page-discussion.tsx). A row's side peek has no editor handle; there, the stored block.
+  const editor = usePageUi((s) => s.editor);
+  const { open: read } = usePageThreads(docId, block ? editor : null);
+  const onBlock = (th: ThreadData) => th.blockId === block;
+  const shown = !block ? [] : editor ? read.filter((th) => th.at && onBlock(th)) : threads.filter(onBlock);
   const first = shown[0]?.root.id;
   const open = !!block && (!!draft || shown.length > 0);
   const content = useRef<HTMLDivElement>(null);
@@ -144,21 +149,20 @@ export function BlockThreads({ docId, projectId, text }: Props) {
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => {
           e.preventDefault();
-          if (!document.activeElement || document.activeElement === document.body) back();
+          // Closed for good, not opened again at once on another block (this comes a moment later).
+          const { focusThread, focusBlock, draftBlock } = usePageUi.getState();
+          const reopened = !!(focusThread || focusBlock || draftBlock);
+          if (!reopened && (!document.activeElement || document.activeElement === document.body)) back();
         }}
         // Esc closing the @ list in a box closes only that list.
         onEscapeKeyDown={(e) => {
           if (content.current?.querySelector('[role="listbox"]')) e.preventDefault();
         }}
-        // A box being written keeps the popover: its draft is kept anyway, but it stays in sight.
+        // A box being written keeps the popover: its draft is kept anyway, but it stays in sight. A
+        // block's mark or highlighted words, clicked, say for themselves what opens next.
         onInteractOutside={(e) => {
           const target = e.target instanceof Element ? e.target : null;
-          // The words of the thread shown, clicked again, keep it.
-          if (
-            draft ||
-            (focusThread && target?.closest(`[data-style-type="comment"][data-value~="${CSS.escape(focusThread)}"]`))
-          )
-            e.preventDefault();
+          if (draft || target?.closest('.qd-thread-mark, [data-style-type="comment"]')) e.preventDefault();
         }}
       >
         {body}

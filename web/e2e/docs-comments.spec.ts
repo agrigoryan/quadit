@@ -1,5 +1,7 @@
-// Comments on a page: threads on a block or on the page as a whole, their
-// replies, resolving, the marks beside the blocks, the keys, and who may
+// Comments on a page, at a window with no room for a margin (Notion's
+// "minimal" comments): threads on a block open from the mark at its end in
+// a popover, threads on the page as a whole sit under its title, and the
+// comments pane lists them all; replies, resolving, the keys, and who may
 // write them. Seeding and checking go through the CLI, which reads the
 // threads as an agent does.
 
@@ -18,8 +20,19 @@ async function newPage(quadit: Quadit, project: string, title: string, markdown:
   return { id: made.ref, blocks };
 }
 
-const column = (page: Page) => page.getByRole("complementary", { name: "Comments" });
-/** Opens the comments column: the header's comments button, then "See all" in its Discussions list. */
+/** The threads of a block, opened in place. */
+const popover = (page: Page) => page.getByRole("dialog", { name: "Comments" });
+/** The page's own discussion, under its title. */
+const onPage = (page: Page) => page.getByRole("region", { name: "Comments on the page" });
+/** The comments pane, every thread in a list. */
+const pane = (page: Page) => page.getByRole("complementary", { name: "Comments" });
+const thread = (where: ReturnType<typeof popover>, text: string) =>
+  where.getByRole("article").filter({ hasText: text });
+const pageText = (page: Page) => page.getByRole("textbox", { name: "Page text" });
+const mark = (page: Page, n: number) =>
+  page.getByRole("button", { name: `${n} open comment thread${n === 1 ? "" : "s"} on this block` });
+
+/** Opens the comments pane: the header's comments button, then "See all" in its Discussions list. */
 async function seeAll(page: Page) {
   await page.getByRole("button", { name: "Comments" }).click();
   const list = page.getByRole("dialog", { name: "Discussions" });
@@ -27,8 +40,6 @@ async function seeAll(page: Page) {
   // Gone, not still on its way out, where it would take the next Esc for itself.
   await expect(list).toBeHidden();
 }
-const thread = (page: Page, text: string) => column(page).getByRole("article").filter({ hasText: text });
-const pageText = (page: Page) => page.getByRole("textbox", { name: "Page text" });
 
 /** Puts the caret at the end of a block's text. */
 async function caretIn(page: Page, text: string) {
@@ -36,7 +47,7 @@ async function caretIn(page: Page, text: string) {
   await page.keyboard.press("End");
 }
 
-test("a thread started over a selection is answered, resolved, reopened and its reply deleted", async ({
+test("a thread started over a selection is answered, resolved from the pane, reopened and its reply deleted", async ({
   page,
   project,
   quadit,
@@ -52,41 +63,48 @@ test("a thread started over a selection is answered, resolved, reopened and its 
   await caretIn(page, "Ship on Tuesday");
   await page.keyboard.press("Shift+Home");
   await page.locator(".bn-formatting-toolbar").getByRole("button", { name: "Comment", exact: true }).click();
-  const box = column(page).getByRole("textbox", { name: "Comment on these words…" });
+  const box = popover(page).getByRole("textbox", { name: "Comment on these words…" });
   await expect(box).toBeFocused();
   await box.fill("Which freeze, the code one?");
-  await column(page).getByRole("button", { name: "Comment", exact: true }).click();
-  const started = thread(page, "Which freeze, the code one?");
-  await expect(started.getByText("Ship on Tuesday after the freeze.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "1 open comment thread on this block" })).toBeVisible();
+  await popover(page).getByRole("button", { name: "Comment", exact: true }).click();
+  await expect(popover(page)).toBeHidden();
+  await expect(mark(page, 1)).toBeVisible();
 
-  await started.getByRole("textbox", { name: "Reply…" }).fill("Yes, the code freeze.");
+  await mark(page, 1).click();
+  const started = thread(popover(page), "Which freeze, the code one?");
+  const reply = started.getByRole("textbox", { name: "Reply…" });
+  await expect(reply).toBeFocused();
+  await reply.fill("Yes, the code freeze.");
   await started.getByRole("button", { name: "Reply", exact: true }).click();
   await expect(started.getByText("Yes, the code freeze.")).toBeVisible();
   await expect
     .poll(() => quadit.cli("comments", doc.id))
     .toMatch(/Which freeze, the code one\?\n {4}@ann-owner .*: Yes, the code freeze\./);
+  await page.keyboard.press("Escape");
+  await expect(popover(page)).toBeHidden();
 
-  await started.getByRole("button", { name: "Resolve" }).click();
-  await expect(started).toBeHidden();
-  await expect(page.getByRole("button", { name: "1 open comment thread on this block" })).toBeHidden();
-  await column(page)
+  await seeAll(page);
+  const listed = thread(pane(page), "Which freeze, the code one?");
+  await listed.getByRole("button", { name: "Resolve" }).click();
+  await expect(listed).toBeHidden();
+  await expect(mark(page, 1)).toBeHidden();
+  await pane(page)
     .getByRole("radio", { name: /Resolved/ })
     .click();
-  await thread(page, "Which freeze, the code one?").getByRole("button", { name: "Reopen" }).click();
-  await expect(thread(page, "Which freeze, the code one?")).toBeHidden();
-  await column(page).getByRole("radio", { name: /Open/ }).click();
-  await expect(started).toBeVisible();
-  await expect(page.getByRole("button", { name: "1 open comment thread on this block" })).toBeVisible();
+  await thread(pane(page), "Which freeze, the code one?").getByRole("button", { name: "Reopen" }).click();
+  await expect(thread(pane(page), "Which freeze, the code one?")).toBeHidden();
+  await pane(page).getByRole("radio", { name: /Open/ }).click();
+  await expect(listed).toBeVisible();
+  await expect(mark(page, 1)).toBeVisible();
 
-  const reply = started.getByText("Yes, the code freeze.");
-  await reply.hover();
-  await started.getByRole("button", { name: "Delete comment" }).last().click();
-  await expect(reply).toBeHidden();
+  const answer = listed.getByText("Yes, the code freeze.");
+  await answer.hover();
+  await listed.getByRole("button", { name: "Delete comment" }).last().click();
+  await expect(answer).toBeHidden();
   await expect.poll(() => quadit.cli("comments", doc.id)).not.toContain("Yes, the code freeze.");
 });
 
-test("the menu on a block's handle starts a thread; the mark beside the block opens it and the thread shows its block", async ({
+test("the menu on a block's handle starts a thread; the mark at the end of the block opens it there", async ({
   page,
   project,
   quadit,
@@ -97,44 +115,59 @@ test("the menu on a block's handle starts a thread; the mark beside the block op
   await pageText(page).getByText("Buy a server.").hover();
   await page.getByRole("button", { name: "Open block menu" }).click();
   await page.getByRole("menuitem", { name: "Comment" }).click();
-  const box = column(page).getByRole("textbox", { name: "Comment on this block…" });
+  const box = popover(page).getByRole("textbox", { name: "Comment on this block…" });
   await expect(box).toBeFocused();
   await box.fill("Which one?");
   await box.press("Control+Enter");
-  await expect(thread(page, "Which one?").getByText("Buy a server.")).toBeVisible();
+  await expect(popover(page)).toBeHidden();
 
-  await column(page).getByRole("button", { name: "Close" }).click();
-  await expect(column(page)).toBeHidden();
-  await page.getByRole("button", { name: "1 open comment thread on this block" }).click();
-  const opened = thread(page, "Which one?");
-  await expect(opened).toHaveAttribute("aria-current", "true");
+  // The mark sits just past the block's text, not at the far end of the page.
+  const line = await pageText(page).getByText("Buy a server.").boundingBox();
+  const text = await pageText(page).boundingBox();
+  const at = await mark(page, 1).boundingBox();
+  if (!line || !text || !at) throw new Error("not laid out");
+  expect(at.y).toBeLessThan(line.y + line.height);
+  expect(at.x).toBeLessThan(text.x + text.width);
 
-  await opened.getByRole("button", { name: "Show in the page" }).click();
-  // The block flashes: an animation runs on it.
-  const block = pageText(page).locator(".bn-block-content").filter({ hasText: "Buy a server." });
-  await expect.poll(() => block.evaluate((el) => el.getAnimations().length)).toBeGreaterThan(0);
+  await mark(page, 1).click();
+  await expect(thread(popover(page), "Which one?")).toHaveAttribute("aria-current", "true");
+  await expect(popover(page).getByRole("textbox", { name: "Reply…" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(popover(page)).toBeHidden();
+  await expect(mark(page, 1)).toBeFocused();
 });
 
-test("a comment on the page as a whole, and on a database page", async ({ page, project, quadit }) => {
+test("a comment on the page as a whole sits under its title, on a page and on a database", async ({
+  page,
+  project,
+  quadit,
+}) => {
   const doc = await newPage(quadit, project.key, "Retro", "What went well.\n");
   await page.goto(`/e2e/docs/${doc.id}`);
-  await seeAll(page);
-  const onPage = column(page).getByRole("textbox", { name: "Comment on the page…" });
-  await onPage.fill("Let us keep this short.");
-  await column(page).getByRole("button", { name: "Comment", exact: true }).click();
-  await expect(thread(page, "Let us keep this short.").getByText("On the page")).toBeVisible();
+  await page.getByRole("textbox", { name: "Page title" }).hover();
+  await onPage(page).getByRole("button", { name: "Add comment" }).click();
+  await onPage(page).getByRole("textbox", { name: "Comment on the page…" }).fill("Let us keep this short.");
+  await onPage(page).getByRole("button", { name: "Comment", exact: true }).click();
+  await expect(onPage(page).getByText("Let us keep this short.")).toBeVisible();
   await expect.poll(() => quadit.cli("comments", doc.id)).toContain("on the page\n  @ann-owner");
+  // Nowhere else in the page: not at its end.
+  await expect(page.getByText("Let us keep this short.")).toHaveCount(1);
 
   const database = await newPage(quadit, project.key, "Vendors", "", "database");
   await page.goto(`/e2e/docs/${database.id}`);
-  await seeAll(page);
-  await column(page).getByRole("textbox", { name: "Comment on the page…" }).fill("Add a column for the contract.");
-  await column(page).getByRole("button", { name: "Comment", exact: true }).click();
-  await expect(thread(page, "Add a column for the contract.")).toBeVisible();
+  await page.getByRole("textbox", { name: "Page title" }).hover();
+  await onPage(page).getByRole("button", { name: "Add comment" }).click();
+  await onPage(page).getByRole("textbox", { name: "Comment on the page…" }).fill("Add a column for the contract.");
+  await onPage(page).getByRole("button", { name: "Comment", exact: true }).click();
+  await expect(onPage(page).getByText("Add a column for the contract.")).toBeVisible();
   await expect.poll(() => quadit.cli("comments", database.id)).toContain("Add a column for the contract.");
 });
 
-test("a thread whose block was taken out of the page says so, and still opens", async ({ page, project, quadit }) => {
+test("a thread whose block was taken out of the page says so under the title, and still opens", async ({
+  page,
+  project,
+  quadit,
+}) => {
   const doc = await newPage(quadit, project.key, "Draft", "Keep this.\n\nCut this.\n");
   const cut = doc.blocks.get("Cut this.") ?? "";
   await quadit.cli("comment", `page=${doc.id}`, `block=${cut}`, "Why is this here?");
@@ -142,10 +175,9 @@ test("a thread whose block was taken out of the page says so, and still opens", 
 
   await page.goto(`/e2e/docs/${doc.id}`);
   await expect(pageText(page).getByText("Keep this.")).toBeVisible();
-  await seeAll(page);
-  const gone = thread(page, "Why is this here?");
+  const gone = thread(onPage(page), "Why is this here?");
   await expect(gone.getByText("The block this was on is gone")).toBeVisible();
-  await expect(gone.getByRole("button", { name: "Show in the page" })).toBeHidden();
+  await gone.getByRole("button", { name: "Reply…" }).click();
   await gone.getByRole("textbox", { name: "Reply…" }).fill("It was moved to the plan.");
   await gone.getByRole("button", { name: "Reply", exact: true }).click();
   await expect(gone.getByText("It was moved to the plan.")).toBeVisible();
@@ -161,22 +193,21 @@ test("an agent's reply from the command line shows in the thread", async ({ page
   await quadit.agent("reply", ref, "Yes, and text with format=text.");
 
   await page.goto(`/e2e/docs/${doc.id}`);
-  await page.getByRole("button", { name: "1 open comment thread on this block" }).click();
-  const answered = thread(page, "@coder is this still true?");
+  await mark(page, 1).click();
+  const answered = thread(popover(page), "@coder is this still true?");
   await expect(answered.getByText("Yes, and text with format=text.")).toBeVisible();
   await expect(answered.getByText("Coder", { exact: true })).toBeVisible();
 
   // The question taken back, the answer stays, as the thread on its block.
   await answered.getByText("@coder is this still true?").hover();
   await answered.getByRole("button", { name: "Delete comment" }).first().click();
-  const left = thread(page, "Yes, and text with format=text.");
-  await expect(left.getByText("The API returns JSON.")).toBeVisible();
+  const left = thread(popover(page), "Yes, and text with format=text.");
+  await expect(left).toBeVisible();
   await expect(left.getByText("@coder is this still true?")).toBeHidden();
-  await expect(page.getByRole("button", { name: "1 open comment thread on this block" })).toBeVisible();
   await expect.poll(() => quadit.cli("comments", doc.id)).toContain('"The API returns JSON."\n  @coder');
 });
 
-test("Ctrl+M starts a comment on the block at the caret, or with no caret on the page; Esc leaves the box, then closes the column", async ({
+test("Ctrl+M starts a comment on the block at the caret, or with no caret on the page; Esc puts the box away, keeping what was written", async ({
   page,
   project,
   quadit,
@@ -186,35 +217,42 @@ test("Ctrl+M starts a comment on the block at the caret, or with no caret on the
 
   await caretIn(page, "Second line.");
   await page.keyboard.press("Control+m");
-  const draft = column(page).getByRole("textbox", { name: "Comment on this block…" });
+  const draft = popover(page).getByRole("textbox", { name: "Comment on this block…" });
   await expect(draft).toBeFocused();
-  await expect(column(page).getByText("Second line.")).toBeVisible();
   await page.keyboard.type("Too short?");
   await page.keyboard.press("Escape");
-  // A new thread's box is put away: nothing was sent.
-  await expect(draft).toBeHidden();
-  await expect(column(page)).toBeVisible();
-
+  // Put away, nothing sent; the draft waits for its block.
+  await expect(popover(page)).toBeHidden();
+  await caretIn(page, "Second line.");
+  await page.keyboard.press("Control+m");
+  await expect(popover(page).getByRole("textbox", { name: "Comment on this block…" })).toHaveValue("Too short?");
+  await popover(page).getByRole("button", { name: "Cancel" }).click();
+  await expect(popover(page)).toBeHidden();
+  // Cancelled on purpose: gone.
+  await caretIn(page, "Second line.");
+  await page.keyboard.press("Control+m");
+  await expect(popover(page).getByRole("textbox", { name: "Comment on this block…" })).toHaveValue("");
   await page.keyboard.press("Escape");
-  await expect(column(page)).toBeHidden();
-
-  // No caret in the text: the page's own box.
+  // A new thread put away leaves Esc to the page again: back out of it.
   await page.getByRole("textbox", { name: "Page title" }).click();
   await page.locator("body").click({ position: { x: 5, y: 5 } });
+
+  // No caret in the text: the page's own box, under its title.
   await page.keyboard.press("Control+m");
-  const onPage = column(page).getByRole("textbox", { name: "Comment on the page…" });
-  await expect(onPage).toBeFocused();
+  const onTheWhole = onPage(page).getByRole("textbox", { name: "Comment on the page…" });
+  await expect(onTheWhole).toBeFocused();
   await page.keyboard.type("Looks good.");
   await page.keyboard.press("Escape");
-  await expect(onPage).not.toBeFocused();
-  await expect(onPage).toHaveValue("Looks good.");
-  await page.keyboard.press("Escape");
-  await expect(column(page)).toBeHidden();
+  await expect(onTheWhole).toBeHidden();
+  await page.keyboard.press("Control+m");
+  await expect(onPage(page).getByRole("textbox", { name: "Comment on the page…" })).toHaveValue("Looks good.");
 
+  await page.keyboard.press("Escape");
+  await page.locator("body").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("Shift+?");
   const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts" });
   await expect(sheet.getByText("Comment on the words selected, the block at the cursor, or the page")).toBeVisible();
-  await expect(sheet.getByText("Close the comments")).toBeVisible();
+  await expect(sheet.getByText("Close the open comment, or the comments pane, away from a comment box")).toBeVisible();
 });
 
 test("Ctrl+M pressed the moment the caret reaches another block comments on that block", async ({
@@ -233,26 +271,44 @@ test("Ctrl+M pressed the moment the caret reaches another block comments on that
     document.getSelection()?.collapse(line.firstChild, "Second line.".length);
     text.dispatchEvent(new KeyboardEvent("keydown", { key: "m", code: "KeyM", ctrlKey: true, bubbles: true }));
   });
-  await expect(column(page).getByRole("textbox", { name: "Comment on this block…" })).toBeFocused();
-  await expect(column(page).getByText("Second line.")).toBeVisible();
-  await expect(column(page).getByText("First line.")).toBeHidden();
+  await expect(popover(page).getByRole("textbox", { name: "Comment on this block…" })).toBeFocused();
+  await popover(page).getByRole("textbox", { name: "Comment on this block…" }).fill("Here.");
+  await popover(page).getByRole("button", { name: "Comment", exact: true }).click();
+  await expect.poll(() => quadit.cli("comments", doc.id)).toContain(`on block ${doc.blocks.get("Second line.")}`);
 });
 
 test("Ctrl+M in a comment box leaves what is being written alone", async ({ page, project, quadit }) => {
   const doc = await newPage(quadit, project.key, "Drafts", "First line.\n\nSecond line.\n");
+  const first = doc.blocks.get("First line.") ?? "";
+  await quadit.cli("comment", `page=${doc.id}`, `block=${first}`, "Is this right?");
   await page.goto(`/e2e/docs/${doc.id}`);
 
   await caretIn(page, "Second line.");
   await page.keyboard.press("Control+m");
-  const draft = column(page).getByRole("textbox", { name: "Comment on this block…" });
+  const draft = popover(page).getByRole("textbox", { name: "Comment on this block…" });
   await expect(draft).toBeFocused();
   await page.keyboard.type("Half a thought");
   await page.keyboard.press("Control+m");
   await expect(draft).toBeFocused();
   await expect(draft).toHaveValue("Half a thought");
+  await page.keyboard.press("Escape");
+
+  // In a reply box too, with no words selected in the text: no comment on the page is started.
+  await mark(page, 1).click();
+  const reply = popover(page).getByRole("textbox", { name: "Reply…" });
+  await expect(reply).toBeFocused();
+  await page.keyboard.type("Not sure");
+  await page.keyboard.press("Control+m");
+  await expect(reply).toBeFocused();
+  await expect(reply).toHaveValue("Not sure");
+  await expect(onPage(page).getByRole("textbox", { name: "Comment on the page…" })).toBeHidden();
 });
 
-test("Esc on a database's cell lets go of the cell and leaves the comments open", async ({ page, project, quadit }) => {
+test("Esc on a database's cell lets go of the cell and leaves the comments pane open", async ({
+  page,
+  project,
+  quadit,
+}) => {
   const database = await newPage(quadit, project.key, "Vendors", "", "database");
   await quadit.cli("row", database.id, "Acme paints");
   await page.goto(`/e2e/docs/${database.id}`);
@@ -263,9 +319,9 @@ test("Esc on a database's cell lets go of the cell and leaves the comments open"
 
   await page.keyboard.press("Escape");
   await expect(grid).not.toHaveAttribute("aria-activedescendant", /.+/);
-  await expect(column(page)).toBeVisible();
+  await expect(pane(page)).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(column(page)).toBeHidden();
+  await expect(pane(page)).toBeHidden();
 });
 
 test("a read-only member reads a page's comments and has no way to add one", async ({
@@ -282,15 +338,18 @@ test("a read-only member reads a page's comments and has no way to add one", asy
   const page = await context.newPage();
 
   await page.goto(`/e2e/docs/${doc.id}`);
-  await page.getByRole("button", { name: "1 open comment thread on this block" }).click();
-  const seen = thread(page, "Add an example?");
-  await expect(seen.getByText("Be kind.")).toBeVisible();
+  await mark(page, 1).click();
+  const seen = thread(popover(page), "Add an example?");
+  await expect(seen).toBeVisible();
+  // No reply box: the cursor is put on the thread itself.
+  await expect(seen).toBeFocused();
   await expect(seen.getByRole("textbox", { name: "Reply…" })).toBeHidden();
   await expect(seen.getByRole("button", { name: "Resolve" })).toBeHidden();
-  await expect(column(page).getByRole("textbox", { name: "Comment on the page…" })).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(onPage(page).getByRole("button", { name: "Add comment" })).toHaveCount(0);
 
   await caretIn(page, "Be kind.");
   await page.keyboard.press("Control+m");
-  await expect(column(page).getByRole("textbox", { name: "Comment on this block…" })).toBeHidden();
+  await expect(page.getByRole("textbox", { name: "Comment on this block…" })).toBeHidden();
   await context.close();
 });

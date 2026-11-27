@@ -24,7 +24,7 @@ interface Props {
   docId: string;
   /** The page's project, to know whether the person may answer, resolve or delete. */
   projectId: string | undefined;
-  /** What the thread is about, above it: its words, the block's text, the page. None beside its words. */
+  /** What the thread is about, above it, compact or not: its words, the block's text. None beside its words. */
   quote?: ReactNode;
   /** The words or the block's text it is on, for its name; none for the page, or a block gone. */
   subject?: string;
@@ -166,6 +166,7 @@ export function Thread({
       )}
       {compact ? (
         <>
+          {quote}
           <div className="[&_.md]:line-clamp-4">
             <CommentBody comment={root} files={files[root.id]} projectId={projectId} />
           </div>

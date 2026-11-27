@@ -25,7 +25,12 @@ async function newPage(quadit: Quadit, project: string, title: string, markdown:
   return { id: made.ref, blocks };
 }
 
+/** The margin of cards beside the text (and the comments pane, which has the same name: they are not open at once here). */
 const comments = (page: Page) => page.getByRole("complementary", { name: "Comments" });
+/** The threads of a block, opened in place where the page has no margin. */
+const popover = (page: Page) => page.getByRole("dialog", { name: "Comments" });
+/** The page's own discussion, under its title. */
+const onPage = (page: Page) => page.getByRole("region", { name: "Comments on the page" });
 const card = (page: Page, text: string) => comments(page).getByRole("article").filter({ hasText: text });
 const pageText = (page: Page) => page.getByRole("textbox", { name: "Page text" });
 const marked = (page: Page, words: string) =>
@@ -216,9 +221,10 @@ test("Discussions lists the open threads; one picked is scrolled to, highlighted
 
   await page.getByRole("button", { name: /Comments/ }).click();
   const list = page.getByRole("dialog", { name: "Discussions" });
+  // Those last written in first.
   await expect(list.getByRole("button")).toHaveText([
-    /Which day exactly\?last day/,
     /Who reads this\?On the page/,
+    /Which day exactly\?last day/,
     "See all",
   ]);
   await list.getByRole("button", { name: /Which day exactly\?/ }).click();
@@ -230,17 +236,98 @@ test("Discussions lists the open threads; one picked is scrolled to, highlighted
   await expect(day).toHaveAttribute("aria-current", "true");
   await expect(day.getByRole("textbox", { name: "Reply…" })).toBeFocused();
 
-  // A thread on the page as a whole opens in the column, its reply box taking the cursor there.
+  // A thread on the page as a whole opens where it is, under the title, its reply box taking the cursor there.
   await page.getByRole("button", { name: /Comments/ }).click();
   await list.getByRole("button", { name: /Who reads this\?/ }).click();
-  const column = page.locator("[data-comments]");
-  await expect(column).toBeVisible();
-  await expect(
-    column.getByRole("article").filter({ hasText: "Who reads this?" }).getByRole("textbox", { name: "Reply…" }),
-  ).toBeFocused();
+  const reply = onPage(page)
+    .getByRole("article")
+    .filter({ hasText: "Who reads this?" })
+    .getByRole("textbox", { name: "Reply…" });
+  await expect(reply).toBeFocused();
+  await expect(reply).toBeInViewport();
 });
 
-test("where the page has no room for a margin, a click on the words opens the thread in the column", async ({
+test("a thread picked from Discussions below a stack of cards has its reply box in view, ready to type in", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const doc = await newPage(quadit, project.key, "Reviewed", "The opening line, much discussed.\n\nThe rest.\n");
+  const first = doc.blocks.get("The opening line, much discussed.") ?? "";
+  for (let i = 1; i <= 9; i++)
+    await quadit.cli(
+      "comment",
+      `page=${doc.id}`,
+      `block=${first}`,
+      `Point ${i} of the review, made at length so that the card is tall.`,
+    );
+  await page.goto(`/e2e/docs/${doc.id}`);
+  await expect(card(page, "Point 9 of the review")).toBeVisible();
+
+  await page.getByRole("button", { name: /Comments/ }).click();
+  await page
+    .getByRole("dialog", { name: "Discussions" })
+    .getByRole("button", { name: /Point 1 of/ })
+    .click();
+  const reply = card(page, "Point 1 of the review").getByRole("textbox", { name: "Reply…" });
+  await expect(reply).toBeFocused();
+  await expect(reply).toBeInViewport();
+});
+
+test("See all opens the pane of every thread; one clicked there opens in place, beside its words", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  await page.setViewportSize({ width: 1920, height: 1000 });
+  const doc = await newPage(quadit, project.key, "Paned", "The boss has three phases.\n\nThen it runs.\n");
+  const block = doc.blocks.get("The boss has three phases.") ?? "";
+  await quadit.cli("comment", `page=${doc.id}`, `block=${block}`, "quote=three phases", "Still three?");
+  await quadit.cli("comment", `page=${doc.id}`, "Who reads this?");
+  await page.goto(`/e2e/docs/${doc.id}`);
+  await page.getByRole("button", { name: /Comments/ }).click();
+  await page.getByRole("dialog", { name: "Discussions" }).getByRole("button", { name: "See all" }).click();
+  const pane = page.locator("[data-comments]");
+  await expect(pane.getByRole("article")).toHaveCount(2);
+  await pane.getByRole("article").filter({ hasText: "Still three?" }).getByText("Still three?").click();
+  const margin = page.getByRole("complementary", { name: "Comments" }).filter({ hasNot: page.locator("header") });
+  await expect(margin.getByRole("article").filter({ hasText: "Still three?" })).toHaveAttribute("aria-current", "true");
+  await expect(marked(page, "three phases")).toHaveCSS("background-color", "rgb(255, 214, 10)");
+  await pane.getByRole("button", { name: "Close" }).click();
+  await expect(pane).toBeHidden();
+});
+
+test("what was written in a new thread's box stays with it when the window narrows and the box moves to a popover", async ({
+  page,
+  project,
+  quadit,
+}) => {
+  const doc = await newPage(quadit, project.key, "Resized", "The boss has three phases.\n\nThen it runs.\n");
+  await page.goto(`/e2e/docs/${doc.id}`);
+  await pageText(page).getByText("Then it runs.").click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Control+m");
+  const inMargin = comments(page).getByRole("textbox", { name: "Comment on this block…" });
+  await expect(inMargin).toBeFocused();
+  await page.keyboard.type("Where to?");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(popover(page).getByRole("textbox", { name: "Comment on this block…" })).toHaveValue("Where to?");
+});
+
+test("a first thread put away leaves Esc to the page again", async ({ page, project, quadit }) => {
+  const doc = await newPage(quadit, project.key, "Quiet", "Nothing said yet.\n");
+  await page.goto(`/e2e/docs/${doc.id}`);
+  await pageText(page).getByText("Nothing said yet.").click();
+  await page.keyboard.press("Control+m");
+  await expect(comments(page).getByRole("textbox", { name: "Comment on this block…" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(comments(page)).toBeHidden();
+  await page.getByRole("button", { name: /Comments/ }).focus();
+  await page.keyboard.press("Escape");
+  await expect(page).not.toHaveURL(new RegExp(`/docs/${doc.id}$`));
+});
+
+test("where the page has no room for a margin, a click on the words opens the thread in a popover at its block", async ({
   page,
   project,
   quadit,
@@ -255,7 +342,11 @@ test("where the page has no room for a margin, a click on the words opens the th
   await expect(page.getByRole("button", { name: "1 open comment thread on this block" })).toBeVisible();
 
   await marked(page, "three phases").click();
-  const column = page.locator("[data-comments]");
-  await expect(column).toBeVisible();
-  await expect(column.getByRole("article").filter({ hasText: "Still three?" })).toHaveAttribute("aria-current", "true");
+  await expect(popover(page).getByRole("article").filter({ hasText: "Still three?" })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  // The cursor stays in the text, where the click put it.
+  await expect(pageText(page)).toBeFocused();
+  await expect(page.locator("[data-comments]")).toBeHidden();
 });

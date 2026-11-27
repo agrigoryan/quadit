@@ -32,8 +32,11 @@ async function blocksOf(quadit: Quadit, page: string) {
   return new Map(read.blocks.map((b) => [(b.content ?? []).map((c) => c.text ?? "").join(""), b.id]));
 }
 
+/** The comments pane, every thread in a list. */
 const column = (page: Page) => page.getByRole("complementary", { name: "Comments" });
-/** Opens the comments column: the header's comments button, then "See all" in its Discussions list. */
+/** The threads of a block, opened in place where the page has no margin. */
+const popover = (page: Page) => page.getByRole("dialog", { name: "Comments" });
+/** Opens the comments pane: the header's comments button, then "See all" in its Discussions list. */
 async function seeAll(page: Page) {
   await page.getByRole("button", { name: "Comments" }).click();
   const list = page.getByRole("dialog", { name: "Discussions" });
@@ -70,7 +73,7 @@ async function selectWords(page: Page, words: string) {
 
 /** Writes a comment in the box of a new thread on words, and sends it. */
 async function writeThread(page: Page, body: string) {
-  const box = column(page).getByRole("textbox", { name: "Comment on these words…" });
+  const box = popover(page).getByRole("textbox", { name: "Comment on these words…" });
   await expect(box).toBeFocused();
   await box.fill(body);
   await box.press("Control+Enter");
@@ -87,16 +90,20 @@ test("a person comments on words; typing in and around them keeps them marked, a
 
   await selectWords(page, "three phases");
   await page.locator(".bn-formatting-toolbar").getByRole("button", { name: "Comment", exact: true }).click();
-  await expect(column(page).getByText("three phases", { exact: true })).toBeVisible();
+  await expect(popover(page).getByText("three phases", { exact: true })).toBeVisible();
   await writeThread(page, "Still three?");
-
-  const card = thread(page, "Still three?");
-  await expect(card.getByText("three phases", { exact: true })).toBeVisible();
   await expect(marked(page, "three phases")).toHaveCSS("border-bottom-width", "2px");
   await expect.poll(() => quadit.cli("comments", doc.id)).toContain(`on words of block ${block} "three phases"`);
 
-  // Typed among the words: theirs. Typed right after them: not.
+  // The pane quotes the words as they read.
+  await seeAll(page);
+  const card = thread(page, "Still three?");
+  await expect(card.getByText("three phases", { exact: true })).toBeVisible();
+
+  // Typed among the words: theirs. Typed right after them: not. A click on them shows their thread,
+  // and the cursor stays where it was put.
   await marked(page, "three phases").click();
+  await expect(popover(page).getByRole("article")).toHaveAttribute("aria-current", "true");
   await page.keyboard.press("End");
   await page.keyboard.press("ArrowLeft");
   for (let i = 0; i < " phases".length; i++) await page.keyboard.press("ArrowLeft");
@@ -110,16 +117,18 @@ test("a person comments on words; typing in and around them keeps them marked, a
 
   // The pointer on its card lights the words; a click on them shows their thread, its words highlighted strongest.
   const shade = () => marked(page, "three short phases").evaluate((el) => getComputedStyle(el).backgroundColor);
-  await column(page).getByRole("button", { name: "Close" }).click();
-  await seeAll(page);
+  await page.keyboard.press("Escape");
+  await expect(popover(page)).toBeHidden();
   await page.mouse.move(0, 0);
   const tint = await shade();
   await thread(page, "Still three?").hover();
   await expect.poll(shade).not.toBe(tint);
   const lit = await shade();
-  await column(page).getByRole("button", { name: "Close" }).click();
   await marked(page, "three short phases").click();
-  await expect(thread(page, "Still three?")).toHaveAttribute("aria-current", "true");
+  await expect(popover(page).getByRole("article", { name: /Still three|three/ })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
   await expect.poll(shade).not.toBe(lit);
   await expect.poll(shade).not.toBe(tint);
 });
@@ -285,7 +294,7 @@ test("on a page mirrored from a read-only file, one who may only comment starts 
   await expect(page.getByText("This page mirrors a file")).toBeVisible();
   await pageText(page).locator(".bn-inline-content").filter({ hasText: "No running in the hall." }).selectText();
   await page.keyboard.press("Control+m");
-  await expect(column(page).getByText("No running in the hall.")).toBeVisible();
+  await expect(popover(page).getByText("No running in the hall.")).toBeVisible();
   await writeThread(page, "Walking only?");
   await expect(marked(page, "No running in the hall.")).toHaveCSS("border-bottom-width", "2px");
   await expect.poll(() => quadit.cli("comments", id ?? "")).toContain('"No running in the hall."\n  @ann-owner');

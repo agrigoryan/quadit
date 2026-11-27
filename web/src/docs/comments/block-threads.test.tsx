@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearStore, loadBootstrap } from "@/data/store";
 import type { Comment, Member, User, Workspace } from "@/types/core";
 import { BlockThreads } from "@/docs/comments/block-threads";
+import type { EditorHandle } from "@/docs/editor/editor";
 import { useCommentDrafts } from "@/docs/comments/drafts";
 import { pageUi, usePageUi } from "@/docs/page/state";
 import { TooltipProvider } from "@/ui/tooltip";
@@ -35,6 +36,18 @@ const comment = (id: string, body: string, at: number, more: Partial<Comment> = 
 
 let phone = false;
 
+/** An editor showing b1 and b2, the words of "first" in b1. */
+const editor = {
+  scrollToBlock: () => {},
+  scrollToThread: () => {},
+  blockText: (id: string) => ({ b1: "The boss has three phases", b2: "Then it runs" })[id],
+  threadText: (id: string) => ({ first: "three phases" })[id],
+  selectedWords: () => undefined,
+  onChange: () => () => {},
+  order: () => ["b1", "b2"],
+  caretBlock: () => null,
+} satisfies EditorHandle;
+
 beforeEach(() => {
   phone = false;
   vi.stubGlobal("matchMedia", (query: string) => ({
@@ -44,6 +57,7 @@ beforeEach(() => {
   }));
   useCommentDrafts.setState({ drafts: {} });
   pageUi.reset();
+  pageUi.setEditor(editor);
   clearStore();
   loadBootstrap("acme", {
     seq: 1,
@@ -56,6 +70,7 @@ beforeEach(() => {
       comment("second", "Which boss?", 2),
       comment("reply", "Yes, three.", 3, { parent_id: "first" }),
       comment("elsewhere", "Which gate?", 4, { subject_id: "b2" }),
+      comment("lost", "On a block taken out", 5, { subject_id: "gone" }),
     ],
   });
 });
@@ -135,6 +150,12 @@ describe("BlockThreads", () => {
     expect(within(popover()).getByRole("textbox", { name: "Comment on this block…" })).toHaveValue("");
     act(() => pageUi.startThread("b1"));
     expect(within(popover()).getByRole("textbox", { name: "Comment on this block…" })).toHaveValue("About the boss");
+  });
+
+  it("leaves a thread whose block is gone to the page's own discussion", () => {
+    show();
+    act(() => pageUi.openThread("lost"));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("opens in a sheet on a phone", () => {
