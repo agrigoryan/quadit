@@ -17,10 +17,10 @@ import (
 )
 
 // wakeItem is one inbox item as listen hands it to its command: the line the
-// feed writes (QUADIT_EVENT, and on stdin, as it always was), and the
-// record wait prints for it (QUADIT_ITEM: the ITEM line, the command that
-// reads it, the one that answers it once).
-type wakeItem struct{ line, record string }
+// feed writes (QUADIT_EVENT, and on stdin, as it always was), the record
+// wait prints for it (QUADIT_ITEM: the ITEM line, the command that reads
+// it, the one that answers it once), and the id of the workspace it is in.
+type wakeItem struct{ line, record, workspace string }
 
 // runEnd is how one run of the command ended: its exit status, or that it
 // was ended for running longer than its limit.
@@ -46,7 +46,7 @@ func (r *runner) wake(command, secrets []string, it wakeItem, limit time.Duratio
 		runCtx, cancel = context.WithTimeout(r.ctx, limit)
 	}
 	defer cancel()
-	cmd, out := r.secretCommand(runCtx, command, env, "QUADIT_EVENT="+it.line, "QUADIT_ITEM="+it.record)
+	cmd, out := r.secretCommand(runCtx, command, childEnv(os.Environ(), r.c, it.workspace), env, "QUADIT_EVENT="+it.line, "QUADIT_ITEM="+it.record)
 	cmd.Stdin = strings.NewReader(it.line + "\n")
 	if limit > 0 {
 		// Its whole process group is killed at its limit, so what it started ends with it; its output is
@@ -74,6 +74,33 @@ func (r *runner) wake(command, secrets []string, it wakeItem, limit time.Duratio
 		return runEnd{code: -1, limited: true, err: fmt.Errorf("the command ran longer than its limit of %s and was ended", limit)}
 	}
 	return runEnd{code: cmd.ProcessState.ExitCode(), err: fmt.Errorf("the command failed: %w", runErr)}
+}
+
+// childEnv is the environment of the command listen runs for an item:
+// listen's own, its Quadit login made the companion's, whatever the
+// command inherited. A login from a file is passed by QUADIT_CONFIG, and
+// QUADIT_URL and QUADIT_TOKEN are dropped; one from those two keeps them.
+// QUADIT_WORKSPACE names the workspace, by its id: a quadit command the
+// item's command runs works where the companion listens, in whatever
+// folder it runs.
+func childEnv(base []string, c *Client, workspace string) []string {
+	env := make([]string, 0, len(base)+2)
+	for _, kv := range base {
+		name, _, _ := strings.Cut(kv, "=")
+		switch envName(name) { // on Windows Quadit_Url is QUADIT_URL
+		case "QUADIT_WORKSPACE":
+			continue
+		case "QUADIT_CONFIG", "QUADIT_URL", "QUADIT_TOKEN":
+			if c.login != "" {
+				continue
+			}
+		}
+		env = append(env, kv)
+	}
+	if c.login != "" {
+		env = append(env, "QUADIT_CONFIG="+c.login)
+	}
+	return append(env, "QUADIT_WORKSPACE="+workspace)
 }
 
 // listenEvents reports what listen does, one JSON object a line, to a file

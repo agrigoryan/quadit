@@ -161,6 +161,7 @@ func TestEverySettingThatCouldChangeTheLoginPauses(t *testing.T) {
 		{"the entry's own login", claudeCode{}, []file{{"home/.claude/settings.json", `{"env":{"QUADIT_CONFIG":"` + login + `"}}`}}, false},
 		{"another login in the user settings", claudeCode{}, []file{{"home/.claude/settings.json", `{"env":{"QUADIT_CONFIG":"/other.json"}}`}}, true},
 		{"QUADIT_URL in the user settings", claudeCode{}, []file{{"home/.claude/settings.json", `{"env":{"QUADIT_URL":"http://x"}}`}}, true},
+		{"QUADIT_WORKSPACE in the user settings", claudeCode{}, []file{{"home/.claude/settings.json", `{"env":{"QUADIT_WORKSPACE":"acme"}}`}}, true},
 		{"QUADIT_TOKEN in the project settings", claudeCode{}, []file{{"folder/.claude/settings.json", `{"env":{"QUADIT_TOKEN":"t"}}`}}, true},
 		{"another login in the project's local settings", claudeCode{}, []file{{"folder/.claude/settings.local.json", `{"env":{"QUADIT_CONFIG":"/other.json"}}`}}, true},
 		{"QUADIT_URL in the project's local settings", claudeCode{}, []file{{"folder/.claude/settings.local.json", `{"env":{"QUADIT_URL":"http://x"}}`}}, true},
@@ -170,6 +171,7 @@ func TestEverySettingThatCouldChangeTheLoginPauses(t *testing.T) {
 		{"Codex with another login", codex{}, []file{{"home/.codex/config.toml", "[shell_environment_policy.set]\nQUADIT_CONFIG = \"/other.json\"\n"}}, true},
 		{"Codex with a quoted key", codex{}, []file{{"home/.codex/config.toml", "[shell_environment_policy.set]\n'QUADIT_CONFIG' = '/other.json'\n"}}, true},
 		{"Codex with QUADIT_URL inline", codex{}, []file{{"home/.codex/config.toml", "[shell_environment_policy]\nset = { OTHER = \"1\", QUADIT_URL = \"http://x\" }\n"}}, true},
+		{"Codex with QUADIT_WORKSPACE", codex{}, []file{{"home/.codex/config.toml", "[shell_environment_policy.set]\nQUADIT_WORKSPACE = \"acme\"\n"}}, true},
 		{"Codex with QUADIT_TOKEN dotted", codex{}, []file{{"home/.codex/config.toml", "shell_environment_policy.set.QUADIT_TOKEN = \"t\"\n"}}, true},
 		{"Codex with a line too long to read", codex{}, []file{{"home/.codex/config.toml", "# " + strings.Repeat("x", 2<<20) + "\n"}}, true},
 		{"Codex naming it elsewhere", codex{}, []file{{"home/.codex/config.toml", "[shell_environment_policy]\nexclude = [\"QUADIT_CONFIG\"]\n# QUADIT_URL = \"x\"\n[other]\nQUADIT_TOKEN = \"t\"\n"}}, false},
@@ -198,6 +200,33 @@ func TestEverySettingThatCouldChangeTheLoginPauses(t *testing.T) {
 			t.Fatalf("an unreadable settings file read as %q", got)
 		}
 	})
+}
+
+// TestSettingsMayNameTheBaseLoginOfTheEntrysTool: an entry's login is
+// one connection of a tool in several workspaces; the tool's settings name
+// its base login, and the run's QUADIT_WORKSPACE chooses the entry's among
+// its connections. Another tool's base is still another login.
+func TestSettingsMayNameTheBaseLoginOfTheEntrysTool(t *testing.T) {
+	dir := t.TempDir()
+	logins := filepath.Join(dir, "quadit")
+	base, login := filepath.Join(logins, "claude.json"), filepath.Join(logins, "claude-acme.json")
+	_ = os.MkdirAll(logins, 0o700)
+	idx := connectionIndex{Connections: []connection{
+		{Tool: base, Login: base, WorkspaceID: personal.ID},
+		{Tool: base, Login: login, WorkspaceID: acme.ID},
+		{Tool: filepath.Join(logins, "codex.json"), Login: filepath.Join(logins, "codex.json"), WorkspaceID: acme.ID}}}
+	if err := idx.write(logins); err != nil {
+		t.Fatal(err)
+	}
+	home, folder := filepath.Join(dir, "home"), filepath.Join(dir, "folder")
+	settings := filepath.Join(home, ".claude", "settings.json")
+	_ = os.MkdirAll(filepath.Dir(settings), 0o700)
+	for named, pause := range map[string]bool{base: false, login: false, filepath.Join(logins, "codex.json"): true} {
+		writeJSON(t, settings, map[string]any{"env": map[string]string{"QUADIT_CONFIG": named}})
+		if got := settingsPause(claudeCode{}, home, folder, login); (got == core.PauseLoginMismatch) != pause {
+			t.Fatalf("settings naming %s paused %q, want a pause: %v", named, got, pause)
+		}
+	}
 }
 
 func TestAResetTimeIsTheNextSuchTime(t *testing.T) {

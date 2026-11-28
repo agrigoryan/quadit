@@ -304,8 +304,8 @@ func TestWindowsFoldersOutsideTheRulesAreRefused(t *testing.T) {
 func TestEnvironmentNamesAreReadWithoutCaseOnWindows(t *testing.T) {
 	t.Run("the program's environment", func(t *testing.T) {
 		env := programEnv([]string{"Quadit_Url=http://elsewhere", "quadit_token=secret", "ClaudeCode=1", "Claude_Code_Entrypoint=cli", "Electron_Run_As_Node=1", "Path=C:\\bin"},
-			`C:\login.json`, "SVA-12", "run")
-		want := []string{"Path=C:\\bin", `QUADIT_CONFIG=C:\login.json`, "NO_COLOR=1", "QUADIT_TASK=SVA-12", "QUADIT_SESSION=run"}
+			regEntry{Login: `C:\login.json`, WorkspaceID: fakeWorkspaceID}, "SVA-12", "run")
+		want := []string{"Path=C:\\bin", `QUADIT_CONFIG=C:\login.json`, "QUADIT_WORKSPACE=" + fakeWorkspaceID, "NO_COLOR=1", "QUADIT_TASK=SVA-12", "QUADIT_SESSION=run"}
 		if !slices.Equal(env, want) {
 			t.Fatalf("the environment %q, want %q", env, want)
 		}
@@ -374,4 +374,13 @@ func TestACmdProgramIsNotStartedInANetworkFolder(t *testing.T) {
 			t.Fatal("the program was started")
 		}
 	})
+}
+
+// TestACompanionsCommandDropsALoginOfAnyCaseOnWindows: Windows reads
+// Quadit_Url as QUADIT_URL, so a login inherited in any case is dropped.
+func TestACompanionsCommandDropsALoginOfAnyCaseOnWindows(t *testing.T) {
+	env := childEnv([]string{"Path=C:\\bin", "Quadit_Url=http://elsewhere", "quadit_token=t", "Quadit_Workspace=acme"}, &Client{login: `C:\q\claude.json`}, acme.ID)
+	if want := []string{"Path=C:\\bin", `QUADIT_CONFIG=C:\q\claude.json`, "QUADIT_WORKSPACE=" + acme.ID}; !slices.Equal(env, want) {
+		t.Fatalf("the environment %q, want %q", env, want)
+	}
 }

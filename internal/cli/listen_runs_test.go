@@ -165,3 +165,22 @@ func TestListenStopsWhenTheServerRefusesIt(t *testing.T) {
 		t.Fatal("listen kept trying a refusal")
 	}
 }
+
+// TestACompanionsCommandWorksAsTheCompanion: the command listen runs for
+// an item gets the companion's own login and workspace, never one it
+// inherited, so the lines the item carries work where it was heard.
+func TestACompanionsCommandWorksAsTheCompanion(t *testing.T) {
+	inherited := []string{"PATH=/bin", "QUADIT_URL=http://elsewhere", "QUADIT_TOKEN=other", "QUADIT_WORKSPACE=acme", "QUADIT_CONFIG=/other.json"}
+	t.Run("a login from a file", func(t *testing.T) {
+		env := childEnv(inherited, &Client{login: "/logins/claude-acme.json"}, acme.ID)
+		if want := []string{"PATH=/bin", "QUADIT_CONFIG=/logins/claude-acme.json", "QUADIT_WORKSPACE=" + acme.ID}; !slices.Equal(env, want) {
+			t.Fatalf("the environment %q, want %q", env, want)
+		}
+	})
+	t.Run("a login from QUADIT_URL and QUADIT_TOKEN keeps them", func(t *testing.T) {
+		env := childEnv(inherited, &Client{URL: "http://elsewhere", Token: "other"}, acme.ID)
+		if want := []string{"PATH=/bin", "QUADIT_URL=http://elsewhere", "QUADIT_TOKEN=other", "QUADIT_CONFIG=/other.json", "QUADIT_WORKSPACE=" + acme.ID}; !slices.Equal(env, want) {
+			t.Fatalf("the environment %q, want %q", env, want)
+		}
+	})
+}

@@ -27,7 +27,7 @@ func TestTheProgramGetsACleanEnvironment(t *testing.T) {
 	rt.f.addItem(fakeItem{Task: "SVA-12"})
 	rt.serve()
 	row := rt.ended(0)
-	want := map[string]string{"QUADIT_CONFIG": rt.login, "QUADIT_TASK": "SVA-12", "QUADIT_SESSION": row["id"].(string)}
+	want := map[string]string{"QUADIT_CONFIG": rt.login, "QUADIT_WORKSPACE": fakeWorkspaceID, "QUADIT_TASK": "SVA-12", "QUADIT_SESSION": row["id"].(string)}
 	if got := rt.records()[0].Env; !maps.Equal(got, want) {
 		t.Fatalf("the program's environment had %v, want %v", got, want)
 	}

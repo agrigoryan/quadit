@@ -18,6 +18,7 @@ import (
 type promptFacts struct {
 	Agent, Owner string       // handles, from GET /me read for this run: every prompt names the owner of now
 	Key          string       // the task's key
+	Workspace    string       // the id of the workspace the run works in, which the items' commands carry
 	Run          string       // the run's id
 	Machine      string       // this computer's name, as the registry holds it
 	Folder       string       // the folder's label
@@ -30,16 +31,16 @@ type promptFacts struct {
 
 // errPromptFacts refuses to build a prompt from an identifier not of its
 // form: nothing is started.
-var errPromptFacts = errors.New("the agent, its owner or the task is not of the form quadit gives them, so nothing is started")
+var errPromptFacts = errors.New("the agent, its owner, the task or the workspace is not of the form quadit gives them, so nothing is started")
 
 // buildPrompt is the prompt of a run, with nonce between the items' lines.
 func buildPrompt(f promptFacts, nonce string) (string, error) {
-	if !handleForm.MatchString(f.Agent) || !handleForm.MatchString(f.Owner) || !taskForm.MatchString(f.Key) || !id.Valid(f.Run) || len(f.Items) == 0 {
+	if !handleForm.MatchString(f.Agent) || !handleForm.MatchString(f.Owner) || !taskForm.MatchString(f.Key) || !id.Valid(f.Run) || !id.Valid(f.Workspace) || len(f.Items) == 0 {
 		return "", errPromptFacts
 	}
 	records := make([]string, len(f.Items))
 	for i, item := range f.Items {
-		records[i] = item.record()
+		records[i] = item.record(f.Workspace)
 	}
 	head := f.Items[0]
 	fill := strings.NewReplacer(

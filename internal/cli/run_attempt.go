@@ -35,14 +35,16 @@ type ladderStep struct {
 	within time.Duration
 }
 
-// programEnv is the environment of a program the runner starts: the
-// runner's own, without the variables of another Claude Code session, of
-// any Quadit login, or of Electron, then the run's own: the entry's login,
-// the task and the run (when there is one), and no colors. Nothing else is
-// removed: the programs' own sign-in and network settings can come through
-// the environment, and a list of what is allowed would break them.
-func programEnv(base []string, login, task, run string) []string {
-	env := make([]string, 0, len(base)+4)
+// programEnv is the environment of a program the runner starts for the
+// entry: the runner's own, without the variables of another Claude Code
+// session, of any Quadit login, or of Electron, then the run's own: the
+// entry's login and its workspace (by id, so that a quadit command the
+// program runs works there whichever login file of its tool its settings
+// name), the task and the run (when there is one), and no colors. Nothing
+// else is removed: the programs' own sign-in and network settings can come
+// through the environment, and a list of what is allowed would break them.
+func programEnv(base []string, entry regEntry, task, run string) []string {
+	env := make([]string, 0, len(base)+5)
 	for _, kv := range base {
 		name, _, _ := strings.Cut(kv, "=")
 		name = envName(name) // on Windows Quadit_Url is QUADIT_URL
@@ -51,7 +53,7 @@ func programEnv(base []string, login, task, run string) []string {
 		}
 		env = append(env, kv)
 	}
-	env = append(env, "QUADIT_CONFIG="+login, "NO_COLOR=1")
+	env = append(env, "QUADIT_CONFIG="+entry.Login, "QUADIT_WORKSPACE="+entry.WorkspaceID, "NO_COLOR=1")
 	if task != "" {
 		env = append(env, "QUADIT_TASK="+task, "QUADIT_SESSION="+run)
 	}
@@ -95,7 +97,7 @@ func (r *agentRun) attempt(ctx context.Context, spec runSpec, prompt string, n i
 		return outcome{Kind: outcomeFailed, Detail: err.Error()}, endedItself, nil
 	}
 	cmd.Dir = e.reg.Folder
-	cmd.Env = programEnv(os.Environ(), e.reg.Login, r.key, r.id)
+	cmd.Env = programEnv(os.Environ(), e.reg, r.key, r.id)
 	cmd.Stdin = strings.NewReader(prompt)
 	cmd.Stdout, cmd.Stderr = outWrite, errWrite
 

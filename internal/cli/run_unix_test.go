@@ -68,8 +68,8 @@ func startAlone(cmd *exec.Cmd) error {
 }
 
 func TestEnvironmentNamesKeepTheirCaseOnMacOSAndLinux(t *testing.T) {
-	env := programEnv([]string{"Quadit_Url=http://elsewhere", "QUADIT_URL=x", "Path=/bin"}, "/login.json", "", "")
-	if want := []string{"Quadit_Url=http://elsewhere", "Path=/bin", "QUADIT_CONFIG=/login.json", "NO_COLOR=1"}; !slices.Equal(env, want) {
+	env := programEnv([]string{"Quadit_Url=http://elsewhere", "QUADIT_URL=x", "Path=/bin"}, regEntry{Login: "/login.json", WorkspaceID: fakeWorkspaceID}, "", "")
+	if want := []string{"Quadit_Url=http://elsewhere", "Path=/bin", "QUADIT_CONFIG=/login.json", "QUADIT_WORKSPACE=" + fakeWorkspaceID, "NO_COLOR=1"}; !slices.Equal(env, want) {
 		t.Fatalf("the environment %q, want %q", env, want)
 	}
 	home := t.TempDir()

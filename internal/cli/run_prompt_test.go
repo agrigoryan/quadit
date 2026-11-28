@@ -9,7 +9,7 @@ func TestEachRunGetsThePromptForWhyItStarted(t *testing.T) {
 	const run, decision = "0199eeee-0000-7000-8000-0000000000aa", "0199cccc-0000-7000-8000-000000000001"
 	item := listenItem{ID: "0199bbbb-0000-7000-8000-000000000001", Seq: 1042, Type: "comment", By: "@aram", Task: "SVA-12", Snippet: "Add a line"}
 	picked := listenItem{ID: "0199bbbb-0000-7000-8000-000000000002", Seq: 1043, Type: "picked", By: "@aram", Task: "SVA-12", Decision: decision}
-	base := promptFacts{Agent: "@claude", Owner: "@aram", Key: "SVA-12", Run: run, Machine: "Test Mac", Folder: "~/devel/game", Program: "Claude Code"}
+	base := promptFacts{Agent: "@claude", Owner: "@aram", Key: "SVA-12", Workspace: fakeWorkspaceID, Run: run, Machine: "Test Mac", Folder: "~/devel/game", Program: "Claude Code"}
 	with := func(change func(*promptFacts)) promptFacts {
 		f := base
 		f.Items = []listenItem{item}
@@ -61,7 +61,7 @@ func TestEveryPromptNamesTheOwnerOfNow(t *testing.T) {
 		"a later item": {Resuming: true}, "a continuation": {Resuming: true, Continue: true}, "a fresh session": {Lost: true},
 		"an answer": {Resuming: true}, "found unclear": {Resuming: true},
 	} {
-		f.Agent, f.Owner, f.Key, f.Run, f.Machine, f.Folder, f.Program = "@claude", "@bea", "SVA-12", run, "Mac", "~/g", "Claude Code"
+		f.Agent, f.Owner, f.Key, f.Workspace, f.Run, f.Machine, f.Folder, f.Program = "@claude", "@bea", "SVA-12", fakeWorkspaceID, run, "Mac", "~/g", "Claude Code"
 		it := item
 		if name == "found unclear" {
 			it.Type = "unclear"

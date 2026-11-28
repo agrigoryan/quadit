@@ -125,14 +125,14 @@ func (codex) QuaditSettings(home, _ string) ([]quaditSetting, error) {
 	return settings, nil
 }
 
-// tomlQuaditVariable finds a QUADIT_CONFIG, QUADIT_URL or QUADIT_TOKEN
-// key on a line, and tomlQuaditValue one with its value; tomlTable finds
+// tomlQuaditVariable finds a QUADIT_CONFIG, QUADIT_URL, QUADIT_TOKEN or
+// QUADIT_WORKSPACE key on a line, and tomlQuaditValue one with its value; tomlTable finds
 // a table's header.
 // The variable's name is matched without regard to case on Windows, which
 // reads names so (envNameFlag).
 var (
-	tomlQuaditVariable = regexp.MustCompile(envNameFlag + `(?:^|[{,\s.])["']?(QUADIT_(?:CONFIG|URL|TOKEN))["']?\s*=`)
-	tomlQuaditValue    = regexp.MustCompile(envNameFlag + `(?:^|[{,\s.])["']?(QUADIT_(?:CONFIG|URL|TOKEN))["']?\s*=\s*(?:"([^"]*)"|'([^']*)')`)
+	tomlQuaditVariable = regexp.MustCompile(envNameFlag + `(?:^|[{,\s.])["']?(QUADIT_(?:CONFIG|URL|TOKEN|WORKSPACE))["']?\s*=`)
+	tomlQuaditValue    = regexp.MustCompile(envNameFlag + `(?:^|[{,\s.])["']?(QUADIT_(?:CONFIG|URL|TOKEN|WORKSPACE))["']?\s*=\s*(?:"([^"]*)"|'([^']*)')`)
 	tomlTable          = regexp.MustCompile(`^\[\s*([A-Za-z0-9_."'-]+)\s*\]`)
 )
 

@@ -129,14 +129,15 @@ var helpTopics = map[string]string{
   run add login=PATH project=KEY folder=PATH program=claude|codex [program_path=PATH] [max_minutes=N]
                                register a project: the agent's own login file (one Connect wrote),
                                the project's own folder (not your home folder, nothing above it,
-                               no system folder), the program (found on PATH, or given)
+                               no system folder), the program (found on PATH, or given). The
+                               folder is tied to the login's workspace (quadit use)
   run list [--json]            the entries, and what each does now while a runner serves
   run waiting login=PATH project=KEY [--json]
                                what a runner set up now would start at once: the tasks whose
                                items from before still wait on the agent there (five named)
-  run remove ENTRY_ID | login=PATH [project=KEY]
+  run remove ENTRY_ID | login=PATH [project=KEY] [workspace=ID]
                                stop its run, tell the server how it ended, let the project go,
-                               then drop the entry
+                               then drop the entry; workspace= keeps to that workspace's entries
   run machine name="…"         this computer's name, as tasks show it
   Files: runner.json beside your login files (QUADIT_CONFIG's folder) and runner/ beside it:
   status.json, runner.log, each run's log in runs/ (kept 30 days).

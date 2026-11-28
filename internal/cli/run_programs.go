@@ -42,7 +42,7 @@ type program interface {
 	ReadSignedIn(exit int, output []byte) (bool, error)
 	// SessionFile is the file the program keeps that session in, if found.
 	SessionFile(home, session, folder string) (string, bool)
-	// QuaditSettings are the QUADIT_CONFIG, QUADIT_URL and QUADIT_TOKEN its
+	// QuaditSettings are the QUADIT_CONFIG, QUADIT_URL, QUADIT_TOKEN and QUADIT_WORKSPACE its
 	// own settings set for the commands it runs, in every file that can
 	// (the user's, and the folder's), whichever wins: such a setting would
 	// make a run work as another login. An error names a settings file that
@@ -55,7 +55,7 @@ type quaditSetting struct{ File, Name, Value string }
 
 // quaditVariables are the variables that choose the login the quadit
 // command works as.
-var quaditVariables = []string{"QUADIT_CONFIG", "QUADIT_URL", "QUADIT_TOKEN"}
+var quaditVariables = []string{"QUADIT_CONFIG", "QUADIT_URL", "QUADIT_TOKEN", "QUADIT_WORKSPACE"}
 
 // programs are the programs a runner starts, by their core.Programs name.
 var programs = map[string]program{

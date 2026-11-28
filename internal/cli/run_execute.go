@@ -327,7 +327,7 @@ func (r *agentRun) attempts(ctx context.Context, resume string) runEnding {
 			attempt--
 			continue
 		}
-		prompt, err := buildPrompt(promptFacts{Agent: me.Handle, Owner: me.Responsible, Key: r.key, Run: r.id, Machine: e.srv.machineNow().Name,
+		prompt, err := buildPrompt(promptFacts{Agent: me.Handle, Owner: me.Responsible, Key: r.key, Workspace: e.reg.WorkspaceID, Run: r.id, Machine: e.srv.machineNow().Name,
 			Folder: e.label, Program: e.prog.Title(), Items: r.items, Resuming: resume != "", Continue: r.continuing && resume != "", Lost: lost}, randomHex(6))
 		if err != nil {
 			return runEnding{state: core.AgentSessionFailed, reason: core.RunStartFailed, ack: true, line: "failed: " + err.Error()}

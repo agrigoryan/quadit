@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"slices"
 	"strings"
 )
 
@@ -65,14 +66,14 @@ func (r *runner) secretEnv(names []string) (map[string]string, error) {
 	return res.Env, json.Unmarshal(out, &res)
 }
 
-// secretCommand makes a command that has the secrets in its environment,
-// each under its name, after whatever more adds to it; and the masker its
-// output goes through. The caller gives the command its input, runs it and
-// flushes the masker.
-func (r *runner) secretCommand(ctx context.Context, command []string, env map[string]string, more ...string) (*exec.Cmd, *masker) {
+// secretCommand makes a command whose environment is base, then whatever
+// more adds to it, then the secrets, each under its name; and the masker
+// its output goes through. The caller gives the command its input, runs it
+// and flushes the masker.
+func (r *runner) secretCommand(ctx context.Context, command, base []string, env map[string]string, more ...string) (*exec.Cmd, *masker) {
 	out := newMasker(r.out, env)
 	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
-	cmd.Env = append(os.Environ(), more...)
+	cmd.Env = append(slices.Clip(base), more...)
 	for k, v := range env {
 		cmd.Env = append(cmd.Env, k+"="+v)
 	}
@@ -105,7 +106,7 @@ func (r *runner) runWithSecrets(in input) error {
 	if err != nil {
 		return err
 	}
-	cmd, out := r.secretCommand(r.ctx, command, env)
+	cmd, out := r.secretCommand(r.ctx, command, os.Environ(), env)
 	cmd.Stdin = os.Stdin
 	err = cmd.Run()
 	if flushErr := out.Flush(); err == nil {

@@ -279,9 +279,9 @@ func TestWaitPrintsOneRecordToActOn(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := `ITEM #42 mentioned SVA-12 from @ann: "Can you look at the login bug?"
-quadit show SVA-12   # read it
-quadit ack 42 listen lease=KQ7MX4PA   # once it is handled
-quadit wait for=30 lease=KQ7MX4PA   # then go on listening
+quadit show SVA-12 --workspace=0199aaaa-0000-7000-8000-000000000001   # read it
+quadit ack 42 listen lease=KQ7MX4PA --workspace=0199aaaa-0000-7000-8000-000000000001   # once it is handled
+quadit wait for=30 lease=KQ7MX4PA --workspace=0199aaaa-0000-7000-8000-000000000001   # then go on listening
 `
 		if out.String() != want {
 			t.Fatalf("wait printed:\n%s\nwant:\n%s", out, want)
@@ -302,7 +302,7 @@ quadit wait for=30 lease=KQ7MX4PA   # then go on listening
 		if took := time.Since(started); took < 3*time.Second || took > 5*time.Second {
 			t.Fatalf("a wait of 3 seconds took %s", took)
 		}
-		if want := "IDLE\nquadit wait for=3 lease=" + testLease + "   # go on listening\n"; out.String() != want {
+		if want := "IDLE\nquadit wait for=3 lease=" + testLease + " --workspace=" + fakeWorkspaceID + "   # go on listening\n"; out.String() != want {
 			t.Fatalf("wait printed:\n%s\nwant:\n%s", out, want)
 		}
 		if len(srv.requests()) != 3 {
@@ -484,7 +484,7 @@ func TestWaitGivesTheLineThatAnswersAnItemOnce(t *testing.T) {
 	if !strings.HasPrefix(thread[0], "ITEM #9 replied SVA-1 from @bot (agent): ") {
 		t.Fatalf("the item's line is %q", thread[0])
 	}
-	answer := regexp.MustCompile(`^quadit reply 0192f4a2-0000-7000-8000-000000000001 "…" --id=([0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})   # `)
+	answer := regexp.MustCompile(`^quadit reply 0192f4a2-0000-7000-8000-000000000001 "…" --id=([0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}) --workspace=` + fakeWorkspaceID + `   # `)
 	m := answer.FindStringSubmatch(thread[2])
 	if m == nil {
 		t.Fatalf("the answering line is %q", thread[2])
@@ -675,7 +675,7 @@ func TestListenGivesItsCommandWhatWaitPrintsAndKeepsItsLease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "ITEM #3 assigned SVA-1 from @mia: \"\"\nquadit show SVA-1   # read it\n--\n#3 @mia assigned you SVA-1"
+	want := "ITEM #3 assigned SVA-1 from @mia: \"\"\nquadit show SVA-1 --workspace=" + fakeWorkspaceID + "   # read it\n--\n#3 @mia assigned you SVA-1"
 	if string(raw) != want {
 		t.Fatalf("the command was given:\n%s\nwant:\n%s", raw, want)
 	}
@@ -711,9 +711,9 @@ func TestWaitForAProjectKeepsToItInWhatItPrints(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := `ITEM #42 assigned SVA-12 from @ann: "SVA-12 Login"
-quadit show SVA-12   # read it
-quadit ack 42 listen lease=KQ7MX4PA   # once it is handled
-quadit wait project=SVA for=30 lease=KQ7MX4PA   # then go on listening
+quadit show SVA-12 --workspace=0199aaaa-0000-7000-8000-000000000001   # read it
+quadit ack 42 listen lease=KQ7MX4PA --workspace=0199aaaa-0000-7000-8000-000000000001   # once it is handled
+quadit wait project=SVA for=30 lease=KQ7MX4PA --workspace=0199aaaa-0000-7000-8000-000000000001   # then go on listening
 `
 		if out.String() != want {
 			t.Fatalf("wait printed:\n%s\nwant:\n%s", out, want)
@@ -730,7 +730,7 @@ quadit wait project=SVA for=30 lease=KQ7MX4PA   # then go on listening
 		if err := r.waitFor(waitSpan{total: 2 * time.Second, hold: time.Second}, listenAsk{project: "SVA", by: "a chat"}, ""); err != nil {
 			t.Fatal(err)
 		}
-		if want := "IDLE\nquadit wait project=SVA lease=" + testLease + "   # go on listening\n"; out.String() != want {
+		if want := "IDLE\nquadit wait project=SVA lease=" + testLease + " --workspace=" + fakeWorkspaceID + "   # go on listening\n"; out.String() != want {
 			t.Fatalf("wait printed:\n%s\nwant:\n%s", out, want)
 		}
 		for _, q := range srv.requests() {
@@ -821,7 +821,7 @@ func TestListeningSaysWhatListensToEachProject(t *testing.T) {
 		`{"project_id":"0192f4a2-0000-7000-8000-000000000001","project":"ART","by":"a chat","last_heard":"2026-11-22 09:00","live":false},` +
 		`{"project_id":"0192f4a2-0000-7000-8000-000000000002","project":"SVA","by":"a chat","last_heard":"2026-11-23 14:04","live":true},` +
 		`{"project_id":"0192f4a2-0000-7000-8000-000000000003","project":"x; rm","by":"a chat","live":true}]}`
-	want := `ART: nothing listens now; its items wait for the next quadit wait project=ART (or, to hand them to everything instead: quadit listening forget project=ART).
+	want := `ART: nothing listens now; its items wait for the next quadit wait project=ART --workspace=0199aaaa-0000-7000-8000-000000000001 (or, to hand them to everything instead: quadit listening forget project=ART --workspace=0199aaaa-0000-7000-8000-000000000001).
 SVA: a chat listens (last heard 2026-11-23 14:04 UTC).
 Everything else: a companion listens (last heard 2026-11-23 14:05 UTC); it leaves out ART, SVA, which have listeners of their own.
 `
@@ -917,7 +917,7 @@ func TestListeningPrintsARunnerWithItsMachine(t *testing.T) {
 		"OPS: Quadit's runner on a computer is away (last heard 2026-11-24 09:00 UTC); its items wait for it.\n" +
 		"WEB: Quadit's runner on Aram's MacBook Pro listens, holding every item back (usage_limit) (last heard 2026-11-24 14:04 UTC).\n" +
 		"Everything else: nothing listens now, and those items wait in the inbox; it leaves out SVA, GS, OPS, WEB, which have listeners of their own.\n"
-	if got := who.lines(); got != want {
+	if got := who.lines(fakeWorkspaceID); got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
@@ -974,6 +974,8 @@ func testCommand(name string, args []string) int {
 		}
 		time.Sleep(time.Second)
 		return 0
+	case "quadit": // the quadit command itself, as a chat runs it
+		return Run(args, os.Stdout, os.Stderr)
 	}
 	return 2
 }

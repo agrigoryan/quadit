@@ -273,16 +273,27 @@ func (e *liveEntry) check(ctx context.Context) (pause string, err error) {
 
 // settingsPause is login_mismatch when the program's own settings could
 // make a run work as another login than the entry's, whichever of its
-// settings files wins: QUADIT_CONFIG naming another file, QUADIT_URL or
-// QUADIT_TOKEN set at all, or a settings file that cannot be read. "" when
-// none.
+// settings files wins: QUADIT_CONFIG naming a file other than the entry's
+// login or the base login of the tool it is a connection of (which the
+// run's QUADIT_WORKSPACE then chooses the entry's among), QUADIT_URL,
+// QUADIT_TOKEN or QUADIT_WORKSPACE set at all, or a settings file that
+// cannot be read. "" when none.
 func settingsPause(p program, home, folder, login string) string {
 	settings, err := p.QuaditSettings(home, folder)
 	if err != nil {
 		return core.PauseLoginMismatch
 	}
+	if len(settings) == 0 {
+		return ""
+	}
+	idx, err := readIndex(filepath.Dir(login))
+	if err != nil {
+		return core.PauseLoginMismatch
+	}
+	tool := idx.toolOf(login)
 	for _, s := range settings {
-		if s.Name != "QUADIT_CONFIG" || resolved(expandHome(s.Value, home)) != resolved(login) {
+		named := resolved(expandHome(s.Value, home))
+		if s.Name != "QUADIT_CONFIG" || (named != resolved(login) && named != resolved(tool)) {
 			return core.PauseLoginMismatch
 		}
 	}
@@ -428,7 +439,7 @@ func programVersionOf(ctx context.Context, path string, within time.Duration) (s
 
 // signedIn asks the program whether it is signed in, the passive way.
 func (e *liveEntry) signedIn(ctx context.Context) (bool, error) {
-	exit, out, err := probe(ctx, e.reg.ProgramPath, e.prog.SignedIn(), programEnv(os.Environ(), e.reg.Login, "", ""), e.srv.host.times.version)
+	exit, out, err := probe(ctx, e.reg.ProgramPath, e.prog.SignedIn(), programEnv(os.Environ(), e.reg, "", ""), e.srv.host.times.version)
 	if err != nil {
 		return false, entryError(e.prog.Title() + " could not check its sign-in")
 	}

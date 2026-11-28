@@ -114,6 +114,57 @@ func TestTheRegistryBindsAnEntryByIDs(t *testing.T) {
 	}
 }
 
+// TestAddingAnEntryTiesItsFolderToItsWorkspace: the quadit commands a
+// person runs in a folder Quadit runs an agent in work in the entry's
+// workspace; a folder tied to another is refused, and nothing is added.
+func TestAddingAnEntryTiesItsFolderToItsWorkspace(t *testing.T) {
+	t.Run("an untied folder is tied, with the entry's project", func(t *testing.T) {
+		rt := newRunTest(t, core.ProgramClaude)
+		rt.writeRegistry()
+		if code, said := rt.add("login="+rt.login, "project=SVA", "folder="+rt.folder, "program=claude", "program_path="+rt.entry.ProgramPath); code != 0 {
+			t.Fatal(said)
+		}
+		idx, err := readIndex(filepath.Dir(rt.login))
+		if err != nil || len(idx.Folders) != 1 || idx.Folders[0] != (folderTie{Folder: rt.folder, WorkspaceID: fakeWorkspaceID, Project: "SVA"}) {
+			t.Fatalf("the ties are %+v (%v)", idx.Folders, err)
+		}
+	})
+	t.Run("a folder tied to another workspace is refused", func(t *testing.T) {
+		rt := newRunTest(t, core.ProgramClaude)
+		rt.writeRegistry()
+		idx := connectionIndex{Folders: []folderTie{{Folder: filepath.Dir(rt.folder), WorkspaceID: acme.ID}}}
+		if err := idx.write(filepath.Dir(rt.login)); err != nil {
+			t.Fatal(err)
+		}
+		code, said := rt.add("login="+rt.login, "project=SVA", "folder="+rt.folder, "program=claude", "program_path="+rt.entry.ProgramPath)
+		if code != 1 || !strings.HasPrefix(said, filepath.FromSlash("~/devel/game")+" is tied to "+acme.ID+", not Personal: untie it first") {
+			t.Fatalf("add: %d %s", code, said)
+		}
+		if reg, _ := readRegistry(rt.files.registry); len(reg.Entries) != 0 {
+			t.Fatalf("added %+v", reg.Entries)
+		}
+	})
+}
+
+// TestRemovingByWorkspaceKeepsTheOthers: run remove login=… workspace=ID
+// removes only that workspace's entries of the login.
+func TestRemovingByWorkspaceKeepsTheOthers(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	other := rt.entry
+	other.ID, other.WorkspaceID, other.ProjectID = "0000bbbb", acme.ID, "0199aaaa-0000-7000-8000-0000000000ac"
+	other.Folder = filepath.Join(rt.home, "devel", "site")
+	_ = os.MkdirAll(other.Folder, 0o700)
+	rt.writeRegistry(rt.entry, other)
+	var out bytes.Buffer
+	if code := runRemove(context.Background(), rt.files, rt.host(), nil, map[string][]string{"login": {rt.login}, "workspace": {fakeWorkspaceID}}, &out, &out); code != 0 {
+		t.Fatalf("remove: %s", out.String())
+	}
+	reg, _ := readRegistry(rt.files.registry)
+	if len(reg.Entries) != 1 || reg.Entries[0].ID != other.ID || reg.Entries[0].Removing {
+		t.Fatalf("the registry holds %+v", reg.Entries)
+	}
+}
+
 func TestALoginOfAnotherWorkspaceOrReadOnlyIsAnEntryError(t *testing.T) {
 	t.Run("add refuses a read-only login and a person's", func(t *testing.T) {
 		rt := newRunTest(t, core.ProgramClaude)

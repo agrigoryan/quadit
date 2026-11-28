@@ -97,7 +97,10 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 		// server can listen by project; a server away is tried again as a
 		// read is.
 		var page listened
-		err := r.checkListensByProject(opts.project, lease)
+		ws, err := r.c.workspace(r.ctx) // asked once, of a login whose workspace the index does not hold
+		if err == nil {
+			err = r.checkListensByProject(opts.project, lease)
+		}
 		if err == nil {
 			page, err = r.nextItem(r.ctx, listenAsk{project: opts.project, lease: lease, take: take, by: opts.by}, waitHold)
 		}
@@ -147,7 +150,7 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 			}
 		}
 		events.say("run_started", map[string]any{"seq": page.Seq})
-		end := r.wake(opts.command, opts.secrets, wakeItem{line: page.Line, record: page.Item.record()}, opts.limit, renew)
+		end := r.wake(opts.command, opts.secrets, wakeItem{line: page.Line, record: page.Item.record(ws.ID), workspace: ws.ID}, opts.limit, renew)
 		if r.ctx.Err() != nil {
 			return r.ctx.Err()
 		}
@@ -160,7 +163,7 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 			failed++
 			if opts.tries == 0 || failed < opts.tries {
 				fmt.Fprintf(r.out, "not handled, trying it again in %s: %v\n", itemPause, end.err)
-				fmt.Fprintf(r.out, "  to give up on it: %s\n", giveUp(page.Seq, lease))
+				fmt.Fprintf(r.out, "  to give up on it: %s\n", giveUp(ws.ID, page.Seq, lease))
 				if err := pause(r.ctx, itemPause); err != nil {
 					return err
 				}
@@ -251,9 +254,17 @@ func listenArgs(args []string) listenOptions {
 
 // giveUp is the command that moves the cursor past an item that should not
 // be tried again, with the listener's lease: the lease says which
-// listener's cursor it is.
-func giveUp(seq int64, lease string) string {
-	return fmt.Sprintf("quadit ack %d listen lease=%s", seq, lease)
+// listener's cursor it is, and the workspace (its id) which login's.
+func giveUp(workspace string, seq int64, lease string) string {
+	return inWorkspace(fmt.Sprintf("quadit ack %d listen lease=%s", seq, lease), workspace)
+}
+
+// inWorkspace is a command the listener prints, to be run as printed,
+// with the workspace it works in (by its id): a line printed before its
+// tool worked in a second workspace still works in its own, and one copied
+// into another folder too.
+func inWorkspace(command, workspace string) string {
+	return command + " --workspace=" + workspace
 }
 
 // listenRefused reports whether the server refused listen in a way waiting
@@ -455,6 +466,10 @@ type waitSpan struct{ total, hold time.Duration }
 // project or task key, a page id, a handle. The item's words are shown in
 // quotes, without what could end them or start a line.
 func (r *runner) waitFor(span waitSpan, ask listenAsk, forArg string) error {
+	ws, err := r.c.workspace(r.ctx)
+	if err != nil {
+		return err
+	}
 	if err := r.checkListensByProject(ask.project, ask.lease); err != nil {
 		return err
 	}
@@ -464,7 +479,7 @@ func (r *runner) waitFor(span waitSpan, ask listenAsk, forArg string) error {
 		if err != nil {
 			var ae *APIError
 			if errors.As(err, &ae) && ae.Reason == "listening_elsewhere" {
-				return fmt.Errorf("%w\n  only when the person says this session should listen instead: %s", err, waitCommand(ask.project, " take=1"))
+				return fmt.Errorf("%w\n  only when the person says this session should listen instead: %s", err, waitCommand(ws.ID, ask.project, " take=1"))
 			}
 			return err
 		}
@@ -476,13 +491,13 @@ func (r *runner) waitFor(span waitSpan, ask listenAsk, forArg string) error {
 			return err
 		}
 		ask.lease, ask.take = page.Lease, false
-		next := fmt.Sprintf("%s lease=%s", waitCommand(project, forArg), ask.lease)
+		next := waitCommand(ws.ID, project, forArg+" lease="+ask.lease)
 		if item := page.Item; item != nil {
-			if _, err := item.reading(); err != nil {
+			if _, err := item.reading(ws.ID); err != nil {
 				return err
 			}
-			fmt.Fprintln(r.out, item.record())
-			fmt.Fprintf(r.out, "quadit ack %d listen lease=%s   # once it is handled\n", item.Seq, ask.lease)
+			fmt.Fprintln(r.out, item.record(ws.ID))
+			fmt.Fprintf(r.out, "%s   # once it is handled\n", giveUp(ws.ID, item.Seq, ask.lease))
 			fmt.Fprintf(r.out, "%s   # then go on listening\n", next)
 			return nil
 		}
@@ -494,13 +509,14 @@ func (r *runner) waitFor(span waitSpan, ask listenAsk, forArg string) error {
 	}
 }
 
-// waitCommand is the command that waits again: of the project of key
-// project (none: everything), with rest after it (" for=N", " take=1").
-func waitCommand(project, rest string) string {
+// waitCommand is the command that waits again, in the workspace of id
+// workspace: of the project of key project (none: everything), with rest
+// after it (" for=N", " take=1").
+func waitCommand(workspace, project, rest string) string {
 	if project == "" {
-		return "quadit wait" + rest
+		return inWorkspace("quadit wait"+rest, workspace)
 	}
-	return "quadit wait project=" + project + rest
+	return inWorkspace("quadit wait project="+project+rest, workspace)
 }
 
 // The forms of what the server sends that wait puts into a command or the
@@ -565,16 +581,17 @@ func quotable(text string) string {
 // record is what wait prints of the item for an agent to act on, without
 // the commands to acknowledge it and wait again (a companion does those):
 // its line, the command that reads it, the one that answers it once, and
-// for an item about a decision the decision's id. Nothing for no item.
-func (item *listenItem) record() string {
+// for an item about a decision the decision's id. The commands work in the
+// workspace of id workspace. Nothing for no item.
+func (item *listenItem) record(workspace string) string {
 	if item == nil {
 		return ""
 	}
 	lines := []string{item.line()}
-	if reading, err := item.reading(); err == nil {
+	if reading, err := item.reading(workspace); err == nil {
 		lines = append(lines, reading+"   # read it")
 	}
-	if answering := item.answering(); answering != "" {
+	if answering := item.answering(workspace); answering != "" {
 		lines = append(lines, answering+"   # answer with this line, your words in the quotes")
 	}
 	if pageForm.MatchString(item.Decision) {
@@ -589,39 +606,41 @@ func (item *listenItem) record() string {
 // (two sessions handed the same item, or one sent again after a crash) is
 // made once. Nothing for an item there is no such place for, or whose ids
 // are not of their form.
-func (item listenItem) answering() string {
+func (item listenItem) answering(workspace string) string {
 	if !pageForm.MatchString(item.ID) {
 		return ""
 	}
 	answerID := madeChangeID("quadit answer " + item.ID)
 	switch {
 	case pageForm.MatchString(item.Thread):
-		return fmt.Sprintf(`quadit reply %s "…" --id=%s`, item.Thread, answerID)
+		return inWorkspace(fmt.Sprintf(`quadit reply %s "…" --id=%s`, item.Thread, answerID), workspace)
 	case taskForm.MatchString(item.Task):
-		return fmt.Sprintf(`quadit comment %s "…" --id=%s`, item.Task, answerID)
+		return inWorkspace(fmt.Sprintf(`quadit comment %s "…" --id=%s`, item.Task, answerID), workspace)
 	}
 	return ""
 }
 
-// reading is the command that reads what the item is about; it refuses an
-// item whose task or page is not of the form quadit gives them.
-func (item listenItem) reading() (string, error) {
+// reading is the command that reads what the item is about, in the
+// workspace of id workspace; it refuses an item whose task or page is not
+// of the form quadit gives them.
+func (item listenItem) reading(workspace string) (string, error) {
+	command := "quadit inbox"
 	switch {
 	case item.Task != "":
 		if !taskForm.MatchString(item.Task) {
 			return "", fmt.Errorf("the server sent a task key quadit does not recognize (%q), so nothing is printed to run", item.Task)
 		}
-		return "quadit show " + item.Task, nil
+		command = "quadit show " + item.Task
 	case item.Page != "":
 		if !pageForm.MatchString(item.Page) {
 			return "", fmt.Errorf("the server sent a page id quadit does not recognize (%q), so nothing is printed to run", item.Page)
 		}
+		command = "quadit doc " + item.Page
 		if item.Thread != "" {
-			return "quadit comments " + item.Page, nil
+			command = "quadit comments " + item.Page
 		}
-		return "quadit doc " + item.Page, nil
 	}
-	return "quadit inbox", nil
+	return inWorkspace(command, workspace), nil
 }
 
 // listening says what listens as this login's member, what each listener
@@ -648,7 +667,11 @@ func (r *runner) listening(in input) error {
 	if err := json.Unmarshal(raw, &who); err != nil {
 		return err
 	}
-	fmt.Fprint(r.out, who.lines())
+	ws, err := r.c.workspace(r.ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Fprint(r.out, who.lines(ws.ID))
 	return nil
 }
 
@@ -683,8 +706,9 @@ type runnerShown struct {
 	Paused  string
 }
 
-// line says what listens to a project, in one sentence.
-func (l listenerShown) line() string {
+// line says what listens to a project, in one sentence; the commands in
+// it work in the workspace of id workspace.
+func (l listenerShown) line(workspace string) string {
 	if r := l.Runner; r != nil && (!l.Live || r.Holding) {
 		who := "Quadit's runner on " + machineLabel(r.Machine)
 		if !l.Live {
@@ -699,8 +723,8 @@ func (l listenerShown) line() string {
 	if l.Live {
 		return fmt.Sprintf("%s: %s listens%s.", l.Project, label(l.By), heard(l.LastHeard))
 	}
-	return fmt.Sprintf("%s: nothing listens now; its items wait for the next %s (or, to hand them to everything instead: quadit listening forget project=%s).",
-		l.Project, waitCommand(l.Project, ""), l.Project)
+	return fmt.Sprintf("%s: nothing listens now; its items wait for the next %s (or, to hand them to everything instead: %s).",
+		l.Project, waitCommand(workspace, l.Project, ""), inWorkspace("quadit listening forget project="+l.Project, workspace))
 }
 
 // machineLabel is a computer's name as a runner said it, when it reads as
@@ -717,8 +741,9 @@ func machineLabel(name string) string {
 // itself, one sentence on everything, as before projects; else a line for
 // each project and one for everything else, which leaves those projects
 // out. What the server sent is printed only in the forms a key, a label
-// and a time have.
-func (who listener) lines() string {
+// and a time have; the commands in it work in the workspace of id
+// workspace.
+func (who listener) lines(workspace string) string {
 	var out strings.Builder
 	var own []string
 	for _, l := range who.Listeners {
@@ -726,7 +751,7 @@ func (who listener) lines() string {
 			continue
 		}
 		own = append(own, l.Project)
-		out.WriteString(l.line() + "\n")
+		out.WriteString(l.line(workspace) + "\n")
 	}
 	if len(own) == 0 {
 		if !who.Listening {

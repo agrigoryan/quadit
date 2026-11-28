@@ -115,7 +115,7 @@ var runForms = map[string]struct {
 }{
 	"":        {nil, 0},
 	"add":     {[]string{"login", "project", "folder", "program", "program_path", "max_minutes"}, 0},
-	"remove":  {[]string{"login", "project"}, 1},
+	"remove":  {[]string{"login", "project", "workspace"}, 1},
 	"list":    {nil, 0},
 	"machine": {[]string{"name"}, 0},
 	"waiting": {[]string{"login", "project"}, 0},
@@ -623,6 +623,17 @@ func runAdd(ctx context.Context, files runFiles, host runHost, fields map[string
 		return refuse(fmt.Errorf("%s may not work in %s: quadit me lists its projects%s", me.Handle, project, keys))
 	}
 	p := projects[i]
+	// The folder is tied to the entry's workspace, so the quadit commands
+	// a person runs in it work there too; one tied to another is refused.
+	dir := filepath.Dir(login)
+	idx, err := readIndex(dir)
+	if err != nil {
+		return refuse(err)
+	}
+	tie, tied := idx.tieAt(canon)
+	if tied && tie.WorkspaceID != me.Workspace.ID {
+		return refuse(fmt.Errorf("%s is tied to %s, not %s: untie it first (quadit use --clear folder=%s)", label, idx.workspaceName(tie.WorkspaceID), me.Workspace.Name, canon))
+	}
 	entry := regEntry{ID: randomHex(4), Server: c.URL, WorkspaceID: me.Workspace.ID, Workspace: me.Workspace.Slug, AgentID: me.UserID, Agent: me.Handle,
 		Login: login, ProjectID: p.ID, Project: p.Key, Folder: canon, Program: name, ProgramPath: path, Mode: modeInPlace, MaxMinutes: maxMinutes,
 		AddedAt: host.clock.Now().UTC().Format(time.RFC3339)}
@@ -641,6 +652,12 @@ func runAdd(ctx context.Context, files runFiles, host runHost, fields map[string
 	if err != nil {
 		return refuse(err)
 	}
+	if !tied {
+		idx.Folders = append(idx.Folders, folderTie{Folder: canon, WorkspaceID: me.Workspace.ID, Project: p.Key})
+		if err := idx.write(dir); err != nil {
+			return refuse(fmt.Errorf("added, but the folder could not be tied to %s: %w", me.Workspace.Name, err))
+		}
+	}
 	if asJSON {
 		fmt.Fprintln(stdout, strings.TrimSpace(string(plainJSON(entry))))
 		return exitOK
@@ -649,14 +666,15 @@ func runAdd(ctx context.Context, files runFiles, host runHost, fields map[string
 	return exitOK
 }
 
-// runRemove is `quadit run remove`: each entry matched stops its run, has
-// how the run ended sent, lets its project go, and is dropped. A serving
+// runRemove is `quadit run remove`: each entry matched (by its id, or by
+// its login, and of those by project= and workspace= when given) stops its
+// run, has how the run ended sent, lets its project go, and is dropped. A serving
 // runner does that (the entry is marked removing, and this waits); with
 // none, this does it.
 func runRemove(ctx context.Context, files runFiles, host runHost, pos []string, fields map[string][]string, stdout, stderr io.Writer) int {
-	login, project := firstValue(fields["login"]), firstValue(fields["project"])
+	login, project, workspace := firstValue(fields["login"]), firstValue(fields["project"]), firstValue(fields["workspace"])
 	if (len(pos) == 0) == (login == "") {
-		fmt.Fprintln(stderr, "usage: quadit run remove ENTRY_ID | login=PATH [project=KEY]")
+		fmt.Fprintln(stderr, "usage: quadit run remove ENTRY_ID | login=PATH [project=KEY] [workspace=ID]")
 		return exitFailed
 	}
 	if login != "" {
@@ -671,7 +689,7 @@ func runRemove(ctx context.Context, files runFiles, host runHost, pos []string, 
 		if len(pos) > 0 {
 			return e.ID == pos[0]
 		}
-		return e.Login == login && (project == "" || strings.EqualFold(e.Project, project))
+		return e.Login == login && (project == "" || strings.EqualFold(e.Project, project)) && (workspace == "" || e.WorkspaceID == workspace)
 	}
 	if err := os.MkdirAll(files.dir, 0o700); err != nil {
 		fmt.Fprintln(stderr, err)
