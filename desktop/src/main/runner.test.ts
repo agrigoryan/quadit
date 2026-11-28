@@ -126,9 +126,9 @@ function setUp({ start, env = {} }: { start?: StartChild; env?: Record<string, s
 
 const PROJECTS = ["SVA", "GS", "ART", "WEB", "API", "DOC", "OPS", "LAB"];
 
-/** The agents the stand-in's logins are, as its entries bind them: @claude and @codex of the workspace w1. */
-const CLAUDE = { server: "https://q.example", workspace: "w1", agent: "id-@claude" };
-const CODEX = { ...CLAUDE, agent: "id-@codex" };
+/** The connections the stand-in's logins are, as its entries bind them: @claude and @codex of the workspace w1. */
+const CLAUDE = { server: "https://q.example", workspace: "w1", agent: "id-@claude", program: "claude" };
+const CODEX = { ...CLAUDE, agent: "id-@codex", program: "codex" };
 
 /** An entry's status as a serving runner writes it: every field there. */
 const said = (fields: Record<string, unknown>) => ({
@@ -412,6 +412,21 @@ posixOnly("Runner, its commands", () => {
     expect(await runner.remove({ of: inAcme })).toEqual({ ok: true });
     expect((await runner.entries(CLAUDE))?.map((e) => e.project)).toEqual(["SVA"]);
     expect(await runner.entries(inAcme)).toEqual([]);
+    runner.quit();
+  });
+
+  it("lists and removes one program's entries only: Codex working as the same agent keeps running when Claude Code goes", async () => {
+    const { runner, login, game, site, configDir } = setUp();
+    // Codex's own login, of the same agent of the same workspace.
+    const codex = join(configDir, "codex-as-claude.json");
+    const me = { handle: "@claude", kind: "agent", projects: PROJECTS };
+    writeFileSync(codex, JSON.stringify({ url: "https://q.example", token: "qd_c", me }));
+    await runner.add({ login, project: "SVA", folder: game, program: "claude" });
+    await runner.add({ login: codex, project: "GS", folder: site, program: "codex" });
+    const asCodex = { ...CLAUDE, program: "codex" };
+    expect((await runner.entries(CLAUDE))?.map((e) => e.project)).toEqual(["SVA"]);
+    expect(await runner.remove({ of: CLAUDE })).toEqual({ ok: true });
+    expect((await runner.entries(asCodex))?.map((e) => e.project)).toEqual(["GS"]);
     runner.quit();
   });
 

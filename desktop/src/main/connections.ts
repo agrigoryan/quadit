@@ -92,6 +92,7 @@ import { CODE_LIFE_MS, handshakeOf, type OpenCode } from "@/main/handshake";
 import { HARNESSES, type Harness } from "@/main/harnesses";
 import { type LoginIndex, loginsOf, readIndex } from "@/main/login-index";
 import { findCommand, type QuaditCli } from "@/main/quadit-cli";
+import type { RunsOf } from "@/main/runner";
 import { type DesktopOutcome, type DesktopRequest, type DesktopSummary, isConnectCode } from "@/shared/bridge";
 import type {
   ConnectChoice,
@@ -140,18 +141,15 @@ export interface ConnectionsParts {
   /** A connection was taken back: what the app ran for it stops. */
   disconnected(key: string): void;
   /**
-   * Stops Quadit running the agent `agent` of the workspace `workspace` on
-   * the server at `server` for any project on this computer (`quadit run
-   * remove`, agent-runs-contract.md §8.2): its runs end and the server is
-   * told, while the login still works. Never another workspace's or agent's,
-   * whatever login file they share. `pending`: the runner is still telling
-   * the server how a run ended.
+   * Stops Quadit running one connection's agent for any project on this
+   * computer (`quadit run remove`, agent-runs-contract.md §8.2): the agent
+   * `agent` of the workspace `workspace` on the server at `server`, as the
+   * program `program` (its tool). Its runs end and the server is told,
+   * while the login still works. Never another workspace's, agent's or
+   * program's, whatever login file they share. `pending`: the runner is
+   * still telling the server how a run ended.
    */
-  removeRuns(of: {
-    server: string;
-    workspace: string;
-    agent: string;
-  }): Promise<{ ok: true } | (Refused & { pending?: true })>;
+  removeRuns(of: RunsOf): Promise<{ ok: true } | (Refused & { pending?: true })>;
   /** Asks the page that speaks for a workspace (Requests.toWorkspace). */
   ask(serverId: string, workspaceId: string, request: DesktopRequest): Promise<DesktopOutcome>;
 }
@@ -1232,7 +1230,7 @@ export class Connections {
     login: string;
     agent: string;
     program: RunProgram;
-    identity: { server: string; workspace: string; agent: string };
+    identity: RunsOf;
   } | null {
     const found = this.find(this.ledger(), ref);
     const harness = HARNESSES.find((h) => h.id === ref.tool);
@@ -1245,7 +1243,7 @@ export class Connections {
       login,
       agent: `@${connection.agent.handle}`,
       program: harness.id,
-      identity: { server: origin, workspace: connection.workspaceId, agent: connection.agent.id },
+      identity: { server: origin, workspace: connection.workspaceId, agent: connection.agent.id, program: harness.id },
     };
   }
 
@@ -1470,7 +1468,12 @@ export class Connections {
       // (agent-runs-contract.md §8.2): that agent of that workspace only. Not done yet: nothing else is, and the same
       // plan may be carried out again.
       const removed = plan.revoke
-        ? await this.parts.removeRuns({ server: origin, workspace: ref.workspaceId, agent: ref.agentId })
+        ? await this.parts.removeRuns({
+            server: origin,
+            workspace: ref.workspaceId,
+            agent: ref.agentId,
+            program: ref.tool,
+          })
         : { ok: true as const };
       if (!removed.ok) {
         this.plans.set(plan.id, plan);

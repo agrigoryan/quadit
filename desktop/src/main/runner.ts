@@ -216,11 +216,10 @@ export class Runner {
   }
 
   /**
-   * The entries of the agent `of.agent` of the workspace `of.workspace` on
-   * the server at `of.server` (an agent of one workspace: the entries are
-   * bound to all three), and what each does now, as its card says them;
-   * never another workspace's, whatever login file it has. Null when the
-   * list cannot be read.
+   * The entries of one connection's runs (`of`: the agent of a workspace on
+   * a server, and its program), and what each does now, as its card says
+   * them; never another workspace's or program's, whatever login file it
+   * has. Null when the list cannot be read.
    */
   async entries(of: RunsOf): Promise<RunEntryView[] | null> {
     let list: RunList;
@@ -310,8 +309,8 @@ export class Runner {
   }
 
   /**
-   * `quadit run remove ID` for the entry `entry`, or for each entry of one
-   * agent of one workspace (`of`, as the card shows them: entries), which
+   * `quadit run remove ID` for the entry `entry`, or for each of one
+   * connection's runs (`of`, as the card shows them: entries), which
    * stops its run, tells the server how it ended and lets the project go,
    * waiting for that. Done only when a fresh read of the registry has none
    * of them: one still there and marked removing is `pending` (the runner
@@ -543,16 +542,26 @@ export class Runner {
   }
 }
 
-/** One agent of one workspace of one server, as the registry binds its entries: the server's address and the ids. */
+/**
+ * One connection's runs: one agent of one workspace of one server, as the
+ * registry binds its entries (the server's address and the ids), run as one
+ * program, since Claude Code and Codex may both work as the same agent.
+ */
 export interface RunsOf {
   server: string;
   workspace: string;
   agent: string;
+  program: string;
 }
 
-/** Whether the entry `e` is bound to the agent `of`: its server, workspace and agent. */
+/** Whether the entry `e` is one of `of`'s runs: its server, workspace, agent and program. */
 function isOf(e: Listed, of: RunsOf): boolean {
-  return sameServer(e.server ?? "", of.server) && e.workspace_id === of.workspace && e.agent_id === of.agent;
+  return (
+    sameServer(e.server ?? "", of.server) &&
+    e.workspace_id === of.workspace &&
+    e.agent_id === of.agent &&
+    e.program === of.program
+  );
 }
 
 /** Whether two server addresses are the same server's: alike but for a trailing "/". */

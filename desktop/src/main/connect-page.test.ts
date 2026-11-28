@@ -38,10 +38,15 @@ function harness({
 }: { covered?: string; available?: boolean; unreadable?: boolean; workspace?: boolean } = {}) {
   let handlers: Partial<PageHandlers> = {};
   const said: string[] = [];
-  const identity = (agent: string) => ({ server: "https://s1.example", workspace: "w1", agent });
+  const identity = (agent: string, program: string) => ({
+    server: "https://s1.example",
+    workspace: "w1",
+    agent,
+    program,
+  });
   const logins: Record<string, { login: string; agent: string; program: "claude" | "codex"; identity: object }> = {
-    claude: { login: "/q/claude.json", agent: "@claude", program: "claude", identity: identity("as-claude") },
-    codex: { login: "/q/codex.json", agent: "@codex", program: "codex", identity: identity("as-codex") },
+    claude: { login: "/q/claude.json", agent: "@claude", program: "claude", identity: identity("as-claude", "claude") },
+    codex: { login: "/q/codex.json", agent: "@codex", program: "codex", identity: identity("as-codex", "codex") },
   };
   // Quadit's runs, by agent: never by login file.
   const entries: Record<string, RunEntryView[]> = {

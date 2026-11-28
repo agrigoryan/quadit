@@ -205,7 +205,7 @@ function setUp({
     connected: (key, code) => void told.push(`connected ${key.replaceAll("\n", " ")} ${code ?? "-"}`),
     disconnected: (key) => void told.push(`disconnected ${key.replaceAll("\n", " ")}`),
     removeRuns: async (of) => {
-      runs.removed.push(`${of.server} ${of.workspace} ${of.agent}`);
+      runs.removed.push(`${of.server} ${of.workspace} ${of.agent} ${of.program}`);
       runs.during?.();
       if (!runs.refused) return { ok: true };
       return runs.failed ? { ok: false, error: runs.failed } : { ok: false, error: "still telling…", pending: true };
@@ -1048,7 +1048,7 @@ posixOnly("Quadit running a connected tool's agent (agent-runs-contract.md §8.2
       login: join(configDir, "claude.json"),
       agent: "@coder",
       program: "claude",
-      identity: { server: ORIGIN, workspace: "w1", agent: "u2" },
+      identity: { server: ORIGIN, workspace: "w1", agent: "u2", program: "claude" },
     });
     expect(connections.runAs(await refIn(connections, "codex"))).toMatchObject({
       login: join(configDir, "codex.json"),
@@ -1090,7 +1090,7 @@ posixOnly("Quadit running a connected tool's agent (agent-runs-contract.md §8.2
       error: "Quadit is still telling the server how @coder's last run ended. Disconnect again in a moment.",
     });
     // That agent of that workspace, whatever file its login is in.
-    expect(runs.removed).toEqual([`${ORIGIN} w1 u2`]);
+    expect(runs.removed).toEqual([`${ORIGIN} w1 u2 claude`]);
     // Nothing taken back, nothing revoked: still connected, as it was.
     expect(existsSync(login)).toBe(true);
     expect(json(".claude/settings.json")).toMatchObject({ env: { QUADIT_CONFIG: login } });
@@ -1100,7 +1100,7 @@ posixOnly("Quadit running a connected tool's agent (agent-runs-contract.md §8.2
     // Pressed again once Quadit is done: the same plan carries it out.
     runs.refused = false;
     expect(await connections.applyDisconnect(planned.plan.id)).toMatchObject({ ok: true });
-    expect(runs.removed).toEqual([`${ORIGIN} w1 u2`, `${ORIGIN} w1 u2`]);
+    expect(runs.removed).toEqual([`${ORIGIN} w1 u2 claude`, `${ORIGIN} w1 u2 claude`]);
     expect(asked.at(-1)).toEqual({ kind: "revoke-token", token: "t1" });
     expect(existsSync(login)).toBe(false);
   });
@@ -1674,7 +1674,7 @@ function setUpSeveral({ surface = "3.1", revokeRefused = "" }: { surface?: strin
     connected: (key, code) => void told.push(`connected ${key.split("\n")[2]} ${code ?? "-"}`),
     disconnected: (key) => void told.push(`disconnected ${key.split("\n")[2]}`),
     removeRuns: async (of) => {
-      removed.push(`${of.workspace} ${of.agent}`);
+      removed.push(`${of.workspace} ${of.agent} ${of.program}`);
       return { ok: true };
     },
     ask: async (_server, workspace, request) => {
@@ -1845,7 +1845,7 @@ posixOnly("A tool in several workspaces (multi-workspace design §3.6)", () => {
       login: join(configDir, "claude-personal.json"),
       agent: "@coder",
       program: "claude",
-      identity: { server: ORIGIN, workspace: "w2", agent: "p2" },
+      identity: { server: ORIGIN, workspace: "w2", agent: "p2", program: "claude" },
     });
     expect(connections.agentsOf("s1", "w2")).toEqual([
       {
@@ -1895,7 +1895,7 @@ posixOnly("A tool in several workspaces (multi-workspace design §3.6)", () => {
     ]);
     asked.length = 0;
     await disconnect("claude", "w2");
-    expect(removed).toEqual(["w2 p2"]);
+    expect(removed).toEqual(["w2 p2 claude"]);
     expect(asked).toEqual([["w2", { kind: "revoke-token", token: "t2" }]]);
     expect(existsSync(join(configDir, "claude-personal.json"))).toBe(false);
     expect(existsSync(join(configDir, "claude.json"))).toBe(true);
