@@ -4,7 +4,7 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
-The server upgrades its database when it starts (migration 0033), copying it first; `quadit upgrade --undo` goes back ([upgrades](docs/install.md#upgrades)). It makes every status of the type waiting an ordinary started status, with its name, colour and place kept; no task moves. What named the type elsewhere is rewritten:
+The server upgrades its database when it starts (migrations 0033 and 0034), copying it first; `quadit upgrade --undo` goes back ([upgrades](docs/install.md#upgrades)). 0034 records when each webhook and rule was made (see Fixed). 0033 makes every status of the type waiting an ordinary started status, with its name, colour and place kept; no task moves. What named the type elsewhere is rewritten:
 
 - A template's status, and a GitHub integration's `on_open` and `on_merge`, that said `waiting` say `started`, except on a row of one project that has a status called Waiting, which it meant and still means.
 - A rule on a move into the type (`to_category: waiting`) is set to started and turned off, for an admin to look at again.
@@ -20,6 +20,9 @@ Everything that already asked for started now takes in the statuses that were wa
 - `scripts/agent-workspaces-check.sh claude|codex` checks by hand, with the real tool and the skill under test, one tool in two workspaces at once: a folder tied to none asks which, two chats each listen and answer in their own, a logout stops only its chat, and a companion listens in one while a chat listens in the other.
 - The agent surface is 3.1: `quadit login`, `logout` and `use`, and `--workspace=` on every command, are added to it, nothing removed; `quadit version` says `(agent surface 3.1)`, which the desktop app reads before it gives a tool a login in a second workspace.
 - The connect-code line says its workspace (`Connect to Quadit K7PQ2M in Personal`), and the agent sends the code to that workspace's server alone (`quadit connect K7PQ2M --workspace=Personal`); the line that has an agent listen says it too (“listen to Quadit for SVA in Personal”).
+- In the desktop app, a tool connected in one workspace offers **Connect here as well** on the Connect agents window of another, with the same agent name made for it there, then asks which folders work in that workspace; **Disconnect from** a workspace takes only that one away, and stops only its runs.
+- Page comments as Notion has them: a button beside the block under the pointer starts a thread on it; threads sit in the margin level with their words when the window has room (the text narrows for them), as a count beside the block when it has not, and in a sheet from the bottom on a phone; the page's own discussion is under its title; the header's Discussions lists every thread, and See all opens them in a pane. Page comments take files by paperclip, paste or drop, and keep an unsent draft per person.
+- One `@` menu in every comment box offers people, tasks and pages in sections; a task's comment box has the paperclip, `@` and send buttons of the page's.
 - Picking yourself in a filter (Assignee, Waiting on) is "Me" in the list, and the page's address and a view saved from it say `me`: a shared view shows each person their own. Views saved before with your name keep it.
 
 ### Changed
@@ -33,6 +36,7 @@ Everything that already asked for started now takes in the statuses that were wa
 
 ### Fixed
 
+- A card dragged with the mouse on a board never landed in another column, and dragging between two columns could flip back and forth until the page failed (React error #185). It goes to the column under the pointer.
 - A webhook or a rule made while the server was still catching up on changes just made (a long batch, a busy server) could be sent those earlier events, or act on them. Each hears only what happens after it is made: migration 0034 keeps the feed's position it was made at.
 - The desktop app never said a newer version was out: every desktop build so far is a pre-release, which the check skipped, and it read 0.1.0-beta.14 and 0.1.0-beta.15 as the same version. A beta now hears of newer betas and of releases, a release only of releases, and versions are ordered as Semantic Versioning orders them. An app before this fix still says nothing: install the newer one by hand once.
 
