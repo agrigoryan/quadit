@@ -197,10 +197,11 @@ test("a tool the app can run gives its code back by itself in the first run, and
     const page = await desktop.pageOf(origin);
     await expect(page.getByText(/is for Claude Code/)).toBeVisible({ timeout: 20_000 });
     // Under its task's comment box: nothing listens for it, and the line that has it listen. The workspace has one
-    // project (the samples): the line is plain, so the chat listens to everything and a project added later is heard.
+    // project (the samples): the line names no project, so the chat listens to everything and a project added later is
+    // heard; it names the workspace, which the web page always does (it cannot know which folders are tied to it).
     await page.goto(`${origin}/personal/task/GS-3`);
     await expect(
-      page.getByText(/is not listening\. To have it answer here, say “listen to Quadit” in Claude Code\./),
+      page.getByText(/is not listening\. To have it answer here, say “listen to Quadit in Personal” in Claude Code\./),
     ).toBeVisible({ timeout: 20_000 });
     await screen(page, "08b-not-listening.png");
   } finally {
