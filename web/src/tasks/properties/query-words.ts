@@ -1,24 +1,23 @@
 // How a task query names what it filters by, both ways: a member as
 // "@handle", "me", "none" or "outside", a row by its name or its id. A saved
-// view or an address written by hand reads the same as one made here.
+// view or an address written by hand reads the same as one made here. "me"
+// stays "me" both ways, so a view says whoever opens it, not who saved it.
 
 import type { Dict } from "@/data/store";
-import { NONE, OUTSIDE, type QueryContext, type QuerySource } from "@/tasks/properties/property";
+import { ME, NONE, OUTSIDE, type QueryContext, type QuerySource } from "@/tasks/properties/property";
 
 const low = (s: string) => s.toLowerCase();
 
-/** The user id a query's word for a member stands for; undefined when it names nobody here. */
-export function memberOf(ref: string, { c, meId }: QueryContext): string | undefined {
-  if (ref === NONE) return NONE;
-  if (ref === OUTSIDE) return OUTSIDE;
-  if (ref === "me") return meId;
+/** The user id a query's word for a member stands for (or ME, NONE, OUTSIDE); undefined when it names nobody here. */
+export function memberOf(ref: string, { c }: QueryContext): string | undefined {
+  if (ref === NONE || ref === OUTSIDE || ref === ME) return ref;
   const handle = low(ref.replace(/^@/, ""));
   return Object.values(c.members).find((m) => m.user_id === ref || low(m.handle) === handle)?.user_id;
 }
 
-/** A member as the address writes it: "@handle"; "none" and "outside" as they are. */
+/** A member as the address writes it: "@handle"; "me", "none" and "outside" as they are. */
 export const memberWord = (id: string, c: QuerySource) =>
-  id === NONE || id === OUTSIDE ? id : c.members[id] ? `@${c.members[id].handle}` : id;
+  id === NONE || id === OUTSIDE || id === ME ? id : c.members[id] ? `@${c.members[id].handle}` : id;
 
 /** The ids of the rows a query's word names, by id or by name, in the projects the query is about. */
 export const rowsNamed = <T extends { id: string; name: string; project_id?: string }>(

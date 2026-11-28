@@ -10,6 +10,7 @@ import { ProjectGlyph } from "@/ui/project-glyph";
 import { useManageLinks } from "@/tasks/manage";
 import {
   type Choice,
+  ME,
   NONE,
   type PickerListProps,
   type PickerPart,
@@ -122,6 +123,20 @@ export function memberItems(
         keywords: `@${m.handle}`,
       };
     });
+}
+
+/**
+ * People and agents as a filter's rows, with me first as "Me": picked, the
+ * filter holds ME, so the page's address and a saved view say "me" and a
+ * shared view shows each person their own. A view that names me by handle,
+ * as views saved before did, keeps a row of my own name while it does.
+ */
+export function memberFilterItems(members: Member[], meId: string, picked: string[]): PickerItem[] {
+  const items = memberItems(members, meId);
+  const mine = items.find((item) => item.id === meId);
+  const others = items.filter((item) => item.id !== meId || picked.includes(meId));
+  if (!mine) return others;
+  return [{ ...mine, id: ME, label: t("filter.me"), keywords: `${mine.label} ${mine.keywords ?? ""}` }, ...others];
 }
 
 /** Projects as picker rows: the mark, the name, the key. */

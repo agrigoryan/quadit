@@ -5,7 +5,7 @@
 import type { Collections, Dict } from "@/data/store";
 import type { SortBy, Task, TaskQuery } from "@/types/core";
 import { type FilterName, FILTERS, type Grouping, GROUPINGS } from "@/tasks/properties";
-import type { GroupHead, GroupSource, QueryContext, QuerySource } from "@/tasks/properties/property";
+import { type GroupHead, type GroupSource, ME, type QueryContext, type QuerySource } from "@/tasks/properties/property";
 
 /**
  * What a task list is filtered by: for each property it can be filtered by
@@ -30,16 +30,23 @@ export function countFilters(f: Filters): number {
 
 export const sameFilters = (a: Filters, b: Filters) => JSON.stringify(a) === JSON.stringify(b);
 
-/** Builds the test a task must pass. `openDecisionTasks` holds the ids of tasks with an open question. */
+/**
+ * Builds the test a task must pass. `openDecisionTasks` holds the ids of
+ * tasks with an open question; `meId` is whoever looks, whom ME stands for.
+ */
 export function matcher(
   f: Filters,
   c: Pick<Collections, "statuses">,
   openDecisionTasks: Dict<unknown>,
+  meId: string,
 ): (task: Task) => boolean {
   const text = f.text.trim().toLowerCase();
-  const set = FILTERS.filter((p) => f[p.name].length > 0);
+  const set = FILTERS.filter((p) => f[p.name].length > 0).map((p) => ({
+    matches: p.filter.matches,
+    picked: f[p.name].map((v) => (v === ME ? meId : v)),
+  }));
   return (task) => {
-    if (!set.every((p) => p.filter.matches(task, f[p.name], c))) return false;
+    if (!set.every(({ matches, picked }) => matches(task, picked, c))) return false;
     if (f.openDecision && !openDecisionTasks[task.id]) return false;
     if (text && !task.title.toLowerCase().includes(text) && !task.key.toLowerCase().includes(text)) return false;
     return true;
@@ -109,7 +116,7 @@ const SORT_TO_QUERY: Record<SortBy, string> = {
   due: "due",
 };
 
-/** The filters as the server's TaskQuery, for a saved view. Everything is sent as ids. */
+/** The filters as the server's TaskQuery, for a saved view. Everything is sent as ids, but for "me", "none" and "outside". */
 export function toQuery(f: Filters, projectKey: string | undefined, sort: SortBy): TaskQuery {
   const q: Record<string, unknown> = {};
   if (projectKey) q.project = [projectKey];
@@ -175,14 +182,13 @@ export function normalizeQuery(raw: unknown): TaskQuery | null {
  * gone (a deleted label, status or epic, a person removed): the server
  * refuses those, and no task can match them.
  */
-export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string, _today?: string): Filters {
+export function fromQuery(q: TaskQuery | undefined, c: QuerySource): Filters {
   if (!q) return emptyFilters;
   const projectIds = (q.project ?? [])
     .map((ref) => Object.values(c.projects).find((p) => p.id === ref || p.key.toLowerCase() === ref.toLowerCase())?.id)
     .filter(Boolean) as string[];
   const ctx: QueryContext = {
     c,
-    meId,
     inScope: (projectId) => projectIds.length === 0 || !projectId || projectIds.includes(projectId),
   };
   return {
@@ -200,10 +206,10 @@ export function fromQuery(q: TaskQuery | undefined, c: QuerySource, meId: string
  * write over the query, each with the values that are left (undefined when
  * none is), or null when nothing is gone.
  */
-export function goneFromQuery(q: TaskQuery, c: QuerySource, meId: string, today: string): Partial<TaskQuery> | null {
+export function goneFromQuery(q: TaskQuery, c: QuerySource): Partial<TaskQuery> | null {
   /** Whether a word still names something: read alone, it gives some filter a value. */
   const found = (one: Record<string, unknown>) => {
-    const f = fromQuery({ project: q.project, ...one }, c, meId, today);
+    const f = fromQuery({ project: q.project, ...one }, c);
     return FILTERS.some((p) => f[p.name].length > 0);
   };
   const patch: Record<string, unknown> = {};

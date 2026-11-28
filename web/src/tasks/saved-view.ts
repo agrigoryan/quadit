@@ -4,7 +4,6 @@
 // removed), which the page leaves out and offers to save the view without.
 
 import { useMemo, useState } from "react";
-import { today } from "@/lib/time";
 import type { TaskQuery, View } from "@/types/core";
 import { fromQuery, goneFromQuery, normalizeQuery, sameFilters, sortFromQuery } from "@/tasks/filters";
 import { defaultViewState, readDisplay, type ViewState } from "@/tasks/view-state";
@@ -19,13 +18,13 @@ export interface SavedView {
   saved: ViewState | null;
 }
 
-function readSaved(view: View | undefined, query: TaskQuery | null, tables: QuerySource, meId: string) {
+function readSaved(view: View | undefined, query: TaskQuery | null, tables: QuerySource) {
   if (!view) return defaultViewState;
   if (!query) return null;
   try {
     const display = readDisplay(view.display);
     return {
-      filters: fromQuery(query, tables, meId, today()),
+      filters: fromQuery(query, tables),
       group: display.group,
       boardGroup: display.boardGroup,
       sort: display.sort ?? sortFromQuery(query) ?? "manual",
@@ -60,14 +59,11 @@ function useSameWhileEqual(value: ViewState | null): ViewState | null {
   return value;
 }
 
-export function useSavedView(view: View | undefined, tables: QuerySource, meId: string): SavedView {
+export function useSavedView(view: View | undefined, tables: QuerySource): SavedView {
   // A view written by hand or by an agent may hold a query the page cannot read; it then says so instead of failing.
   const query = useMemo(() => normalizeQuery(view?.query), [view?.query]);
   const isView = view !== undefined;
-  const gone = useMemo(
-    () => (isView && query ? goneFromQuery(query, tables, meId, today()) : null),
-    [isView, query, tables, meId],
-  );
-  const read = useMemo(() => readSaved(view, query, tables, meId), [view, query, tables, meId]);
+  const gone = useMemo(() => (isView && query ? goneFromQuery(query, tables) : null), [isView, query, tables]);
+  const read = useMemo(() => readSaved(view, query, tables), [view, query, tables]);
   return { query, gone, saved: useSameWhileEqual(read) };
 }

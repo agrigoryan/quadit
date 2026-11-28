@@ -132,6 +132,7 @@ export const tasks = {
   "filter.cycle": "Cycle",
   "filter.estimate": "Estimate",
   "filter.waitingOn": "Waiting on",
+  "filter.me": "Me",
   "filter.openDecision": "Has open question",
   "filter.remove": "Remove filter: {name}",
   "filter.clear": "Clear",

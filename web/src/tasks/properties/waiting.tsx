@@ -22,7 +22,7 @@ import {
   type TaskProperty,
 } from "@/tasks/properties/property";
 import { memberOf, memberWord } from "@/tasks/properties/query-words";
-import { memberItems, noneItem, useListeningFor } from "@/tasks/property-picker";
+import { memberFilterItems, memberItems, noneItem, useListeningFor } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Input, Textarea } from "@/ui/input";
@@ -233,12 +233,12 @@ export const waiting = {
     title: () => t("filter.waitingOn"),
     holds: "one",
     // People first and "nothing" last, unlike the picker's list.
-    useOptions: () => {
+    useOptions: (_project, picked) => {
       const members = useMembers();
       const me = useMe();
       return useMemo(
         () => [
-          ...memberItems(members, me.user_id),
+          ...memberFilterItems(members, me.user_id, picked),
           {
             id: OUTSIDE,
             label: t("prop.outside"),
@@ -247,7 +247,7 @@ export const waiting = {
           },
           noneItem(t("prop.nobody")),
         ],
-        [members, me.user_id],
+        [members, me.user_id, picked],
       );
     },
     matches: (task, [on]) => {

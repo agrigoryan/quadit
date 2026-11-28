@@ -15,7 +15,7 @@ const tables: QuerySource = { projects: {}, members: {}, statuses: {}, labels: {
 function page(scope: string, address: string) {
   return renderHook(
     () => ({
-      page: usePageState({ scope, saved: null, tables, meId: "me", project: undefined, routeLayout: undefined }),
+      page: usePageState({ scope, saved: null, tables, project: undefined, routeLayout: undefined }),
       search: useLocation().search,
     }),
     {

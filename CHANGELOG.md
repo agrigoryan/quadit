@@ -4,6 +4,10 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+### Added
+
+- Picking yourself in a filter (Assignee, Waiting on) is "Me" in the list, and the page's address and a view saved from it say `me`: a shared view shows each person their own. Views saved before with your name keep it.
+
 ## [0.9.0] - 2026-11-27
 
 The server upgrades its database when it starts (migrations 0031 and 0032), copying it first; `quadit upgrade --undo` goes back ([upgrades](docs/install.md#upgrades)). It changes the feed's older events: an estimate cleared, or set where there was none, said that none as 0, and now says it as `null`, as the feed does from this version on. And a comment deleted before no longer mentions what its text named: a task stops listing a page only that comment named.

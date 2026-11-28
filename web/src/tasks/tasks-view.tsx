@@ -57,16 +57,9 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
   );
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
 
-  const { query, gone, saved } = useSavedView(view, tables, me.user_id);
+  const { query, gone, saved } = useSavedView(view, tables);
   const scope = view ? `view:${view.id}` : `project:${project?.id ?? ""}`;
-  const { state, setState, setFilters } = usePageState({
-    scope,
-    saved,
-    tables,
-    meId: me.user_id,
-    project,
-    routeLayout,
-  });
+  const { state, setState, setFilters } = usePageState({ scope, saved, tables, project, routeLayout });
   usePageTitle(view ? view.name : (project?.name ?? ""));
   const all = useLiveTasks();
   const openDecisions = useOpenDecisions();
@@ -82,11 +75,11 @@ export function TasksView({ project, view, layout: routeLayout }: Props) {
 
   const board = state.layout === "board";
   const tasks = useMemo(() => {
-    const match = matcher(state.filters, { statuses }, openDecisions);
+    const match = matcher(state.filters, { statuses }, openDecisions, me.user_id);
     const scoped = new Set(projectIds);
     const inScope = all.filter((task) => (scoped.size === 0 || scoped.has(task.project_id)) && match(task));
     return inScope.sort(comparer(board ? "manual" : state.sort));
-  }, [all, state.filters, state.sort, board, statuses, openDecisions, projectIds]);
+  }, [all, state.filters, state.sort, board, statuses, openDecisions, projectIds, me.user_id]);
 
   // The board keeps every column; the list leaves out sections with nothing in them. Finished work arrives
   // after the rest: until it has, the Done and Canceled sections stay, saying so, instead of looking empty.

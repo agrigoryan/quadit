@@ -56,12 +56,12 @@ const TASKS = [
   task("done", { status_id: "s-done", waiting_outside: true }),
 ];
 
-const read = (search: string) => filtersFromSearch(search, source, "u1", "2000-01-05", "SVA");
+const read = (search: string) => filtersFromSearch(search, source, "SVA");
 /** The tasks an address lets through. */
 const shown = (search: string, open: Dict<unknown> = {}) => {
   const f = read(search);
   if (!f) return null;
-  return TASKS.filter(matcher(f, { statuses }, open)).map((t) => t.id);
+  return TASKS.filter(matcher(f, { statuses }, open, "u1")).map((t) => t.id);
 };
 /** The address written back for what an address was read as. */
 const again = (search: string) => {
@@ -73,10 +73,21 @@ describe("a task page's filters in its address", () => {
   it("assignee: by handle, me, or none", () => {
     expect(shown("?assignee=@coder")).toEqual(["bot"]);
     expect(shown("?assignee=me,none")).toEqual(["plain", "ann", "done"]);
-    expect(again("?assignee=me,none")).toBe("?assignee=@ann,none");
+    expect(again("?assignee=me,none")).toBe("?assignee=me,none");
     expect(toQuery(read("?assignee=@coder,none")!, "SVA", "manual")).toMatchObject({
       assignee: ["u2", "none"],
     });
+  });
+
+  it("me: whoever looks, kept as me in the address and in a saved view; a handle that is mine stays a handle", () => {
+    expect(toQuery(read("?assignee=me")!, "SVA", "manual")).toMatchObject({ assignee: ["me"] });
+    expect(toQuery(read("?waiting_on=me")!, "SVA", "manual")).toMatchObject({ waiting_on: "me" });
+    expect(shown("?waiting_on=me")).toEqual(["bot"]);
+    // Whoever else opens the same address sees what waits on them.
+    const f = read("?waiting_on=me");
+    expect(f && TASKS.filter(matcher(f, { statuses }, {}, "u2")).map((t) => t.id)).toEqual([]);
+    expect(again("?assignee=@ann")).toBe("?assignee=@ann");
+    expect(toQuery(read("?assignee=@ann")!, "SVA", "manual")).toMatchObject({ assignee: ["u1"] });
   });
 
   it("status: by name; a category's name reads as the status type", () => {
@@ -148,7 +159,7 @@ describe("a task page's filters in its address", () => {
     const all =
       "?q=x&waiting_on=none&estimate=5&cycle=4&epic=none&priority=2&label=bug&category=done&status=Doing&assignee=me";
     expect(again(all)).toBe(
-      "?assignee=@ann&status=Doing&category=done&label=bug&priority=2&epic=none&cycle=cy1&estimate=L&waiting_on=none&q=x",
+      "?assignee=me&status=Doing&category=done&label=bug&priority=2&epic=none&cycle=cy1&estimate=L&waiting_on=none&q=x",
     );
     const f = read("?label=bug");
     expect(f && searchFromFilters(f, source, "p1", "?view=board&label=art")).toBe("?view=board&label=bug");

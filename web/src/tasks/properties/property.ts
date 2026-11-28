@@ -21,6 +21,12 @@ export const NONE = "none";
  * the "waiting on" filter, in a picker, and in the change that sets it.
  */
 export const OUTSIDE = "outside";
+/**
+ * Whoever looks, where a member's id would be: in a filter, the page's
+ * address and a saved view. A shared view that says it shows each person
+ * their own tasks; only matching a task asks who that is.
+ */
+export const ME = "me";
 
 export interface TaskProperty<Name extends string = string> {
   name: Name;
@@ -109,7 +115,6 @@ export type QuerySource = Pick<Collections, "projects" | "members" | "statuses" 
 /** What reading a stored query's words needs. */
 export interface QueryContext {
   c: QuerySource;
-  meId: string;
   /** Whether a row of this project is one the query is about: any, when it names no project. */
   inScope: (projectId: string | undefined) => boolean;
 }
@@ -132,7 +137,7 @@ export interface FilterPart {
    * picked value may be one it no longer offers (an estimate off the scale).
    */
   useOptions: (project: Project | undefined, picked: string[]) => PickerItem[];
-  /** Whether a task passes, for the values picked (never none). */
+  /** Whether a task passes, for the values picked (never none); ME is already the id of whoever looks. */
   matches: (task: Task, picked: string[], c: Pick<Collections, "statuses">) => boolean;
   /**
    * The values a stored query stands for. A view may have been written by

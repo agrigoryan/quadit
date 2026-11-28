@@ -57,7 +57,7 @@ const filters = (over: Partial<Filters>): Filters => ({ ...emptyFilters, ...over
 
 describe("matcher", () => {
   const ids = (f: Partial<Filters>, tasks: Task[], open: Dict<unknown> = {}) =>
-    tasks.filter(matcher(filters(f), { statuses }, open)).map((t) => t.id);
+    tasks.filter(matcher(filters(f), { statuses }, open, "u1")).map((t) => t.id);
 
   it("passes every task with no filter set", () => {
     const tasks = [task({ id: "a" }), task({ id: "b", assignee_id: "u1" })];
@@ -261,9 +261,9 @@ describe("toQuery and fromQuery", () => {
     // The server's names for the project and the sort.
     expect(q).toMatchObject({ project: ["SVA"], sort: "due" });
     expect(toQuery(emptyFilters, undefined, "updated")).toEqual({ sort: "-updated" });
-    expect(fromQuery(q, source, "u1")).toEqual(f);
+    expect(fromQuery(q, source)).toEqual(f);
     expect(sortFromQuery(q)).toBe("due");
-    expect(fromQuery(toQuery(emptyFilters, undefined, "manual"), source, "u1")).toEqual(emptyFilters);
+    expect(fromQuery(toQuery(emptyFilters, undefined, "manual"), source)).toEqual(emptyFilters);
   });
 
   it("read names where ids belong, and drop what names nothing or something gone", () => {
@@ -276,8 +276,8 @@ describe("toQuery and fromQuery", () => {
       cycle: ["4"],
       estimate: ["M", "5", "NONE", "0", "big", "-1"],
     };
-    expect(fromQuery(q, source, "u1")).toMatchObject({
-      assignee: ["u1", "u2"],
+    expect(fromQuery(q, source)).toMatchObject({
+      assignee: ["me", "u2"],
       status: ["s-doing", "s-done"],
       category: ["waiting"],
       label: ["l-bug"],
@@ -288,8 +288,8 @@ describe("toQuery and fromQuery", () => {
   });
 
   it("read an estimate a view stores as numbers or as one word", () => {
-    expect(fromQuery(normalizeQuery({ estimate: [5, 8] }) ?? {}, source, "u1").estimate).toEqual(["5", "8"]);
-    expect(fromQuery(normalizeQuery({ estimate: "m" }) ?? {}, source, "u1").estimate).toEqual(["3"]);
+    expect(fromQuery(normalizeQuery({ estimate: [5, 8] }) ?? {}, source).estimate).toEqual(["5", "8"]);
+    expect(fromQuery(normalizeQuery({ estimate: "m" }) ?? {}, source).estimate).toEqual(["3"]);
   });
 
   it("send the estimate as a list of words, as the server reads it", () => {

@@ -113,14 +113,14 @@ describe("FilterBar", () => {
   });
 
   it.each([
-    ["Assignee", ["Unassigned", "Ann", "Coder"], "Coder", { assignee: ["u2"] }],
+    ["Assignee", ["Me", "Coder", "Unassigned"], "Coder", { assignee: ["u2"] }],
     ["Status", ["Todo", "Doing"], "Doing", { status: ["s2"] }],
     ["Status type", ["Backlog", "To do", "In progress", "Waiting", "Done", "Canceled"], "Done", { category: ["done"] }],
     ["Label", ["bug", "Manage labels"], "bug", { label: ["l1"] }],
     ["Priority", ["No priority", "Urgent", "High", "Medium", "Low"], "Low", { priority: [4] }],
     ["Epic", ["No epic", "Launch"], "No epic", { epic: ["none"] }],
     ["Cycle", ["No cycle", "Cycle 4"], "Cycle 4", { cycle: ["c1"] }],
-    ["Waiting on", ["Ann", "Coder", "An outside event", "Nobody"], "An outside event", { waiting_on: "outside" }],
+    ["Waiting on", ["Me", "Coder", "An outside event", "Nobody"], "An outside event", { waiting_on: "outside" }],
   ])("%s: offers its values and filters by the one picked", (filter, values, value, query) => {
     const onChange = renderBar(emptyFilters, project("p1"));
     addFilter();
@@ -166,5 +166,25 @@ describe("FilterBar", () => {
     expect(options()).toEqual(["No estimate", "1 point", "2 points", "3 points", "4 points", "5 points", "8 points"]);
     choose("4 points");
     expect(onChange.mock.lastCall?.[0]).toMatchObject({ estimate: [] });
+  });
+
+  it.each([
+    ["Assignee", { assignee: ["me"] }],
+    ["Waiting on", { waiting_on: "me" }],
+  ])("%s: picking myself filters by me, which a shared view reads as whoever opens it", (filter, query) => {
+    const onChange = renderBar(emptyFilters, undefined);
+    addFilter();
+    choose(filter);
+    choose("Me");
+    const next = onChange.mock.lastCall?.[0] as Filters;
+    expect(toQuery(next, undefined, "manual")).toEqual({ ...query, sort: "rank" });
+  });
+
+  it("shows me as Me, and a view saved with my own name by that name, offering both", () => {
+    renderBar({ ...emptyFilters, waiting: ["me"], assignee: ["u1"] }, undefined);
+    expect(screen.getByRole("button", { name: /^Waiting on\s*Me$/ })).toBeInTheDocument();
+    const named = screen.getByRole("button", { name: /^Assignee\s*Ann$/ });
+    fireEvent.click(named);
+    expect(options()).toEqual(["Me", "Ann", "Coder", "Unassigned"]);
   });
 });

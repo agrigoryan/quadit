@@ -22,7 +22,7 @@ import {
   type TaskProperty,
 } from "@/tasks/properties/property";
 import { memberOf, memberWord } from "@/tasks/properties/query-words";
-import { memberItems, noneItem, useAssignOutlook, useListeningFor } from "@/tasks/property-picker";
+import { memberFilterItems, memberItems, noneItem, useAssignOutlook, useListeningFor } from "@/tasks/property-picker";
 import { Avatar } from "@/ui/avatar";
 import { ConnectionMark } from "@/ui/connection-mark";
 import { ListeningDot } from "@/ui/listening-dot";
@@ -174,12 +174,13 @@ export const assignee = {
   filter: {
     word: "assignee",
     title: () => t("filter.assignee"),
-    useOptions: () => {
+    // Me first and "unassigned" last, as the wait's filter has them; the picker that assigns keeps its own order.
+    useOptions: (_project, picked) => {
       const members = useMembers();
       const me = useMe();
       return useMemo(
-        () => [noneItem(t("task.unassigned")), ...memberItems(members, me.user_id)],
-        [members, me.user_id],
+        () => [...memberFilterItems(members, me.user_id, picked), noneItem(t("task.unassigned"))],
+        [members, me.user_id, picked],
       );
     },
     matches: (task, picked) => picked.includes(task.assignee_id ?? NONE),

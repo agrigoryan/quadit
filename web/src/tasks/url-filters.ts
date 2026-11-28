@@ -21,13 +21,7 @@ export const hasFilters = (search: string): boolean => {
  * The filters an address asks for, or null when it asks for none. Names are
  * looked up in the project in view when there is one.
  */
-export function filtersFromSearch(
-  search: string,
-  c: QuerySource,
-  meId: string,
-  today: string,
-  projectKey: string | undefined,
-): Filters | null {
+export function filtersFromSearch(search: string, c: QuerySource, projectKey: string | undefined): Filters | null {
   const params = new URLSearchParams(search);
   if (!WORDS.some((word) => params.has(word))) return null;
   const raw: Record<string, unknown> = {};
@@ -50,7 +44,7 @@ export function filtersFromSearch(
   if (q) raw.q = q;
   if (projectKey) raw.project = [projectKey];
   const query: TaskQuery | null = normalizeQuery(raw);
-  return query ? fromQuery(query, c, meId, today) : null;
+  return query ? fromQuery(query, c) : null;
 }
 
 /**

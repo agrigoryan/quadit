@@ -5,7 +5,6 @@
 
 import { useEffect, useEffectEvent, useLayoutEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { today } from "@/lib/time";
 import type { Project } from "@/types/core";
 import { type Filters, sameFilters } from "@/tasks/filters";
 import type { QuerySource } from "@/tasks/properties/property";
@@ -18,7 +17,6 @@ interface Options {
   /** What the page starts from (tasks/saved-view.ts); null for a view it cannot read. */
   saved: ViewState | null;
   tables: QuerySource;
-  meId: string;
   project: Project | undefined;
   /** Project pages take their layout from the address (/tasks or /board). */
   routeLayout: "list" | "board" | undefined;
@@ -31,10 +29,10 @@ export interface PageState {
   setFilters: (filters: Filters) => void;
 }
 
-export function usePageState({ scope, saved, tables, meId, project, routeLayout }: Options): PageState {
+export function usePageState({ scope, saved, tables, project, routeLayout }: Options): PageState {
   const location = useLocation();
   const navigate = useNavigate();
-  const readAddress = () => filtersFromSearch(location.search, tables, meId, today(), project?.key);
+  const readAddress = () => filtersFromSearch(location.search, tables, project?.key);
 
   const initial = useMemo(() => {
     const start = saved ?? defaultViewState;
