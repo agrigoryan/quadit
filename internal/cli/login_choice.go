@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -284,8 +285,33 @@ func connectionClient(conn connection) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.ws = conn.ref()
+	c.ws, c.connection = conn.ref(), true
 	return c, nil
+}
+
+// loggedOut reports whether the client's login was taken away since it was
+// chosen (quadit logout): its file is gone, or, for one of the tool's
+// connections, its entry in the index. A login given in QUADIT_URL and
+// QUADIT_TOKEN never is; an index that cannot be read says nothing here,
+// the next request says what is wrong.
+func (c *Client) loggedOut() bool {
+	if c.login == "" {
+		return false
+	}
+	if _, err := os.Stat(c.login); errors.Is(err, os.ErrNotExist) {
+		return true
+	}
+	if !c.connection {
+		return false
+	}
+	idx, err := readIndex(filepath.Dir(c.login))
+	return err == nil && !slices.ContainsFunc(idx.Connections, func(o connection) bool { return samePath(o.Login, c.login) })
+}
+
+// errLoggedOut stops a listener whose login was taken away while it ran.
+// The lease it held runs out by itself, ninety seconds after its last hold.
+func (c *Client) errLoggedOut() error {
+	return fmt.Errorf("this tool is not connected to %s any more (quadit logout): it stopped listening there", cmp.Or(c.ws.Name, "this workspace"))
 }
 
 // whoAmI is what GET /me says of a login: who, in which workspace, and

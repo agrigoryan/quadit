@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -241,5 +242,100 @@ func TestTwoChatsWorkInTwoWorkspacesAtOnce(t *testing.T) {
 	}
 	if !strings.Contains(games.task(), "Still here") {
 		t.Fatal("the game chat's answer did not land")
+	}
+}
+
+// TestALogoutEndsAWaitAlreadyRunningInThatWorkspace: a chat's wait that
+// started before `quadit logout --workspace=acme` stops listening there at
+// its next hold, saying why, instead of holding Acme's lease until its for=
+// ends; and so does a companion.
+func TestALogoutEndsAWaitAlreadyRunningInThatWorkspace(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := filepath.Join(root, "quadit", "claude.json")
+	games := newChatWorkspace(t, "Games", "games", filepath.Join(root, "devel", "game"), "")
+	acmeW := newChatWorkspace(t, "Acme", "acme", filepath.Join(root, "devel", "site"), "")
+	for _, w := range []*chatWorkspace{games, acmeW} {
+		if code, said := quaditIn(t, config, root, w.agent, "login", w.q.url, "-"); code != 0 {
+			t.Fatalf("login to %s: %s", w.slug, said)
+		}
+	}
+	t.Setenv("QUADIT_CONFIG", config)
+	c, _, err := openLogin(context.Background(), workspaceAsk{named: "acme"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &runner{ctx: context.Background(), c: c, out: &syncBuffer{}}
+	ended := make(chan error, 1)
+	go func() {
+		// A wait of 150 seconds, in holds of one: the server's are 50.
+		ended <- r.waitFor(waitSpan{total: 150 * time.Second, hold: time.Second}, listenAsk{project: "SVA", by: "a chat"}, " for=150")
+	}()
+	for deadline := time.Now().Add(20 * time.Second); !acmeW.listening(); time.Sleep(50 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the wait never listened")
+		}
+	}
+	if code, out, errs := runCLI(t, "logout", "--workspace=acme"); code != 0 {
+		t.Fatalf("logout: %s%s", out, errs)
+	}
+	select {
+	case err := <-ended:
+		if err == nil || err.Error() != "this tool is not connected to Acme any more (quadit logout): it stopped listening there" {
+			t.Fatalf("the wait ended with %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("10 s after the logout the wait still holds Acme's lease")
+	}
+}
+
+// TestALogoutEndsACompanionInThatWorkspace: a companion whose login file
+// is taken away stops at its next hold, saying why.
+func TestALogoutEndsACompanionInThatWorkspace(t *testing.T) {
+	w := newToolWorld(t)
+	inbox := &inboxServer{}
+	srv := httptest.NewServer(inbox)
+	t.Cleanup(srv.Close)
+	login := filepath.Join(w.dir, "claude-acme.json")
+	writeJSON(t, login, map[string]string{"url": srv.URL, "token": "t"})
+	conn := connection{Tool: w.base, Login: login, Server: srv.URL, WorkspaceID: acme.ID, Workspace: acme.Slug, WorkspaceName: acme.Name}
+	if err := (connectionIndex{Connections: []connection{conn}}).write(w.dir); err != nil {
+		t.Fatal(err)
+	}
+	c, err := connectionClient(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &runner{ctx: context.Background(), c: c, out: &syncBuffer{}}
+	ended := make(chan error, 1)
+	go func() { ended <- r.listenWith(listenArgs([]string{"--exec", "true"}), time.Minute) }()
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		inbox.mu.Lock()
+		held := len(inbox.leases) > 0
+		inbox.mu.Unlock()
+		if held {
+			break
+		}
+		select {
+		case err := <-ended:
+			t.Fatalf("the companion ended before it listened: %v", err)
+		default:
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the companion never listened")
+		}
+	}
+	if err := os.Remove(login); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-ended:
+		if err == nil || !strings.HasPrefix(err.Error(), "this tool is not connected to Acme any more") {
+			t.Fatalf("the companion ended with %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the companion goes on without its login")
 	}
 }

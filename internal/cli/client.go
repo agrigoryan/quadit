@@ -46,6 +46,9 @@ type Client struct {
 	login string
 	// ws is the workspace of the login, once known (workspace).
 	ws workspaceRef
+	// connection is whether the login is one of the tool's connections in
+	// the index.
+	connection bool
 }
 
 // savedConfig is the file `quadit login` writes. App is there when the

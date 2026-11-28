@@ -96,6 +96,9 @@ func (r *runner) listenWith(opts listenOptions, renewEvery time.Duration) error 
 		// Until it holds a lease, a companion of a project first checks the
 		// server can listen by project; a server away is tried again as a
 		// read is.
+		if r.c.loggedOut() {
+			return r.c.errLoggedOut()
+		}
 		var page listened
 		ws, err := r.c.workspace(r.ctx) // asked once, of a login whose workspace the index does not hold
 		if err == nil {
@@ -480,6 +483,10 @@ func (r *runner) waitFor(span waitSpan, ask listenAsk, forArg string) error {
 	}
 	deadline := time.Now().Add(span.total)
 	for {
+		// A wait of an hour is many holds: one whose login was taken away meanwhile stops at the next.
+		if r.c.loggedOut() {
+			return r.c.errLoggedOut()
+		}
 		page, err := r.nextItem(r.ctx, ask, min(span.hold, time.Until(deadline)))
 		if err != nil {
 			var ae *APIError
