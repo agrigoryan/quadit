@@ -27,7 +27,8 @@ func TestARunLongerThanItsLimitIsEnded(t *testing.T) {
 	srv := &inboxServer{items: []int64{3}}
 	began := time.Now()
 	events, _ := listenFor(t, srv, []string{"limit=1", "tries=1", "--exec", exe}, func(events []map[string]any) bool {
-		return len(named(events, "gave_up")) == 1
+		_, acks := srv.state() // an item given up is acknowledged after it is reported
+		return len(named(events, "gave_up")) == 1 && len(acks) == 1
 	})
 	if took := time.Since(began); took > 5*time.Second {
 		t.Fatalf("ending the run took %s", took)

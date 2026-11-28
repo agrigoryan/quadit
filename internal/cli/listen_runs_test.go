@@ -86,8 +86,10 @@ func named(events []map[string]any, name string) []map[string]any {
 func TestListenGivesUpAnItemAfterItsTries(t *testing.T) {
 	srv := &inboxServer{items: []int64{3, 4}}
 	command := append([]string{"--exec"}, listenCommand(t, "fail-3")...)
+	// Listen acknowledges an item after it reports the run's end: the test waits for both.
 	events, said := listenFor(t, srv, append([]string{"tries=2", "by=the Quadit app"}, command...), func(events []map[string]any) bool {
-		return len(named(events, "run_ended")) == 3
+		_, acks := srv.state()
+		return len(named(events, "run_ended")) == 3 && len(acks) == 2
 	})
 	runs := named(events, "run_started")
 	if len(runs) != 3 || runs[0]["seq"] != 3.0 || runs[1]["seq"] != 3.0 || runs[2]["seq"] != 4.0 {
