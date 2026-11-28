@@ -10,7 +10,9 @@
 // The app runs only `quadit version`, `quadit skill`,
 // `quadit me`, `quadit login --path` and `quadit login URL -` (with
 // `--app PATH` for its own server's logins) with the token on standard
-// input, so that it never shows on a command line.
+// input, so that it never shows on a command line; and, for a tool that
+// works in several workspaces (multi-workspace design §3.3), `quadit logout`
+// and `quadit use`, which keep the logins' index (login-index.ts).
 
 import { execFile } from "node:child_process";
 import { accessSync, constants, existsSync, statSync } from "node:fs";
@@ -19,6 +21,13 @@ import { withoutQuadit } from "@/main/child-guard";
 import { systemPath } from "@/main/windows-environment";
 
 const RUN_TIMEOUT_MS = 20_000;
+
+/**
+ * The first agent surface whose quadit keeps a login per workspace (its
+ * index, `logout`, `use`, `--workspace=`): an older one would log a second
+ * workspace in over the first, and act in the first everywhere.
+ */
+const WORKSPACES_SURFACE = [3, 1] as const;
 
 export interface CliLook {
   /** The login shell's PATH, folder by folder. */
@@ -43,6 +52,15 @@ export type Install =
 /** Where the person's own commands go, under their home folder (the XDG convention). */
 const OWN_BIN = [".local", "bin"];
 const MARK = "# Added by the Quadit app: Disconnect in the app takes it out.";
+
+/** Who a login is: its user's id and handle (without "@") and name, whether it is an agent, and its workspace when its server says. */
+export interface Identity {
+  id: string;
+  handle: string;
+  name: string;
+  agent: boolean;
+  workspace: { id: string; slug: string; name: string } | null;
+}
 
 export class QuaditCli {
   /** The link the app made this session: found even where the login PATH the app sees does not show it yet. */
@@ -98,20 +116,71 @@ export class QuaditCli {
     return run(binary, ["skill"]);
   }
 
-  /** Who the login saved in `config` is: asks its server (`quadit me`), whatever the app's environment says. */
-  async whoIs(binary: string, config: string): Promise<{ id: string; handle: string; name: string }> {
+  /**
+   * Who the login saved in `config` is, and in which workspace (null: its
+   * server did not say): asks its server (`quadit me`), whatever the app's
+   * environment says. Only for a login that is one connection: a base login
+   * the index lists several of answers with the list, and that is an error.
+   */
+  async whoIs(binary: string, config: string): Promise<Identity> {
     const said = await run(binary, ["--json", "me"], {
       QUADIT_CONFIG: config,
       QUADIT_URL: undefined,
       QUADIT_TOKEN: undefined,
     });
-    const me = JSON.parse(said) as { user_id?: unknown; handle?: unknown; name?: unknown };
+    const me = JSON.parse(said) as {
+      user_id?: unknown;
+      handle?: unknown;
+      name?: unknown;
+      kind?: unknown;
+      workspace?: unknown;
+    };
     if (typeof me.user_id !== "string" || typeof me.handle !== "string")
       throw new Error("quadit me: no identity in its answer");
-    return { id: me.user_id, handle: me.handle.replace(/^@/, ""), name: typeof me.name === "string" ? me.name : "" };
+    const ws = (typeof me.workspace === "object" && me.workspace) || {};
+    const { id, slug, name } = ws as { id?: unknown; slug?: unknown; name?: unknown };
+    return {
+      id: me.user_id,
+      handle: me.handle.replace(/^@/, ""),
+      name: typeof me.name === "string" ? me.name : "",
+      agent: me.kind === "agent",
+      workspace:
+        typeof id === "string" && id
+          ? { id, slug: typeof slug === "string" ? slug : "", name: typeof name === "string" ? name : "" }
+          : null,
+    };
   }
 
-  /** Checks `token` against the server at `origin` and saves both to `config`. */
+  /** Whether `binary` keeps a login per workspace: the agent surface its `quadit version` says (WORKSPACES_SURFACE). */
+  async knowsWorkspaces(binary: string): Promise<boolean> {
+    const said = await run(binary, ["version"]).catch(() => "");
+    const [major = 0, minor = 0] = (/\(agent surface (\d+)\.(\d+)/.exec(said) ?? []).slice(1).map(Number);
+    const [wantMajor, wantMinor] = WORKSPACES_SURFACE;
+    return major > wantMajor || (major === wantMajor && minor >= wantMinor);
+  }
+
+  /**
+   * `quadit logout --workspace=ID` for the tool whose base login is `base`:
+   * its login in that workspace goes, file and index entry; with `revoke`,
+   * the token of that id is revoked first, with the token itself, and a
+   * revocation that fails leaves everything as it was (an error).
+   */
+  async logout(binary: string, base: string, workspaceId: string, revoke: string | null): Promise<void> {
+    await run(binary, ["logout", `--workspace=${workspaceId}`, ...(revoke ? [`--revoke=${revoke}`] : [])], {
+      QUADIT_CONFIG: base,
+    });
+  }
+
+  /** `quadit use ID folder=PATH`: ties `folder` to the workspace `workspaceId` of the tool whose base login is `base`. */
+  async tie(binary: string, base: string, workspaceId: string, folder: string): Promise<void> {
+    await run(binary, ["use", workspaceId, `folder=${folder}`], { QUADIT_CONFIG: base });
+  }
+
+  /** `quadit use --clear folder=PATH`: unties `folder`, whatever workspace it was tied to. */
+  async untie(binary: string, base: string, folder: string): Promise<void> {
+    await run(binary, ["use", "--clear", `folder=${folder}`], { QUADIT_CONFIG: base });
+  }
+
   /**
    * `quadit login ORIGIN -` into `config`, the token on standard input.
    * `app` (the running app's executable) marks a login for the server the
