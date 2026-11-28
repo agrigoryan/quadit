@@ -90,10 +90,11 @@ export interface CardActions {
   connect(planId?: string): Promise<{ ok: true; connection: CardConnection; agent?: string | null } | Refused>;
   /**
    * Takes the connection back (Undo while it waits for the tool, Disconnect
-   * otherwise). Gives what the person should know after, which the card
-   * shows (a token to revoke by hand).
+   * otherwise): `connection`, the one the card is set up as now, whatever
+   * the page drew it from. Gives what the person should know after, which
+   * the card shows (a token to revoke by hand).
    */
-  back(): Promise<Disconnected | Refused>;
+  back(connection: CardConnection): Promise<Disconnected | Refused>;
   /** Opens what connecting it changes (the sheet). */
   seeFiles(): void;
   /**
@@ -222,6 +223,11 @@ export class ToolCard {
   /** Whether Connect has set it up on this computer: its files are written, whether or not the tool reached Quadit. */
   get isSetUp(): boolean {
     return this.connection !== null;
+  }
+
+  /** The connection Connect set up the tool as, which the card shows; null when it is not set up. */
+  get setUpAs(): CardConnection | null {
+    return this.connection;
   }
 
   /** Whether the server says the tool's agent proved it reached Quadit (its code given back). */
@@ -366,9 +372,11 @@ export class ToolCard {
   }
 
   private async takeBack(control: HTMLButtonElement) {
+    const { connection } = this;
+    if (!connection) return;
     this.error.textContent = "";
     control.disabled = true;
-    const done = await this.actions.back();
+    const done = await this.actions.back(connection);
     control.disabled = false;
     if (!done.ok) {
       this.error.textContent = done.error;

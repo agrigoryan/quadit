@@ -555,7 +555,9 @@ posixOnly("Connect and Disconnect", () => {
     mkdirSync(configDir, { recursive: true });
     writeFileSync(join(configDir, "config.json"), JSON.stringify({ url: ORIGIN, token: "qd_mine" }));
     tokenIn("qd_mine", "w1");
-    expect((await connections.state()).defaultLogin).toEqual([{ server: ORIGIN, agent: "@as-qd_mine" }]);
+    expect((await connections.state()).defaultLogin).toEqual([
+      { server: ORIGIN, agent: "@as-qd_mine", workspaceId: "w1" },
+    ]);
     await connect(choice("pi", { agent: null }));
     expect(asked).toEqual([]);
     await disconnect("pi");

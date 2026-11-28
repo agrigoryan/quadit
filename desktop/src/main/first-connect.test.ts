@@ -206,7 +206,7 @@ describe("FirstConnect", () => {
         harness("gemini", "Gemini CLI", { installed: true, elsewhere: [connection("gemini", "z")] }),
         harness("pi", "pi", { cliIdentity: "default", listenVerified: false }),
       ],
-      defaultLogin: [{ server: "https://q.example", agent: "@ann" }],
+      defaultLogin: [{ server: "https://q.example", agent: "@ann", workspaceId: "w0" }],
     });
     expect(await first.look()).toEqual({
       tools: [

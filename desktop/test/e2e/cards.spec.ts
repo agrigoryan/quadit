@@ -33,6 +33,12 @@ interface Stand {
   focus?: unknown;
   /** The choices the page planned a Connect with. */
   planned?: unknown[];
+  /** The connections the page planned a Disconnect of. */
+  unplanned?: unknown[];
+  /** Claude Code works in another workspace too (Personal, as @claude-code); absent: in none. */
+  elsewhere?: boolean;
+  /** Claude Code has no login of its own (it works as this computer's default login), which works in `defaultIn`. */
+  defaultIn?: string;
   /** The page asked to be taken away. */
   closed?: boolean;
   /** How long connectState takes, as the app's does while it asks the login shell and quadit. */
@@ -70,12 +76,10 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
           state.planned = [...(state.planned ?? []), choice];
           return { ok: true, plan };
         },
-        applyConnect: async () => ({
-          ok: true,
-          hint: "",
-          connection: { ref: CLAUDE_HERE, workspace: "E2E" },
-          added: false,
-        }),
+        applyConnect: async () => {
+          state.connected = true;
+          return { ok: true, hint: "", connection: { ref: CLAUDE_HERE, workspace: "E2E" }, added: !!state.elsewhere };
+        },
         connectTarget: async () => {
           state.targets++;
           return {
@@ -90,7 +94,9 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
           await wait(state.slowMs);
           return {
             at: { serverId: "s1", workspaceId: "w1" },
-            defaultLogin: [],
+            defaultLogin: state.defaultIn
+              ? [{ server: "https://q.example", agent: "@ann", workspaceId: state.defaultIn }]
+              : [],
             claudePlugin: false,
             cli: {
               found: "/usr/local/bin/quadit",
@@ -107,7 +113,7 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
                 initials: "CC",
                 installed: true,
                 mcp: true,
-                cliIdentity: "own",
+                cliIdentity: state.defaultIn ? "default" : "own",
                 listenVerified: true,
                 chatListens: "background",
                 allows: true,
@@ -122,7 +128,18 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
                       folders: [],
                     }
                   : null,
-                elsewhere: [],
+                elsewhere: state.elsewhere
+                  ? [
+                      {
+                        ref: { ...CLAUDE_HERE, workspaceId: "w2" },
+                        methods: ["cli"],
+                        server: "Work",
+                        workspace: "Personal",
+                        agent: "@claude-code",
+                        folders: [],
+                      },
+                    ]
+                  : [],
               },
             ],
           };
@@ -162,7 +179,10 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
           state.asks++;
           return state.connected ? state.handshake : null;
         },
-        planDisconnect: async () => ({ ok: true, plan }),
+        planDisconnect: async (ref: unknown) => {
+          state.unplanned = [...(state.unplanned ?? []), ref];
+          return { ok: true, plan };
+        },
         applyDisconnect: async () => {
           state.connected = false;
           return { ok: true, notes: [], unrevoked: null };
@@ -727,3 +747,36 @@ test("the sheet of one agent is titled with its name, its handle beside it, when
   await page.getByRole("button", { name: "All agents on this computer" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Connect agents");
 });
+
+for (const elsewhere of [false, true])
+  test(`Undo right after ${elsewhere ? "Connect here as well" : "a first Connect"} takes back the connection just made`, async ({
+    page,
+  }) => {
+    // The state the page draws from comes slowly: the card is set up before the page draws it again.
+    await open(page, { connected: false, handshake: { state: "waiting", code: "K7QX4M" }, slowMs: 1_500, elsewhere });
+    const card = page.getByRole("article", { name: "Claude Code" });
+    await card
+      .getByRole("button", { name: elsewhere ? "Connect Claude Code here as well" : "Connect Claude Code" })
+      .click();
+    await card.getByRole("button", { name: /^Undo Claude Code/ }).click();
+    await expect(page.getByRole("dialog", { name: "What disconnecting Claude Code changes" })).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { stand: Stand }).stand.unplanned)).toEqual([
+      { tool: "claude", serverId: "s1", workspaceId: "w1", agentId: "u-claude" },
+    ]);
+  });
+
+// Where the default login works: in another workspace, a login is made here for an agent chosen; here, the tool works as it.
+for (const [defaultIn, asked] of [
+  ["w2", true],
+  ["w1", false],
+] as const)
+  test(`More options ${asked ? "asks" : "does not ask"} which agent a tool on this computer's login works as, that login working in ${defaultIn}`, async ({
+    page,
+  }) => {
+    await open(page, { connected: false, handshake: null, slowMs: 0, defaultIn });
+    const card = page.getByRole("article", { name: "Claude Code" });
+    await card.getByRole("button", { name: "More options for Claude Code" }).click();
+    const workAs = card.getByText("Work as", { exact: true });
+    if (asked) await expect(workAs).toBeVisible();
+    else await expect(workAs).toBeHidden();
+  });

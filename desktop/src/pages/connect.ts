@@ -179,12 +179,15 @@ function reviewConnect(h: HarnessView, plan: () => Promise<Planned>) {
 }
 
 /**
- * Shows what disconnecting does in the sheet, whose button does it; resolves
- * with how that went and what the person should know (closed: nothing).
+ * Shows what disconnecting `connected`, a connection of `h`, does in the
+ * sheet, whose button does it; resolves with how that went and what the
+ * person should know (closed: nothing).
  */
-function reviewDisconnect(h: HarnessView, within?: HTMLElement): Promise<Disconnected | Refused> {
-  const { connected } = h;
-  if (!connected) return Promise.resolve({ ok: false, error: `${h.name} is not connected here.` });
+function reviewDisconnect(
+  h: HarnessView,
+  connected: CardConnection,
+  within?: HTMLElement,
+): Promise<Disconnected | Refused> {
   return new Promise((settle) => {
     let done = false;
     openSheet({
@@ -250,9 +253,11 @@ function newCard(h: HarnessView, made: string, addsCommand: boolean, handshake: 
       void render();
       return { ok: true, connection: done.connection };
     },
-    back: () => reviewDisconnect(h),
+    // The card's own connection: the one it was just set up as, before the page draws it again.
+    back: (connection) => reviewDisconnect(h, connection),
     seeFiles: () => {
-      if (card.isSetUp) void reviewDisconnect(h);
+      const { setUpAs } = card;
+      if (setUpAs) void reviewDisconnect(h, setUpAs);
       else reviewConnect(h, () => cardPlan(h));
     },
     changed: () => {},
@@ -450,20 +455,22 @@ function optionsForm(h: HarnessView): { form: HTMLFormElement; fill: () => void 
   // Whether choosing an agent holds: not for the quadit command alone in a tool that works as the default login there already.
   const showIdentity = () => {
     const viaMcp = mcp.box.checked && h.mcp;
-    const fixed = h.cliIdentity === "default" && defaultLogin.length > 0 && h.elsewhere.length === 0;
+    // Fixed only where the default login works in this workspace: anywhere else a login is made, for an agent chosen.
+    const here = defaultLogin.filter((login) => login.workspaceId === chosen()?.summary.workspace.id);
+    const fixed = h.cliIdentity === "default" && here.length > 0 && h.elsewhere.length === 0;
     workAs.hidden = fixed && !viaMcp;
     newAgent.hidden = workAs.hidden || agents.value !== NEW_AGENT || agents.options.length === 0;
     identity.textContent =
       h.cliIdentity === "own"
         ? `With the quadit command, ${h.name} gets a login of its own, as the agent chosen here.`
         : fixed
-          ? `With the quadit command, ${h.name} works as this computer's default login, ${loginName(defaultLogin)}: it has no setting the app can use to give it a login of its own.` +
+          ? `With the quadit command, ${h.name} works as this computer's default login, ${loginName(here)}: it has no setting the app can use to give it a login of its own.` +
             (h.mcp
               ? viaMcp
                 ? " The agent chosen here is the one to pick when it signs in to MCP."
                 : " Connect it by MCP to give it an agent of its own."
               : "")
-          : `${h.name} has no setting the app can use to give the quadit command its own login: there it works as this computer's default login, made now for the agent chosen here.` +
+          : `${h.name} has no setting the app can use to give the quadit command its own login: there it works as this computer's default login, ${defaultLogin.length > 0 ? "which gets a login for this workspace" : "made now"} for the agent chosen here.` +
             (h.mcp ? " Connect it by MCP to give it an agent of its own." : "");
   };
   mcp.box.addEventListener("change", showIdentity);
@@ -718,12 +725,13 @@ function goTo(focus: ConnectFocusView) {
   const h = harnesses.find((one) => one.id === focus.tool);
   if (!shown || !h) return;
   shown.card.bringForward();
+  const { setUpAs } = shown.card;
   if (focus.intent === "run") shown.card.openRun();
-  else if (focus.intent === "disconnect" && shown.card.isSetUp) {
-    if (!sheet) return void reviewDisconnect(h);
+  else if (focus.intent === "disconnect" && setUpAs) {
+    if (!sheet) return void reviewDisconnect(h, setUpAs);
     disconnecting = h.id;
     arrange();
-    void reviewDisconnect(h, element("inline")).then(() => {
+    void reviewDisconnect(h, setUpAs, element("inline")).then(() => {
       disconnecting = null;
       arrange();
     });

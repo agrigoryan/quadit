@@ -361,13 +361,21 @@ export class Connections {
     index: LoginIndex,
   ): Promise<ConnectView["defaultLogin"]> {
     const listed = loginsOf(index, defaultConfig);
-    if (listed.length > 0) return listed.map((l) => ({ server: l.server, agent: l.agent ? `@${l.agent}` : null }));
+    if (listed.length > 0)
+      return listed.map((l) => ({
+        server: l.server,
+        agent: l.agent ? `@${l.agent}` : null,
+        workspaceId: l.workspaceId,
+      }));
     if (!existsSync(defaultConfig)) return [];
-    const agent = await this.parts.cli.whoIs(binary, defaultConfig).then(
-      (who) => `@${who.handle}`,
-      () => null,
-    );
-    return [{ server: savedServer(defaultConfig), agent }];
+    const who = await this.parts.cli.whoIs(binary, defaultConfig).catch(() => null);
+    return [
+      {
+        server: savedServer(defaultConfig),
+        agent: who ? `@${who.handle}` : null,
+        workspaceId: who?.workspace?.id ?? null,
+      },
+    ];
   }
 
   private connectionView(harness: Harness, c: Connection, index: LoginIndex): ConnectionView {

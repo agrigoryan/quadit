@@ -206,11 +206,12 @@ export interface ConnectView {
   };
   /**
    * The computer's default login, one for each workspace it works in (none:
-   * there is none): its server, and the agent it is there (null when its
-   * server could not be asked). The harnesses without a login of their own
-   * work as it.
+   * there is none): its server, the agent it is there and the workspace's id
+   * (null when its server could not be asked). The harnesses without a login
+   * of their own work as it there; elsewhere they get a login of their own
+   * beside it, for an agent chosen.
    */
-  defaultLogin: { server: string | null; agent: string | null }[];
+  defaultLogin: { server: string | null; agent: string | null; workspaceId: string | null }[];
   /** The Quadit plugin for Claude Code is installed: its MCP entry needs QUADIT_URL and QUADIT_TOKEN. */
   claudePlugin: boolean;
 }
