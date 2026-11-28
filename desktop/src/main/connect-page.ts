@@ -148,7 +148,7 @@ export class ConnectPage {
       },
       agentProjects: (_sender, ref) => {
         const tool = this.runAs(refOf(ref));
-        return tool ? parts.runner.projects(tool.login) : NOT_RUN;
+        return tool ? parts.runner.projects(tool.login, tool.identity.workspace) : NOT_RUN;
       },
       pickFolder: async (sender) => {
         const path = await parts.pickFolder(sender);

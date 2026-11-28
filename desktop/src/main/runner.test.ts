@@ -417,13 +417,13 @@ posixOnly("Runner, its commands", () => {
 
   it("gives the projects the agent may work in, as its own login says, and the runner's log", async () => {
     const { runner, login, configDir } = setUp();
-    const projects = await runner.projects(login);
+    const projects = await runner.projects(login, "w1");
     expect(projects.ok && projects.projects.slice(0, 3)).toEqual([
       { key: "SVA", name: "Samurai vs Aliens" },
       { key: "GS", name: "Getting started" },
       { key: "ART", name: "ART" },
     ]);
-    expect(await runner.projects(join(configDir, "nobody.json"))).toEqual({
+    expect(await runner.projects(join(configDir, "nobody.json"), "w1")).toEqual({
       ok: false,
       error: "cannot reach https://q.example: connection refused",
     });
@@ -432,7 +432,15 @@ posixOnly("Runner, its commands", () => {
     const odd = join(configDir, "odd.json");
     const me = { handle: "@odd", kind: "agent", projects: ["SVA", "sva", "GS\nrm -rf ~", 7] };
     writeFileSync(odd, JSON.stringify({ url: "https://q.example", token: "qd_z", me }));
-    expect(await runner.projects(odd)).toEqual({ ok: true, projects: [{ key: "SVA", name: "SVA" }] });
+    expect(await runner.projects(odd, "w1")).toEqual({ ok: true, projects: [{ key: "SVA", name: "SVA" }] });
+  });
+
+  it("gives the projects of a login of a tool in several workspaces, in the workspace of its card, wherever it runs", async () => {
+    const { runner, configDir } = setUp();
+    const acme = join(configDir, "claude-acme.json");
+    const me = { handle: "@claude", kind: "agent", projects: ["WEB"], workspace_id: "w2", several: true };
+    writeFileSync(acme, JSON.stringify({ url: "https://q.example", token: "qd_w", me }));
+    expect(await runner.projects(acme, "w2")).toEqual({ ok: true, projects: [{ key: "WEB", name: "WEB" }] });
   });
 
   it("says what adding a project would start at once, and nothing it cannot tell", async () => {

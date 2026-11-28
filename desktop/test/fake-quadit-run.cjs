@@ -16,7 +16,9 @@
 //   run list [--json]
 //   run waiting login= project= --json   what the login file's "waiting" says of the project (read only)
 //   run machine name=
-//   --json me              the login file's "me" (QUADIT_CONFIG), as the server answers /me
+//   --json me              the login file's "me" (QUADIT_CONFIG), as the server answers /me; one
+//                          marked several, of a tool in several workspaces, lists them as text
+//                          unless QUADIT_WORKSPACE names its workspace_id
 //   login --path
 //
 // Where it differs, on purpose: the lock is a file holding the serving
@@ -99,6 +101,11 @@ if (first === "login" && second === "--path") {
   const login = process.env.QUADIT_CONFIG;
   const me = login && existsSync(login) ? JSON.parse(readFileSync(login, "utf8")).me : undefined;
   if (!me) refuse("cannot reach https://q.example: connection refused");
+  // A login of a tool in several workspaces: unless the workspace is named, quadit me lists them, as text.
+  if (me.several && process.env.QUADIT_WORKSPACE !== me.workspace_id) {
+    say("This tool works in 2 workspaces:\n  personal  @claude in Personal\n  acme  @claude in Acme");
+    process.exit(0);
+  }
   say(JSON.stringify(me, null, 2));
 } else if (first === "run" && second === "add") {
   const a = keyed(args.slice(2));

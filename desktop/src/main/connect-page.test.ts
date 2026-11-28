@@ -112,7 +112,10 @@ function harness({
     runner: {
       available,
       entries: async (of) => (unreadable ? null : (entries[of.agent] ?? [])),
-      projects: async (login) => ({ ok: true, projects: [{ key: login, name: "as asked" }] }),
+      projects: async (login, workspace) => ({
+        ok: true,
+        projects: [{ key: login, name: `as asked in ${workspace}` }],
+      }),
       waiting: async (login, project) => {
         said.push(`waiting ${login} ${project}`);
         return { agent: "@claude", runs: 1, tasks: [{ key: `${project}-1`, title: "First" }] };
@@ -265,7 +268,7 @@ describe("ConnectPage, Run by Quadit", () => {
     const { call } = harness();
     expect(await call(1, "agentProjects", ref("codex"))).toEqual({
       ok: true,
-      projects: [{ key: "/q/codex.json", name: "as asked" }],
+      projects: [{ key: "/q/codex.json", name: "as asked in w1" }],
     });
     expect(await call(1, "agentProjects", ref("gemini"))).toMatchObject({ ok: false });
   });

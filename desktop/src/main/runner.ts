@@ -389,10 +389,17 @@ export class Runner {
     }
   }
 
-  /** The projects the agent of the login `login` may work in: `quadit me`, as that login. */
-  async projects(login: string): Promise<{ ok: true; projects: { key: string; name: string }[] } | Refused> {
+  /**
+   * The projects the agent of the login `login` may work in: `quadit me`, as
+   * that login in its workspace `workspace` (an id), which a tool with a login
+   * in several needs named, wherever the command runs.
+   */
+  async projects(
+    login: string,
+    workspace: string,
+  ): Promise<{ ok: true; projects: { key: string; name: string }[] } | Refused> {
     if (!this.available) return NO_QUADIT;
-    const said = await this.run(["--json", "me"], COMMAND_MS, { login });
+    const said = await this.run(["--json", "me"], COMMAND_MS, { login, workspace });
     if (said.code !== 0) return { ok: false, error: said.words };
     const me = JSON.parse(said.out) as { projects?: unknown; project_names?: unknown };
     const names = (typeof me.project_names === "object" && me.project_names) || {};
@@ -511,19 +518,20 @@ export class Runner {
 
   /**
    * Runs the quadit the app carries with `args`, the app's environment
-   * without QUADIT_ settings, as the quadit login `login` when given, and
-   * with `path` as its PATH when given.
+   * without QUADIT_ settings, as the quadit login `login` in the workspace
+   * `workspace` when given, and with `path` as its PATH when given.
    */
   private run(
     args: string[],
     timeout: number,
-    given: { login?: string; path?: string } = {},
+    given: { login?: string; workspace?: string; path?: string } = {},
   ): Promise<{ code: number | null; out: string; words: string }> {
     const quadit = this.parts.quadit();
     if (!quadit) return Promise.resolve({ code: null, out: "", words: NO_QUADIT.error });
     let env = withoutQuadit(this.parts.env);
     if (given.path !== undefined) env = withPath(env, given.path);
     if (given.login !== undefined) env = { ...env, QUADIT_CONFIG: given.login };
+    if (given.workspace !== undefined) env = { ...env, QUADIT_WORKSPACE: given.workspace };
     return new Promise((resolve) => {
       execFile(quadit, args, { env, timeout, windowsHide: true }, (err, stdout, stderr) => {
         const code = err ? (typeof err.code === "number" ? err.code : null) : 0;
