@@ -742,6 +742,8 @@ cli layout
 cli link
 cli listen
 cli listening
+cli login
+cli logout
 cli ls
 cli me
 cli memory
@@ -763,12 +765,14 @@ cli run
 cli search
 cli secrets
 cli show
+cli skill
 cli status
 cli take
 cli tasks
 cli unclear
 cli update
 cli upload
+cli use
 cli wait
 cli whoami
 cli work

@@ -118,9 +118,14 @@ func findCommand(name string) (command, bool) {
 	return command{}, false
 }
 
-// Commands lists every name a command answers to, aliases too, sorted.
+// beforeLogin are the commands answered before a login is chosen (cli.go),
+// which are as much the tool's surface as those of the table.
+var beforeLogin = []string{"login", "logout", "use", "skill"}
+
+// Commands lists every name a command answers to, aliases too, and those
+// answered before a login is chosen, sorted.
 func Commands() []string {
-	var out []string
+	out := slices.Clone(beforeLogin)
 	for _, c := range commands {
 		out = append(out, c.names...)
 	}

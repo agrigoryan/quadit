@@ -213,7 +213,7 @@ webhook.delete (admin): id (required)
 webhook.update (admin): id (required), name, url, secret, event_types, project, for, active
 workspace.delete (owner): confirm (required)
 workspace.update (admin): name, icon, settings
-surface: 3.0 (within 3.x nothing is removed or renamed)
+surface: 3.1 (within 3.x nothing is removed or renamed)
 
 === GET /api/v1/version
 200
@@ -223,7 +223,7 @@ surface: 3.0 (within 3.x nothing is removed or renamed)
   "inset": 1
  },
  "name": "quadit",
- "surface": "3.0",
+ "surface": "3.1",
  "version": "test"
 }
 

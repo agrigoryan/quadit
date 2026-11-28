@@ -30,7 +30,7 @@ type ChangeInfo struct {
 // added; anything removed or renamed, a value an argument took among them,
 // raises the major version. A test holds the names to this (see
 // testdata/surface.txt); a value is held to it by whoever removes it.
-const Surface = "3.0"
+const Surface = "3.1"
 
 // Catalog lists every change the engine accepts with its arguments. The
 // OpenAPI document, the MCP tool list and the command help are made from it.
