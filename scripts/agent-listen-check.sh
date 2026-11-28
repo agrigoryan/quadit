@@ -36,7 +36,7 @@
 # Ends with "N checks passed, M phases skipped: …" and exits 0 only when no
 # check failed: a phase skipped is not a phase passed.
 
-# Some functions are only called through others (the trap, passed, until_true).
+# Some functions are only called through others (the trap).
 # shellcheck disable=SC2329
 set -euo pipefail
 
@@ -47,7 +47,9 @@ idle=${AGENT_CHECK_IDLE:-150}
 answer_time=${AGENT_CHECK_ANSWER:-300}
 
 # Nothing of the person's Quadit reaches this check.
-for v in $(env | sed -n 's/^\(QUADIT_[A-Z_]*\)=.*/\1/p'); do unset "$v"; done
+# shellcheck source=scripts/agent-check-frame.sh
+. "$root/scripts/agent-check-frame.sh"
+forget_own_quadit
 
 # The tool's one-prompt command; the prompt is "$1". Each line is the tool's documented one-prompt form
 # (docs/agents.md) with the permission it needs to run the quadit command without asking: check it against
@@ -84,49 +86,7 @@ chat_format=${AGENT_CHECK_CHAT_FORMAT:-$chat_format}
 [ -n "$command" ] || { echo "no one-prompt command for $tool: set AGENT_CHECK_COMMAND" >&2; exit 2; }
 [ -x "$real" ] || { echo "no quadit at $real: run make server, or set QUADIT_BIN" >&2; exit 2; }
 
-# The tool's known MCP settings, and their kind.
-mcp_settings() {
-	case $tool in
-	claude) printf '%s\n' "$HOME/.claude.json json" "$HOME/.claude/settings.json json" ;;
-	codex) printf '%s\n' "$HOME/.codex/config.toml toml" ;;
-	gemini) printf '%s\n' "$HOME/.gemini/settings.json json" ;;
-	agy) printf '%s\n' "$HOME/.gemini/config/mcp_config.json json" ;;
-	cursor-agent) printf '%s\n' "$HOME/.cursor/mcp.json json" ;;
-	esac
-}
-# quadit_mcp FILE KIND: the names of the MCP entries of a settings file that mention Quadit anywhere (name, address,
-# command, arguments), in any case; MCP entries are those under any key named mcpServers, mcp_servers or mcp.
-quadit_mcp() { python3 -c 'import json,sys,tomllib
-path, kind = sys.argv[1], sys.argv[2]
-with open(path, "rb") as f:
-    text = f.read()
-# A settings file that is there but empty names no MCP server.
-doc = {} if not text.strip() else tomllib.loads(text.decode()) if kind == "toml" else json.loads(text)
-found = []
-def walk(v):
-    if isinstance(v, dict):
-        for k, entries in v.items():
-            if k in ("mcpServers", "mcp_servers", "mcp") and isinstance(entries, dict):
-                for name, entry in entries.items():
-                    if "quadit" in (name + json.dumps(entry, default=str)).lower():
-                        found.append(name)
-            walk(entries)
-    elif isinstance(v, list):
-        for item in v:
-            walk(item)
-walk(doc)
-print(" ".join(sorted(set(found))))' "$1" "$2"; }
-if [ "${AGENT_CHECK_ALLOW_MCP:-}" != 1 ]; then
-	while read -r file kind; do
-		[ -n "$file" ] && [ -f "$file" ] || continue
-		names=$(quadit_mcp "$file" "$kind") || { echo "$file could not be read to look for a Quadit MCP server; run with AGENT_CHECK_ALLOW_MCP=1 to go on anyway." >&2; exit 2; }
-		if [ -n "$names" ]; then
-			echo "$tool has an MCP server that mentions Quadit in $file ($names), which it could use instead of the quadit command, and so reach your own Quadit." >&2
-			echo "Turn it off for this check, or run with AGENT_CHECK_ALLOW_MCP=1 if you know it cannot reach it." >&2
-			exit 2
-		fi
-	done < <(mcp_settings)
-fi
+refuse_quadit_mcp "$tool"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/agent-listen-check.XXXXXX")
 mkdir -p "$work/bin" "$work/cwd"
@@ -142,27 +102,9 @@ cleanup() {
 trap cleanup EXIT
 
 failed=0 passes=0 skipped=()
-check() { # check NAME CONDITION-RESULT(0/1) [DETAIL]
-	if [ "$2" = 0 ]; then
-		echo "  pass  $1"
-		passes=$((passes + 1))
-	else
-		echo "  FAIL  $1${3:+: $3}"
-		failed=1
-	fi
-}
-skip() { # skip PHASE WHY: a phase not run, which is not a phase passed
-	echo "  SKIPPED  $2"
-	skipped+=("$1")
-}
 
 # The server, on a free port, with a data folder of its own.
-port=$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1])')
-url="http://127.0.0.1:$port"
-"$real" serve --data "$work/server" --listen "127.0.0.1:$port" --url "$url" >"$work/server.log" 2>&1 &
-server=$!
-for _ in $(seq 100); do curl -sf "$url/healthz" >/dev/null 2>&1 && break; sleep 0.2; done
-curl -sf "$url/healthz" >/dev/null || { echo "the server did not start: $work/server.log" >&2; exit 1; }
+start_server "$real" "$work"
 
 # The person, signed in by a cookie for the set-up and by a token after it.
 jar=$work/jar
@@ -170,9 +112,6 @@ curl -sf -c "$jar" -H "Origin: $url" -H "Content-Type: application/json" -X POST
 	-d '{"name":"Check Person","email":"person@example.com","password":"correct-horse-battery","workspace_name":"Check"}' >"$work/setup.json"
 slug=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["workspace"]["slug"])' "$work/setup.json")
 api() { curl -sf -b "$jar" -H "Origin: $url" -H "Content-Type: application/json" -X "$1" "$url/api/v1/w/$slug$2" ${3:+-d "$3"}; }
-field() { python3 -c 'import json,sys;v=json.load(sys.stdin)
-for k in sys.argv[1].split("."): v=v[k]
-print(v)' "$1"; }
 person_token=$(api POST /tokens '{"user":"me","name":"check"}' | field token)
 person() { QUADIT_URL=$url QUADIT_TOKEN=$person_token QUADIT_CONFIG=$work/none.json "$real" "$@"; }
 
@@ -269,13 +208,8 @@ for line in open(sys.argv[1]):
 idle = any(idle and t0 <= at <= t1 for at, idle in ends.values())
 held = any(at <= t0 and (pid not in ends or ends[pid][0] >= t1) for pid, at in starts.items())
 sys.exit(0 if idle or held else 1)' "$work/calls.log" "$1" "$2"; }
-until_true() { # until_true SECONDS COMMAND...: polls once a second
-	local end=$((SECONDS + $1)); shift
-	until "$@"; do [ "$SECONDS" -lt "$end" ] || return 1; sleep 1; done
-}
 listens() { [ "$(agents)" = "connected listening" ]; }
 answered() { [ "$(replies "$@")" -ge 1 ]; }
-passed() { if "$@"; then echo 0; else echo 1; fi; }
 
 echo "tool: $tool"
 case $tool in codex | claude | agy | gemini | cursor-agent) echo "version: $("$tool" --version 2>&1 | head -n 1)" ;; esac
