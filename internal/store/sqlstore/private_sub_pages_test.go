@@ -130,6 +130,7 @@ var columnsAddedSince = map[int][]string{
 		"agent_sessions items_through BIGINT", "agent_sessions accepted_at BIGINT", "agent_sessions stop_requested_at BIGINT",
 		"agent_sessions stop_requested_by UUID", "agent_sessions steps_dropped INTEGER", "comments session_id UUID",
 		"notifications addressed BOOLEAN"},
+	34: {"webhooks created_seq BIGINT", "rules created_seq BIGINT"},
 }
 
 // openWritableAt opens an empty database at an older schema version that

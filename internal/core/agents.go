@@ -95,6 +95,7 @@ type Webhook struct {
 	LastAt      int64    `json:"last_at,omitempty" db:"last_at,null"`
 	CreatedBy   string   `json:"created_by" db:"created_by"`
 	CreatedAt   int64    `json:"created_at" db:"created_at"`
+	CreatedSeq  int64    `json:"-" db:"created_seq"` // it hears the events after this one; 0 for one made before it was kept
 	UpdatedSeq  int64    `json:"updated_seq" db:"updated_seq"`
 	DeletedAt   int64    `json:"deleted_at,omitempty" db:"deleted_at,null"`
 }
@@ -148,6 +149,7 @@ type Rule struct {
 	Action      *RuleAction `json:"action,omitempty" db:"action,json"`
 	CreatedBy   string      `json:"created_by" db:"created_by"`
 	CreatedAt   int64       `json:"created_at" db:"created_at"`
+	CreatedSeq  int64       `json:"-" db:"created_seq"` // it hears the events after this one; 0 for one made before it was kept
 	UpdatedSeq  int64       `json:"updated_seq" db:"updated_seq"`
 	DeletedAt   int64       `json:"deleted_at,omitempty" db:"deleted_at,null"`
 }

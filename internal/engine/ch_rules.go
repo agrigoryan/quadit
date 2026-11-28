@@ -97,7 +97,7 @@ func ruleCreate(c *cx, a ruleArgs) error {
 	}
 	seq := c.tx.NextSeq()
 	r := core.Rule{ID: rid, WorkspaceID: c.ws, Name: strings.TrimSpace(a.Name), Active: a.Active == nil || *a.Active, Match: a.Match,
-		Action: a.Action, CreatedBy: c.actor.UserID, CreatedAt: c.at, UpdatedSeq: seq}
+		Action: a.Action, CreatedBy: c.actor.UserID, CreatedAt: c.at, CreatedSeq: seq, UpdatedSeq: seq}
 	if err := c.tx.Insert(c.ctx, r); err != nil {
 		return alreadyInUse(err, "id", rid)
 	}

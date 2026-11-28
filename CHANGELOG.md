@@ -27,6 +27,10 @@ Everything that already asked for started now takes in the statuses that were wa
 
 - **Breaking for API users:** the status type `waiting` is gone. The types are `backlog`, `unstarted`, `started`, `done` and `canceled`, as in Linear; who a task waits on stays its `waiting_on`. `category=waiting` (the task list, the feed, saving a view, `quadit tasks`, the MCP `tasks` tool), `status.create` and `status.update` with `"category": "waiting"`, and a rule's `"match": {"to_category": "waiting"}` are refused as `invalid`, with the types allowed. A status word `waiting` (`status=waiting`) names only a status called that. The agent surface is 3.0.
 
+### Fixed
+
+- A webhook or a rule made while the server was still catching up on changes just made (a long batch, a busy server) could be sent those earlier events, or act on them. Each hears only what happens after it is made: migration 0034 keeps the feed's position it was made at.
+
 ## [0.9.0] - 2026-11-27
 
 The server upgrades its database when it starts (migrations 0031 and 0032), copying it first; `quadit upgrade --undo` goes back ([upgrades](docs/install.md#upgrades)). It changes the feed's older events: an estimate cleared, or set where there was none, said that none as 0, and now says it as `null`, as the feed does from this version on. And a comment deleted before no longer mentions what its text named: a task stops listing a page only that comment named.

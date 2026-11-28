@@ -383,6 +383,61 @@ func TestAWebhookHearsEventsInOrder(t *testing.T) {
 	})
 }
 
+// TestAWebhookAndARuleHearOnlyWhatHappensAfterTheyAreMade: a webhook and a
+// rule hear the events after the one that made them, also when the
+// dispatcher reaches earlier events only once they are there: it was behind
+// (a busy server, a long batch), or stopped before it recorded how far it
+// got.
+func TestAWebhookAndARuleHearOnlyWhatHappensAfterTheyAreMade(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		_, bea := s.invitedPerson(t)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		workspace := func() core.Workspace {
+			var ws core.Workspace
+			if err := st.Get(t.Context(), &ws, store.Eq("slug", "games")); err != nil {
+				t.Fatal(err)
+			}
+			return ws
+		}
+		behind := workspace().Seq
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Before"})
+		hook := newReceiver(t, "")
+		s.change(t, s.owner, "", "webhook.create", M{"name": "tasks", "url": hook.srv.URL, "event_types": []string{"task.created"}})
+		s.change(t, s.owner, "", "rule.create", M{"name": "to Bea", "match": M{"event_types": []string{"task.created"}},
+			"action": M{"kind": "assign", "user_id": bea}})
+		eventually(t, "the events so far to be dispatched", func() bool { ws := workspace(); return ws.DispatchedSeq == ws.Seq })
+
+		// The dispatcher had not reached the first task when the webhook and the rule were made.
+		if _, err := st.Update(t.Context(), "workspaces", map[string]any{"dispatched_seq": behind}, store.Eq("slug", "games")); err != nil {
+			t.Fatal(err)
+		}
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "After"})
+		assignee := func(title string) string {
+			var task core.Task
+			if err := st.Get(t.Context(), &task, store.Eq("title", title)); err != nil {
+				t.Fatal(err)
+			}
+			return task.AssigneeID
+		}
+		eventually(t, "the events to be dispatched again, and the rule to assign the second task", func() bool {
+			ws := workspace()
+			return ws.DispatchedSeq == ws.Seq && assignee("After") == bea
+		})
+		var queued []core.WebhookDelivery
+		if err := st.List(t.Context(), &queued, store.Q{Order: "seq"}); err != nil {
+			t.Fatal(err)
+		}
+		if len(queued) != 1 {
+			t.Fatalf("the webhook was queued %d deliveries, want only the second task's: %+v", len(queued), queued)
+		}
+		if got := assignee("Before"); got != "" {
+			t.Fatalf("the rule assigned the task made before it to %q", got)
+		}
+	})
+}
+
 // TestAWebhooksDeliveriesAreQueuedABatchAtATime: the dispatcher queues the
 // deliveries of a batch of events (dispatchBatch, 300) in one write, not
 // one write each: on a slow disk a commit for every event a busy webhook

@@ -65,7 +65,7 @@ func webhookCreate(c *cx, a webhookCreateArgs) error {
 		return err
 	}
 	seq := c.tx.NextSeq()
-	w.UpdatedSeq = seq
+	w.CreatedSeq, w.UpdatedSeq = seq, seq
 	if err := c.tx.Insert(c.ctx, w); err != nil {
 		return alreadyInUse(err, "id", wid)
 	}

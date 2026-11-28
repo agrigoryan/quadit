@@ -230,8 +230,13 @@ func typeMatches(patterns []string, typ string) bool {
 
 // hookWants reports whether a webhook should get an event. A webhook "for"
 // a member gets that member's inbox items and nothing else; any other
-// webhook gets the public events it asked for.
+// webhook gets the public events it asked for. Either way only those after
+// the webhook was made: the dispatcher may reach earlier ones only once it
+// is there.
 func hookWants(h core.Webhook, ev core.Event) bool {
+	if ev.Seq <= h.CreatedSeq {
+		return false
+	}
 	if h.UserID != "" {
 		return ev.Type == "notification.created" && ev.AudienceID == h.UserID
 	}
@@ -244,9 +249,11 @@ func hookWants(h core.Webhook, ev core.Event) bool {
 	return typeMatches(h.EventTypes, ev.Type)
 }
 
-// runRule applies one rule to one event if it matches.
+// runRule applies one rule to one event if it matches. A rule acts only on
+// what happens after it was made, though the dispatcher may reach earlier
+// events only once it is there.
 func (s *Server) runRule(ctx context.Context, l listeners, r core.Rule, ev core.Event) error {
-	if r.Action == nil {
+	if r.Action == nil || ev.Seq <= r.CreatedSeq {
 		return nil
 	}
 	if ok, err := ruleMatches(ctx, l.db, r.Match, ev); err != nil || !ok {
