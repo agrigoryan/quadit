@@ -39,13 +39,13 @@ type connection struct {
 }
 
 // folderTie ties a folder (absolute, links resolved) and everything under
-// it to a workspace, and optionally to one of its projects (a key). It
-// names the workspace, not a login: one tie serves every tool connected
-// there.
+// it to a workspace, and optionally to one of its projects (a key; "" for
+// none). It names the workspace, not a login: one tie serves every tool
+// connected there.
 type folderTie struct {
 	Folder      string `json:"folder"`
 	WorkspaceID string `json:"workspace_id"`
-	Project     string `json:"project,omitempty"`
+	Project     string `json:"project"`
 }
 
 // indexFile is the index beside the login files in dir.
