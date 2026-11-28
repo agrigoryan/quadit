@@ -18,7 +18,7 @@
 // Styled by tools.css.
 
 import { button, make } from "@/pages/dom";
-import type { Owner, PagesApi, RunEntryView, RunsView, RunWaiting } from "@/shared/pages-api";
+import type { ConnectionRef, Owner, PagesApi, RunEntryView, RunsView, RunWaiting } from "@/shared/pages-api";
 
 /** The app's pages API, asked only once the card is on its page. */
 const api = () => window.quaditPages as PagesApi;
@@ -204,9 +204,11 @@ export class RunByQuadit {
   /** The form while the person chooses; null otherwise. */
   private choosing: { form: HTMLFormElement; note: HTMLParagraphElement } | null = null;
 
+  /** `connection` gives the connection its card is set up as, which everything it asks names; null: none. */
   constructor(
     private tool: { id: string; name: string },
     here: string,
+    private connection: () => ConnectionRef | null,
   ) {
     this.words = { program: tool.name, here };
     const section = make("section", "", "runs");
@@ -351,14 +353,17 @@ export class RunByQuadit {
 
   /** Asks the app for the entries now (after the person changed them). */
   private async refresh() {
-    this.show(await api().runEntries(this.tool.id), this.owner);
+    const ref = this.connection();
+    if (ref) this.show(await api().runEntries(ref), this.owner);
   }
 
   private async stop(entryId: string, control: HTMLButtonElement) {
+    const ref = this.connection();
+    if (!ref) return;
     this.error.textContent = "";
     control.disabled = true;
     control.dataset.busy = "1";
-    const done = await api().stopRunning(this.tool.id, entryId);
+    const done = await api().stopRunning(ref, entryId);
     delete control.dataset.busy;
     control.disabled = false;
     if (!done.ok) this.error.textContent = done.error;
@@ -372,7 +377,8 @@ export class RunByQuadit {
 
   /** Opens the form in the card: which project, which folder, and what that means. */
   private choose() {
-    if (this.choosing || !this.runs || !this.owner) return;
+    const ref = this.connection();
+    if (this.choosing || !this.runs || !this.owner || !ref) return;
     this.error.textContent = "";
     const { agent, entries } = this.runs;
     const id = `run-${this.tool.id}`;
@@ -437,7 +443,7 @@ export class RunByQuadit {
       };
       waitEnd = setTimeout(answered, WAITING_WAIT_MS);
       void api()
-        .runWaiting(this.tool.id, project)
+        .runWaiting(ref, project)
         .then((waiting) => {
           if (askedFor !== project || this.choosing?.form !== form) return;
           const words = waiting && waitingWords(waiting);
@@ -475,7 +481,7 @@ export class RunByQuadit {
       refused.textContent = "";
       start.textContent = "Starting…";
       update();
-      const done = await api().startRunning(this.tool.id, select.value, folder);
+      const done = await api().startRunning(ref, select.value, folder);
       busy = false;
       start.textContent = "Start running";
       update();
@@ -496,7 +502,7 @@ export class RunByQuadit {
 
     // The projects the agent may work in, but those Quadit runs it for already.
     void api()
-      .agentProjects(this.tool.id)
+      .agentProjects(ref)
       .then((answer) => {
         if (this.choosing?.form !== form) return;
         select.replaceChildren();

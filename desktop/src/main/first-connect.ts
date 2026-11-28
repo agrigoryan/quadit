@@ -22,7 +22,7 @@ import type { Answer } from "@/main/requests";
 import type { DesktopRequest, DesktopSummary } from "@/shared/bridge";
 import { defaultLoginWords } from "@/shared/change-words";
 import { defaultChoice } from "@/shared/default-choice";
-import type { Disconnected, FoundTools, Planned, PlanView, Refused, ToolView } from "@/shared/pages-api";
+import type { ConnectionRef, Disconnected, FoundTools, Planned, PlanView, Refused, ToolView } from "@/shared/pages-api";
 
 export interface FirstConnectParts {
   connections: Pick<
@@ -45,8 +45,11 @@ const FINISHING: Refused = { ok: false, error: "Quadit is opening your workspace
 export class FirstConnect {
   /** The tools the last look found here and offered. */
   private offered: ToolView[] = [];
-  /** What connecting each tool did, and the agent of this workspace it works as, in the order they were connected. */
-  private done = new Map<string, { plan: PlanView; agent: string | null }>();
+  /**
+   * What connecting each tool did, the connection it made, and the agent of
+   * this workspace it works as, in the order they were connected.
+   */
+  private done = new Map<string, { plan: PlanView; ref: ConnectionRef; agent: string | null }>();
   /** The plan "See the files" showed for each tool, which its Connect there applies. */
   private reviewed = new Map<string, PlanView>();
   private queue: Promise<unknown> = Promise.resolve();
@@ -62,7 +65,7 @@ export class FirstConnect {
 
   /**
    * Looks for the agent tools on this computer: every tool Connect knows,
-   * found or not, but those connected before the step (to whatever server),
+   * found or not, but those connected before the step (in whatever workspace),
    * which it leaves alone, and those it cannot connect on this system (its
    * card in Connect agents says why); and whether connecting puts the quadit
    * command here.
@@ -70,7 +73,7 @@ export class FirstConnect {
   async look(): Promise<FoundTools> {
     const { harnesses, cli, defaultLogin } = await this.parts.connections.state();
     const tools = harnesses
-      .filter((h) => (!h.connected || this.done.has(h.id)) && !h.unavailable)
+      .filter((h) => ((!h.connected && h.elsewhere.length === 0) || this.done.has(h.id)) && !h.unavailable)
       .map((h) => ({
         id: h.id,
         name: h.name,
@@ -89,9 +92,13 @@ export class FirstConnect {
   /**
    * Connects a tool the step offers: with the plan "See the files" showed for
    * it when `planId` names that one, else with the default choice. Gives the
-   * handle of the workspace's agent it works as (null: none of this workspace).
+   * handle of the workspace's agent it works as (null: none of this
+   * workspace), and the connection made.
    */
-  connect(toolId: string, planId?: string): Promise<{ ok: true; agent: string | null } | Refused> {
+  connect(
+    toolId: string,
+    planId?: string,
+  ): Promise<{ ok: true; agent: string | null; connection: { ref: ConnectionRef; workspace: string } } | Refused> {
     if (this.finishing) return Promise.resolve(FINISHING);
     return this.inTurn(async () => {
       const reviewed = this.reviewed.get(toolId);
@@ -103,8 +110,8 @@ export class FirstConnect {
       if (!planned.ok) return planned;
       const applied = await this.parts.connections.applyConnect(planned.plan.id);
       if (!applied.ok) return applied;
-      this.done.set(toolId, { plan: planned.plan, agent: applied.agent?.id ?? null });
-      return { ok: true, agent: applied.agent?.handle ?? null };
+      this.done.set(toolId, { plan: planned.plan, ref: applied.connection.ref, agent: applied.agent?.id ?? null });
+      return { ok: true, agent: applied.agent?.handle ?? null, connection: applied.connection };
     });
   }
 
@@ -112,8 +119,9 @@ export class FirstConnect {
   disconnect(toolId: string): Promise<Disconnected | Refused> {
     if (this.finishing) return Promise.resolve(FINISHING);
     return this.inTurn(async () => {
-      if (!this.done.has(toolId)) return { ok: false, error: "It was not connected here." };
-      const planned = this.parts.connections.planDisconnect(toolId);
+      const done = this.done.get(toolId);
+      if (!done) return { ok: false, error: "It was not connected here." };
+      const planned = await this.parts.connections.planDisconnect(done.ref);
       if (!planned.ok) return planned;
       const applied = await this.parts.connections.applyDisconnect(planned.plan.id);
       if (!applied.ok) return applied;

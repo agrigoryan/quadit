@@ -174,14 +174,24 @@ async function endGroup(pgid: number): Promise<void> {
 
 /**
  * The environment a child gets: the app's, without any QUADIT_ setting (the
- * person's own servers' URL and token), with `login` as its quadit login and
- * the login shell's PATH (`path`: an app started from the Dock has a short
- * one, and the tool must find quadit and its own helpers). Every other
- * variable is kept: a tool may need its own keys.
+ * person's own servers' URL and token), with `quadit.config` as its quadit
+ * login, `quadit.workspace` (a workspace's id) as the workspace its quadit
+ * acts in when given (a login that works in several: multi-workspace design
+ * §3.9), and the login shell's PATH (`path`: an app started from the Dock
+ * has a short one, and the tool must find quadit and its own helpers).
+ * Every other variable is kept: a tool may need its own keys.
  */
-export function childEnv(env: NodeJS.ProcessEnv, login: string, path?: string): NodeJS.ProcessEnv {
+export function childEnv(
+  env: NodeJS.ProcessEnv,
+  quadit: { config: string; workspace: string | null },
+  path?: string,
+): NodeJS.ProcessEnv {
   const kept = withoutQuadit(env);
-  return { ...(path ? withPath(kept, path) : kept), QUADIT_CONFIG: login };
+  return {
+    ...(path ? withPath(kept, path) : kept),
+    QUADIT_CONFIG: quadit.config,
+    ...(quadit.workspace ? { QUADIT_WORKSPACE: quadit.workspace } : {}),
+  };
 }
 
 /**

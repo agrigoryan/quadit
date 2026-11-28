@@ -93,6 +93,7 @@ function harness({
         {
           connections: {
             state: async () => ({
+              at: null,
               harnesses: [],
               cli: {
                 found: "/bin/quadit",
@@ -102,12 +103,12 @@ function harness({
                 pathFolder: null,
                 manual: null,
               },
-              defaultLogin: null,
+              defaultLogin: [],
               claudePlugin: false,
             }),
             planConnect: async () => ({ ok: false, error: "none" }),
             applyConnect: async () => ({ ok: false, error: "none" }),
-            planDisconnect: () => ({ ok: false, error: "none" }),
+            planDisconnect: async () => ({ ok: false, error: "none" }),
             applyDisconnect: async () => ({ ok: false, error: "none" }),
             dropPlans: () => {},
           },

@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { countWord, diskLine, fileWords, filesSummary, sheetIntro, unrevokedWords } from "@/shared/change-words";
+import {
+  addedDiskLine,
+  alsoInWords,
+  countWord,
+  defaultLoginWords,
+  diskLine,
+  fileWords,
+  filesSummary,
+  sheetIntro,
+  unrevokedWords,
+  worksInWords,
+} from "@/shared/change-words";
 
 describe("fileWords for a tool's command rules", () => {
   it("names the rules file and its folder plainly", () => {
@@ -123,17 +134,59 @@ describe("sheetIntro", () => {
 });
 
 describe("unrevokedWords", () => {
-  it("says what happened, then what to do and where, by the token's name, and keeps the server's reason apart", () => {
+  it("says what happened, then what to do and where, by the workspace's and the token's names, and keeps the server's reason apart", () => {
     const unrevoked = {
       label: "Claude Code on mac",
       agent: "claude-code",
+      workspace: "Personal",
       server: "This computer",
       reason: "Token revocation was refused",
     };
     expect(unrevokedWords(unrevoked, "Claude Code")).toEqual({
-      happened: "Claude Code is disconnected, but its key to this workspace could not be taken back.",
-      todo: "To take it back, open Quadit (This computer), go to Settings → Agents → @claude-code, and under Tokens revoke “Claude Code on mac”.",
+      happened: "Claude Code is disconnected, but its key to Personal could not be taken back.",
+      todo: "To take it back, open Personal in Quadit (This computer), go to Settings → Agents → @claude-code, and under Tokens revoke “Claude Code on mac”.",
       reason: "The server said: Token revocation was refused.",
     });
+    // A workspace whose name was not kept (a ledger from before): its own, not the one Connect agents shows now.
+    expect(unrevokedWords({ ...unrevoked, workspace: "" }, "Claude Code").happened).toBe(
+      "Claude Code is disconnected, but its key to its workspace could not be taken back.",
+    );
+  });
+});
+
+describe("the words of a tool that works in several workspaces", () => {
+  it("says where else it works and as whom, one agent's workspaces together", () => {
+    expect(worksInWords([{ workspace: "Personal", agent: "@claude" }])).toBe("Works in Personal as @claude.");
+    expect(
+      worksInWords([
+        { workspace: "Personal", agent: "@claude" },
+        { workspace: "Client", agent: "@claude" },
+        { workspace: "Acme", agent: "@cc" },
+      ]),
+    ).toBe("Works in Personal and Client as @claude and in Acme as @cc.");
+  });
+
+  it("says, connected here, where else it works too", () => {
+    expect(alsoInWords([{ workspace: "Personal" }])).toBe("Also in Personal.");
+    expect(alsoInWords([{ workspace: "Personal" }, { workspace: "Client" }, { workspace: "" }])).toBe(
+      "Also in Personal, Client and another workspace.",
+    );
+  });
+
+  it("says Connect here as well adds a login and leaves the tool's own files alone", () => {
+    expect(addedDiskLine("Codex")).toBe(
+      "Adds a login for this workspace; Codex’s settings and skill stay as they are.",
+    );
+  });
+
+  it("names the computer's default login in each workspace it works in", () => {
+    expect(defaultLoginWords([])).toBeNull();
+    expect(defaultLoginWords([{ server: "https://q.example", agent: "@ann" }])).toBe("@ann on https://q.example");
+    expect(
+      defaultLoginWords([
+        { server: "https://q.example", agent: "@pi" },
+        { server: "https://acme.example", agent: null },
+      ]),
+    ).toBe("@pi on https://q.example and an agent on https://acme.example");
   });
 });

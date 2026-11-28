@@ -8,34 +8,44 @@
 //   ledger says. A tool of any other server is never run: its card keeps the
 //   line to paste.
 //
-//   Right after Connect (and for a tool the app has never run, with the open
-//   code or a new one), the tool is run once with its one-prompt command and
-//   "Connect to Quadit CODE", as its own login, in a folder of the app's, for
-//   two minutes at most. Done is the server's word that the code was used,
+//   Right after Connect (and for a connection the app has never run, with the
+//   open code or a new one), the tool is run once with its one-prompt command
+//   and "Connect to Quadit CODE in WORKSPACE", as its own login in that
+//   workspace (QUADIT_WORKSPACE: a tool that works in several needs it to
+//   give a code back), in a folder of the app's, for two minutes at most. Done is the server's word that the code was used,
 //   never the run's exit, and the app marks it (ran); otherwise the card
 //   falls back to the line to paste, with the reason.
 //
-// One run at a time for a tool, started through child-guard.ts and stopped
-// on Disconnect and quit; after every wait the app looks again whether it is
-// quitting and the tool still wanted. What each run said goes to the tool's
-// log.
+// Each connection of a tool (one per workspace) is run for itself, by its key
+// (connections.ts, connectionKey): one run at a time for each, started
+// through child-guard.ts and stopped on its Disconnect and quit; after every wait the app looks again whether it is
+// quitting and the connection still wanted. What each run said goes to the
+// tool's log.
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { childEnv, type RunningChild, type StartChild } from "@/main/child-guard";
 import { appendLog } from "@/main/log-file";
+import { connectLine } from "@/shared/connect-line";
 import type { SelfRun } from "@/shared/pages-api";
 
-/** A tool Connect set up, as the app runs it. */
+/** A connection Connect made, as the app runs its tool. */
 export interface SelfRunTool {
-  id: string;
+  /** The connection (connections.ts, connectionKey). */
+  key: string;
+  /** Its tool (a harness id): the runs of its connections share a folder and a log. */
+  tool: string;
   name: string;
   /** Its program (tool-program.ts); null when it was not found. */
   program: string | null;
   /** Its one-prompt command's arguments for a prompt (harnesses.ts); null when it has none the app may run. */
   oneShot: ((prompt: string) => string[]) | null;
-  /** Its quadit login file, which its run uses. */
+  /** Its quadit login file in that workspace. */
   login: string;
+  /** What its run gives quadit (childEnv): the tool's base login, and the workspace it acts in. */
+  quadit: { config: string; workspace: string | null };
+  /** The workspace's name, which the line it is run with names. */
+  workspace: string;
   /** Whether that login is for the server the app runs on this computer: its address, and the app's mark on it. */
   here: boolean;
   /** For a tool here: whether that server runs now as the app's own child; runs of it exist only then. */
@@ -46,7 +56,7 @@ export interface SelfRunTool {
 
 /** What the app looks at before it runs anything: the tools and the login shell's PATH. */
 export interface SelfRunsLook {
-  /** The tools Connect set up, as they are now. */
+  /** The connections Connect made, as they are now. */
   tools: SelfRunTool[];
   /** The login shell's PATH, which every run gets. */
   path: string;
@@ -56,14 +66,14 @@ export interface SelfRunsParts {
   look(): Promise<SelfRunsLook>;
   /** Starts a program, held to the app (child-guard.ts). */
   start: StartChild;
-  /** Whether the server says the tool's connect code was given back. */
-  codeGivenBack(id: string): Promise<boolean>;
-  /** The tool's connect code still open, if any. */
-  openCode(id: string): string | null;
-  /** Makes the tool a new connect code; the app is told of it as of a Connect (prove follows). */
-  newCode(id: string): Promise<void>;
-  /** Marks the tool as run by the app and proven connected (the ledger). */
-  ran(id: string): void;
+  /** Whether the server says the connection's connect code was given back (by its key). */
+  codeGivenBack(key: string): Promise<boolean>;
+  /** The connection's connect code still open, if any. */
+  openCode(key: string): string | null;
+  /** Makes the connection a new connect code; the app is told of it as of a Connect (prove follows). */
+  newCode(key: string): Promise<void>;
+  /** Marks the connection as run by the app and proven connected (the ledger). */
+  ran(key: string): void;
   /** The folder of the runs' working folders and of the tools' logs. */
   dir: string;
   /** The app's environment, which a run gets without its QUADIT_ settings (childEnv). */
@@ -74,7 +84,7 @@ export interface SelfRunsParts {
 
 const PROVE_LIMIT_MS = 2 * 60_000;
 
-/** What runs, or is said, for one tool: its run giving the code back. */
+/** What runs, or is said, for one connection: its run giving the code back. */
 interface Held {
   proving: SelfRun["proving"];
   prover?: RunningChild;
@@ -91,26 +101,26 @@ export class SelfRuns {
   constructor(private parts: SelfRunsParts) {}
 
   /** The folder a tool's runs work in, which the app makes. */
-  private runDir(id: string): string {
-    const dir = join(this.parts.dir, "runs", id);
+  private runDir(tool: string): string {
+    const dir = join(this.parts.dir, "runs", tool);
     mkdirSync(dir, { recursive: true });
     return dir;
   }
 
-  /** The log of what a tool's runs said. */
-  logOf(id: string): string {
-    return join(this.parts.dir, "logs", `${id}.log`);
+  /** The log of what a tool's runs said, of all its connections. */
+  logOf(tool: string): string {
+    return join(this.parts.dir, "logs", `${tool}.log`);
   }
 
-  private log(id: string, line: string) {
-    appendLog(this.logOf(id), line);
+  private log(tool: string, line: string) {
+    appendLog(this.logOf(tool), line);
   }
 
-  private heldOf(id: string): Held {
-    let held = this.held.get(id);
+  private heldOf(key: string): Held {
+    let held = this.held.get(key);
     if (!held) {
       held = { proving: null, tried: false };
-      this.held.set(id, held);
+      this.held.set(key, held);
     }
     return held;
   }
@@ -121,23 +131,24 @@ export class SelfRuns {
   }
 
   /**
-   * Runs the tool once to give `code` back, as its own login; resolves when
-   * that run is over. Done is the server's word, and marked; else the
-   * reason it could not is kept for its card. A tool of another server, or
-   * without a one-prompt command, is left to the line to paste.
+   * Runs the connection's tool once to give `code` back, as its own login
+   * there; resolves when that run is over. Done is the server's word, and
+   * marked; else the reason it could not is kept for its card. A tool of
+   * another server, or without a one-prompt command, is left to the line to
+   * paste.
    */
-  async prove(id: string, code: string): Promise<void> {
+  async prove(key: string, code: string): Promise<void> {
     if (this.quitting) return;
     // Said at once, so its card never shows the line to paste before it shows this.
-    const held = this.heldOf(id);
+    const held = this.heldOf(key);
     held.proving = { state: "running" };
     held.tried = true;
     this.parts.changed();
     const { tools, path } = await this.parts.look();
     // Taken back meanwhile (disconnected): nothing starts for it.
-    if (this.held.get(id) !== held) return;
+    if (this.held.get(key) !== held) return;
     this.known = tools;
-    const tool = this.known.find((t) => t.id === id);
+    const tool = this.known.find((t) => t.key === key);
     if (!tool?.oneShot || !this.mayRun(tool)) {
       held.proving = null;
       this.parts.changed();
@@ -150,11 +161,11 @@ export class SelfRuns {
     }
     // One run at a time: one asked before for another code goes.
     held.prover?.stop();
-    this.log(id, `giving the connect code back: ${tool.program}`);
-    const child = this.parts.start(tool.program, tool.oneShot(`Connect to Quadit ${code}`), {
-      cwd: this.runDir(id),
-      env: childEnv(this.parts.env, tool.login, path),
-      line: (line) => this.log(id, line),
+    this.log(tool.tool, `giving the connect code back in ${tool.workspace}: ${tool.program}`);
+    const child = this.parts.start(tool.program, tool.oneShot(connectLine(code, tool.workspace)), {
+      cwd: this.runDir(tool.tool),
+      env: childEnv(this.parts.env, tool.quadit, path),
+      line: (line) => this.log(tool.tool, line),
     });
     held.prover = child;
     let late = false;
@@ -167,26 +178,29 @@ export class SelfRuns {
     if (held.prover !== child) return;
     held.prover = undefined;
     if (this.quitting) return;
-    if (await this.parts.codeGivenBack(id)) {
+    if (await this.parts.codeGivenBack(key)) {
       held.proving = null;
-      this.parts.ran(id);
+      this.parts.ran(key);
     } else held.proving = { state: "failed", reason: late ? "it took longer than two minutes" : failedHow(exit) };
-    this.log(id, held.proving ? `could not give the code back: ${held.proving.reason}` : "the code was given back");
+    this.log(
+      tool.tool,
+      held.proving ? `could not give the code back: ${held.proving.reason}` : "the code was given back",
+    );
     this.parts.changed();
   }
 
-  /** What the app does by itself for a tool now, for its card; null for a tool not set up. */
-  self(id: string): SelfRun | null {
-    const held = this.held.get(id);
+  /** What the app does by itself for a connection now, for its card; null for one not made. */
+  self(key: string): SelfRun | null {
+    const held = this.held.get(key);
     // Giving its code back is said before the tools were looked at.
-    if (!this.known.some((t) => t.id === id)) return held?.proving ? { proving: held.proving } : null;
+    if (!this.known.some((t) => t.key === key)) return held?.proving ? { proving: held.proving } : null;
     return { proving: held?.proving ?? null };
   }
 
-  /** A tool taken back (Undo, Disconnect): its run stops now, and none starts for it from a look begun before. */
-  disconnected(id: string) {
-    this.held.get(id)?.prover?.stop();
-    this.held.delete(id);
+  /** A connection taken back (Undo, Disconnect): its run stops now, and none starts for it from a look begun before. */
+  disconnected(key: string) {
+    this.held.get(key)?.prover?.stop();
+    this.held.delete(key);
     this.parts.changed();
     void this.sync();
   }
@@ -202,18 +216,18 @@ export class SelfRuns {
     const { tools } = await this.parts.look();
     if (this.quitting) return;
     this.known = tools;
-    for (const [id, held] of this.held) {
-      // A tool giving its code back stays: this look may have begun before it was connected.
-      if (!tools.some((t) => t.id === id) && !held.prover && held.proving?.state !== "running") this.held.delete(id);
+    for (const [key, held] of this.held) {
+      // A connection giving its code back stays: this look may have begun before it was made.
+      if (!tools.some((t) => t.key === key) && !held.prover && held.proving?.state !== "running") this.held.delete(key);
     }
     for (const tool of tools) {
-      const held = this.heldOf(tool.id);
+      const held = this.heldOf(tool.key);
       if (held.prover && !this.mayRun(tool)) held.prover.stop();
       if (this.mayRun(tool) && tool.program && !tool.ran && !held.tried) {
         held.tried = true;
-        const code = this.parts.openCode(tool.id);
+        const code = this.parts.openCode(tool.key);
         // A new code comes back as a Connect does: prove follows.
-        void (code ? this.prove(tool.id, code) : this.parts.newCode(tool.id));
+        void (code ? this.prove(tool.key, code) : this.parts.newCode(tool.key));
       }
     }
     this.parts.changed();

@@ -19,11 +19,14 @@ interface Started {
 
 function tool(extra: Partial<SelfRunTool> = {}): SelfRunTool {
   return {
-    id: "codex",
+    key: "codex",
+    tool: "codex",
     name: "Codex",
     program: "/bin/codex",
     oneShot: (prompt) => ["exec", "--skip-git-repo-check", prompt],
     login: "/c/codex.json",
+    quadit: { config: "/c/codex.json", workspace: null },
+    workspace: "Acme",
     here: true,
     serverRuns: true,
     ran: true,
@@ -108,7 +111,7 @@ describe("SelfRuns, giving the code back", () => {
     expect(started).toHaveLength(1);
     expect(started[0]).toMatchObject({
       program: "/bin/codex",
-      args: ["exec", "--skip-git-repo-check", "Connect to Quadit ABC234"],
+      args: ["exec", "--skip-git-repo-check", "Connect to Quadit ABC234 in Acme"],
       env: ENV,
     });
     expect(started[0]?.cwd).toContain("codex");
@@ -118,6 +121,27 @@ describe("SelfRuns, giving the code back", () => {
     await flush();
     expect(runs.self("codex")).toEqual({ proving: null });
     expect(ran).toEqual(["codex"]);
+  });
+
+  it("runs each workspace's connection of a tool for itself, its quadit acting in that workspace, and stops only the one taken back", async () => {
+    const personal = tool({ key: "codex\npersonal", ran: false, workspace: "Personal" });
+    const acme = tool({
+      key: "codex\nacme",
+      ran: false,
+      login: "/c/codex-acme.json",
+      quadit: { config: "/c/codex.json", workspace: "w-acme" },
+    });
+    const { runs, started } = setUp([personal, acme]);
+    void runs.prove("codex\npersonal", "ABC234");
+    void runs.prove("codex\nacme", "XYZ789");
+    await flush();
+    expect(started.map((c) => [c.args.at(-1), c.env.QUADIT_CONFIG, c.env.QUADIT_WORKSPACE])).toEqual([
+      ["Connect to Quadit ABC234 in Personal", "/c/codex.json", undefined],
+      ["Connect to Quadit XYZ789 in Acme", "/c/codex.json", "w-acme"],
+    ]);
+    runs.disconnected("codex\nacme");
+    expect(started.map((c) => c.stopped)).toEqual([false, true]);
+    expect(runs.self("codex\npersonal")).toEqual({ proving: { state: "running" } });
   });
 
   it("says it is giving the code back at once, before it has looked at the tools", async () => {
@@ -220,7 +244,7 @@ describe("SelfRuns, a look at the tools", () => {
     await withCode.runs.sync();
     await flush();
     expect(withCode.started.map((c) => c.program)).toEqual(["/bin/codex"]);
-    expect(withCode.started[0]?.args.at(-1)).toBe("Connect to Quadit ABC234");
+    expect(withCode.started[0]?.args.at(-1)).toBe("Connect to Quadit ABC234 in Acme");
 
     const without = setUp([tool({ ran: false })]);
     await without.runs.sync();
@@ -231,7 +255,9 @@ describe("SelfRuns, a look at the tools", () => {
 
   it("starts nothing else, ever: no listener for a tool it ran, before or after its code came back", async () => {
     const { runs, started, setBack, list } = setUp([tool({ ran: false })]);
-    list.push(tool({ id: "claude", name: "Claude Code", program: "/bin/claude", login: "/c/claude.json" }));
+    list.push(
+      tool({ key: "claude", tool: "claude", name: "Claude Code", program: "/bin/claude", login: "/c/claude.json" }),
+    );
     void runs.prove("codex", "ABC234");
     await flush();
     setBack(true);

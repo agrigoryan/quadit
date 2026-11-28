@@ -16,6 +16,11 @@
 // A redraw keeps each tool's card and changes it in place: its nodes are
 // replaced only when what it shows changes, so focus, a selection or a click
 // in it survive the redraw after a Connect or a Disconnect.
+// The tools are seen from the workspace the window shows (each card is set
+// up as the tool's connection there, if any, and says where else it works,
+// with "Connect here as well"; folders.ts after it); a draw for one
+// workspace is dropped once the window shows another (draws.ts), and while
+// it shows none, no tool is offered at all.
 // Opened by a page at one of its agents (ConnectTarget's focus), it is a
 // sheet of that agent alone over the page, as a dialog of that page's card
 // (focus-sheet.ts): the card of the tool that works as that agent, focused
@@ -26,7 +31,9 @@
 // a click outside closes it. It only prepares: the person still does it.
 
 import { button, element, make, separated } from "@/pages/dom";
+import { Draws } from "@/pages/draws";
 import { openSheet } from "@/pages/files-sheet";
+import { Folders } from "@/pages/folders";
 import { letInputIn } from "@/pages/hold-input";
 import { listenSteps } from "@/pages/listen-steps";
 import { type Sheet, sheetOf } from "@/pages/focus-sheet";
@@ -34,8 +41,10 @@ import { HERE, tile, ToolCard } from "@/pages/tool-card";
 import { defaultChoice, handleOf } from "@/shared/default-choice";
 import { defaultLoginWords } from "@/shared/change-words";
 import type {
+  CardConnection,
   ConnectChoice,
   ConnectFocusView,
+  ConnectionView,
   ConnectTarget,
   ConnectView,
   Disconnected,
@@ -55,8 +64,16 @@ const FIRST_LOOK_MS = 1_500;
 
 /** The window this page is over: its server, and the workspace its page shows. */
 let target: ConnectTarget | null = null;
+/** The draws of the page: one for a workspace the window no longer shows is dropped. */
+const draws = new Draws();
 /** The computer's default login, as the last look at the harnesses found it. */
-let defaultLogin: ConnectView["defaultLogin"] = null;
+let defaultLogin: ConnectView["defaultLogin"] = [];
+/**
+ * The tools whose card asks which folders work in each of their workspaces
+ * (the folders step, right after Connect here as well), and which
+ * workspaces it asks about, by id, until the person is done.
+ */
+const askingFolders = new Map<string, Set<string>>();
 /** What the last Disconnect of each tool left the person to know, which its card says until it connects again. */
 const takenBack = new Map<string, Disconnected>();
 /**
@@ -71,6 +88,8 @@ interface Shown {
   made: string;
   more: string;
   fill: (() => void) | null;
+  /** The folders tied to its workspaces, for a tool that works in several. */
+  folders: Folders;
 }
 const shownCards = new Map<string, Shown>();
 /** Whether the page has shown its cards yet: input is let in once it has. */
@@ -104,8 +123,29 @@ function describeCli(view: ConnectView): string {
   return `quadit is not on your PATH, and the app cannot put it there. Install it first: ${view.cli.manual ?? ""}`;
 }
 
-function loginName(login: NonNullable<ConnectView["defaultLogin"]>): string {
-  return defaultLoginWords(login) ?? "";
+function loginName(logins: ConnectView["defaultLogin"]): string {
+  return defaultLoginWords(logins) ?? "";
+}
+
+/** The connection a card is set up as: the tool's here, with its workspace's name. */
+function cardConnection(h: HarnessView): CardConnection | null {
+  return h.connected ? { ref: h.connected.ref, workspace: h.connected.workspace } : null;
+}
+
+/** Where else the tool works, as its card says it. */
+function elsewhereOf(h: HarnessView): { workspace: string; agent: string }[] {
+  return h.elsewhere.map((c) => ({ workspace: c.workspace, agent: c.agent }));
+}
+
+/**
+ * A Connect here as well ended: its card asks which folders work in the
+ * workspace here, and in those of its others with none tied yet, until the
+ * person is done.
+ */
+function askFolders(h: HarnessView, connection: CardConnection) {
+  const asked = new Set([connection.ref.workspaceId]);
+  for (const other of h.elsewhere) if (other.folders.length === 0) asked.add(other.ref.workspaceId);
+  askingFolders.set(h.id, asked);
 }
 
 function say(text: string) {
@@ -121,11 +161,12 @@ function reviewConnect(h: HarnessView, plan: () => Promise<Planned>) {
     kind: "connect",
     plan,
     action: {
-      label: `Connect ${h.name}`,
+      label: h.elsewhere.length > 0 ? `Connect ${h.name} here as well` : `Connect ${h.name}`,
       run: async (planId) => {
         const done = await api.applyConnect(planId);
         if (!done.ok) return done;
         applied = true;
+        if (done.added) askFolders(h, done.connection);
         say(done.hint);
         void render();
         return { ok: true };
@@ -142,15 +183,17 @@ function reviewConnect(h: HarnessView, plan: () => Promise<Planned>) {
  * with how that went and what the person should know (closed: nothing).
  */
 function reviewDisconnect(h: HarnessView, within?: HTMLElement): Promise<Disconnected | Refused> {
+  const { connected } = h;
+  if (!connected) return Promise.resolve({ ok: false, error: `${h.name} is not connected here.` });
   return new Promise((settle) => {
     let done = false;
     openSheet({
       tool: h,
       kind: "disconnect",
       ...(within ? { within } : {}),
-      plan: () => api.planDisconnect(h.id),
+      plan: () => api.planDisconnect(connected.ref),
       action: {
-        label: `Disconnect ${h.name}`,
+        label: h.elsewhere.length > 0 ? `Disconnect ${h.name} from ${connected.workspace}` : `Disconnect ${h.name}`,
         run: async (planId) => {
           const applied = await api.applyDisconnect(planId);
           if (!applied.ok) return applied;
@@ -171,25 +214,41 @@ function reviewDisconnect(h: HarnessView, within?: HTMLElement): Promise<Disconn
   });
 }
 
-/** The plan of a card's Connect of `h`, and of its "See the files": its defaults, as the agent the page chose if any. */
+/**
+ * The plan of a card's Connect of `h`, and of its "See the files": its
+ * defaults, as the agent the page chose if any; for Connect here as well, as
+ * an agent with the handle it has elsewhere.
+ */
 function cardPlan(h: HarnessView): Promise<Planned> {
   const at = chosen();
   if (!at) return Promise.resolve(NO_WORKSPACE);
-  return api.planConnect(defaultChoice(h, at.serverId, at.summary, connectAs?.id));
+  return api.planConnect(defaultChoice(h, at.serverId, at.summary, connectAs?.id, handleElsewhere(h)));
+}
+
+/** The handle `h` works as elsewhere (its first other workspace's), without "@"; undefined when it works nowhere else. */
+function handleElsewhere(h: HarnessView): string | undefined {
+  return h.elsewhere[0]?.agent.replace(/^@/, "");
 }
 
 /** A new card for `h`, set up or not as `h` says, with where it stands when known (`handshake`). */
 function newCard(h: HarnessView, made: string, addsCommand: boolean, handshake: Handshake | null): Shown {
-  const tool = { ...h, ownLogin: h.cliIdentity === "own", worksAs: workingAs(h), mcpOnly: mcpOnly(h) };
+  const tool = {
+    ...h,
+    ownLogin: h.cliIdentity === "own",
+    worksAs: workingAs(h),
+    mcpOnly: mcpOnly(h),
+    elsewhere: elsewhereOf(h),
+  };
   const card: ToolCard = new ToolCard(tool, addsCommand, {
     connect: async () => {
       const planned = await cardPlan(h);
       if (!planned.ok) return planned;
       const done = await api.applyConnect(planned.plan.id);
       if (!done.ok) return done;
+      if (done.added) askFolders(h, done.connection);
       say(done.hint);
       void render();
-      return { ok: true };
+      return { ok: true, connection: done.connection };
     },
     back: () => reviewDisconnect(h),
     seeFiles: () => {
@@ -198,12 +257,12 @@ function newCard(h: HarnessView, made: string, addsCommand: boolean, handshake: 
     },
     changed: () => {},
   });
-  card.markSetUp(!!h.connected, handshake);
+  card.markSetUp(cardConnection(h), handshake);
   card.setConnectAs(connectAs?.handle ?? null);
   const left = takenBack.get(h.id);
   if (h.connected) takenBack.delete(h.id);
   else if (left) card.takenBack(left);
-  const shown: Shown = { card, made, more: "", fill: null };
+  const shown: Shown = { card, made, more: "", fill: null, folders: new Folders(h.name, () => void render()) };
   drawMore(shown, h);
   return shown;
 }
@@ -214,7 +273,7 @@ function newCard(h: HarnessView, made: string, addsCommand: boolean, handshake: 
  * options and the line about a skill changed by hand.
  */
 function updateCard(shown: Shown, h: HarnessView, addsCommand: boolean, handshake: Handshake | null) {
-  if (shown.card.isSetUp !== !!h.connected) shown.card.markSetUp(!!h.connected, handshake);
+  if (shown.card.isSetUp !== !!h.connected) shown.card.markSetUp(cardConnection(h), handshake);
   if (h.connected) takenBack.delete(h.id);
   shown.card.setAddsCommand(addsCommand);
   drawMore(shown, h);
@@ -226,7 +285,8 @@ function updateCard(shown: Shown, h: HarnessView, addsCommand: boolean, handshak
  * changed by hand, drawn anew only when what they show changes.
  */
 function drawMore(shown: Shown, h: HarnessView) {
-  const drawn = JSON.stringify([h.connected, h.skillChangedByHand]);
+  drawFolders(shown, h);
+  const drawn = JSON.stringify([h.connected?.ref, h.connected?.methods, h.elsewhere.length > 0, h.skillChangedByHand]);
   if (drawn === shown.more) return;
   shown.more = drawn;
   const form = h.connected ? null : optionsForm(h);
@@ -243,7 +303,43 @@ function drawMore(shown: Shown, h: HarnessView) {
     `More options for ${h.name}`,
   );
   toggle.setAttribute("aria-expanded", "false");
-  shown.card.extra.replaceChildren(...(h.skillChangedByHand ? [skillChanged(h)] : []), toggle, options);
+  shown.card.extra.replaceChildren(
+    shown.folders.element,
+    ...(h.skillChangedByHand ? [skillChanged(h)] : []),
+    toggle,
+    options,
+  );
+}
+
+/**
+ * The folders tied to the workspaces of a tool that works in several: on
+ * its card connected here, those of the workspace here; in the folders
+ * step, of each workspace it asks about, with Done.
+ */
+function drawFolders(shown: Shown, h: HarnessView) {
+  const asked = askingFolders.get(h.id);
+  const here = h.connected;
+  // Working in several, a chat in a folder tied to none asks which: the line to say names this one.
+  shown.card.setListenIn(here && h.elsewhere.length > 0 && here.folders.length === 0 ? here.workspace : null);
+  if (!here) askingFolders.delete(h.id);
+  const place = (c: ConnectionView) => ({ ref: c.ref, workspace: c.workspace, folders: c.folders });
+  const places =
+    !here || h.elsewhere.length === 0
+      ? []
+      : asked
+        ? [place(here), ...h.elsewhere.filter((c) => asked.has(c.ref.workspaceId)).map(place)]
+        : [place(here)];
+  shown.folders.show(
+    places,
+    here && asked
+      ? {
+          done: () => {
+            askingFolders.delete(h.id);
+            drawFolders(shown, h);
+          },
+        }
+      : null,
+  );
 }
 
 /** A connected tool whose Quadit skill the person changed by hand: the app leaves it, and offers to update it. */
@@ -266,10 +362,14 @@ function connectedHow(h: HarnessView): HTMLDivElement {
   const box = make("div", "", "options");
   const { connected } = h;
   if (!connected) return box;
-  const how = connected.methods.map((m) => (m === "cli" ? "quadit command" : "MCP")).join(" and ");
-  const where = [connected.server, connected.workspace].filter(Boolean).join(" · ");
+  const line = (c: ConnectionView) => {
+    const how = c.methods.map((m) => (m === "cli" ? "quadit command" : "MCP")).join(" and ");
+    const where = [c.server, c.workspace].filter(Boolean).join(" · ");
+    return make("p", `Connected (${how}) to ${where} as ${c.agent}`, "where-to");
+  };
   box.append(
-    make("p", `Connected (${how}) to ${where} as ${connected.agent}`, "where-to"),
+    line(connected),
+    ...h.elsewhere.map(line),
     button("Show log", () => void api.showToolLog(h.id), "link-blue", `Show the log of what Quadit ran for ${h.name}`),
   );
   return box;
@@ -298,7 +398,8 @@ function optionsForm(h: HarnessView): { form: HTMLFormElement; fill: () => void 
   const cli = check("cli", "The quadit command and its skill", true);
   const mcp = check("mcp", `Quadit's MCP server (signs in through ${h.name})`, false);
   how.append(cli.label);
-  if (h.mcp) how.append(mcp.label);
+  // Its MCP entry stays with the workspace it was first connected in: here it works through the quadit command.
+  if (h.mcp && h.elsewhere.length === 0) how.append(mcp.label);
 
   const workAs = make("label", "", "stacked");
   const agents = make("select");
@@ -315,7 +416,7 @@ function optionsForm(h: HarnessView): { form: HTMLFormElement; fill: () => void 
     return input;
   };
   const agentName = field("New agent's name", h.name);
-  const agentHandle = field("Handle", handleOf(h.name));
+  const agentHandle = field("Handle", handleElsewhere(h) ?? handleOf(h.name));
   const identity = make("p", "", "hint");
   const error = make("p", "", "card-error");
   error.setAttribute("role", "alert");
@@ -349,13 +450,13 @@ function optionsForm(h: HarnessView): { form: HTMLFormElement; fill: () => void 
   // Whether choosing an agent holds: not for the quadit command alone in a tool that works as the default login there already.
   const showIdentity = () => {
     const viaMcp = mcp.box.checked && h.mcp;
-    const fixed = h.cliIdentity === "default" && defaultLogin !== null;
+    const fixed = h.cliIdentity === "default" && defaultLogin.length > 0 && h.elsewhere.length === 0;
     workAs.hidden = fixed && !viaMcp;
     newAgent.hidden = workAs.hidden || agents.value !== NEW_AGENT || agents.options.length === 0;
     identity.textContent =
       h.cliIdentity === "own"
         ? `With the quadit command, ${h.name} gets a login of its own, as the agent chosen here.`
-        : fixed && defaultLogin
+        : fixed
           ? `With the quadit command, ${h.name} works as this computer's default login, ${loginName(defaultLogin)}: it has no setting the app can use to give it a login of its own.` +
             (h.mcp
               ? viaMcp
@@ -393,11 +494,14 @@ function optionsForm(h: HarnessView): { form: HTMLFormElement; fill: () => void 
 }
 
 async function render() {
+  const draw = draws.begin();
   const view = await api.connectState();
+  if (!draw.counts()) return;
+  draw.isFor(workspaceKey(view.at));
   defaultLogin = view.defaultLogin;
   element("cli").textContent = describeCli(view);
   element("notices").replaceChildren(
-    ...(view.defaultLogin
+    ...(view.defaultLogin.length > 0
       ? [
           make(
             "li",
@@ -417,17 +521,23 @@ async function render() {
       : []),
   );
   harnesses = view.harnesses;
-  const here = view.harnesses.filter((h) => h.installed || h.connected);
-  const away = view.harnesses.filter((h) => !h.installed && !h.connected);
+  // With no workspace in the window, nothing of one is offered: no tool is shown until it shows one.
+  const shows = (h: HarnessView) => view.at !== null && (h.installed || !!h.connected || h.elsewhere.length > 0);
+  const here = view.harnesses.filter(shows);
+  const away = view.at ? view.harnesses.filter((h) => !shows(h)) : [];
   const addsCommand = !view.cli.found && (view.cli.linkInto !== null || view.cli.pathFolder !== null);
   // Where the tools newly set up stand, as far as known in a moment; a card not answered by then asks itself, and
   // one set up already asks on its own.
   const known = new Map<string, Handshake | null>();
-  const asked = here
-    .filter((h) => h.connected && !shownCards.get(h.id)?.card.isSetUp)
-    .map((h) => api.toolHandshake(h.id).then((handshake) => void known.set(h.id, handshake)));
+  const asked = here.flatMap((h) =>
+    h.connected && !shownCards.get(h.id)?.card.isSetUp
+      ? [api.toolHandshake(h.connected.ref).then((handshake) => void known.set(h.id, handshake))]
+      : [],
+  );
   await Promise.race([Promise.all(asked), new Promise((done) => setTimeout(done, FIRST_LOOK_MS))]);
-  placeCards(here, addsCommand, known);
+  // Another draw began meanwhile (the window shows another workspace now): this one's answers are not drawn.
+  if (!draw.counts()) return;
+  placeCards(here, addsCommand, known, workspaceKey(view.at));
   arrange();
   await showTarget();
   if (!shownOnce) {
@@ -435,7 +545,7 @@ async function render() {
     letInputIn(element("connect"), target?.openedByPage ?? false);
   }
   // With none found here, the list of tools that are not waits, folded.
-  const noneFound = here.length === 0;
+  const noneFound = view.at !== null && here.length === 0;
   element("none-found").hidden = !noneFound;
   element("all-tools").hidden = !noneFound;
   element("all-harnesses").replaceChildren(
@@ -455,15 +565,17 @@ async function render() {
 /**
  * Shows a card for each of `here`, in order: a tool's card kept and changed
  * in place, a new one only for a tool not shown before or whose card's
- * making changed (whom it works as); a card moved only when the order did.
+ * making changed (whom it works as, the workspace `seenFrom` it is seen from,
+ * where else it works); a card moved only when the order did.
  */
-function placeCards(here: HarnessView[], addsCommand: boolean, known: Map<string, Handshake | null>) {
+function placeCards(here: HarnessView[], addsCommand: boolean, known: Map<string, Handshake | null>, seenFrom: string) {
   for (const [id, shown] of shownCards) {
     if (here.some((h) => h.id === id)) continue;
     shown.card.element.remove();
     shownCards.delete(id);
   }
   here.forEach((h, i) => {
+    // The workspace it is seen from, and where else it works, are what it was made for: another is another card.
     const made = JSON.stringify([
       h.id,
       h.name,
@@ -473,6 +585,8 @@ function placeCards(here: HarnessView[], addsCommand: boolean, known: Map<string
       h.chatListens,
       workingAs(h),
       mcpOnly(h),
+      seenFrom,
+      elsewhereOf(h),
     ]);
     const kept = shownCards.get(h.id);
     const handshake = known.get(h.id) ?? null;
@@ -500,9 +614,32 @@ function workingAs(h: HarnessView): string | null {
   return h.cliIdentity === "default" ? defaultLoginWords(defaultLogin) : null;
 }
 
+/** The server and workspace a view is seen from, or a target shows, as one string; "" for none. */
+function workspaceKey(at: { serverId: string; workspaceId: string } | null): string {
+  return at ? `${at.serverId}\n${at.workspaceId}` : "";
+}
+
+/** The workspace a target shows, as workspaceKey makes it. */
+function targetKey(shown: ConnectTarget | null): string {
+  return workspaceKey(shown?.summary ? { serverId: shown.serverId, workspaceId: shown.summary.workspace.id } : null);
+}
+
 /** The workspace the window under this page shows (it changes as its page publishes), and its agents in the options. */
 async function showTarget() {
+  const was = targetKey(target);
   target = await api.connectTarget();
+  const now = targetKey(target);
+  // Another workspace: what a page asked for the one before (an agent of its own, a Connect as it) is not this one's.
+  if (was && now !== was) {
+    sheet = null;
+    connectAs = null;
+    disconnecting = null;
+    askingFolders.clear();
+    element("focus-line").hidden = true;
+    arrange();
+  }
+  // The tools were drawn as seen from another workspace: they are drawn again, from this one.
+  if (draws.stale(now)) void render();
   const at = chosen();
   element("where").textContent = at ? `For ${at.summary.workspace.name} on ${target?.serverName ?? ""}.` : "";
   const openedBy = element("opened-by");
@@ -518,7 +655,7 @@ async function showTarget() {
     sheet = sheetOf(
       focus,
       harnesses
-        .filter((h) => h.installed || h.connected)
+        .filter((h) => h.installed || h.connected || h.elsewhere.length > 0)
         .map((h) => ({ id: h.id, found: h.installed, setUp: !!h.connected, defaultLogin: workingAs(h) !== null })),
       HERE,
       target?.summary?.agents ?? [],

@@ -239,8 +239,9 @@ describe("childEnv", () => {
           QUADIT_URL: "u",
           QUADIT_TOKEN: "t",
           QUADIT_CONFIG: "/x",
+          QUADIT_WORKSPACE: "w-theirs",
         },
-        "/login.json",
+        { config: "/login.json", workspace: null },
         "/opt/homebrew/bin:/usr/bin:/bin",
       ),
     ).toEqual({
@@ -249,6 +250,16 @@ describe("childEnv", () => {
       OPENAI_API_KEY: "k",
       QUADIT_CONFIG: "/login.json",
     });
+  });
+
+  it("names the workspace its quadit acts in, for a login that works in several", () => {
+    expect(childEnv({ HOME: "/h", QUADIT_WORKSPACE: "w-theirs" }, { config: "/claude.json", workspace: "w2" })).toEqual(
+      {
+        HOME: "/h",
+        QUADIT_CONFIG: "/claude.json",
+        QUADIT_WORKSPACE: "w2",
+      },
+    );
   });
 });
 

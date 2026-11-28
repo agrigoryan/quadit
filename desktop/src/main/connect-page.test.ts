@@ -2,10 +2,13 @@ import type { WebContents, WebContentsView } from "electron";
 import { describe, expect, it } from "vitest";
 import type { PageHandlers } from "@/main/app-pages";
 import { ConnectPage } from "@/main/connect-page";
-import type { ConnectTarget, RunEntryView } from "@/shared/pages-api";
+import type { ConnectionRef, ConnectTarget, RunEntryView } from "@/shared/pages-api";
 
 const CLAUDE = "0190f3a2-7b1c-7d4e-9a0b-1c2d3e4f5a6b";
 const HELPER = "0190f3a2-7b1c-7d4e-9a0b-1c2d3e4f5a6c";
+
+/** The connection of the tool `tool` in the workspace w1 of the server s1, as a card names it. */
+const ref = (tool: string): ConnectionRef => ({ tool, serverId: "s1", workspaceId: "w1", agentId: `as-${tool}` });
 
 /** An entry of quadit run's registry, ready. */
 const entry = (id: string, project: string): RunEntryView => ({
@@ -35,13 +38,15 @@ function harness({
 }: { covered?: string; available?: boolean; unreadable?: boolean; workspace?: boolean } = {}) {
   let handlers: Partial<PageHandlers> = {};
   const said: string[] = [];
-  const logins: Record<string, { login: string; agent: string; program: "claude" | "codex" }> = {
-    claude: { login: "/q/claude.json", agent: "@claude", program: "claude" },
-    codex: { login: "/q/codex.json", agent: "@codex", program: "codex" },
+  const identity = (agent: string) => ({ server: "https://s1.example", workspace: "w1", agent });
+  const logins: Record<string, { login: string; agent: string; program: "claude" | "codex"; identity: object }> = {
+    claude: { login: "/q/claude.json", agent: "@claude", program: "claude", identity: identity("as-claude") },
+    codex: { login: "/q/codex.json", agent: "@codex", program: "codex", identity: identity("as-codex") },
   };
+  // Quadit's runs, by agent: never by login file.
   const entries: Record<string, RunEntryView[]> = {
-    "/q/claude.json": [entry("e1", "SVA")],
-    "/q/codex.json": [entry("e2", "GS")],
+    "as-claude": [entry("e1", "SVA")],
+    "as-codex": [entry("e2", "GS")],
   };
   const closers = new Map<number, () => void>();
   let views = 0;
@@ -54,7 +59,12 @@ function harness({
     },
     connections: {
       dropPlans: () => void said.push("drop plans"),
-      runAs: (id: string) => logins[id] ?? null,
+      state: async (at: unknown) => ({ harnesses: [], at }),
+      tie: async (r: ConnectionRef, folder: string) => {
+        said.push(`tie ${r.tool} ${r.workspaceId} ${folder}`);
+        return { ok: true };
+      },
+      runAs: (r: ConnectionRef) => (r.workspaceId === "w1" ? (logins[r.tool] ?? null) : null),
       agentsOf: (serverId: string, workspaceId: string) =>
         (serverId === "s1" || serverId === "local") && workspaceId === "w1"
           ? [
@@ -101,7 +111,7 @@ function harness({
     showBackups: async () => {},
     runner: {
       available,
-      entries: async (login) => (unreadable ? null : (entries[login] ?? [])),
+      entries: async (of) => (unreadable ? null : (entries[of.agent] ?? [])),
       projects: async (login) => ({ ok: true, projects: [{ key: login, name: "as asked" }] }),
       waiting: async (login, project) => {
         said.push(`waiting ${login} ${project}`);
@@ -169,6 +179,36 @@ describe("ConnectPage", () => {
     expect(await call(1, "connectTarget")).toBeNull();
   });
 
+  it("tells its page of the tools as seen from the workspace under it, and of none before the window shows one", async () => {
+    const { connect, call } = harness({ workspace: true });
+    connect.show("s2");
+    expect(await call(1, "connectState")).toMatchObject({ at: { serverId: "s2", workspaceId: "w1" } });
+    const bare = harness();
+    bare.connect.show("s2");
+    expect(await bare.call(1, "connectState")).toMatchObject({ at: null });
+    // A page not its own: from none.
+    expect(await bare.call(7, "connectState")).toMatchObject({ at: null });
+  });
+
+  it("asks about a connection named whole, never another workspace's of the same tool", async () => {
+    const { connect, call } = harness();
+    connect.show("s1");
+    expect(await call(1, "runEntries", { ...ref("claude"), workspaceId: "w2" })).toBeNull();
+    expect(await call(1, "runEntries", "claude")).toBeNull();
+  });
+
+  it("ties only a whole folder to a connection's workspace", async () => {
+    const { connect, said, call } = harness();
+    connect.show("s1");
+    expect(await call(1, "tieFolder", ref("claude"), "/h/devel/site")).toEqual({ ok: true });
+    for (const folder of ["devel/site", "/h/a\0b", 7])
+      expect(await call(1, "tieFolder", ref("claude"), folder)).toEqual({
+        ok: false,
+        error: "Choose the folder again.",
+      });
+    expect(said.filter((line) => line.startsWith("tie "))).toEqual(["tie claude w1 /h/devel/site"]);
+  });
+
   it("tells and obeys only its own page", async () => {
     const { connect, said, call } = harness();
     connect.show("s1");
@@ -181,13 +221,13 @@ describe("ConnectPage", () => {
 describe("ConnectPage, Run by Quadit", () => {
   it("gives a tool's agent and its entries, and nothing for a tool Quadit cannot run or an app without a quadit", async () => {
     const { call } = harness();
-    expect(await call(1, "runEntries", "claude")).toEqual({ agent: "@claude", entries: [entry("e1", "SVA")] });
-    expect(await call(1, "runEntries", "gemini")).toBeNull();
-    expect(await harness({ available: false }).call(1, "runEntries", "claude")).toBeNull();
+    expect(await call(1, "runEntries", ref("claude"))).toEqual({ agent: "@claude", entries: [entry("e1", "SVA")] });
+    expect(await call(1, "runEntries", ref("gemini"))).toBeNull();
+    expect(await harness({ available: false }).call(1, "runEntries", ref("claude"))).toBeNull();
   });
 
   it("says when what Quadit runs could not be read, rather than that it runs nothing", async () => {
-    expect(await harness({ unreadable: true }).call(1, "runEntries", "claude")).toEqual({
+    expect(await harness({ unreadable: true }).call(1, "runEntries", ref("claude"))).toEqual({
       agent: "@claude",
       entries: [],
       unreadable: true,
@@ -197,12 +237,12 @@ describe("ConnectPage, Run by Quadit", () => {
   it("hands quadit run add only a project key and a whole folder path, refusing anything else in plain words", async () => {
     const { call, said } = harness();
     for (const project of ["sva", "SVA\nrm -rf ~", "", 7])
-      expect(await call(1, "startRunning", "claude", project, "/h/devel/game")).toEqual({
+      expect(await call(1, "startRunning", ref("claude"), project, "/h/devel/game")).toEqual({
         ok: false,
         error: "That is not a project of this workspace.",
       });
     for (const folder of ["devel/game", "/h/devel\0/game", "", null])
-      expect(await call(1, "startRunning", "claude", "SVA", folder)).toEqual({
+      expect(await call(1, "startRunning", ref("claude"), "SVA", folder)).toEqual({
         ok: false,
         error: "Choose the folder again.",
       });
@@ -211,28 +251,28 @@ describe("ConnectPage, Run by Quadit", () => {
 
   it("tells what running a project would start, asked as the tool's own login, for a project key only", async () => {
     const { call, said } = harness();
-    expect(await call(1, "runWaiting", "claude", "SVA")).toEqual({
+    expect(await call(1, "runWaiting", ref("claude"), "SVA")).toEqual({
       agent: "@claude",
       runs: 1,
       tasks: [{ key: "SVA-1", title: "First" }],
     });
-    expect(await call(1, "runWaiting", "claude", "sva; rm")).toBeNull();
-    expect(await call(1, "runWaiting", "gemini", "SVA")).toBeNull();
+    expect(await call(1, "runWaiting", ref("claude"), "sva; rm")).toBeNull();
+    expect(await call(1, "runWaiting", ref("gemini"), "SVA")).toBeNull();
     expect(said).toEqual(["waiting /q/claude.json SVA"]);
   });
 
   it("asks the projects as the tool's own login", async () => {
     const { call } = harness();
-    expect(await call(1, "agentProjects", "codex")).toEqual({
+    expect(await call(1, "agentProjects", ref("codex"))).toEqual({
       ok: true,
       projects: [{ key: "/q/codex.json", name: "as asked" }],
     });
-    expect(await call(1, "agentProjects", "gemini")).toMatchObject({ ok: false });
+    expect(await call(1, "agentProjects", ref("gemini"))).toMatchObject({ ok: false });
   });
 
   it("starts running a project with the tool's login, program and the program the app finds", async () => {
     const { call, said } = harness();
-    expect(await call(1, "startRunning", "claude", "SVA", "/h/devel/game")).toEqual({ ok: true });
+    expect(await call(1, "startRunning", ref("claude"), "SVA", "/h/devel/game")).toEqual({ ok: true });
     expect(said).toEqual([
       `add ${JSON.stringify({ login: "/q/claude.json", project: "SVA", folder: "/h/devel/game", program: "claude", programPath: "/h/.local/bin/claude" })}`,
     ]);
@@ -240,7 +280,7 @@ describe("ConnectPage, Run by Quadit", () => {
 
   it("starts no run of an agent whose skill lacks the section for runs, saying why", async () => {
     const { call, said } = harness();
-    expect(await call(1, "startRunning", "codex", "GS", "/h/devel/site")).toEqual({
+    expect(await call(1, "startRunning", ref("codex"), "GS", "/h/devel/site")).toEqual({
       ok: false,
       error: "The Quadit skill for Codex was changed by hand…",
     });
@@ -249,12 +289,12 @@ describe("ConnectPage, Run by Quadit", () => {
 
   it("stops running only an entry of the tool's own agent", async () => {
     const { call, said } = harness();
-    expect(await call(1, "stopRunning", "claude", "e2")).toEqual({
+    expect(await call(1, "stopRunning", ref("claude"), "e2")).toEqual({
       ok: false,
       error: "Quadit does not run that project for @claude.",
     });
     expect(said).toEqual([]);
-    expect(await call(1, "stopRunning", "claude", "e1")).toEqual({ ok: true });
+    expect(await call(1, "stopRunning", ref("claude"), "e1")).toEqual({ ok: true });
     expect(said).toEqual([`remove ${JSON.stringify({ entry: "e1" })}`]);
   });
 

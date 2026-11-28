@@ -144,10 +144,53 @@ export interface HarnessView {
   allows: boolean;
   /** Connected, its Quadit skill was changed by hand since the app wrote it, so the app does not update it by itself. */
   skillChangedByHand: boolean;
-  connected: { methods: ConnectMethod[]; server: string; workspace: string; agent: string } | null;
+  /** Its connection in the workspace Connect agents is for (ConnectView's `at`); null when it has none there, or no workspace is shown. */
+  connected: ConnectionView | null;
+  /** Its connections in the other workspaces it works in, of this server or another. */
+  elsewhere: ConnectionView[];
+}
+
+/**
+ * One connection of a tool, as the pages name it to the app (desktop,
+ * multi-workspace design §3.6): the tool, and the agent of a workspace of a
+ * server it works as there. Whatever a card asks about a connection names
+ * it whole, so an answer is never another workspace's.
+ */
+export interface ConnectionRef {
+  tool: string;
+  serverId: string;
+  workspaceId: string;
+  agentId: string;
+}
+
+/** A connection as a card holds it once set up: whom it asks about, and its workspace's name, which its lines say. */
+export interface CardConnection {
+  ref: ConnectionRef;
+  workspace: string;
+}
+
+/** A folder tied to a workspace on this computer (the quadit command's index): there, the tool works in that workspace. */
+export interface TiedFolder {
+  path: string;
+  /** As a person writes it: ~ for the home folder. */
+  shown: string;
+  /** The project the tie names, if any. */
+  project: string | null;
+}
+
+/** A tool's connection in one workspace: how, where and as whom, and the folders tied to that workspace. */
+export interface ConnectionView {
+  ref: ConnectionRef;
+  methods: ConnectMethod[];
+  server: string;
+  workspace: string;
+  agent: string;
+  folders: TiedFolder[];
 }
 
 export interface ConnectView {
+  /** The workspace this view is seen from (the one Connect agents is for); null when the window shows none. */
+  at: { serverId: string; workspaceId: string } | null;
   harnesses: HarnessView[];
   cli: {
     /** The quadit command on the login shell's PATH, and its version; null when there is none. */
@@ -162,11 +205,12 @@ export interface ConnectView {
     manual: string | null;
   };
   /**
-   * The computer's default login, when there is one: its server, and the
-   * agent it is (null when its server could not be asked). The harnesses
-   * without a login of their own work as it.
+   * The computer's default login, one for each workspace it works in (none:
+   * there is none): its server, and the agent it is there (null when its
+   * server could not be asked). The harnesses without a login of their own
+   * work as it.
    */
-  defaultLogin: { server: string | null; agent: string | null } | null;
+  defaultLogin: { server: string | null; agent: string | null }[];
   /** The Quadit plugin for Claude Code is installed: its MCP entry needs QUADIT_URL and QUADIT_TOKEN. */
   claudePlugin: boolean;
 }
@@ -368,6 +412,8 @@ export type Planned = { ok: true; plan: PlanView } | { ok: false; error: string 
 export interface Unrevoked {
   label: string;
   agent: string;
+  /** The workspace's name, and its server's in the app. */
+  workspace: string;
   server: string;
   reason: string;
 }
@@ -421,9 +467,13 @@ export interface PagesApi {
   /**
    * Connects a tool lookForTools found: with the plan toolChanges showed when
    * `planId` is that one's, else with the defaults and nothing asked. Gives
-   * the handle of the workspace's agent it works as (null: none of this workspace).
+   * the handle of the workspace's agent it works as (null: none of this
+   * workspace), and the connection made.
    */
-  connectTool(id: string, planId?: string): Promise<{ ok: true; agent: string | null } | Refused>;
+  connectTool(
+    id: string,
+    planId?: string,
+  ): Promise<{ ok: true; agent: string | null; connection: CardConnection } | Refused>;
   /** Takes back what connectTool did (its Undo); gives what the person should know (a token to revoke by hand). */
   disconnectTool(id: string): Promise<Disconnected | Refused>;
   /** What connecting one of those tools changes: the plan as it would be (kept for connectTool), or as it was carried out. */
@@ -477,30 +527,35 @@ export interface PagesApi {
   connectTarget(): Promise<ConnectTarget | null>;
   /** Takes this Connect agents page away, showing the page under it ("Done", Escape). */
   closeConnect(): Promise<void>;
-  /** Where a tool Connect has set up stands with Quadit; null when it is not set up. */
-  toolHandshake(id: string): Promise<Handshake | null>;
-  /** Makes a new connect code for a tool Connect has set up, replacing the one it had. */
-  newConnectCode(id: string): Promise<{ ok: true } | Refused>;
-  /** What the app does by itself for a tool Connect set up (main/self-runs.ts); null when it is not set up. */
-  toolSelf(id: string): Promise<SelfRun | null>;
+  /** Where a connection stands with Quadit; null when it is not set up (taken back elsewhere). */
+  toolHandshake(ref: ConnectionRef): Promise<Handshake | null>;
+  /** Makes a new connect code for a connection, replacing the one it had. */
+  newConnectCode(ref: ConnectionRef): Promise<{ ok: true } | Refused>;
+  /** What the app does by itself for a connection (main/self-runs.ts); null when it is not set up. */
+  toolSelf(ref: ConnectionRef): Promise<SelfRun | null>;
   /** Opens the log of what the app ran for a tool. */
   showToolLog(id: string): Promise<void>;
   /**
-   * Run by Quadit for a tool: its agent and the projects Quadit runs it for
-   * on this computer, with what each does now; null when Quadit cannot run
-   * it (not Claude Code or Codex, no login of its own, no quadit in the app).
+   * Run by Quadit for a connection: its agent and the projects Quadit runs
+   * it for on this computer, with what each does now; null when Quadit
+   * cannot run it (not Claude Code or Codex, no login of its own, no quadit
+   * in the app).
    */
-  runEntries(toolId: string): Promise<RunsView | null>;
-  /** The projects the tool's agent may work in. */
-  agentProjects(toolId: string): Promise<{ ok: true; projects: { key: string; name: string }[] } | Refused>;
+  runEntries(ref: ConnectionRef): Promise<RunsView | null>;
+  /** The projects the connection's agent may work in. */
+  agentProjects(ref: ConnectionRef): Promise<{ ok: true; projects: { key: string; name: string }[] } | Refused>;
   /** What Start running would start at once in `project`; null when it cannot be told (the card then says nothing). */
-  runWaiting(toolId: string, project: string): Promise<RunWaiting | null>;
+  runWaiting(ref: ConnectionRef, project: string): Promise<RunWaiting | null>;
   /** The native folder picker over the page's window: the folder chosen, and as a person writes it (~); null when cancelled. */
   pickFolder(): Promise<{ path: string; shown: string } | null>;
-  /** Has Quadit run the tool's agent for `project` in `folder` (quadit run add); the runner is started if it was not running. */
-  startRunning(toolId: string, project: string, folder: string): Promise<{ ok: true } | Refused>;
-  /** Has Quadit stop running the tool's agent for the entry `entryId` (quadit run remove), waiting for it to be done. */
-  stopRunning(toolId: string, entryId: string): Promise<{ ok: true } | Refused>;
+  /** Has Quadit run the connection's agent for `project` in `folder` (quadit run add); the runner is started if it was not running. */
+  startRunning(ref: ConnectionRef, project: string, folder: string): Promise<{ ok: true } | Refused>;
+  /** Has Quadit stop running the connection's agent for the entry `entryId` (quadit run remove), waiting for it to be done. */
+  stopRunning(ref: ConnectionRef, entryId: string): Promise<{ ok: true } | Refused>;
+  /** Ties `folder` to the connection's workspace (quadit use): there, the tools work in that workspace. */
+  tieFolder(ref: ConnectionRef, folder: string): Promise<{ ok: true } | Refused>;
+  /** Unties `folder` from the connection's workspace. */
+  untieFolder(ref: ConnectionRef, folder: string): Promise<{ ok: true } | Refused>;
   /** Opens the runner's log (runner/runner.log). */
   showRunnerLog(): Promise<void>;
   /** Writes the app's Quadit skill over a connected tool's one the person changed by hand. */
@@ -509,9 +564,15 @@ export interface PagesApi {
   copyText(text: string): Promise<void>;
   connectState(): Promise<ConnectView>;
   planConnect(c: ConnectChoice): Promise<Planned>;
-  /** `stale`: the plan is gone or a file changed since: look again. */
-  applyConnect(planId: string): Promise<{ ok: true; hint: string } | Refused>;
-  planDisconnect(harness: string): Promise<Planned>;
+  /**
+   * `stale`: the plan is gone or a file changed since: look again. Done,
+   * the connection made, and whether the tool works in another workspace
+   * too (`added`), when the folders that work in each are to be asked.
+   */
+  applyConnect(
+    planId: string,
+  ): Promise<{ ok: true; hint: string; connection: CardConnection; added: boolean } | Refused>;
+  planDisconnect(ref: ConnectionRef): Promise<Planned>;
   /** Drops the plan under review (Cancel). */
   dropPlan(): Promise<void>;
   applyDisconnect(planId: string): Promise<Disconnected | Refused>;

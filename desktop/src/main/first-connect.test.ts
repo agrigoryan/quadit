@@ -4,6 +4,8 @@ import type { Answer } from "@/main/requests";
 import type { DesktopRequest, DesktopSummary } from "@/shared/bridge";
 import type {
   ConnectChoice,
+  ConnectionRef,
+  ConnectionView,
   ConnectView,
   HarnessView,
   Planned,
@@ -25,7 +27,20 @@ function harness(id: string, name: string, extra: Partial<HarnessView> = {}): Ha
     skillChangedByHand: false,
     allows: false,
     connected: null,
+    elsewhere: [],
     ...extra,
+  };
+}
+
+/** A tool's connection in the workspace `workspace`, as Connect agents sees it. */
+function connection(tool: string, workspace: string): ConnectionView {
+  return {
+    ref: { tool, serverId: "s0", workspaceId: workspace, agentId: `as-${tool}` },
+    methods: ["cli"],
+    server: "x",
+    workspace,
+    agent: `@${tool}`,
+    folders: [],
   };
 }
 
@@ -55,7 +70,21 @@ const PLAN: PlanView = {
 
 const SAMPLES_PATH: Answer = { ok: true, path: "/personal/projects/GS" };
 
-type Applied = { ok: true; hint: string; agent: { id: string; handle: string } | null } | Refused;
+type Applied =
+  | {
+      ok: true;
+      hint: string;
+      agent: { id: string; handle: string } | null;
+      connection: { ref: ConnectionRef; workspace: string };
+      added: boolean;
+    }
+  | Refused;
+
+/** The connection a Connect made, in the workspace the step is for. */
+const MADE = {
+  ref: { tool: "claude", serverId: "s1", workspaceId: "w1", agentId: "as-claude" },
+  workspace: "Personal",
+};
 
 /** A promise and the function that settles it, for work a test holds until it lets it go. */
 function held<T>(): { promise: Promise<T>; settle(value: T): void } {
@@ -80,7 +109,7 @@ function setUp({
   opensAfter = 0,
   agents = [],
   cliFound = true,
-  defaultLogin = null,
+  defaultLogin = [],
   answer = SAMPLES_PATH,
   unrevoked = null,
 }: {
@@ -105,6 +134,7 @@ function setUp({
   const parts: FirstConnectParts = {
     connections: {
       state: async () => ({
+        at: null,
         harnesses,
         cli: cliFound
           ? {
@@ -129,9 +159,20 @@ function setUp({
         made++;
         const agent = `agent-${made}`;
         await applyWaits.shift();
-        return applied.shift() ?? { ok: true, hint: "Start a new session.", agent: { id: agent, handle: agent } };
+        return (
+          applied.shift() ?? {
+            ok: true,
+            hint: "Start a new session.",
+            agent: { id: agent, handle: agent },
+            connection: {
+              ref: { tool: "t", serverId: "s1", workspaceId: "w1", agentId: agent },
+              workspace: "Personal",
+            },
+            added: false,
+          }
+        );
       },
-      planDisconnect: (id) => ({ ok: true, plan: { ...PLAN, id: `undo-${id}` } }),
+      planDisconnect: async (ref) => ({ ok: true, plan: { ...PLAN, id: `undo-${ref.agentId}` } }),
       applyDisconnect: async (planId) => {
         disconnected.push(planId);
         return { ok: true, notes: [], unrevoked };
@@ -160,13 +201,12 @@ describe("FirstConnect", () => {
     const { first } = setUp({
       harnesses: [
         harness("claude", "Claude Code", { installed: true, chatListens: "background" }),
-        harness("codex", "Codex", {
-          installed: true,
-          connected: { methods: ["cli"], server: "x", workspace: "y", agent: "@codex" },
-        }),
+        harness("codex", "Codex", { installed: true, connected: connection("codex", "y") }),
+        // Connected in another workspace only: left alone too (Connect agents offers to connect it here as well).
+        harness("gemini", "Gemini CLI", { installed: true, elsewhere: [connection("gemini", "z")] }),
         harness("pi", "pi", { cliIdentity: "default", listenVerified: false }),
       ],
-      defaultLogin: { server: "https://q.example", agent: "@ann" },
+      defaultLogin: [{ server: "https://q.example", agent: "@ann" }],
     });
     expect(await first.look()).toEqual({
       tools: [
@@ -204,7 +244,11 @@ describe("FirstConnect", () => {
   it("connects a tool found with the defaults, asking nothing, and says which agent of the workspace it works as", async () => {
     const { first, choices, appliedIds } = setUp();
     await first.look();
-    expect(await first.connect("claude")).toEqual({ ok: true, agent: "agent-1" });
+    expect(await first.connect("claude")).toMatchObject({
+      ok: true,
+      agent: "agent-1",
+      connection: { workspace: "Personal" },
+    });
     expect(choices).toEqual([
       {
         harness: "claude",
@@ -279,13 +323,19 @@ describe("FirstConnect", () => {
   });
 
   it("takes a connection back with Undo, asking nothing, gives what the person should know, and only one it made", async () => {
-    const unrevoked = { label: "Claude Code on mac", agent: "claude-code", server: "This computer", reason: "No." };
+    const unrevoked = {
+      label: "Claude Code on mac",
+      agent: "claude-code",
+      workspace: "Personal",
+      server: "This computer",
+      reason: "No.",
+    };
     const { first, disconnected } = setUp({ unrevoked });
     await first.look();
     expect(await first.disconnect("claude")).toMatchObject({ ok: false });
     await first.connect("claude");
     expect(await first.disconnect("claude")).toEqual({ ok: true, notes: [], unrevoked });
-    expect(disconnected).toEqual(["undo-claude"]);
+    expect(disconnected).toEqual(["undo-agent-1"]);
   });
 
   it("ends by asking the workspace's page for the samples, the third task for the first tool connected that still is", async () => {
@@ -313,9 +363,9 @@ describe("FirstConnect", () => {
     expect(skipped.first.samplesRequest()).toEqual({ kind: "samples" });
 
     // A tool on this computer's login, which is someone of another server: it works as that one, not as an agent here.
-    const elsewhere = setUp({ applied: [{ ok: true, hint: "", agent: null }] });
+    const elsewhere = setUp({ applied: [{ ok: true, hint: "", agent: null, connection: MADE, added: false }] });
     await elsewhere.first.look();
-    expect(await elsewhere.first.connect("claude")).toEqual({ ok: true, agent: null });
+    expect(await elsewhere.first.connect("claude")).toEqual({ ok: true, agent: null, connection: MADE });
     expect(elsewhere.first.samplesRequest()).toEqual({ kind: "samples" });
   });
 

@@ -257,13 +257,14 @@ function start() {
     cli,
     summaries: () => requests.summaries(),
     server: (id) => store.get(id),
+    serverAt: (origin) => store.byOrigin(origin)?.id ?? null,
     // The running app itself, which the quadit command starts: an AppImage by its own file, not where it is mounted.
     appFor: (id) => (id === list.localServer()?.id ? process.env.APPIMAGE || app.getPath("exe") : null),
     ask: (serverId, workspaceId, request) => requests.toWorkspace(serverId, workspaceId, request),
     // A code to give back, else a look at the tools.
-    connected: (id, code) => void (code ? selfRuns.prove(id, code) : selfRuns.sync()),
-    disconnected: (id) => selfRuns.disconnected(id),
-    removeRuns: (login) => runner.remove({ login }),
+    connected: (key, code) => void (code ? selfRuns.prove(key, code) : selfRuns.sync()),
+    disconnected: (key) => selfRuns.disconnected(key),
+    removeRuns: (of) => runner.remove({ of }),
     ownQuadit: localServerBinary,
   });
   // What the app runs by itself for the tools connected (desktop contract §11, third amendment): each tool's program
@@ -292,15 +293,18 @@ function start() {
     look: async () => {
       const look = await cli.look();
       const tools = (await connections.selfRunTools()).flatMap((tool) => {
-        const harness = HARNESSES.find((h) => h.id === tool.id);
+        const harness = HARNESSES.find((h) => h.id === tool.tool);
         if (!harness) return [];
         return [
           {
-            id: tool.id,
+            key: tool.key,
+            tool: tool.tool,
             name: harness.name,
             program: toolProgram(harness, toolsWhere(look.path)),
             oneShot: harness.oneShot ?? null,
             login: tool.login,
+            quadit: { config: tool.config, workspace: tool.workspace },
+            workspace: tool.workspaceName,
             here: loginIsHere(tool.login),
             ran: tool.ran,
             // Runs for the app's own server exist only while it runs as the app's child (never another program on its port).
@@ -311,10 +315,16 @@ function start() {
       return { tools, path: look.path.join(delimiter) };
     },
     start: startChild,
-    codeGivenBack: async (id) => (await connections.handshake(id))?.state === "connected",
-    openCode: (id) => connections.waitingCodes().find((open) => open.id === id)?.code ?? null,
-    newCode: async (id) => void (await connections.newCode(id)),
-    ran: (id) => connections.markRan(id),
+    codeGivenBack: async (key) => {
+      const ref = connections.connectionOf(key);
+      return !!ref && (await connections.handshake(ref))?.state === "connected";
+    },
+    openCode: (key) => connections.waitingCodes().find((open) => open.key === key)?.code ?? null,
+    newCode: async (key) => {
+      const ref = connections.connectionOf(key);
+      if (ref) await connections.newCode(ref);
+    },
+    ran: (key) => connections.markRan(key),
     dir: join(dataDir, "tools"),
     env: process.env,
     changed: () => pages.changed(),

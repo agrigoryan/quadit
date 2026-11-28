@@ -61,6 +61,8 @@ const api: PagesApi = {
   pickFolder: call("pickFolder"),
   startRunning: call("startRunning"),
   stopRunning: call("stopRunning"),
+  tieFolder: call("tieFolder"),
+  untieFolder: call("untieFolder"),
   showRunnerLog: call("showRunnerLog"),
   copyText: call("copyText"),
   connectState: call("connectState"),

@@ -1,43 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { defaultChoice, handleOf } from "@/shared/default-choice";
+import { defaultChoice } from "@/shared/default-choice";
 
-const workspace = { id: "w1", slug: "personal", name: "Personal" };
-const agent = { handle: "claude-code", name: "Claude Code", state: "idle" as const, detail: "", path: "/" };
+const agent = (id: string, handle: string, usable = true) => ({
+  id,
+  handle,
+  name: handle,
+  state: "idle" as const,
+  detail: "",
+  path: "/x",
+  usable,
+});
+const workspace = { id: "w2", slug: "personal", name: "Personal" };
+const CLAUDE = { id: "claude", name: "Claude Code" };
 
 describe("defaultChoice", () => {
-  it("connects the command and its skill, as a new agent named after the tool, asking nothing", () => {
-    expect(defaultChoice({ id: "claude", name: "Claude Code" }, "s1", { workspace, agents: [] })).toEqual({
-      harness: "claude",
-      serverId: "s1",
-      workspaceId: "w1",
-      methods: ["cli"],
-      agent: { create: { name: "Claude Code", handle: "claude-code" } },
+  it("connects here as well as the agent with the handle the tool has elsewhere: the one there, or one made", () => {
+    expect(
+      defaultChoice(CLAUDE, "s1", { workspace, agents: [agent("p2", "coder")] }, undefined, "coder").agent,
+    ).toEqual({
+      id: "p2",
     });
+    expect(
+      defaultChoice(CLAUDE, "s1", { workspace, agents: [agent("p2", "coder", false)] }, undefined, "coder").agent,
+    ).toEqual({ create: { name: "Claude Code", handle: "coder" } });
   });
 
-  it("works as the tool's agent when the workspace has one the person may work as", () => {
-    const usable = { ...agent, id: "u7", usable: true };
-    expect(defaultChoice({ id: "claude", name: "Claude Code" }, "s1", { workspace, agents: [usable] }).agent).toEqual({
-      id: "u7",
-    });
-    const notMine = { ...agent, id: "u8", usable: false };
-    expect(defaultChoice({ id: "claude", name: "Claude Code" }, "s1", { workspace, agents: [notMine] }).agent).toEqual({
+  it("names a first connection's agent after the tool, and works as the agent a page chose", () => {
+    expect(defaultChoice(CLAUDE, "s1", { workspace, agents: [] }).agent).toEqual({
       create: { name: "Claude Code", handle: "claude-code" },
     });
-  });
-
-  it("works as the agent a page chose when there is one, whatever the workspace's agent named after the tool", () => {
-    const usable = { ...agent, id: "u7", usable: true };
-    for (const agents of [[], [usable]])
-      expect(defaultChoice({ id: "claude", name: "Claude Code" }, "s1", { workspace, agents }, "u9").agent).toEqual({
-        id: "u9",
-      });
-  });
-});
-
-describe("handleOf", () => {
-  it("makes a handle of a tool's name", () => {
-    expect(handleOf("GitHub Copilot CLI")).toBe("github-copilot-cli");
-    expect(handleOf("pi")).toBe("pi");
+    expect(defaultChoice(CLAUDE, "s1", { workspace, agents: [] }, "u9").agent).toEqual({ id: "u9" });
   });
 });

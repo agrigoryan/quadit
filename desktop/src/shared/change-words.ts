@@ -40,23 +40,59 @@ export function diskLine(
     : `Adds ${listed}${login}${lets}. Nothing else is touched; a backup is kept.`;
 }
 
-/** The computer's default quadit login as a person reads it: "@ann on https://q.example"; null when there is none. */
-export function defaultLoginWords(login: { server: string | null; agent: string | null } | null): string | null {
-  if (!login) return null;
-  return `${login.agent ?? "an agent"}${login.server ? ` on ${login.server}` : ""}`;
+/**
+ * The line on the card of a tool connected in other workspaces than the one
+ * Connect agents is for: where, and as whom. "Works in Personal as @claude."
+ */
+export function worksInWords(elsewhere: { workspace: string; agent: string }[]): string {
+  const byAgent = new Map<string, string[]>();
+  for (const { workspace, agent } of elsewhere)
+    byAgent.set(agent, [...(byAgent.get(agent) ?? []), workspace || "another workspace"]);
+  const parts = [...byAgent].map(([agent, workspaces]) => `${andList(workspaces)} as ${agent}`);
+  return `Works in ${parts.join(" and in ")}.`;
+}
+
+/** The line on the card of a tool connected here and elsewhere too: "Also in Personal." */
+export function alsoInWords(elsewhere: { workspace: string }[]): string {
+  return `Also in ${andList(elsewhere.map((c) => c.workspace || "another workspace"))}.`;
+}
+
+/**
+ * The card's line saying what Connect here as well changes on disk: a login
+ * for this workspace, beside the one it has; nothing of the tool's own.
+ */
+export function addedDiskLine(tool: string): string {
+  return `Adds a login for this workspace; ${tool}’s settings and skill stay as they are.`;
+}
+
+/** Names in a sentence: "A", "A and B", "A, B and C". */
+export function andList(names: string[]): string {
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "");
+}
+
+/**
+ * The computer's default quadit login as a person reads it, one for each
+ * workspace it works in: "@ann on https://q.example"; null when there is none.
+ */
+export function defaultLoginWords(logins: { server: string | null; agent: string | null }[]): string | null {
+  if (logins.length === 0) return null;
+  return logins
+    .map((login) => `${login.agent ?? "an agent"}${login.server ? ` on ${login.server}` : ""}`)
+    .join(" and ");
 }
 
 /**
  * The caution a card shows when a disconnect could not revoke the tool's
  * token: what happened, what the person is to do and where in Quadit (the
- * token by the name it is listed under), and the reason the server gave,
- * which is shown quieter.
+ * workspace by its name, the token by the name it is listed under), and the
+ * reason the server gave, which is shown quieter.
  */
 export function unrevokedWords(unrevoked: Unrevoked, tool: string): { happened: string; todo: string; reason: string } {
+  const workspace = unrevoked.workspace || "its workspace";
   return {
-    happened: `${tool} is disconnected, but its key to this workspace could not be taken back.`,
+    happened: `${tool} is disconnected, but its key to ${workspace} could not be taken back.`,
     todo:
-      `To take it back, open Quadit (${unrevoked.server}), go to Settings → Agents → @${unrevoked.agent}, ` +
+      `To take it back, open ${workspace} in Quadit (${unrevoked.server}), go to Settings → Agents → @${unrevoked.agent}, ` +
       `and under Tokens revoke “${unrevoked.label}”.`,
     reason: `The server said: ${unrevoked.reason.replace(/\.?$/, ".")}`,
   };
