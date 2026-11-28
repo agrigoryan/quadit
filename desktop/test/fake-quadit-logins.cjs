@@ -22,8 +22,7 @@
 //                           replaces its token
 //   --json me               the identity of the login QUADIT_WORKSPACE or the
 //                           only one selects; with several and none, the list
-//   logout --workspace=ID [--revoke=TOKEN_ID]   the folders tied to ID go with
-//                           its last connection of any tool
+//   logout --workspace=ID [--revoke=TOKEN_ID]   folder ties stay
 //   use ID folder=PATH | use --clear folder=PATH   a tie carries project ""
 
 const { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, appendFileSync } = require("node:fs");
@@ -132,9 +131,6 @@ switch (command) {
     }
     rmSync(entry.login, { force: true });
     list.connections = list.connections.filter((c) => c !== entry);
-    // Ties are the workspace's, shared by every tool there: they go with its last connection.
-    if (!list.connections.some((c) => c.workspace_id === workspace))
-      list.folders = list.folders.filter((f) => f.workspace_id !== workspace);
     write(indexFile, list);
     break;
   }

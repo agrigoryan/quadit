@@ -38,10 +38,11 @@
 // call about a connection names it whole (ConnectionRef: the tool, the
 // server, the workspace and the agent), never by its tool or its login
 // file alone, so one about a workspace never reaches another. Disconnect
-// takes back one connection: its runs, its token, its login, and the folders
-// tied to its workspace when no other connection works there; what was
-// changed for the tool goes with its last. A quadit older than this has none
-// of it, and is refused for a second workspace (quadit-cli.ts,
+// takes back one connection: its runs, its token and its login (one the app
+// made); what was changed for the tool goes with its last. Folder ties are
+// the workspace's, shared by every tool there: Disconnect leaves them (the
+// card's Folders unties one). A quadit older than this has none of it, and
+// is refused for a second workspace (quadit-cli.ts,
 // knowsWorkspaces). The MCP entry stays with the first workspace.
 //
 // Written is not connected (desktop contract §11): a tool connected through
@@ -261,15 +262,8 @@ type DisconnectPlan = {
   agent: string;
   /** The login file the plan takes away, for the plan's words; null without one. */
   loginPath: string | null;
-  /**
-   * The index lists the login: `quadit logout` takes it away, file and
-   * entry, and the folders tied to the workspace with its last connection.
-   */
+  /** The index lists the login: `quadit logout` takes it away, file and entry. */
   logout: { binary: string; base: string } | null;
-  /** The folders tied to the workspace, untied since no other connection works there. */
-  ties: string[];
-  /** What unties them when no logout does (a login the index does not list). */
-  untie: { binary: string; base: string } | null;
   backupDir: string;
   warnings: string[];
 };
@@ -1364,10 +1358,10 @@ export class Connections {
   }
 
   /**
-   * Plans taking back one connection: its runs, its token, its login, and
-   * the folders tied to its workspace when no other connection works there;
-   * with the tool's last, what was changed for the tool, where its files
-   * still say what was written.
+   * Plans taking back one connection: its runs, its token and its login,
+   * when the app made that login for it; with the tool's last, what was
+   * changed for the tool, where its files still say what was written. The
+   * folders tied to its workspace stay: other tools may work there.
    */
   async planDisconnect(ref: ConnectionRef): Promise<Planned> {
     const harness = HARNESSES.find((h) => h.id === ref.tool);
@@ -1379,7 +1373,9 @@ export class Connections {
       const binary = await this.binary();
       const base = binary ? await this.baseOf(tool, binary) : (tool.base ?? null);
       const index = base ? readIndex(dirname(base)) : EMPTY_INDEX;
-      const login = connection.login ?? base;
+      // Only a login the app made for this connection (its token) is the app's to take away: never a login a tool
+      // merely works as (the computer's default one, the person's), and none for one by MCP alone.
+      const login = connection.methods.includes("cli") && connection.token ? (connection.login ?? base) : null;
       const last = tool.connections.length === 1;
       // A login another connection uses too (a tool that shares the computer's default login) stays, with its token.
       const shared =
@@ -1409,10 +1405,6 @@ export class Connections {
           edits.push({ path: login, kind: "written-by", link: false, before, after: null, writtenBy: true });
       }
       const revoke = connection.token && !shared ? connection.token : null;
-      // The folders tied to the workspace, when no other connection of any tool works there.
-      const stays = index.connections.some((l) => l.workspaceId === ref.workspaceId && l.login !== login);
-      const ties = stays ? [] : index.folders.filter((t) => t.workspaceId === ref.workspaceId).map((t) => t.folder);
-      const untie = ties.length > 0 && !logout && binary && base ? { binary, base } : null;
       const workspace = this.workspaceName(connection.serverId, connection.workspaceId) || connection.workspaceName;
       const elsewhere = tool.connections
         .filter((c) => c !== connection)
@@ -1430,17 +1422,10 @@ export class Connections {
         agent: connection.agent.handle,
         loginPath: revoke || logout ? login : null,
         logout,
-        ties,
-        untie,
         backupDir: this.backupDir(harness.id),
         warnings: [
           ...notes,
           ...(revoke ? [`The token “${revoke.label}” is revoked on the server.`] : []),
-          ...(ties.length > 0
-            ? [
-                `The folders tied to ${workspace || "that workspace"} are untied: ${ties.map((f) => homely(this.parts.home, f)).join(", ")}.`,
-              ]
-            : []),
           ...(elsewhere.length > 0 ? [`${harness.name} keeps working in ${elsewhere.join(" and ")}.`] : []),
           ...(connection.methods.includes("mcp")
             ? [
@@ -1532,13 +1517,6 @@ export class Connections {
               )
             : out;
         if (left) return { ok: false, error: left.message };
-      }
-      if (plan.untie) {
-        const { binary, base } = plan.untie;
-        for (const folder of plan.ties)
-          await this.parts.cli.untie(binary, base, folder).catch((err: Error) => {
-            plan.notes.push(`${homely(this.parts.home, folder)} stays tied: ${err.message}`);
-          });
       }
       const writes = plan.edits.filter((edit) => !edit.writtenBy);
       backUp(writes, plan.backupDir);

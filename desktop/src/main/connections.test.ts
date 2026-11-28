@@ -16,6 +16,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -1872,7 +1873,7 @@ posixOnly("A tool in several workspaces (multi-workspace design §3.6)", () => {
     expect(index().folders).toEqual([]);
   });
 
-  it("disconnects one workspace only: its runs, its token, its login and its folders; the other keeps working", async () => {
+  it("disconnects one workspace only: its runs, its token and its login; the other keeps working, and the folders stay tied", async () => {
     const { connections, connect, disconnect, choice, home, configDir, asked, removed, index, ledger, told } =
       setUpSeveral();
     await connect(choice("claude", "w1"));
@@ -1890,7 +1891,6 @@ posixOnly("A tool in several workspaces (multi-workspace design §3.6)", () => {
     ]);
     expect(planned.plan.warnings).toEqual([
       "The token “Claude Code on mac” is revoked on the server.",
-      "The folders tied to Personal are untied: ~/devel/site.",
       "Claude Code keeps working in Acme.",
     ]);
     asked.length = 0;
@@ -1900,7 +1900,11 @@ posixOnly("A tool in several workspaces (multi-workspace design §3.6)", () => {
     expect(existsSync(join(configDir, "claude-personal.json"))).toBe(false);
     expect(existsSync(join(configDir, "claude.json"))).toBe(true);
     expect(readFileSync(join(home, ".claude", "settings.json"), "utf8")).toBe(settings);
-    expect(index()).toMatchObject({ connections: [{ workspace_id: "w1" }], folders: [{ folder: game }] });
+    // Ties are the workspace's, which another tool may work in: they stay, and the card's Folders unties one.
+    expect(index()).toMatchObject({
+      connections: [{ workspace_id: "w1" }],
+      folders: [{ folder: game }, { folder: site }],
+    });
     expect(ledger().harnesses.claude.connections.map((c: { workspaceId: string }) => c.workspaceId)).toEqual(["w1"]);
     expect(told.at(-1)).toBe("disconnected w2");
     const acme = (await connections.state({ serverId: "s1", workspaceId: "w1" })).harnesses.find(
@@ -1953,6 +1957,35 @@ posixOnly("A tool in several workspaces (multi-workspace design §3.6)", () => {
       },
     });
     expect(existsSync(join(both.configDir, "claude-personal.json"))).toBe(false);
+  });
+
+  it("never takes away a login a tool only works as: one by MCP alone, or the person's own default login", async () => {
+    const { connections, connect, disconnect, choice, configDir, fake, saveFake, quadit } = setUpSeveral();
+    // The person's own default login works in Acme and Personal: the index lists both.
+    mkdirSync(configDir, { recursive: true });
+    const mine = (id: string, slug: string, name: string) => ({
+      url: ORIGIN,
+      user_id: `me-${id}`,
+      handle: "ann",
+      kind: "person",
+      workspace: { id, slug, name },
+    });
+    fake.tokens.qd_acme = mine("w1", "acme", "Acme");
+    fake.tokens.qd_personal = mine("w2", "personal", "Personal");
+    saveFake();
+    for (const token of ["qd_acme", "qd_personal"])
+      execFileSync(quadit, ["login", ORIGIN, "-"], { input: token, env: { PATH: process.env.PATH } });
+    const logins = readdirSync(configDir).sort();
+    expect(logins).toEqual(["config-personal.json", "config.json", "index.json"]);
+
+    await connect({ ...choice("cursor", "w2"), methods: ["mcp"] });
+    const cursor = await connections.planDisconnect(await refIn(connections, "cursor", "w2"));
+    expect(cursor.ok && cursor.plan.files.some((f) => f.role === "shared-login" || f.role === "login")).toBe(false);
+    await disconnect("cursor", "w2");
+    // pi works as the person's login in Personal: Connect made none, Disconnect takes none.
+    await connect({ ...choice("pi", "w2"), agent: null });
+    await disconnect("pi", "w2");
+    expect(readdirSync(configDir).sort()).toEqual(logins);
   });
 
   it("gives a tool on the computer's default login a login for this workspace beside the one of another", async () => {
