@@ -438,6 +438,57 @@ func TestAWebhookAndARuleHearOnlyWhatHappensAfterTheyAreMade(t *testing.T) {
 	})
 }
 
+// TestARuleSendsAWebhookOnlyWhatHappensAfterTheWebhookIsMade: a rule made
+// before a task, pointed after it at a webhook made after it too, does not
+// send that webhook the task, also when the dispatcher reaches the task
+// only once the rule points there; it sends what happens after.
+func TestARuleSendsAWebhookOnlyWhatHappensAfterTheWebhookIsMade(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		workspace := func() core.Workspace {
+			var ws core.Workspace
+			if err := st.Get(t.Context(), &ws, store.Eq("slug", "games")); err != nil {
+				t.Fatal(err)
+			}
+			return ws
+		}
+		old := newReceiver(t, "")
+		oldRef := s.change(t, s.owner, "", "webhook.create", M{"name": "old", "url": old.srv.URL, "event_types": []string{"comment.created"}})["ref"]
+		rule := s.change(t, s.owner, "", "rule.create", M{"name": "tasks out", "match": M{"event_types": []string{"task.created"}},
+			"action": M{"kind": "webhook", "webhook_id": oldRef}})["ref"]
+		behind := workspace().Seq
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Before"})
+		before := workspace().Seq
+		hook := newReceiver(t, "")
+		newRef := s.change(t, s.owner, "", "webhook.create", M{"name": "new", "url": hook.srv.URL, "event_types": []string{"comment.created"}})["ref"]
+		s.change(t, s.owner, "", "rule.update", M{"id": rule, "action": M{"kind": "webhook", "webhook_id": newRef}})
+		eventually(t, "the events so far to be dispatched", func() bool { ws := workspace(); return ws.DispatchedSeq == ws.Seq })
+
+		// The dispatcher had not reached the task when the new webhook was made and the rule pointed at it.
+		if _, err := st.Update(t.Context(), "workspaces", map[string]any{"dispatched_seq": behind}, store.Eq("slug", "games")); err != nil {
+			t.Fatal(err)
+		}
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "After"})
+		queued := func() []core.WebhookDelivery {
+			var list []core.WebhookDelivery
+			if err := st.List(t.Context(), &list, store.Q{Where: []store.Cond{store.Eq("webhook_id", newRef)}, Order: "seq"}); err != nil {
+				t.Fatal(err)
+			}
+			return list
+		}
+		eventually(t, "the events to be dispatched again", func() bool {
+			ws := workspace()
+			return ws.DispatchedSeq == ws.Seq && len(queued()) > 0
+		})
+		// The second task's event, through the rule though the webhook asked for comments only.
+		if list := queued(); len(list) != 1 || list[0].Seq <= before || list[0].EventType != "task.created" {
+			t.Fatalf("the new webhook was queued %+v, want only the second task's", list)
+		}
+	})
+}
+
 // TestAWebhooksDeliveriesAreQueuedABatchAtATime: the dispatcher queues the
 // deliveries of a batch of events (dispatchBatch, 300) in one write, not
 // one write each: on a slow disk a commit for every event a busy webhook

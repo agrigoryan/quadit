@@ -37,8 +37,13 @@ const (
 
 // queueDelivery puts one event in a webhook's queue, once: an event queued
 // already (a batch the dispatcher handles again) leaves its delivery as it
-// is, waiting, made or given up.
+// is, waiting, made or given up. An event from before the webhook was made
+// is not queued, whether the webhook asked for it or a rule sends it: the
+// dispatcher may reach such an event only once the webhook is there.
 func (s *Server) queueDelivery(ctx context.Context, db store.DB, h core.Webhook, ev core.Event) error {
+	if ev.Seq <= h.CreatedSeq {
+		return nil
+	}
 	now := time.Now().UnixMilli()
 	return db.Ensure(ctx, core.WebhookDelivery{ID: id.New(), WorkspaceID: h.WorkspaceID, WebhookID: h.ID, Seq: ev.Seq, EventType: ev.Type,
 		State: core.DeliveryPending, CreatedAt: now, NextAt: now}, "webhook_id", "seq")

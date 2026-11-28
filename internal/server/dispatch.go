@@ -230,13 +230,8 @@ func typeMatches(patterns []string, typ string) bool {
 
 // hookWants reports whether a webhook should get an event. A webhook "for"
 // a member gets that member's inbox items and nothing else; any other
-// webhook gets the public events it asked for. Either way only those after
-// the webhook was made: the dispatcher may reach earlier ones only once it
-// is there.
+// webhook gets the public events it asked for.
 func hookWants(h core.Webhook, ev core.Event) bool {
-	if ev.Seq <= h.CreatedSeq {
-		return false
-	}
 	if h.UserID != "" {
 		return ev.Type == "notification.created" && ev.AudienceID == h.UserID
 	}
