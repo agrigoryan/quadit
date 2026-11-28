@@ -151,3 +151,51 @@ func TestAViewIsSavedOnlyWithAQueryThatReads(t *testing.T) {
 		compareWithRecorded(t, "view-queries.golden", out.String())
 	})
 }
+
+// TestASavedViewOnTheWaitingTypeLeavesItOut: a view saved before the type
+// waiting was gone keeps its filter as it was stored; read, that part is
+// left out with a note, as a status deleted since is. Asked for afresh,
+// on its own or on top of a view, the type is refused.
+func TestASavedViewOnTheWaitingTypeLeavesItOut(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss fight"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss music", "status": "Done"})
+		saved := func(name, query string) string {
+			t.Helper()
+			ref := s.change(t, s.owner, "", "view.create", M{"name": name, "query": M{}})["ref"].(string)
+			if _, err := st.Update(t.Context(), "views", M{"query": []byte(query)}, store.Eq("id", ref)); err != nil {
+				t.Fatal(err)
+			}
+			return strings.ToLower(name)
+		}
+		read := func(path string) (keys []string, note string) {
+			t.Helper()
+			var got struct {
+				Tasks []struct{ Key string }
+				Note  string
+			}
+			s.call(t, s.owner, "", "GET", w+path, nil, 200, &got)
+			for _, task := range got.Tasks {
+				keys = append(keys, task.Key)
+			}
+			return keys, got.Note
+		}
+		for _, tc := range []struct{ view, query, want string }{
+			{saved("Todo", `{"category":["waiting","unstarted"]}`), "", "SVA-1"},
+			{saved("Waiting", `{"category":["waiting"]}`), "", "SVA-1 SVA-2"},
+			{saved("Word", `{"status":["waiting"]}`), "", "SVA-1 SVA-2"},
+		} {
+			keys, note := read("/tasks?sort=created&view=" + tc.view)
+			if strings.Join(keys, " ") != tc.want || !strings.Contains(note, "no longer exists") {
+				t.Errorf("view %s: %v, note %q; want %s and a note", tc.view, keys, note, tc.want)
+			}
+		}
+		// The type given by the caller, even on top of a view, is refused.
+		s.call(t, s.owner, "", "GET", w+"/tasks?category=waiting", nil, 400, nil)
+		s.call(t, s.owner, "", "GET", w+"/tasks?view=todo&category=waiting", nil, 400, nil)
+		s.call(t, s.owner, "", "GET", w+"/tasks?view=word&category=done,waiting", nil, 400, nil)
+	})
+}

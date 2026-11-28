@@ -55,7 +55,7 @@ function addTo(tally: Tally, task: Task, statuses: Dict<Status>, projects: Dict<
   if (isDoneCategory(category)) {
     tally.done++;
     tally.pointsDone += points;
-  } else if (category === "started" || category === "waiting") tally.started++;
+  } else if (category === "started") tally.started++;
   if (task.updated_at > tally.lastMove) tally.lastMove = task.updated_at;
 }
 

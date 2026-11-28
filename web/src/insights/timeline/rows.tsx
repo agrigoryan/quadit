@@ -42,7 +42,6 @@ const taskColor: Record<Category, string> = {
   backlog: "var(--viz-backlog)",
   unstarted: "var(--viz-todo)",
   started: "var(--viz-started)",
-  waiting: "var(--viz-waiting)",
   done: "var(--viz-done)",
   canceled: "var(--viz-backlog)",
 };

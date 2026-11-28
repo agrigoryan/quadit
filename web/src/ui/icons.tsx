@@ -31,7 +31,7 @@ function Svg({ className, title, children, size = 14 }: IconProps & { children: 
 
 const frame = { x: 1.75, y: 1.75, width: 10.5, height: 10.5, rx: 3 };
 
-/** One of six shapes, by status category. */
+/** One of five shapes, by status category. */
 export function StatusIcon({ category, className, title }: IconProps & { category: Category }) {
   const color = `var(--cat-${category})`;
   const label = title ?? undefined;
@@ -53,14 +53,6 @@ export function StatusIcon({ category, className, title }: IconProps & { categor
         <Svg className={className} title={label}>
           <rect {...frame} stroke={color} strokeWidth="1.5" />
           <path d="M4.5 4.5H7v5H4.5a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5Z" fill={color} />
-        </Svg>
-      );
-    case "waiting":
-      return (
-        <Svg className={className} title={label}>
-          <rect {...frame} stroke={color} strokeWidth="1.5" />
-          <rect x="4.6" y="4.5" width="1.6" height="5" rx=".8" fill={color} />
-          <rect x="7.8" y="4.5" width="1.6" height="5" rx=".8" fill={color} />
         </Svg>
       );
     case "done":

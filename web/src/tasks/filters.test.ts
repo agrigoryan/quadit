@@ -8,6 +8,7 @@ import {
   emptyFilters,
   type Filters,
   fromQuery,
+  goneFromQuery,
   groupTasks,
   matcher,
   normalizeQuery,
@@ -206,7 +207,6 @@ describe("groupTasks headings", () => {
       "status backlog Backlog backlog backlog",
       "status unstarted To do unstarted unstarted",
       "status started In progress started started",
-      "status waiting Waiting waiting waiting",
       "status done Done done done",
       "status canceled Canceled canceled canceled",
     ]);
@@ -270,7 +270,7 @@ describe("toQuery and fromQuery", () => {
     const q = {
       project: ["sva"],
       assignee: ["me", "@Coder", "cy", "nobody"],
-      status: ["doing", "Done", "waiting", "nonsense"],
+      status: ["doing", "Done", "started", "waiting", "nonsense"],
       label: ["BUG", "gone"],
       epic: ["launch", "old"],
       cycle: ["4"],
@@ -279,12 +279,19 @@ describe("toQuery and fromQuery", () => {
     expect(fromQuery(q, source)).toMatchObject({
       assignee: ["me", "u2"],
       status: ["s-doing", "s-done"],
-      category: ["waiting"],
+      category: ["started"],
       label: ["l-bug"],
       epic: ["e1"],
       cycle: ["cy1"],
       estimate: ["3", "5", "none", "0"],
     });
+  });
+
+  it("count a status type there is no more (waiting) as gone, like a deleted status, word or type", () => {
+    const saved = { category: ["waiting", "done"], status: ["waiting", "Doing"], label: ["bug"] };
+    expect(goneFromQuery(saved, source, "u1", "2026-11-27")).toEqual({ category: ["done"], status: ["Doing"] });
+    expect(goneFromQuery({ category: ["waiting"] }, source, "u1", "2026-11-27")).toEqual({ category: undefined });
+    expect(goneFromQuery({ category: ["started"] }, source, "u1", "2026-11-27")).toBeNull();
   });
 
   it("read an estimate a view stores as numbers or as one word", () => {

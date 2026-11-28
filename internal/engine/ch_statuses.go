@@ -43,7 +43,9 @@ func statusCreate(c *cx, a statusCreateArgs) error {
 	}
 	rk := a.Rank
 	if rk == "" {
-		// A new status goes after the last one of its category.
+		// A new status goes after the last one (by rank) of its category or
+		// of one before it, and before the status ranked next, whatever its
+		// category: the columns need not be in category order.
 		all, err := c.statuses(project.ID)
 		if err != nil {
 			return err
@@ -56,8 +58,12 @@ func statusCreate(c *cx, a statusCreateArgs) error {
 		for _, s := range all {
 			if order[s.Category] <= order[a.Category] {
 				prev = s.Rank
-			} else if next == "" {
+			}
+		}
+		for _, s := range all {
+			if s.Rank > prev {
 				next = s.Rank
+				break
 			}
 		}
 		rk = rank.Between(prev, next)

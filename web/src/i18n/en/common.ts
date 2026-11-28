@@ -216,7 +216,6 @@ export const common = {
   "category.backlog": "Backlog",
   "category.unstarted": "To do",
   "category.started": "In progress",
-  "category.waiting": "Waiting",
   "category.done": "Done",
   "category.canceled": "Canceled",
 

@@ -24,7 +24,9 @@ export const category = {
         [],
       ),
     matches: (task, picked, c) => picked.includes(c.statuses[task.status_id]?.category ?? ""),
-    // A status word that names no status but a status type ("waiting") is read as the type.
+    // A view saved with a type there is no more (waiting) has that part gone, as the server reads it.
+    canBeGone: true,
+    // A status word that names no status but a status type ("started") is read as the type.
     read: (q, ctx) =>
       [
         ...(q.category ?? []),

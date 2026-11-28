@@ -7,7 +7,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -235,15 +234,9 @@ func (x *c) queryFromRequest(skip ...string) (core.TaskQuery, error) {
 		if err != nil {
 			return q, err
 		}
-		if len(view.Query) > 0 {
-			if err := json.Unmarshal(view.Query, &q); err != nil {
-				return q, &engine.Error{Code: engine.CodeInvalid, Field: "view", Message: fmt.Sprintf("the view %s has a filter that cannot be read (%s); save it again with view.update", view.Slug, engine.PlainJSON(err))}
-			}
+		if q, err = view.TaskQuery(); err != nil {
+			return q, &engine.Error{Code: engine.CodeInvalid, Field: "view", Message: fmt.Sprintf("the view %s has a filter that cannot be read (%s); save it again with view.update", view.Slug, engine.PlainJSON(err))}
 		}
-		if view.ProjectID != "" && len(q.Project) == 0 {
-			q.Project = []string{view.ProjectID}
-		}
-		q.SavedAs = view.Slug
 	}
 	// since= means the same here as on every list: what changed after that
 	// position in the feed.

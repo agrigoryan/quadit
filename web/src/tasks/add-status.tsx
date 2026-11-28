@@ -20,7 +20,6 @@ const START_COLOR: Record<Category, string> = {
   backlog: "#6b7183",
   unstarted: "#6b7183",
   started: "#3451e0",
-  waiting: "#c26a00",
   done: "#16874a",
   canceled: "#6b7183",
 };

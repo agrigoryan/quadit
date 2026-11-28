@@ -294,7 +294,7 @@ type TaskFilter struct {
 	WaitingNobody  bool
 	LeaseHolderID  string
 	StatusIDs      []string
-	Categories     []string // status categories, e.g. started, waiting
+	Categories     []string // status categories, e.g. started, done
 	Open           bool     // not done and not canceled
 	Closed         bool     // done, canceled or archived: everything Open with Archived off leaves out
 	// MadeUpTo keeps to tasks made at or before a feed position, so a list

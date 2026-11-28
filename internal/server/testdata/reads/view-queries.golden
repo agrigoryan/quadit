@@ -748,11 +748,9 @@ saved
   "In Progress",
   "Review",
   "Todo",
-  "Waiting",
   "backlog",
   "unstarted",
   "started",
-  "waiting",
   "done",
   "canceled"
  ],
@@ -772,11 +770,9 @@ saved
   "In Progress",
   "Review",
   "Todo",
-  "Waiting",
   "backlog",
   "unstarted",
   "started",
-  "waiting",
   "done",
   "canceled"
  ],
@@ -796,11 +792,9 @@ saved
   "In Progress",
   "Review",
   "Todo",
-  "Waiting",
   "backlog",
   "unstarted",
   "started",
-  "waiting",
   "done",
   "canceled"
  ],
@@ -820,11 +814,9 @@ saved
   "In Progress",
   "Review",
   "Todo",
-  "Waiting",
   "backlog",
   "unstarted",
   "started",
-  "waiting",
   "done",
   "canceled"
  ],
@@ -841,7 +833,6 @@ saved
   "backlog",
   "unstarted",
   "started",
-  "waiting",
   "done",
   "canceled"
  ],
@@ -857,7 +848,6 @@ saved
   "backlog",
   "unstarted",
   "started",
-  "waiting",
   "done",
   "canceled"
  ],
@@ -873,7 +863,6 @@ saved
   "backlog",
   "unstarted",
   "started",
-  "waiting",
   "done",
   "canceled"
  ],
@@ -889,7 +878,6 @@ saved
   "backlog",
   "unstarted",
   "started",
-  "waiting",
   "done",
   "canceled"
  ],
@@ -2005,11 +1993,9 @@ saved
   "Done",
   "In Progress",
   "Todo",
-  "Waiting",
   "backlog",
   "unstarted",
   "started",
-  "waiting",
   "done",
   "canceled"
  ],
@@ -2027,11 +2013,9 @@ saved
   "Done",
   "In Progress",
   "Todo",
-  "Waiting",
   "backlog",
   "unstarted",
   "started",
-  "waiting",
   "done",
   "canceled"
  ],

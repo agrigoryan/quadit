@@ -115,8 +115,10 @@ function IntegrationItem({ it, sync, onSync, onToggle, onEdit, onHook, onDelete 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-11 text-xs">
         <Badge>{project ? project.key : t("s.everyProject")}</Badge>
         {!it.has_secret && <Badge tone="wait">{t("auto.gh.noToken")}</Badge>}
-        {cfg.on_open && <Fact label={t("auto.gh.onOpenShort")}>{tMaybe(`category.${cfg.on_open}`)}</Fact>}
-        {cfg.on_merge && <Fact label={t("auto.gh.onMergeShort")}>{tMaybe(`category.${cfg.on_merge}`)}</Fact>}
+        {cfg.on_open && <Fact label={t("auto.gh.onOpenShort")}>{tMaybe(`category.${cfg.on_open}`, cfg.on_open)}</Fact>}
+        {cfg.on_merge && (
+          <Fact label={t("auto.gh.onMergeShort")}>{tMaybe(`category.${cfg.on_merge}`, cfg.on_merge)}</Fact>
+        )}
         {cfg.comment_back && <span className="text-ink-2">{t("auto.gh.commentsBack")}</span>}
         {cfg.issues_label && (
           <Fact label={t("auto.gh.issuesShort")}>

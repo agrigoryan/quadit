@@ -128,10 +128,9 @@ func (r *orbitReader) workflow(projectID, key string) error {
 	for _, s := range statuses.Items {
 		cat := orbitCategory[strings.ToLower(orStr(s.Category, s.Type))]
 		// Orbit has fewer kinds of status: its "Backlog" is a status not
-		// started, its "Waiting on you" one that is. The name says which
-		// of ours it is.
+		// started. The name says which of ours it is.
 		switch guess := category(s.Name); {
-		case cat == "", cat == core.CatUnstarted && guess == core.CatBacklog, cat == core.CatStarted && guess == core.CatWaiting:
+		case cat == "", cat == core.CatUnstarted && guess == core.CatBacklog:
 			cat = guess
 		}
 		st := Status{Project: key, Name: s.Name, Category: cat, Color: s.Color}

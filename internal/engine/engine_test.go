@@ -253,7 +253,7 @@ func TestTaskUpdate(t *testing.T) {
 			t.Fatalf("events = %d", len(upd.Events))
 		}
 		e := w.refused(engine.CodeInvalid, w.owner.ID, "task.update", M{"id": "SVA-1", "status": "Dne"})
-		if e.Nearest != "Done" || len(e.Allowed) != 6 {
+		if e.Nearest != "Done" || len(e.Allowed) != 5 {
 			t.Fatalf("refusal should suggest Done: %+v", e)
 		}
 		e = w.refused(engine.CodeInvalid, w.owner.ID, "task.update", M{"id": "SVA-1", "titel": "x"})

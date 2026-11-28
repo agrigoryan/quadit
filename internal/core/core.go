@@ -62,17 +62,18 @@ const (
 )
 
 // Status categories are fixed; names, colors and order belong to the team.
+// A task waiting on someone is in a started status: who it waits on is its
+// waiting_on, not a category.
 const (
 	CatBacklog   = "backlog"
 	CatUnstarted = "unstarted"
 	CatStarted   = "started"
-	CatWaiting   = "waiting"
 	CatDone      = "done"
 	CatCanceled  = "canceled"
 )
 
 // Categories lists the status categories in board order.
-var Categories = []string{CatBacklog, CatUnstarted, CatStarted, CatWaiting, CatDone, CatCanceled}
+var Categories = []string{CatBacklog, CatUnstarted, CatStarted, CatDone, CatCanceled}
 
 // ValidCategory reports whether c is one of the fixed status categories.
 func ValidCategory(c string) bool { return slices.Contains(Categories, c) }

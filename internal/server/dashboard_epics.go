@@ -70,7 +70,7 @@ func epicProgressOf(scope dashboardScope) []epicProgress {
 		case core.CatDone:
 			progress.Done++
 			points.done += settings.Points(t)
-		case core.CatStarted, core.CatWaiting:
+		case core.CatStarted:
 			progress.Started++
 		}
 		if t.UpdatedAt > lastMove[t.EpicID] {

@@ -54,8 +54,10 @@ func (sy *Syncer) client(api, token string) *Client {
 type Config struct {
 	Repo   string `json:"repo"`    // owner/name
 	APIURL string `json:"api_url"` // for GitHub Enterprise; default api.github.com
-	// OnOpen and OnMerge name the status category a task moves to when its
-	// pull request opens or merges; empty leaves the task alone.
+	// OnOpen and OnMerge name the status a task moves to when its pull
+	// request opens or merges, as task.update reads it: a status category
+	// (the first status of it in the task's project) or a status's name.
+	// Empty leaves the task alone.
 	OnOpen  string `json:"on_open"`
 	OnMerge string `json:"on_merge"`
 	// CommentBack posts a link to the task on the pull request, once.

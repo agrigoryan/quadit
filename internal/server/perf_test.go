@@ -27,7 +27,7 @@ func TestSpeedAtTenThousandTasks(t *testing.T) {
 		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
 		s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
 		s.change(t, s.owner, "", "label.create", M{"name": "art", "project": "SVA"})
-		statuses := []string{"Backlog", "Todo", "In Progress", "Waiting", "Done"}
+		statuses := []string{"Backlog", "Todo", "In Progress", "Done", "Canceled"}
 		start := time.Now()
 		for batch := range 20 {
 			var changes []M
@@ -69,7 +69,7 @@ func TestSpeedAtTenThousandTasks(t *testing.T) {
 		const fast = 100 * time.Millisecond
 		timed("my work", fast, get("/my-work?format=text"))
 		timed("tasks assigned to me, open", fast, get("/tasks?assignee=me&open=1&sort=priority&format=text"))
-		timed("count by status", fast, get("/tasks?status=waiting&count=1"))
+		timed("count by status", fast, get("/tasks?status=started&count=1"))
 		timed("one task", fast, get("/tasks/SVA-5000?format=text"))
 		timed("context pack", fast, get("/tasks/SVA-5000/context?format=text"))
 		timed("search", fast, get("/search?q=explosions&format=text"))

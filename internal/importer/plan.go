@@ -74,7 +74,7 @@ type Task struct {
 	Title       string
 	Description string
 	Status      string // the status's name there
-	Category    string // backlog, unstarted, started, waiting, done or canceled
+	Category    string // backlog, unstarted, started, done or canceled
 	Priority    int    // 0 none, 1 urgent … 4 low
 	Assignee    string // a name or an email address
 	Labels      []string

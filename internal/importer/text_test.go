@@ -4,15 +4,16 @@ import "testing"
 
 func TestCategory(t *testing.T) {
 	cases := map[string]string{
-		"Canceled":       "canceled",
-		"Won't do":       "canceled",
-		"Duplicate":      "canceled",
-		"Done":           "done",
-		"Completed":      "done",
-		"Merged":         "done",
-		"Waiting on you": "waiting",
-		"Blocked":        "waiting",
-		"On hold":        "waiting",
+		"Canceled":  "canceled",
+		"Won't do":  "canceled",
+		"Duplicate": "canceled",
+		"Done":      "done",
+		"Completed": "done",
+		"Merged":    "done",
+		// Waiting and blocked are started: who a task waits on is its waiting_on.
+		"Waiting on you": "started",
+		"Blocked":        "started",
+		"On hold":        "started",
 		"In Progress":    "started",
 		"In review":      "started",
 		"Backlog":        "backlog",

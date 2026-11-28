@@ -43,8 +43,8 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
 
     const config: GitHubConfig = { repo: cleanRepo };
     if (apiUrl.trim()) config.api_url = apiUrl.trim();
-    if (onOpen) config.on_open = onOpen as GitHubConfig["on_open"];
-    if (onMerge) config.on_merge = onMerge as GitHubConfig["on_merge"];
+    if (onOpen) config.on_open = onOpen;
+    if (onMerge) config.on_merge = onMerge;
     if (commentBack) config.comment_back = true;
     if (issuesLabel.trim()) {
       if (!issueProjectKey) refuse("issues_project", t("auto.gh.issuesProjectNeeded"));
@@ -66,9 +66,11 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
     onSaved();
   }
 
-  const categories = [
+  // A status named in place of a type (an upgrade made it so, where the type is gone) is offered as it is.
+  const choices = (current: string) => [
     { value: "", label: t("auto.gh.leaveAlone") },
     ...CATEGORIES.map((c) => ({ value: c, label: tMaybe(`category.${c}`) })),
+    ...(current && !(CATEGORIES as string[]).includes(current) ? [{ value: current, label: current }] : []),
   ];
 
   return (
@@ -134,10 +136,10 @@ export function IntegrationForm({ integration: it, onClose, onSaved }: Props) {
       </FormField>
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <FormField label={t("auto.gh.onOpen")} htmlFor="gh-open" hint={t("auto.gh.onOpenHint")}>
-          <NativeSelect id="gh-open" value={onOpen} onChange={setOnOpen} options={categories} />
+          <NativeSelect id="gh-open" value={onOpen} onChange={setOnOpen} options={choices(onOpen)} />
         </FormField>
         <FormField label={t("auto.gh.onMerge")} htmlFor="gh-merge" hint={t("auto.gh.onMergeHint")}>
-          <NativeSelect id="gh-merge" value={onMerge} onChange={setOnMerge} options={categories} />
+          <NativeSelect id="gh-merge" value={onMerge} onChange={setOnMerge} options={choices(onMerge)} />
         </FormField>
       </div>
       <SwitchRow

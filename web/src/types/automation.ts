@@ -80,8 +80,9 @@ export interface GitHubConfig {
   repo?: string;
   /** GitHub Enterprise only. */
   api_url?: string;
-  on_open?: Category | "";
-  on_merge?: Category | "";
+  /** The status a task moves to: a status type (the first status of that type in the task's project), or a status's name. */
+  on_open?: string;
+  on_merge?: string;
   comment_back?: boolean;
   /** Issues with this label become tasks and stay in step with the issue; "*" means every issue. */
   issues_label?: string;

@@ -67,3 +67,24 @@ func TestNearestIgnoresCaseAndGivesUpWhenFarOff(t *testing.T) {
 		}
 	}
 }
+
+// TestWaitingNamesNoStatusType: waiting is no type a query can ask for,
+// and a status word "waiting" names a status called that, or nothing.
+func TestWaitingNamesNoStatusType(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		w := newWorld(t, st)
+		w.do(w.owner.ID, "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		e := w.refused(engine.CodeInvalid, w.owner.ID, "view.create", M{"name": "V", "query": M{"category": []string{"waiting"}}})
+		if e.Field != "query.category" || strings.Join(e.Allowed, ",") != "backlog,unstarted,started,done,canceled" {
+			t.Errorf("category waiting: %+v", e)
+		}
+		e = w.refused(engine.CodeInvalid, w.owner.ID, "view.create", M{"name": "V", "query": M{"status": []string{"waiting"}}})
+		if e.Field != "query.status" || !strings.Contains(e.Message, `no status "waiting"`) {
+			t.Errorf("a status word waiting with no status of that name: %+v", e)
+		}
+		w.do(w.owner.ID, "view.create", M{"name": "Started", "query": M{"status": []string{"started"}}})
+		w.do(w.owner.ID, "status.create", M{"project": "SVA", "name": "Waiting", "category": "started"})
+		w.do(w.owner.ID, "view.create", M{"name": "Waiting", "query": M{"status": []string{"waiting"}}})
+	})
+}

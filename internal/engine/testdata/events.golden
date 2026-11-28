@@ -8,235 +8,232 @@ project.created {"row":{"id":"#5","workspace_id":"#1","key":"SVA","name":"Samura
 status.created {"row":{"id":"#6","project_id":"#5","name":"Backlog","color":"#9ca3af","category":"backlog","rank":"00000000sg","updated_seq":8}}
 status.created {"row":{"id":"#7","project_id":"#5","name":"Todo","color":"#6b7280","category":"unstarted","rank":"00000001kw","is_default":true,"updated_seq":9}}
 status.created {"row":{"id":"#8","project_id":"#5","name":"In Progress","color":"#f59e0b","category":"started","rank":"00000002dc","updated_seq":10}}
-status.created {"row":{"id":"#9","project_id":"#5","name":"Waiting","color":"#8b5cf6","category":"waiting","rank":"000000035s","updated_seq":11}}
-status.created {"row":{"id":"#10","project_id":"#5","name":"Done","color":"#10b981","category":"done","rank":"00000003y8","updated_seq":12}}
-status.created {"row":{"id":"#11","project_id":"#5","name":"Canceled","color":"#ef4444","category":"canceled","rank":"00000004qo","updated_seq":13}}
-cycle.created {"row":{"id":"#12","project_id":"#5","number":1,"starts_on":"2026-01-04","ends_on":"2026-01-10","created_at":1767603609000,"updated_seq":14}}
-cycle.created {"row":{"id":"#13","project_id":"#5","number":2,"starts_on":"2026-01-11","ends_on":"2026-01-17","created_at":1767603609000,"updated_seq":15}}
-project.created {"row":{"id":"#14","workspace_id":"#1","key":"OPS","name":"Operations","rank":"i","created_by":"#3","created_at":1767603610000,"updated_seq":16}}
-status.created {"row":{"id":"#15","project_id":"#14","name":"Backlog","color":"#9ca3af","category":"backlog","rank":"00000000sg","updated_seq":17}}
-status.created {"row":{"id":"#16","project_id":"#14","name":"Todo","color":"#6b7280","category":"unstarted","rank":"00000001kw","is_default":true,"updated_seq":18}}
-status.created {"row":{"id":"#17","project_id":"#14","name":"In Progress","color":"#f59e0b","category":"started","rank":"00000002dc","updated_seq":19}}
-status.created {"row":{"id":"#18","project_id":"#14","name":"Waiting","color":"#8b5cf6","category":"waiting","rank":"000000035s","updated_seq":20}}
-status.created {"row":{"id":"#19","project_id":"#14","name":"Done","color":"#10b981","category":"done","rank":"00000003y8","updated_seq":21}}
-status.created {"row":{"id":"#20","project_id":"#14","name":"Canceled","color":"#ef4444","category":"canceled","rank":"00000004qo","updated_seq":22}}
-project.updated {"changes":{"description":{"from":null,"to":"the boring part"}},"id":"#14"}
-status.created {"row":{"id":"#21","project_id":"#5","name":"Polish","category":"started","rank":"00000002o","updated_seq":24}}
-status.updated {"changes":{"color":{"from":null,"to":"#123456"}},"id":"#21"}
-label.created {"row":{"id":"#22","project_id":"#5","name":"art","updated_seq":26}}
-label.updated {"changes":{"color":{"from":null,"to":"#ff0000"}},"id":"#22"}
-label.created {"row":{"id":"#23","project_id":"#5","name":"sound","updated_seq":28}}
-epic.created {"row":{"id":"#24","project_id":"#5","name":"Combat","state":"planned","rank":"00000000sg","created_by":"#3","created_at":1767603617000,"updated_at":1767603617000,"updated_seq":29}}
-epic.updated {"changes":{"state":{"from":"planned","to":"active"}},"id":"#24"}
-milestone.created {"row":{"id":"#25","epic_id":"#24","name":"Alpha","rank":"00000000sg","created_at":1767603619000,"updated_seq":31}}
-milestone.updated {"changes":{"description":{"from":null,"to":"first playable"}},"id":"#25"}
-cycle.created {"row":{"id":"#26","project_id":"#5","number":3,"name":"Later","starts_on":"2026-06-01","ends_on":"2026-06-07","created_at":1767603621000,"updated_seq":33}}
-cycle.updated {"changes":{"name":{"from":"Later","to":"Much later"}},"id":"#26"}
-template.created {"row":{"id":"#27","project_id":"#5","name":"Bug","title":"Bug: ","created_at":1767603623000,"updated_seq":35}}
-template.updated {"changes":{"description":{"from":null,"to":"what broke"}},"id":"#27"}
-view.created {"row":{"id":"#28","project_id":"#5","name":"Mine","slug":"mine","owner_id":"#3","shared":true,"query":{"assignee":["me"]},"layout":"list","rank":"00000000sg","created_at":1767603625000,"updated_seq":37}}
-view.updated {"changes":{"description":{"from":null,"to":"my tasks"}},"id":"#28"}
-preference.created {"row":{"id":"#29","project_id":"#5","body":"Prefer small commits","created_by":"#3","created_at":1767603627000,"updated_seq":39}}
-preference.updated {"changes":{"body":{"from":"Prefer small commits","to":"Prefer small, clear commits"}},"id":"#29"}
-task.created {"row":{"id":"#30","project_id":"#5","number":1,"key":"SVA-1","title":"Explosion effect","status_id":"#7","priority":0,"assignee_id":"#2","asked_by":"#3","epic_id":"#24","milestone_id":"#25","cycle_id":"#12","label_ids":["#22","#23"],"rank":"00000000sg","created_by":"#3","created_at":1767603629000,"updated_at":1767603629000,"created_seq":41,"updated_seq":41,"activity_seq":41}}
-notification.created {"row":{"id":"#31","user_id":"#2","seq":42,"type":"assigned","actor_id":"#3","task_id":"#30","entity_type":"task","entity_id":"#30","title":"SVA-1 Explosion effect","created_at":1767603629000,"addressed":true}}
-task.created {"row":{"id":"#32","project_id":"#5","number":2,"key":"SVA-2","title":"Sword sound","status_id":"#7","priority":0,"waiting_on_id":"#2","waiting_on_note":"pick one","rank":"00000001kw","created_by":"#3","created_at":1767603630000,"updated_at":1767603630000,"created_seq":43,"updated_seq":43,"activity_seq":43}}
-notification.created {"row":{"id":"#33","user_id":"#2","seq":44,"type":"waiting_on","actor_id":"#3","task_id":"#32","entity_type":"task","entity_id":"#32","title":"SVA-2 Sword sound","snippet":"pick one","created_at":1767603630000,"addressed":true}}
-task.created {"row":{"id":"#34","project_id":"#5","number":3,"key":"SVA-3","title":"Bug: Title screen","description":"what broke","status_id":"#7","priority":0,"rank":"00000002dc","created_by":"#3","created_at":1767603631000,"updated_at":1767603631000,"created_seq":45,"updated_seq":45,"activity_seq":45}}
-task.updated {"changes":{"due_on":{"from":null,"to":"2026-02-01"},"priority":{"from":0,"to":2},"title":{"from":"Explosion effect","to":"Big explosion"}},"id":"#30","key":"SVA-1"}
-task.updated {"changes":{"waiting_on_id":{"from":"#2","to":null}},"id":"#32","key":"SVA-2"}
-task.updated {"changes":{"lease_holder_id":{"from":null,"to":"#2"},"lease_until":{"from":0,"to":1767605434000},"started_at":{"from":0,"to":1767603634000},"status_id":{"from":"#7","to":"#8"}},"id":"#30","key":"SVA-1"}
+status.created {"row":{"id":"#9","project_id":"#5","name":"Done","color":"#10b981","category":"done","rank":"000000035s","updated_seq":11}}
+status.created {"row":{"id":"#10","project_id":"#5","name":"Canceled","color":"#ef4444","category":"canceled","rank":"00000003y8","updated_seq":12}}
+cycle.created {"row":{"id":"#11","project_id":"#5","number":1,"starts_on":"2026-01-04","ends_on":"2026-01-10","created_at":1767603609000,"updated_seq":13}}
+cycle.created {"row":{"id":"#12","project_id":"#5","number":2,"starts_on":"2026-01-11","ends_on":"2026-01-17","created_at":1767603609000,"updated_seq":14}}
+project.created {"row":{"id":"#13","workspace_id":"#1","key":"OPS","name":"Operations","rank":"i","created_by":"#3","created_at":1767603610000,"updated_seq":15}}
+status.created {"row":{"id":"#14","project_id":"#13","name":"Backlog","color":"#9ca3af","category":"backlog","rank":"00000000sg","updated_seq":16}}
+status.created {"row":{"id":"#15","project_id":"#13","name":"Todo","color":"#6b7280","category":"unstarted","rank":"00000001kw","is_default":true,"updated_seq":17}}
+status.created {"row":{"id":"#16","project_id":"#13","name":"In Progress","color":"#f59e0b","category":"started","rank":"00000002dc","updated_seq":18}}
+status.created {"row":{"id":"#17","project_id":"#13","name":"Done","color":"#10b981","category":"done","rank":"000000035s","updated_seq":19}}
+status.created {"row":{"id":"#18","project_id":"#13","name":"Canceled","color":"#ef4444","category":"canceled","rank":"00000003y8","updated_seq":20}}
+project.updated {"changes":{"description":{"from":null,"to":"the boring part"}},"id":"#13"}
+status.created {"row":{"id":"#19","project_id":"#5","name":"Polish","category":"started","rank":"00000002o","updated_seq":22}}
+status.updated {"changes":{"color":{"from":null,"to":"#123456"}},"id":"#19"}
+label.created {"row":{"id":"#20","project_id":"#5","name":"art","updated_seq":24}}
+label.updated {"changes":{"color":{"from":null,"to":"#ff0000"}},"id":"#20"}
+label.created {"row":{"id":"#21","project_id":"#5","name":"sound","updated_seq":26}}
+epic.created {"row":{"id":"#22","project_id":"#5","name":"Combat","state":"planned","rank":"00000000sg","created_by":"#3","created_at":1767603617000,"updated_at":1767603617000,"updated_seq":27}}
+epic.updated {"changes":{"state":{"from":"planned","to":"active"}},"id":"#22"}
+milestone.created {"row":{"id":"#23","epic_id":"#22","name":"Alpha","rank":"00000000sg","created_at":1767603619000,"updated_seq":29}}
+milestone.updated {"changes":{"description":{"from":null,"to":"first playable"}},"id":"#23"}
+cycle.created {"row":{"id":"#24","project_id":"#5","number":3,"name":"Later","starts_on":"2026-06-01","ends_on":"2026-06-07","created_at":1767603621000,"updated_seq":31}}
+cycle.updated {"changes":{"name":{"from":"Later","to":"Much later"}},"id":"#24"}
+template.created {"row":{"id":"#25","project_id":"#5","name":"Bug","title":"Bug: ","created_at":1767603623000,"updated_seq":33}}
+template.updated {"changes":{"description":{"from":null,"to":"what broke"}},"id":"#25"}
+view.created {"row":{"id":"#26","project_id":"#5","name":"Mine","slug":"mine","owner_id":"#3","shared":true,"query":{"assignee":["me"]},"layout":"list","rank":"00000000sg","created_at":1767603625000,"updated_seq":35}}
+view.updated {"changes":{"description":{"from":null,"to":"my tasks"}},"id":"#26"}
+preference.created {"row":{"id":"#27","project_id":"#5","body":"Prefer small commits","created_by":"#3","created_at":1767603627000,"updated_seq":37}}
+preference.updated {"changes":{"body":{"from":"Prefer small commits","to":"Prefer small, clear commits"}},"id":"#27"}
+task.created {"row":{"id":"#28","project_id":"#5","number":1,"key":"SVA-1","title":"Explosion effect","status_id":"#7","priority":0,"assignee_id":"#2","asked_by":"#3","epic_id":"#22","milestone_id":"#23","cycle_id":"#11","label_ids":["#20","#21"],"rank":"00000000sg","created_by":"#3","created_at":1767603629000,"updated_at":1767603629000,"created_seq":39,"updated_seq":39,"activity_seq":39}}
+notification.created {"row":{"id":"#29","user_id":"#2","seq":40,"type":"assigned","actor_id":"#3","task_id":"#28","entity_type":"task","entity_id":"#28","title":"SVA-1 Explosion effect","created_at":1767603629000,"addressed":true}}
+task.created {"row":{"id":"#30","project_id":"#5","number":2,"key":"SVA-2","title":"Sword sound","status_id":"#7","priority":0,"waiting_on_id":"#2","waiting_on_note":"pick one","rank":"00000001kw","created_by":"#3","created_at":1767603630000,"updated_at":1767603630000,"created_seq":41,"updated_seq":41,"activity_seq":41}}
+notification.created {"row":{"id":"#31","user_id":"#2","seq":42,"type":"waiting_on","actor_id":"#3","task_id":"#30","entity_type":"task","entity_id":"#30","title":"SVA-2 Sword sound","snippet":"pick one","created_at":1767603630000,"addressed":true}}
+task.created {"row":{"id":"#32","project_id":"#5","number":3,"key":"SVA-3","title":"Bug: Title screen","description":"what broke","status_id":"#7","priority":0,"rank":"00000002dc","created_by":"#3","created_at":1767603631000,"updated_at":1767603631000,"created_seq":43,"updated_seq":43,"activity_seq":43}}
+task.updated {"changes":{"due_on":{"from":null,"to":"2026-02-01"},"priority":{"from":0,"to":2},"title":{"from":"Explosion effect","to":"Big explosion"}},"id":"#28","key":"SVA-1"}
+task.updated {"changes":{"waiting_on_id":{"from":"#2","to":null}},"id":"#30","key":"SVA-2"}
+task.updated {"changes":{"lease_holder_id":{"from":null,"to":"#2"},"lease_until":{"from":0,"to":1767605434000},"started_at":{"from":0,"to":1767603634000},"status_id":{"from":"#7","to":"#8"}},"id":"#28","key":"SVA-1"}
 member.updated {"changes":{"connected_at":{"from":null,"to":1767603634000}},"id":"#2"}
-task.updated {"changes":{"lease_holder_id":{"from":"#2","to":null},"lease_until":{"from":1767605434000,"to":0}},"id":"#30","key":"SVA-1"}
-watcher.deleted {"gone":true,"id":"#32","user_id":"#3"}
-watcher.created {"row":{"user_id":"#3","subject_type":"task","subject_id":"#32","created_at":1767603637000}}
-relation.created {"key":"SVA-1","other_key":"SVA-2","row":{"id":"#35","task_id":"#30","related_task_id":"#32","type":"blocks","created_by":"#3","created_at":1767603638000}}
-task.related {"id":"#32","key":"SVA-2","other_id":"#30","other_key":"SVA-1","relation":"#35","removed":false,"type":"blocks"}
-relation.deleted {"gone":true,"id":"#35"}
-task.related {"id":"#32","key":"SVA-2","other_id":"#30","other_key":"SVA-1","relation":"#35","removed":true,"type":"blocks"}
-link.created {"key":"SVA-1","row":{"id":"#36","task_id":"#30","kind":"pr","url":"https://example.com/pr/1","title":"Explosions","repo":"a/b","ref":"1","created_by":"#3","created_at":1767603640000,"updated_at":1767603640000,"updated_seq":57}}
-link.updated {"changes":{"state":{"from":null,"to":"merged"}},"id":"#36","key":"SVA-1","kind":"pr","ref":"1"}
-link.created {"key":"SVA-1","row":{"id":"#37","task_id":"#30","kind":"url","url":"https://example.com/notes","created_by":"#3","created_at":1767603642000,"updated_at":1767603642000,"updated_seq":59}}
-link.updated {"changes":{"title":{"from":null,"to":"Notes"}},"id":"#37","key":"SVA-1","kind":"url","ref":""}
-link.deleted {"changes":{"deleted_at":{"from":null,"to":1767603644000}},"id":"#36"}
-comment.created {"attachments":[{"id":"#38","file_id":"#39","subject_type":"comment","subject_id":"#40","task_id":"#30","rank":"00000000sg","created_by":"#3","created_at":1767603646000,"file":{"id":"#39","name":"a.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1767603645000,"url":"/f/#39/a.png"}}],"key":"SVA-1","row":{"id":"#40","task_id":"#30","subject_type":"task","subject_id":"#30","kind":"comment","author_id":"#3","body":"Looks good","created_at":1767603646000,"created_seq":62,"updated_seq":62}}
-notification.created {"row":{"id":"#41","user_id":"#2","seq":63,"type":"comment","actor_id":"#3","task_id":"#30","entity_type":"comment","entity_id":"#40","title":"SVA-1 Big explosion","snippet":"Looks good","created_at":1767603646000,"addressed":true}}
-comment.updated {"changes":{"body":{"from":"Looks good","to":"Looks very good"},"edited_at":{"from":0,"to":1767603647000}},"id":"#40","key":"SVA-1"}
-comment.updated {"changes":{"resolved_at":{"from":0,"to":1767603648000}},"id":"#40","key":"SVA-1"}
-comment.deleted {"changes":{"deleted_at":{"from":null,"to":1767603649000}},"id":"#40","key":"SVA-1"}
-attachment.created {"key":"SVA-1","row":{"id":"#42","file_id":"#43","subject_type":"task","subject_id":"#30","task_id":"#30","caption":"first try","rank":"00000000sg","created_by":"#3","created_at":1767603651000,"file":{"id":"#43","name":"b.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1767603650000,"url":"/f/#43/b.png"}}}
-attachment.deleted {"changes":{"deleted_at":{"from":null,"to":1767603652000}},"id":"#42"}
-attachment.restored {"row":{"id":"#42","file_id":"#43","subject_type":"task","subject_id":"#30","task_id":"#30","caption":"first try","rank":"00000000sg","created_by":"#3","created_at":1767603651000,"file":{"id":"#43","name":"b.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1767603650000}}}
-decision.opened {"attachments":[{"id":"#44","file_id":"#45","subject_type":"decision_option","subject_id":"#46","task_id":"#30","rank":"00000000sg","created_by":"#3","created_at":1767603655000,"file":{"id":"#45","name":"c.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1767603654000,"url":"/f/#45/c.png"}}],"key":"SVA-1","row":{"id":"#47","task_id":"#30","kind":"choice","question":"Which one?","state":"open","asked_id":"#2","recommended_option_id":"#46","rank":"00000000sg","created_by":"#3","created_at":1767603655000,"updated_at":1767603655000,"updated_seq":70,"options":[{"id":"#46","decision_id":"#47","label":"A","rank":"00000000sg"},{"id":"#48","decision_id":"#47","label":"B","rank":"00000001kw"}]}}
-notification.created {"row":{"id":"#49","user_id":"#2","seq":71,"type":"decision_asked","actor_id":"#3","task_id":"#30","entity_type":"decision","entity_id":"#47","title":"SVA-1 Big explosion","snippet":"Which one?","created_at":1767603655000,"addressed":true}}
-task.updated {"changes":{"waiting_on_id":{"from":null,"to":"#2"},"waiting_on_note":{"from":null,"to":"answer: Which one?"}},"id":"#30","key":"SVA-1"}
-decision.updated {"changes":{"details":{"from":null,"to":"both are fine"}},"id":"#47","key":"SVA-1"}
-decision.picked {"key":"SVA-1","row":{"id":"#47","task_id":"#30","kind":"choice","question":"Which one?","details":"both are fine","state":"picked","asked_id":"#2","recommended_option_id":"#46","picked_option_id":"#46","outcome":"with_changes","outcome_note":"A it is","decided_by":"#2","decided_at":1767603657000,"rank":"00000000sg","created_by":"#3","created_at":1767603655000,"updated_at":1767603656000,"updated_seq":74,"options":[{"id":"#46","decision_id":"#47","label":"A","rank":"00000000sg"},{"id":"#48","decision_id":"#47","label":"B","rank":"00000001kw"}]}}
-notification.updated {"changes":{"read_at":{"from":null,"to":1767603657000}},"ids":["#49"]}
-notification.updated {"changes":{"read_at":{"from":null,"to":1767603657000}},"ids":["#31","#41"]}
-notification.created {"row":{"id":"#50","user_id":"#3","seq":77,"type":"picked","actor_id":"#2","task_id":"#30","entity_type":"decision","entity_id":"#47","title":"SVA-1 Big explosion","snippet":"A: A it is","created_at":1767603657000,"addressed":true}}
-task.updated {"changes":{"waiting_on_id":{"from":"#2","to":"#3"},"waiting_on_note":{"from":"answer: Which one?","to":"answered: A: A it is"}},"id":"#30","key":"SVA-1"}
-decision.unclear {"key":"SVA-1","previous":{"decided_by":"#2","outcome":"with_changes","outcome_note":"A it is","picked_option_id":"#46"},"row":{"id":"#47","task_id":"#30","kind":"choice","question":"Which one?","details":"both are fine","state":"open","asked_id":"#2","unclear_note":"which A?","recommended_option_id":"#46","rank":"00000000sg","created_by":"#3","created_at":1767603655000,"updated_at":1767603657000,"updated_seq":79,"options":[{"id":"#46","decision_id":"#47","label":"A","rank":"00000000sg"},{"id":"#48","decision_id":"#47","label":"B","rank":"00000001kw"}]}}
-notification.created {"row":{"id":"#51","user_id":"#2","seq":80,"type":"unclear","actor_id":"#3","task_id":"#30","entity_type":"decision","entity_id":"#47","title":"SVA-1 Big explosion","snippet":"which A?","created_at":1767603658000,"addressed":true}}
-notification.updated {"changes":{"read_at":{"from":null,"to":1767603658000}},"ids":["#50"]}
-task.updated {"changes":{"waiting_on_id":{"from":"#3","to":"#2"},"waiting_on_note":{"from":"answered: A: A it is","to":"unclear: which A?"}},"id":"#30","key":"SVA-1"}
-decision.deleted {"changes":{"deleted_at":{"from":null,"to":1767603659000}},"id":"#47","key":"SVA-1"}
-notification.updated {"changes":{"read_at":{"from":null,"to":1767603659000}},"ids":["#51"]}
-decision.restored {"key":"SVA-1","row":{"id":"#47","task_id":"#30","kind":"choice","question":"Which one?","details":"both are fine","state":"open","asked_id":"#2","unclear_note":"which A?","recommended_option_id":"#46","rank":"00000000sg","created_by":"#3","created_at":1767603655000,"updated_at":1767603658000,"updated_seq":85,"options":[{"id":"#46","decision_id":"#47","label":"A","rank":"00000000sg"},{"id":"#48","decision_id":"#47","label":"B","rank":"00000001kw"}]}}
-decision.opened {"key":"SVA-1","row":{"id":"#52","task_id":"#30","kind":"choice","question":"Which sky?","state":"open","asked_id":"#2","rank":"00000001kw","created_by":"#3","created_at":1767603661000,"updated_at":1767603661000,"updated_seq":86,"options":[{"id":"#53","decision_id":"#52","label":"Day","rank":"00000000sg"},{"id":"#54","decision_id":"#52","label":"Night","rank":"00000001kw"}]}}
-notification.created {"row":{"id":"#55","user_id":"#2","seq":87,"type":"decision_asked","actor_id":"#3","task_id":"#30","entity_type":"decision","entity_id":"#52","title":"SVA-1 Big explosion","snippet":"Which sky?","created_at":1767603661000,"addressed":true}}
-task.updated {"changes":{"waiting_on_note":{"from":"unclear: which A?","to":"answer: Which sky?"}},"id":"#30","key":"SVA-1"}
-decision.closed {"key":"SVA-1","row":{"id":"#52","task_id":"#30","kind":"choice","question":"Which sky?","state":"not_needed","asked_id":"#2","outcome_note":"settled in the comments","decided_by":"#2","decided_at":1767603662000,"rank":"00000001kw","created_by":"#3","created_at":1767603661000,"updated_at":1767603662000,"updated_seq":89,"options":[{"id":"#53","decision_id":"#52","label":"Day","rank":"00000000sg"},{"id":"#54","decision_id":"#52","label":"Night","rank":"00000001kw"}]}}
-notification.updated {"changes":{"read_at":{"from":null,"to":1767603662000}},"ids":["#55"]}
-notification.created {"row":{"id":"#56","user_id":"#3","seq":91,"type":"not_needed","actor_id":"#2","task_id":"#30","entity_type":"decision","entity_id":"#52","title":"SVA-1 Big explosion","snippet":"no longer needed: settled in the comments","created_at":1767603662000,"addressed":true}}
-task.updated {"changes":{"waiting_on_id":{"from":"#2","to":null},"waiting_on_note":{"from":"answer: Which sky?","to":null}},"id":"#30","key":"SVA-1"}
-notification.created {"row":{"id":"#57","user_id":"#2","seq":93,"type":"mentioned","actor_id":"#3","task_id":"#30","entity_type":"task","entity_id":"#30","title":"SVA-1 Big explosion","snippet":"have a look","created_at":1767603663000,"addressed":true}}
-notification.updated {"changes":{"read_at":{"from":null,"to":1767603664000}},"ids":["#33","#57"]}
-session.created {"key":"SVA-1","row":{"id":"#58","agent_id":"#3","task_id":"#30","title":"Drawing","state":"running","started_at":1767603665000,"updated_seq":95}}
-session.created {"key":"","row":{"id":"#59","agent_id":"#3","title":"Thinking","state":"running","started_at":1767603666000,"updated_seq":96}}
-session.updated {"appended":{"steps":["read the brief",{"any":"form"}]},"id":"#59"}
-session.updated {"changes":{"ended_at":{"from":0,"to":1767603668000},"state":{"from":"running","to":"done"},"summary":{"from":null,"to":"thought"}},"id":"#59"}
-session.created {"key":"SVA-1","row":{"id":"#60","agent_id":"#2","task_id":"#30","title":"Big explosion","state":"waiting","instructions":"#1 comment","started_at":1767603671000,"updated_seq":99,"program":"claude","machine_id":"3f9c0a7d5e21b864","machine_name":"Studio","folder":"~/game","reason":"folder_busy","item_seq":1}}
-session.updated {"appended":{"steps":[{"tool":"Bash","text":"Run the tests","at":1767603600000}]},"changes":{"accepted_at":{"from":0,"to":1767603672000},"items_through":{"from":0,"to":1},"program_session":{"from":null,"to":"#61"},"reason":{"from":"folder_busy","to":null},"state":{"from":"waiting","to":"running"}},"id":"#60"}
-comment.created {"key":"SVA-1","row":{"id":"#62","task_id":"#30","subject_type":"task","subject_id":"#30","kind":"comment","author_id":"#2","body":"It explodes now.","session_id":"#60","created_at":1767603673000,"created_seq":101,"updated_seq":101}}
-notification.created {"row":{"id":"#63","user_id":"#3","seq":102,"type":"comment","actor_id":"#2","task_id":"#30","entity_type":"comment","entity_id":"#62","title":"SVA-1 Big explosion","snippet":"It explodes now.","created_at":1767603673000}}
-session.updated {"changes":{"stop_requested_at":{"from":0,"to":1767603674000},"stop_requested_by":{"from":null,"to":"#3"}},"id":"#60"}
-session.updated {"changes":{"ended_at":{"from":0,"to":1767603675000},"state":{"from":"running","to":"stopped"},"summary":{"from":null,"to":"It explodes now."}},"id":"#60"}
-task.updated {"changes":{"key":{"from":"SVA-3","to":"OPS-1"},"number":{"from":3,"to":1},"project_id":{"from":"#5","to":"#14"},"status_id":{"from":"#7","to":"#16"}},"from_project_id":"#5","id":"#34","key":"OPS-1","moved_from":"SVA-3"}
-task.updated {"changes":{"deleted_at":{"from":0,"to":1767603677000}},"deleted":true,"id":"#32","key":"SVA-2"}
-task.updated {"changes":{"deleted_at":{"from":1767603677000,"to":0}},"id":"#32","key":"SVA-2","restored":true,"row":{"id":"#32","project_id":"#5","number":2,"key":"SVA-2","title":"Sword sound","status_id":"#7","priority":0,"waiting_on_note":"pick one","rank":"00000001kw","created_by":"#3","created_at":1767603630000,"updated_at":1767603678000,"created_seq":43,"updated_seq":107,"activity_seq":107}}
-member.created {"row":{"workspace_id":"#1","user_id":"#64","role":"member","handle":"helper","kind":"agent","name":"Helper","tint":3,"scope":{"projects":["#5"],"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete","secret.send"]},"created_at":1767603679000,"updated_seq":108,"delegated_by":"#3","delegated_task":"#32","responsible_id":"#3"}}
-task.updated {"changes":{"completed_at":{"from":0,"to":1767603680000},"started_at":{"from":0,"to":1767603680000},"status_id":{"from":"#7","to":"#10"},"waiting_on_note":{"from":"pick one","to":null}},"id":"#32","key":"SVA-2"}
-member.updated {"changes":{"suspended_at":{"from":null,"to":1767603680000}},"id":"#64","reason":"its task SVA-2 is closed","user_id":"#64"}
-rule.created {"row":{"id":"#65","name":"Ping","active":true,"match":{"event_types":["task.updated"]},"action":{"kind":"notify","user_id":"#3","message":"x"},"created_by":"#3","created_at":1767603681000,"updated_seq":111}}
-rule.updated {"changes":{"action":{"from":null,"to":{"kind":"notify","user_id":"#3","message":"y"}},"match":{"from":null,"to":{"event_types":["task.updated"]}},"name":{"from":"Ping","to":"Ping me"}},"id":"#65"}
-task.updated {"changes":{"priority":{"from":2,"to":1}},"id":"#30","key":"SVA-1","rule":"#65"}
-task.created {"quiet":true,"row":{"id":"#66","project_id":"#5","number":4,"key":"SVA-4","title":"Imported","status_id":"#7","priority":0,"assignee_id":"#2","asked_by":"#3","rank":"000000035s","created_by":"#3","created_at":1767603684000,"updated_at":1767603684000,"created_seq":114,"updated_seq":114,"activity_seq":114}}
-task.updated {"changes":{"cycle_id":{"from":"#12","to":"#13"}},"id":"#30","key":"SVA-1","rolled_over":true}
-cycle.updated {"changes":{"closed_at":{"from":0,"to":1768294886000}},"id":"#12","rolled":1}
-task.updated {"changes":{"cycle_id":{"from":"#13","to":null}},"id":"#30","key":"SVA-1"}
-cycle.updated {"changes":{"closed_at":{"from":0,"to":1768899689000}},"id":"#13","rolled":0}
-resource.created {"row":{"id":"#67","name":"gpu","created_at":1768899690000,"updated_seq":119}}
-claim.created {"resource":"gpu","row":{"id":"#68","resource_id":"#67","user_id":"#3","task_id":"#30","state":"holding","requested_at":1768899691000,"acquired_at":1768899691000,"lease_until":1768901491000}}
-claim.created {"resource":"gpu","row":{"id":"#69","resource_id":"#67","user_id":"#2","state":"waiting","requested_at":1768899692000}}
-claim.updated {"changes":{"released_at":{"from":null,"to":1768899693000},"state":{"from":null,"to":"released"}},"id":"#68","resource_id":"#67","task_id":"#30","user_id":"#3","why":"released"}
-claim.updated {"changes":{"acquired_at":{"from":null,"to":1768899693000},"lease_until":{"from":null,"to":1768901493000},"state":{"from":null,"to":"holding"}},"id":"#69","resource_id":"#67","task_id":"","user_id":"#2","why":"acquired"}
-notification.created {"row":{"id":"#70","user_id":"#2","seq":124,"type":"waiting_on","actor_id":"#3","entity_type":"resource","entity_id":"#67","title":"gpu is yours now","created_at":1768899693000,"addressed":true}}
-claim.updated {"changes":{"released_at":{"from":null,"to":1768986095000},"state":{"from":null,"to":"released"}},"id":"#69","resource_id":"#67","task_id":"","user_id":"#2","why":"expired"}
-resource.deleted {"changes":{"deleted_at":{"from":null,"to":1768986096000}},"id":"#67"}
-webhook.created {"row":{"id":"#71","name":"out","url":"https://example.com/hook","active":true,"failures":0,"created_by":"#3","created_at":1768986097000,"updated_seq":127}}
-webhook.updated {"changes":{"active":{"from":true,"to":false}},"id":"#71"}
-webhook.deleted {"changes":{"deleted_at":{"from":null,"to":1768986099000}},"id":"#71"}
-integration.created {"row":{"id":"#72","kind":"github","name":"gh","active":true,"created_by":"#3","created_at":1768986100000,"updated_seq":130,"has_secret":false}}
-integration.updated {"changes":{"active":{"from":true,"to":false}},"id":"#72"}
-integration.deleted {"changes":{"deleted_at":{"from":null,"to":1768986102000}},"id":"#72"}
-secret.created {"row":{"id":"#73","name":"TOKEN","env":false,"created_by":"#3","created_at":1768986103000,"updated_at":1768986103000,"updated_seq":133}}
-secret.updated {"changes":{"description":{"from":null,"to":"for builds"},"updated_at":{"from":1768986103000,"to":1768986104000}},"id":"#73"}
-secret.deleted {"changes":{"deleted_at":{"from":null,"to":1768986106000}},"id":"#73","name":"TOKEN"}
-doc.created {"blocks":[{"id":"#74","doc_id":"#75","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":136,"updated_seq":136},{"id":"#76","doc_id":"#75","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":136,"updated_seq":136}],"row":{"id":"#75","kind":"page","title":"Plan","project_id":"#5","rank":"00000000sg","created_by":"#3","created_at":1768986107000,"updated_by":"#3","updated_at":1768986107000,"created_seq":136,"updated_seq":136,"content_seq":136}}
-doc.created {"row":{"id":"#77","kind":"page","title":"Empty","rank":"i","created_by":"#3","created_at":1768986108000,"updated_by":"#3","updated_at":1768986108000,"created_seq":137,"updated_seq":137,"content_seq":137}}
-doc.edited {"blocks":[{"id":"#78","doc_id":"#75","rank":"i","type":"paragraph","content":"Second para.","created_by":"#3","updated_by":"#3","created_seq":138,"updated_seq":138}],"changes":{"content_seq":{"from":null,"to":138},"updated_at":{"from":null,"to":1768986109000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#75"}
-doc.edited {"blocks":null,"changes":{"content_seq":{"from":null,"to":139},"updated_at":{"from":null,"to":1768986110000},"updated_by":{"from":null,"to":"#3"}},"deleted":["#78"],"id":"#75"}
-version.created {"row":{"id":"#79","doc_id":"#75","seq":140,"label":"v1","title":"Plan","created_by":"#3","created_at":1768986111000}}
-doc.edited {"blocks":[{"id":"#80","doc_id":"#75","rank":"i","type":"paragraph","content":[{"type":"text","text":"All new."}],"created_by":"#3","updated_by":"#3","created_seq":141,"updated_seq":141}],"changes":{"content_seq":{"from":null,"to":141},"updated_at":{"from":null,"to":1768986112000},"updated_by":{"from":null,"to":"#3"}},"deleted":["#76"],"id":"#75"}
-doc.edited {"blocks":[{"id":"#74","doc_id":"#75","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":136,"updated_seq":142},{"id":"#76","doc_id":"#75","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":136,"updated_seq":142}],"changes":{"content_seq":{"from":null,"to":142},"updated_at":{"from":null,"to":1768986113000}},"deleted":["#80"],"id":"#75","reverted_to":"#79"}
-doc.updated {"changes":{"title":{"from":"Plan","to":"The plan"}},"id":"#75"}
-comment.created {"row":{"id":"#81","doc_id":"#75","subject_type":"doc","subject_id":"#75","kind":"comment","author_id":"#3","body":"on the page","created_at":1768986115000,"created_seq":144,"updated_seq":144}}
-comment.created {"row":{"id":"#82","doc_id":"#75","subject_type":"doc","subject_id":"#75","kind":"comment","author_id":"#3","body":"another","created_at":1768986116000,"created_seq":145,"updated_seq":145}}
-comment.updated {"changes":{"resolved_at":{"from":0,"to":1768986117000}},"id":"#82","key":""}
-comment.deleted {"changes":{"deleted_at":{"from":null,"to":1768986118000}},"id":"#82","key":""}
-attachment.created {"row":{"id":"#83","file_id":"#84","subject_type":"doc","subject_id":"#75","rank":"00000000sg","created_by":"#3","created_at":1768986120000,"file":{"id":"#84","name":"d.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1768986119000,"url":"/f/#84/d.png"}}}
-doc.created {"row":{"id":"#85","kind":"page","title":"Mine","owner_id":"#3","rank":"r","created_by":"#3","created_at":1768986121000,"updated_by":"#3","updated_at":1768986121000,"created_seq":149,"updated_seq":149,"content_seq":149}}
-doc.updated {"changes":{"shared_with":{"from":null,"to":["#2"]}},"id":"#85","row":{"id":"#85","kind":"page","title":"Mine","owner_id":"#3","shared_with":["#2"],"rank":"r","created_by":"#3","created_at":1768986121000,"updated_by":"#3","updated_at":1768986122000,"created_seq":149,"updated_seq":150,"content_seq":149}}
-doc.updated {"changes":{"shared_with":{"from":["#2"],"to":null}},"id":"#85"}
-doc.unshared {"gone":true,"id":"#85"}
-doc.created {"row":{"id":"#86","parent_id":"#75","kind":"page","title":"Details","project_id":"#5","rank":"00000000sg","created_by":"#3","created_at":1768986124000,"updated_by":"#3","updated_at":1768986124000,"created_seq":153,"updated_seq":153,"content_seq":153}}
-doc.updated {"changes":{"project_id":{"from":"#5","to":"#14"}},"id":"#75"}
-doc.updated {"row":{"id":"#75","kind":"page","title":"The plan","project_id":"#14","rank":"00000000sg","created_by":"#3","created_at":1768986107000,"updated_by":"#3","updated_at":1768986125000,"created_seq":136,"updated_seq":154,"content_seq":142}}
-doc.updated {"changes":{"project_id":{"from":"#5","to":"#14"}},"id":"#86"}
-doc.updated {"row":{"id":"#86","parent_id":"#75","kind":"page","title":"Details","project_id":"#14","rank":"00000000sg","created_by":"#3","created_at":1768986124000,"updated_by":"#3","updated_at":1768986124000,"created_seq":153,"updated_seq":156,"content_seq":153}}
-doc.created {"row":{"id":"#87","kind":"database","title":"Assets","rank":"v","created_by":"#3","created_at":1768986126000,"updated_by":"#3","updated_at":1768986126000,"created_seq":158,"updated_seq":158,"content_seq":158}}
-property.created {"row":{"id":"#88","database_id":"#87","name":"Kind","type":"select","rank":"00000000sg","updated_seq":159}}
-property.updated {"changes":{"name":{"from":"Kind","to":"Sort"}},"id":"#88"}
-doc.created {"row":{"id":"#89","parent_id":"#87","kind":"row","title":"Sword","rank":"00000000sg","created_by":"#3","created_at":1768986129000,"updated_by":"#3","updated_at":1768986129000,"created_seq":161,"updated_seq":161,"content_seq":161}}
-property.updated {"changes":{"config":{"from":null,"to":{"options":[{"color":"gray","name":"blade"}]}}},"id":"#88"}
-doc.updated {"changes":{"props":{"from":null,"to":{"#88":"blade"}}},"id":"#89"}
-property.updated {"changes":{"config":{"from":{"options":[{"color":"gray","name":"blade"}]},"to":{"options":[{"color":"gray","name":"edge"}]}}},"id":"#88"}
-doc.updated {"changes":{"props":{"from":null,"to":{"#88":"edge"}}},"id":"#89"}
-dbview.created {"row":{"id":"#90","database_id":"#87","name":"Board","type":"board","rank":"00000000sg","updated_seq":166}}
-dbview.updated {"changes":{"name":{"from":"Board","to":"Kanban"}},"id":"#90"}
-dbview.deleted {"changes":{"deleted_at":{"from":null,"to":1768986134000}},"id":"#90"}
-property.deleted {"changes":{"deleted_at":{"from":null,"to":1768986135000}},"id":"#88"}
-doc.created {"row":{"id":"#91","kind":"page","title":"Docs","icon":"git","props":null,"rank":"x","created_by":"#3","created_at":1768986136000,"updated_by":"#3","updated_at":1768986136000,"created_seq":170,"updated_seq":170,"content_seq":170}}
-source.created {"row":{"id":"#92","root_doc_id":"#91","repo":"/tmp/nowhere","authority":"repo","write_mode":"commit","created_by":"#3","created_at":1768986136000,"updated_seq":171}}
-source.updated {"changes":{"branch":{"from":null,"to":"main"}},"id":"#92"}
-source.deleted {"changes":{"deleted_at":{"from":null,"to":1768986138000}},"id":"#92"}
-doc.deleted {"changes":{"deleted_at":{"from":null,"to":1768986139000}},"id":"#85"}
-doc.deleted {"changes":{"deleted_at":{"from":null,"to":1768986140000}},"id":"#89"}
-doc.restored {"changes":{"deleted_at":{"from":null,"to":null}},"row":{"id":"#89","parent_id":"#87","kind":"row","title":"Sword","props":{"#88":"edge"},"rank":"00000000sg","created_by":"#3","created_at":1768986129000,"updated_by":"#3","updated_at":1768986130000,"created_seq":161,"updated_seq":176,"content_seq":161}}
-task.updated {"changes":{"label_ids":{"from":["#22","#23"],"to":["#22"]}},"id":"#30","key":"SVA-1"}
-label.deleted {"changes":{"deleted_at":{"from":null,"to":1768986142000}},"id":"#23"}
-task.updated {"changes":{"milestone_id":{"from":"#25","to":null}},"id":"#30","key":"SVA-1"}
-milestone.deleted {"changes":{"deleted_at":{"from":null,"to":1768986143000}},"id":"#25"}
-task.updated {"changes":{"epic_id":{"from":"#24","to":null}},"id":"#30","key":"SVA-1"}
-epic.deleted {"changes":{"deleted_at":{"from":null,"to":1768986144000}},"id":"#24"}
-status.deleted {"changes":{"deleted_at":{"from":null,"to":1768986145000}},"id":"#21"}
-cycle.deleted {"changes":{"deleted_at":{"from":null,"to":1768986146000}},"id":"#26"}
-template.deleted {"changes":{"deleted_at":{"from":null,"to":1768986147000}},"id":"#27"}
-view.deleted {"changes":{"deleted_at":{"from":null,"to":1768986148000}},"id":"#28"}
-preference.deleted {"changes":{"deleted_at":{"from":null,"to":1768986149000}},"id":"#29"}
-rule.deleted {"changes":{"deleted_at":{"from":null,"to":1768986150000}},"id":"#65"}
-project.created {"row":{"id":"#93","workspace_id":"#1","key":"GS","name":"Getting started","rank":"r","created_by":"#3","created_at":1768986151000,"updated_seq":189}}
-status.created {"row":{"id":"#94","project_id":"#93","name":"Backlog","color":"#9ca3af","category":"backlog","rank":"00000000sg","updated_seq":190}}
-status.created {"row":{"id":"#95","project_id":"#93","name":"Todo","color":"#6b7280","category":"unstarted","rank":"00000001kw","is_default":true,"updated_seq":191}}
-status.created {"row":{"id":"#96","project_id":"#93","name":"In Progress","color":"#f59e0b","category":"started","rank":"00000002dc","updated_seq":192}}
-status.created {"row":{"id":"#97","project_id":"#93","name":"Waiting","color":"#8b5cf6","category":"waiting","rank":"000000035s","updated_seq":193}}
-status.created {"row":{"id":"#98","project_id":"#93","name":"Done","color":"#10b981","category":"done","rank":"00000003y8","updated_seq":194}}
-status.created {"row":{"id":"#99","project_id":"#93","name":"Canceled","color":"#ef4444","category":"canceled","rank":"00000004qo","updated_seq":195}}
-label.created {"row":{"id":"#100","project_id":"#93","name":"Sample","color":"#9a6bff","updated_seq":196}}
-task.created {"row":{"id":"#101","project_id":"#93","number":1,"key":"GS-1","title":"Open this task and leave a comment","status_id":"#95","priority":0,"assignee_id":"#3","label_ids":["#100"],"rank":"00000000sg","created_by":"#3","created_at":1768986151000,"updated_at":1768986151000,"created_seq":197,"updated_seq":197,"activity_seq":197}}
-task.created {"row":{"id":"#102","project_id":"#93","number":2,"key":"GS-2","title":"Write a page in Docs about what you are working on","status_id":"#95","priority":0,"assignee_id":"#3","label_ids":["#100"],"rank":"00000001kw","created_by":"#3","created_at":1768986151000,"updated_at":1768986151000,"created_seq":198,"updated_seq":198,"activity_seq":198}}
-task.created {"row":{"id":"#103","project_id":"#93","number":3,"key":"GS-3","title":"Say hello and tell Aram what you can do","status_id":"#95","priority":0,"assignee_id":"#2","asked_by":"#3","label_ids":["#100"],"rank":"00000002dc","created_by":"#3","created_at":1768986151000,"updated_at":1768986151000,"created_seq":199,"updated_seq":199,"activity_seq":199}}
-notification.created {"row":{"id":"#104","user_id":"#2","seq":200,"type":"assigned","actor_id":"#3","task_id":"#103","entity_type":"task","entity_id":"#103","title":"GS-3 Say hello and tell Aram what you can do","created_at":1768986151000,"addressed":true}}
-project.updated {"changes":{"samples":{"from":null,"to":["#101","#102","#103"]}},"id":"#93"}
-task.updated {"changes":{"deleted_at":{"from":0,"to":1768986152000}},"deleted":true,"id":"#101","key":"GS-1"}
-task.updated {"changes":{"deleted_at":{"from":0,"to":1768986152000}},"deleted":true,"id":"#102","key":"GS-2"}
-task.updated {"changes":{"deleted_at":{"from":0,"to":1768986152000}},"deleted":true,"id":"#103","key":"GS-3"}
-project.deleted {"changes":{"deleted_at":{"from":null,"to":1768986152000}},"id":"#93","key":"GS"}
-project.deleted {"changes":{"deleted_at":{"from":null,"to":1768986153000}},"id":"#14","key":"OPS"}
-task.created {"row":{"id":"#105","project_id":"#5","number":5,"key":"SVA-5","title":"Restored","status_id":"#7","priority":0,"rank":"00000003y8","created_by":"#3","created_at":1768986154000,"updated_at":1768986154000,"created_seq":207,"updated_seq":207,"activity_seq":207}}
-task.created {"row":{"id":"#106","project_id":"#5","number":6,"key":"SVA-6","title":"Thrown away","status_id":"#7","priority":0,"rank":"00000004qo","created_by":"#3","created_at":1768986155000,"updated_at":1768986155000,"created_seq":208,"updated_seq":208,"activity_seq":208}}
-task.updated {"changes":{"deleted_at":{"from":0,"to":1768986156000}},"deleted":true,"id":"#106","key":"SVA-6"}
-task.restored {"from_backup":true,"key":"SVA-5","row":{"id":"#105","project_id":"#5","number":5,"key":"SVA-5","title":"Restored","status_id":"#7","priority":0,"rank":"00000003y8","created_by":"#3","created_at":1768986154000,"updated_at":1768986154000,"created_seq":207,"updated_seq":210,"activity_seq":210}}
-doc.restored {"from_backup":true,"row":{"id":"#75","kind":"page","title":"The plan","project_id":"#14","rank":"00000000sg","created_by":"#3","created_at":1768986107000,"updated_by":"#3","updated_at":1768986125000,"created_seq":136,"updated_seq":211,"content_seq":212}}
-doc.edited {"blocks":[{"id":"#74","doc_id":"#75","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":136,"updated_seq":212},{"id":"#76","doc_id":"#75","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":136,"updated_seq":212}],"changes":{"content_seq":{"from":null,"to":212}},"deleted":["#78","#80"],"from_backup":true,"id":"#75"}
-task.deleted {"gone":true,"id":"#101"}
-task.deleted {"gone":true,"id":"#102"}
+task.updated {"changes":{"lease_holder_id":{"from":"#2","to":null},"lease_until":{"from":1767605434000,"to":0}},"id":"#28","key":"SVA-1"}
+watcher.deleted {"gone":true,"id":"#30","user_id":"#3"}
+watcher.created {"row":{"user_id":"#3","subject_type":"task","subject_id":"#30","created_at":1767603637000}}
+relation.created {"key":"SVA-1","other_key":"SVA-2","row":{"id":"#33","task_id":"#28","related_task_id":"#30","type":"blocks","created_by":"#3","created_at":1767603638000}}
+task.related {"id":"#30","key":"SVA-2","other_id":"#28","other_key":"SVA-1","relation":"#33","removed":false,"type":"blocks"}
+relation.deleted {"gone":true,"id":"#33"}
+task.related {"id":"#30","key":"SVA-2","other_id":"#28","other_key":"SVA-1","relation":"#33","removed":true,"type":"blocks"}
+link.created {"key":"SVA-1","row":{"id":"#34","task_id":"#28","kind":"pr","url":"https://example.com/pr/1","title":"Explosions","repo":"a/b","ref":"1","created_by":"#3","created_at":1767603640000,"updated_at":1767603640000,"updated_seq":55}}
+link.updated {"changes":{"state":{"from":null,"to":"merged"}},"id":"#34","key":"SVA-1","kind":"pr","ref":"1"}
+link.created {"key":"SVA-1","row":{"id":"#35","task_id":"#28","kind":"url","url":"https://example.com/notes","created_by":"#3","created_at":1767603642000,"updated_at":1767603642000,"updated_seq":57}}
+link.updated {"changes":{"title":{"from":null,"to":"Notes"}},"id":"#35","key":"SVA-1","kind":"url","ref":""}
+link.deleted {"changes":{"deleted_at":{"from":null,"to":1767603644000}},"id":"#34"}
+comment.created {"attachments":[{"id":"#36","file_id":"#37","subject_type":"comment","subject_id":"#38","task_id":"#28","rank":"00000000sg","created_by":"#3","created_at":1767603646000,"file":{"id":"#37","name":"a.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1767603645000,"url":"/f/#37/a.png"}}],"key":"SVA-1","row":{"id":"#38","task_id":"#28","subject_type":"task","subject_id":"#28","kind":"comment","author_id":"#3","body":"Looks good","created_at":1767603646000,"created_seq":60,"updated_seq":60}}
+notification.created {"row":{"id":"#39","user_id":"#2","seq":61,"type":"comment","actor_id":"#3","task_id":"#28","entity_type":"comment","entity_id":"#38","title":"SVA-1 Big explosion","snippet":"Looks good","created_at":1767603646000,"addressed":true}}
+comment.updated {"changes":{"body":{"from":"Looks good","to":"Looks very good"},"edited_at":{"from":0,"to":1767603647000}},"id":"#38","key":"SVA-1"}
+comment.updated {"changes":{"resolved_at":{"from":0,"to":1767603648000}},"id":"#38","key":"SVA-1"}
+comment.deleted {"changes":{"deleted_at":{"from":null,"to":1767603649000}},"id":"#38","key":"SVA-1"}
+attachment.created {"key":"SVA-1","row":{"id":"#40","file_id":"#41","subject_type":"task","subject_id":"#28","task_id":"#28","caption":"first try","rank":"00000000sg","created_by":"#3","created_at":1767603651000,"file":{"id":"#41","name":"b.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1767603650000,"url":"/f/#41/b.png"}}}
+attachment.deleted {"changes":{"deleted_at":{"from":null,"to":1767603652000}},"id":"#40"}
+attachment.restored {"row":{"id":"#40","file_id":"#41","subject_type":"task","subject_id":"#28","task_id":"#28","caption":"first try","rank":"00000000sg","created_by":"#3","created_at":1767603651000,"file":{"id":"#41","name":"b.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1767603650000}}}
+decision.opened {"attachments":[{"id":"#42","file_id":"#43","subject_type":"decision_option","subject_id":"#44","task_id":"#28","rank":"00000000sg","created_by":"#3","created_at":1767603655000,"file":{"id":"#43","name":"c.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1767603654000,"url":"/f/#43/c.png"}}],"key":"SVA-1","row":{"id":"#45","task_id":"#28","kind":"choice","question":"Which one?","state":"open","asked_id":"#2","recommended_option_id":"#44","rank":"00000000sg","created_by":"#3","created_at":1767603655000,"updated_at":1767603655000,"updated_seq":68,"options":[{"id":"#44","decision_id":"#45","label":"A","rank":"00000000sg"},{"id":"#46","decision_id":"#45","label":"B","rank":"00000001kw"}]}}
+notification.created {"row":{"id":"#47","user_id":"#2","seq":69,"type":"decision_asked","actor_id":"#3","task_id":"#28","entity_type":"decision","entity_id":"#45","title":"SVA-1 Big explosion","snippet":"Which one?","created_at":1767603655000,"addressed":true}}
+task.updated {"changes":{"waiting_on_id":{"from":null,"to":"#2"},"waiting_on_note":{"from":null,"to":"answer: Which one?"}},"id":"#28","key":"SVA-1"}
+decision.updated {"changes":{"details":{"from":null,"to":"both are fine"}},"id":"#45","key":"SVA-1"}
+decision.picked {"key":"SVA-1","row":{"id":"#45","task_id":"#28","kind":"choice","question":"Which one?","details":"both are fine","state":"picked","asked_id":"#2","recommended_option_id":"#44","picked_option_id":"#44","outcome":"with_changes","outcome_note":"A it is","decided_by":"#2","decided_at":1767603657000,"rank":"00000000sg","created_by":"#3","created_at":1767603655000,"updated_at":1767603656000,"updated_seq":72,"options":[{"id":"#44","decision_id":"#45","label":"A","rank":"00000000sg"},{"id":"#46","decision_id":"#45","label":"B","rank":"00000001kw"}]}}
+notification.updated {"changes":{"read_at":{"from":null,"to":1767603657000}},"ids":["#47"]}
+notification.updated {"changes":{"read_at":{"from":null,"to":1767603657000}},"ids":["#29","#39"]}
+notification.created {"row":{"id":"#48","user_id":"#3","seq":75,"type":"picked","actor_id":"#2","task_id":"#28","entity_type":"decision","entity_id":"#45","title":"SVA-1 Big explosion","snippet":"A: A it is","created_at":1767603657000,"addressed":true}}
+task.updated {"changes":{"waiting_on_id":{"from":"#2","to":"#3"},"waiting_on_note":{"from":"answer: Which one?","to":"answered: A: A it is"}},"id":"#28","key":"SVA-1"}
+decision.unclear {"key":"SVA-1","previous":{"decided_by":"#2","outcome":"with_changes","outcome_note":"A it is","picked_option_id":"#44"},"row":{"id":"#45","task_id":"#28","kind":"choice","question":"Which one?","details":"both are fine","state":"open","asked_id":"#2","unclear_note":"which A?","recommended_option_id":"#44","rank":"00000000sg","created_by":"#3","created_at":1767603655000,"updated_at":1767603657000,"updated_seq":77,"options":[{"id":"#44","decision_id":"#45","label":"A","rank":"00000000sg"},{"id":"#46","decision_id":"#45","label":"B","rank":"00000001kw"}]}}
+notification.created {"row":{"id":"#49","user_id":"#2","seq":78,"type":"unclear","actor_id":"#3","task_id":"#28","entity_type":"decision","entity_id":"#45","title":"SVA-1 Big explosion","snippet":"which A?","created_at":1767603658000,"addressed":true}}
+notification.updated {"changes":{"read_at":{"from":null,"to":1767603658000}},"ids":["#48"]}
+task.updated {"changes":{"waiting_on_id":{"from":"#3","to":"#2"},"waiting_on_note":{"from":"answered: A: A it is","to":"unclear: which A?"}},"id":"#28","key":"SVA-1"}
+decision.deleted {"changes":{"deleted_at":{"from":null,"to":1767603659000}},"id":"#45","key":"SVA-1"}
+notification.updated {"changes":{"read_at":{"from":null,"to":1767603659000}},"ids":["#49"]}
+decision.restored {"key":"SVA-1","row":{"id":"#45","task_id":"#28","kind":"choice","question":"Which one?","details":"both are fine","state":"open","asked_id":"#2","unclear_note":"which A?","recommended_option_id":"#44","rank":"00000000sg","created_by":"#3","created_at":1767603655000,"updated_at":1767603658000,"updated_seq":83,"options":[{"id":"#44","decision_id":"#45","label":"A","rank":"00000000sg"},{"id":"#46","decision_id":"#45","label":"B","rank":"00000001kw"}]}}
+decision.opened {"key":"SVA-1","row":{"id":"#50","task_id":"#28","kind":"choice","question":"Which sky?","state":"open","asked_id":"#2","rank":"00000001kw","created_by":"#3","created_at":1767603661000,"updated_at":1767603661000,"updated_seq":84,"options":[{"id":"#51","decision_id":"#50","label":"Day","rank":"00000000sg"},{"id":"#52","decision_id":"#50","label":"Night","rank":"00000001kw"}]}}
+notification.created {"row":{"id":"#53","user_id":"#2","seq":85,"type":"decision_asked","actor_id":"#3","task_id":"#28","entity_type":"decision","entity_id":"#50","title":"SVA-1 Big explosion","snippet":"Which sky?","created_at":1767603661000,"addressed":true}}
+task.updated {"changes":{"waiting_on_note":{"from":"unclear: which A?","to":"answer: Which sky?"}},"id":"#28","key":"SVA-1"}
+decision.closed {"key":"SVA-1","row":{"id":"#50","task_id":"#28","kind":"choice","question":"Which sky?","state":"not_needed","asked_id":"#2","outcome_note":"settled in the comments","decided_by":"#2","decided_at":1767603662000,"rank":"00000001kw","created_by":"#3","created_at":1767603661000,"updated_at":1767603662000,"updated_seq":87,"options":[{"id":"#51","decision_id":"#50","label":"Day","rank":"00000000sg"},{"id":"#52","decision_id":"#50","label":"Night","rank":"00000001kw"}]}}
+notification.updated {"changes":{"read_at":{"from":null,"to":1767603662000}},"ids":["#53"]}
+notification.created {"row":{"id":"#54","user_id":"#3","seq":89,"type":"not_needed","actor_id":"#2","task_id":"#28","entity_type":"decision","entity_id":"#50","title":"SVA-1 Big explosion","snippet":"no longer needed: settled in the comments","created_at":1767603662000,"addressed":true}}
+task.updated {"changes":{"waiting_on_id":{"from":"#2","to":null},"waiting_on_note":{"from":"answer: Which sky?","to":null}},"id":"#28","key":"SVA-1"}
+notification.created {"row":{"id":"#55","user_id":"#2","seq":91,"type":"mentioned","actor_id":"#3","task_id":"#28","entity_type":"task","entity_id":"#28","title":"SVA-1 Big explosion","snippet":"have a look","created_at":1767603663000,"addressed":true}}
+notification.updated {"changes":{"read_at":{"from":null,"to":1767603664000}},"ids":["#31","#55"]}
+session.created {"key":"SVA-1","row":{"id":"#56","agent_id":"#3","task_id":"#28","title":"Drawing","state":"running","started_at":1767603665000,"updated_seq":93}}
+session.created {"key":"","row":{"id":"#57","agent_id":"#3","title":"Thinking","state":"running","started_at":1767603666000,"updated_seq":94}}
+session.updated {"appended":{"steps":["read the brief",{"any":"form"}]},"id":"#57"}
+session.updated {"changes":{"ended_at":{"from":0,"to":1767603668000},"state":{"from":"running","to":"done"},"summary":{"from":null,"to":"thought"}},"id":"#57"}
+session.created {"key":"SVA-1","row":{"id":"#58","agent_id":"#2","task_id":"#28","title":"Big explosion","state":"waiting","instructions":"#1 comment","started_at":1767603671000,"updated_seq":97,"program":"claude","machine_id":"3f9c0a7d5e21b864","machine_name":"Studio","folder":"~/game","reason":"folder_busy","item_seq":1}}
+session.updated {"appended":{"steps":[{"tool":"Bash","text":"Run the tests","at":1767603600000}]},"changes":{"accepted_at":{"from":0,"to":1767603672000},"items_through":{"from":0,"to":1},"program_session":{"from":null,"to":"#59"},"reason":{"from":"folder_busy","to":null},"state":{"from":"waiting","to":"running"}},"id":"#58"}
+comment.created {"key":"SVA-1","row":{"id":"#60","task_id":"#28","subject_type":"task","subject_id":"#28","kind":"comment","author_id":"#2","body":"It explodes now.","session_id":"#58","created_at":1767603673000,"created_seq":99,"updated_seq":99}}
+notification.created {"row":{"id":"#61","user_id":"#3","seq":100,"type":"comment","actor_id":"#2","task_id":"#28","entity_type":"comment","entity_id":"#60","title":"SVA-1 Big explosion","snippet":"It explodes now.","created_at":1767603673000}}
+session.updated {"changes":{"stop_requested_at":{"from":0,"to":1767603674000},"stop_requested_by":{"from":null,"to":"#3"}},"id":"#58"}
+session.updated {"changes":{"ended_at":{"from":0,"to":1767603675000},"state":{"from":"running","to":"stopped"},"summary":{"from":null,"to":"It explodes now."}},"id":"#58"}
+task.updated {"changes":{"key":{"from":"SVA-3","to":"OPS-1"},"number":{"from":3,"to":1},"project_id":{"from":"#5","to":"#13"},"status_id":{"from":"#7","to":"#15"}},"from_project_id":"#5","id":"#32","key":"OPS-1","moved_from":"SVA-3"}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1767603677000}},"deleted":true,"id":"#30","key":"SVA-2"}
+task.updated {"changes":{"deleted_at":{"from":1767603677000,"to":0}},"id":"#30","key":"SVA-2","restored":true,"row":{"id":"#30","project_id":"#5","number":2,"key":"SVA-2","title":"Sword sound","status_id":"#7","priority":0,"waiting_on_note":"pick one","rank":"00000001kw","created_by":"#3","created_at":1767603630000,"updated_at":1767603678000,"created_seq":41,"updated_seq":105,"activity_seq":105}}
+member.created {"row":{"workspace_id":"#1","user_id":"#62","role":"member","handle":"helper","kind":"agent","name":"Helper","tint":3,"scope":{"projects":["#5"],"needs_approval":["project.delete","member.remove","member.add","workspace.update","webhook.create","webhook.update","integration.create","integration.update","source.create","source.update","secret.set","secret.delete","secret.send"]},"created_at":1767603679000,"updated_seq":106,"delegated_by":"#3","delegated_task":"#30","responsible_id":"#3"}}
+task.updated {"changes":{"completed_at":{"from":0,"to":1767603680000},"started_at":{"from":0,"to":1767603680000},"status_id":{"from":"#7","to":"#9"},"waiting_on_note":{"from":"pick one","to":null}},"id":"#30","key":"SVA-2"}
+member.updated {"changes":{"suspended_at":{"from":null,"to":1767603680000}},"id":"#62","reason":"its task SVA-2 is closed","user_id":"#62"}
+rule.created {"row":{"id":"#63","name":"Ping","active":true,"match":{"event_types":["task.updated"]},"action":{"kind":"notify","user_id":"#3","message":"x"},"created_by":"#3","created_at":1767603681000,"updated_seq":109}}
+rule.updated {"changes":{"action":{"from":null,"to":{"kind":"notify","user_id":"#3","message":"y"}},"match":{"from":null,"to":{"event_types":["task.updated"]}},"name":{"from":"Ping","to":"Ping me"}},"id":"#63"}
+task.updated {"changes":{"priority":{"from":2,"to":1}},"id":"#28","key":"SVA-1","rule":"#63"}
+task.created {"quiet":true,"row":{"id":"#64","project_id":"#5","number":4,"key":"SVA-4","title":"Imported","status_id":"#7","priority":0,"assignee_id":"#2","asked_by":"#3","rank":"000000035s","created_by":"#3","created_at":1767603684000,"updated_at":1767603684000,"created_seq":112,"updated_seq":112,"activity_seq":112}}
+task.updated {"changes":{"cycle_id":{"from":"#11","to":"#12"}},"id":"#28","key":"SVA-1","rolled_over":true}
+cycle.updated {"changes":{"closed_at":{"from":0,"to":1768294886000}},"id":"#11","rolled":1}
+task.updated {"changes":{"cycle_id":{"from":"#12","to":null}},"id":"#28","key":"SVA-1"}
+cycle.updated {"changes":{"closed_at":{"from":0,"to":1768899689000}},"id":"#12","rolled":0}
+resource.created {"row":{"id":"#65","name":"gpu","created_at":1768899690000,"updated_seq":117}}
+claim.created {"resource":"gpu","row":{"id":"#66","resource_id":"#65","user_id":"#3","task_id":"#28","state":"holding","requested_at":1768899691000,"acquired_at":1768899691000,"lease_until":1768901491000}}
+claim.created {"resource":"gpu","row":{"id":"#67","resource_id":"#65","user_id":"#2","state":"waiting","requested_at":1768899692000}}
+claim.updated {"changes":{"released_at":{"from":null,"to":1768899693000},"state":{"from":null,"to":"released"}},"id":"#66","resource_id":"#65","task_id":"#28","user_id":"#3","why":"released"}
+claim.updated {"changes":{"acquired_at":{"from":null,"to":1768899693000},"lease_until":{"from":null,"to":1768901493000},"state":{"from":null,"to":"holding"}},"id":"#67","resource_id":"#65","task_id":"","user_id":"#2","why":"acquired"}
+notification.created {"row":{"id":"#68","user_id":"#2","seq":122,"type":"waiting_on","actor_id":"#3","entity_type":"resource","entity_id":"#65","title":"gpu is yours now","created_at":1768899693000,"addressed":true}}
+claim.updated {"changes":{"released_at":{"from":null,"to":1768986095000},"state":{"from":null,"to":"released"}},"id":"#67","resource_id":"#65","task_id":"","user_id":"#2","why":"expired"}
+resource.deleted {"changes":{"deleted_at":{"from":null,"to":1768986096000}},"id":"#65"}
+webhook.created {"row":{"id":"#69","name":"out","url":"https://example.com/hook","active":true,"failures":0,"created_by":"#3","created_at":1768986097000,"updated_seq":125}}
+webhook.updated {"changes":{"active":{"from":true,"to":false}},"id":"#69"}
+webhook.deleted {"changes":{"deleted_at":{"from":null,"to":1768986099000}},"id":"#69"}
+integration.created {"row":{"id":"#70","kind":"github","name":"gh","active":true,"created_by":"#3","created_at":1768986100000,"updated_seq":128,"has_secret":false}}
+integration.updated {"changes":{"active":{"from":true,"to":false}},"id":"#70"}
+integration.deleted {"changes":{"deleted_at":{"from":null,"to":1768986102000}},"id":"#70"}
+secret.created {"row":{"id":"#71","name":"TOKEN","env":false,"created_by":"#3","created_at":1768986103000,"updated_at":1768986103000,"updated_seq":131}}
+secret.updated {"changes":{"description":{"from":null,"to":"for builds"},"updated_at":{"from":1768986103000,"to":1768986104000}},"id":"#71"}
+secret.deleted {"changes":{"deleted_at":{"from":null,"to":1768986106000}},"id":"#71","name":"TOKEN"}
+doc.created {"blocks":[{"id":"#72","doc_id":"#73","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":134,"updated_seq":134},{"id":"#74","doc_id":"#73","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":134,"updated_seq":134}],"row":{"id":"#73","kind":"page","title":"Plan","project_id":"#5","rank":"00000000sg","created_by":"#3","created_at":1768986107000,"updated_by":"#3","updated_at":1768986107000,"created_seq":134,"updated_seq":134,"content_seq":134}}
+doc.created {"row":{"id":"#75","kind":"page","title":"Empty","rank":"i","created_by":"#3","created_at":1768986108000,"updated_by":"#3","updated_at":1768986108000,"created_seq":135,"updated_seq":135,"content_seq":135}}
+doc.edited {"blocks":[{"id":"#76","doc_id":"#73","rank":"i","type":"paragraph","content":"Second para.","created_by":"#3","updated_by":"#3","created_seq":136,"updated_seq":136}],"changes":{"content_seq":{"from":null,"to":136},"updated_at":{"from":null,"to":1768986109000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#73"}
+doc.edited {"blocks":null,"changes":{"content_seq":{"from":null,"to":137},"updated_at":{"from":null,"to":1768986110000},"updated_by":{"from":null,"to":"#3"}},"deleted":["#76"],"id":"#73"}
+version.created {"row":{"id":"#77","doc_id":"#73","seq":138,"label":"v1","title":"Plan","created_by":"#3","created_at":1768986111000}}
+doc.edited {"blocks":[{"id":"#78","doc_id":"#73","rank":"i","type":"paragraph","content":[{"type":"text","text":"All new."}],"created_by":"#3","updated_by":"#3","created_seq":139,"updated_seq":139}],"changes":{"content_seq":{"from":null,"to":139},"updated_at":{"from":null,"to":1768986112000},"updated_by":{"from":null,"to":"#3"}},"deleted":["#74"],"id":"#73"}
+doc.edited {"blocks":[{"id":"#72","doc_id":"#73","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":134,"updated_seq":140},{"id":"#74","doc_id":"#73","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":134,"updated_seq":140}],"changes":{"content_seq":{"from":null,"to":140},"updated_at":{"from":null,"to":1768986113000}},"deleted":["#78"],"id":"#73","reverted_to":"#77"}
+doc.updated {"changes":{"title":{"from":"Plan","to":"The plan"}},"id":"#73"}
+comment.created {"row":{"id":"#79","doc_id":"#73","subject_type":"doc","subject_id":"#73","kind":"comment","author_id":"#3","body":"on the page","created_at":1768986115000,"created_seq":142,"updated_seq":142}}
+comment.created {"row":{"id":"#80","doc_id":"#73","subject_type":"doc","subject_id":"#73","kind":"comment","author_id":"#3","body":"another","created_at":1768986116000,"created_seq":143,"updated_seq":143}}
+comment.updated {"changes":{"resolved_at":{"from":0,"to":1768986117000}},"id":"#80","key":""}
+comment.deleted {"changes":{"deleted_at":{"from":null,"to":1768986118000}},"id":"#80","key":""}
+attachment.created {"row":{"id":"#81","file_id":"#82","subject_type":"doc","subject_id":"#73","rank":"00000000sg","created_by":"#3","created_at":1768986120000,"file":{"id":"#82","name":"d.png","content_type":"image/png","size":3,"state":"ready","uploaded_by":"#3","created_at":1768986119000,"url":"/f/#82/d.png"}}}
+doc.created {"row":{"id":"#83","kind":"page","title":"Mine","owner_id":"#3","rank":"r","created_by":"#3","created_at":1768986121000,"updated_by":"#3","updated_at":1768986121000,"created_seq":147,"updated_seq":147,"content_seq":147}}
+doc.updated {"changes":{"shared_with":{"from":null,"to":["#2"]}},"id":"#83","row":{"id":"#83","kind":"page","title":"Mine","owner_id":"#3","shared_with":["#2"],"rank":"r","created_by":"#3","created_at":1768986121000,"updated_by":"#3","updated_at":1768986122000,"created_seq":147,"updated_seq":148,"content_seq":147}}
+doc.updated {"changes":{"shared_with":{"from":["#2"],"to":null}},"id":"#83"}
+doc.unshared {"gone":true,"id":"#83"}
+doc.created {"row":{"id":"#84","parent_id":"#73","kind":"page","title":"Details","project_id":"#5","rank":"00000000sg","created_by":"#3","created_at":1768986124000,"updated_by":"#3","updated_at":1768986124000,"created_seq":151,"updated_seq":151,"content_seq":151}}
+doc.updated {"changes":{"project_id":{"from":"#5","to":"#13"}},"id":"#73"}
+doc.updated {"row":{"id":"#73","kind":"page","title":"The plan","project_id":"#13","rank":"00000000sg","created_by":"#3","created_at":1768986107000,"updated_by":"#3","updated_at":1768986125000,"created_seq":134,"updated_seq":152,"content_seq":140}}
+doc.updated {"changes":{"project_id":{"from":"#5","to":"#13"}},"id":"#84"}
+doc.updated {"row":{"id":"#84","parent_id":"#73","kind":"page","title":"Details","project_id":"#13","rank":"00000000sg","created_by":"#3","created_at":1768986124000,"updated_by":"#3","updated_at":1768986124000,"created_seq":151,"updated_seq":154,"content_seq":151}}
+doc.created {"row":{"id":"#85","kind":"database","title":"Assets","rank":"v","created_by":"#3","created_at":1768986126000,"updated_by":"#3","updated_at":1768986126000,"created_seq":156,"updated_seq":156,"content_seq":156}}
+property.created {"row":{"id":"#86","database_id":"#85","name":"Kind","type":"select","rank":"00000000sg","updated_seq":157}}
+property.updated {"changes":{"name":{"from":"Kind","to":"Sort"}},"id":"#86"}
+doc.created {"row":{"id":"#87","parent_id":"#85","kind":"row","title":"Sword","rank":"00000000sg","created_by":"#3","created_at":1768986129000,"updated_by":"#3","updated_at":1768986129000,"created_seq":159,"updated_seq":159,"content_seq":159}}
+property.updated {"changes":{"config":{"from":null,"to":{"options":[{"color":"gray","name":"blade"}]}}},"id":"#86"}
+doc.updated {"changes":{"props":{"from":null,"to":{"#86":"blade"}}},"id":"#87"}
+property.updated {"changes":{"config":{"from":{"options":[{"color":"gray","name":"blade"}]},"to":{"options":[{"color":"gray","name":"edge"}]}}},"id":"#86"}
+doc.updated {"changes":{"props":{"from":null,"to":{"#86":"edge"}}},"id":"#87"}
+dbview.created {"row":{"id":"#88","database_id":"#85","name":"Board","type":"board","rank":"00000000sg","updated_seq":164}}
+dbview.updated {"changes":{"name":{"from":"Board","to":"Kanban"}},"id":"#88"}
+dbview.deleted {"changes":{"deleted_at":{"from":null,"to":1768986134000}},"id":"#88"}
+property.deleted {"changes":{"deleted_at":{"from":null,"to":1768986135000}},"id":"#86"}
+doc.created {"row":{"id":"#89","kind":"page","title":"Docs","icon":"git","props":null,"rank":"x","created_by":"#3","created_at":1768986136000,"updated_by":"#3","updated_at":1768986136000,"created_seq":168,"updated_seq":168,"content_seq":168}}
+source.created {"row":{"id":"#90","root_doc_id":"#89","repo":"/tmp/nowhere","authority":"repo","write_mode":"commit","created_by":"#3","created_at":1768986136000,"updated_seq":169}}
+source.updated {"changes":{"branch":{"from":null,"to":"main"}},"id":"#90"}
+source.deleted {"changes":{"deleted_at":{"from":null,"to":1768986138000}},"id":"#90"}
+doc.deleted {"changes":{"deleted_at":{"from":null,"to":1768986139000}},"id":"#83"}
+doc.deleted {"changes":{"deleted_at":{"from":null,"to":1768986140000}},"id":"#87"}
+doc.restored {"changes":{"deleted_at":{"from":null,"to":null}},"row":{"id":"#87","parent_id":"#85","kind":"row","title":"Sword","props":{"#86":"edge"},"rank":"00000000sg","created_by":"#3","created_at":1768986129000,"updated_by":"#3","updated_at":1768986130000,"created_seq":159,"updated_seq":174,"content_seq":159}}
+task.updated {"changes":{"label_ids":{"from":["#20","#21"],"to":["#20"]}},"id":"#28","key":"SVA-1"}
+label.deleted {"changes":{"deleted_at":{"from":null,"to":1768986142000}},"id":"#21"}
+task.updated {"changes":{"milestone_id":{"from":"#23","to":null}},"id":"#28","key":"SVA-1"}
+milestone.deleted {"changes":{"deleted_at":{"from":null,"to":1768986143000}},"id":"#23"}
+task.updated {"changes":{"epic_id":{"from":"#22","to":null}},"id":"#28","key":"SVA-1"}
+epic.deleted {"changes":{"deleted_at":{"from":null,"to":1768986144000}},"id":"#22"}
+status.deleted {"changes":{"deleted_at":{"from":null,"to":1768986145000}},"id":"#19"}
+cycle.deleted {"changes":{"deleted_at":{"from":null,"to":1768986146000}},"id":"#24"}
+template.deleted {"changes":{"deleted_at":{"from":null,"to":1768986147000}},"id":"#25"}
+view.deleted {"changes":{"deleted_at":{"from":null,"to":1768986148000}},"id":"#26"}
+preference.deleted {"changes":{"deleted_at":{"from":null,"to":1768986149000}},"id":"#27"}
+rule.deleted {"changes":{"deleted_at":{"from":null,"to":1768986150000}},"id":"#63"}
+project.created {"row":{"id":"#91","workspace_id":"#1","key":"GS","name":"Getting started","rank":"r","created_by":"#3","created_at":1768986151000,"updated_seq":187}}
+status.created {"row":{"id":"#92","project_id":"#91","name":"Backlog","color":"#9ca3af","category":"backlog","rank":"00000000sg","updated_seq":188}}
+status.created {"row":{"id":"#93","project_id":"#91","name":"Todo","color":"#6b7280","category":"unstarted","rank":"00000001kw","is_default":true,"updated_seq":189}}
+status.created {"row":{"id":"#94","project_id":"#91","name":"In Progress","color":"#f59e0b","category":"started","rank":"00000002dc","updated_seq":190}}
+status.created {"row":{"id":"#95","project_id":"#91","name":"Done","color":"#10b981","category":"done","rank":"000000035s","updated_seq":191}}
+status.created {"row":{"id":"#96","project_id":"#91","name":"Canceled","color":"#ef4444","category":"canceled","rank":"00000003y8","updated_seq":192}}
+label.created {"row":{"id":"#97","project_id":"#91","name":"Sample","color":"#9a6bff","updated_seq":193}}
+task.created {"row":{"id":"#98","project_id":"#91","number":1,"key":"GS-1","title":"Open this task and leave a comment","status_id":"#93","priority":0,"assignee_id":"#3","label_ids":["#97"],"rank":"00000000sg","created_by":"#3","created_at":1768986151000,"updated_at":1768986151000,"created_seq":194,"updated_seq":194,"activity_seq":194}}
+task.created {"row":{"id":"#99","project_id":"#91","number":2,"key":"GS-2","title":"Write a page in Docs about what you are working on","status_id":"#93","priority":0,"assignee_id":"#3","label_ids":["#97"],"rank":"00000001kw","created_by":"#3","created_at":1768986151000,"updated_at":1768986151000,"created_seq":195,"updated_seq":195,"activity_seq":195}}
+task.created {"row":{"id":"#100","project_id":"#91","number":3,"key":"GS-3","title":"Say hello and tell Aram what you can do","status_id":"#93","priority":0,"assignee_id":"#2","asked_by":"#3","label_ids":["#97"],"rank":"00000002dc","created_by":"#3","created_at":1768986151000,"updated_at":1768986151000,"created_seq":196,"updated_seq":196,"activity_seq":196}}
+notification.created {"row":{"id":"#101","user_id":"#2","seq":197,"type":"assigned","actor_id":"#3","task_id":"#100","entity_type":"task","entity_id":"#100","title":"GS-3 Say hello and tell Aram what you can do","created_at":1768986151000,"addressed":true}}
+project.updated {"changes":{"samples":{"from":null,"to":["#98","#99","#100"]}},"id":"#91"}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1768986152000}},"deleted":true,"id":"#98","key":"GS-1"}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1768986152000}},"deleted":true,"id":"#99","key":"GS-2"}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1768986152000}},"deleted":true,"id":"#100","key":"GS-3"}
+project.deleted {"changes":{"deleted_at":{"from":null,"to":1768986152000}},"id":"#91","key":"GS"}
+project.deleted {"changes":{"deleted_at":{"from":null,"to":1768986153000}},"id":"#13","key":"OPS"}
+task.created {"row":{"id":"#102","project_id":"#5","number":5,"key":"SVA-5","title":"Restored","status_id":"#7","priority":0,"rank":"00000003y8","created_by":"#3","created_at":1768986154000,"updated_at":1768986154000,"created_seq":204,"updated_seq":204,"activity_seq":204}}
+task.created {"row":{"id":"#103","project_id":"#5","number":6,"key":"SVA-6","title":"Thrown away","status_id":"#7","priority":0,"rank":"00000004qo","created_by":"#3","created_at":1768986155000,"updated_at":1768986155000,"created_seq":205,"updated_seq":205,"activity_seq":205}}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1768986156000}},"deleted":true,"id":"#103","key":"SVA-6"}
+task.restored {"from_backup":true,"key":"SVA-5","row":{"id":"#102","project_id":"#5","number":5,"key":"SVA-5","title":"Restored","status_id":"#7","priority":0,"rank":"00000003y8","created_by":"#3","created_at":1768986154000,"updated_at":1768986154000,"created_seq":204,"updated_seq":207,"activity_seq":207}}
+doc.restored {"from_backup":true,"row":{"id":"#73","kind":"page","title":"The plan","project_id":"#13","rank":"00000000sg","created_by":"#3","created_at":1768986107000,"updated_by":"#3","updated_at":1768986125000,"created_seq":134,"updated_seq":208,"content_seq":209}}
+doc.edited {"blocks":[{"id":"#72","doc_id":"#73","rank":"00000000sg","type":"heading","props":{"level":1},"content":[{"type":"text","text":"Plan"}],"created_by":"#3","updated_by":"#3","created_seq":134,"updated_seq":209},{"id":"#74","doc_id":"#73","rank":"00000001kw","type":"paragraph","content":[{"type":"text","text":"First para."}],"created_by":"#3","updated_by":"#3","created_seq":134,"updated_seq":209}],"changes":{"content_seq":{"from":null,"to":209}},"deleted":["#76","#78"],"from_backup":true,"id":"#73"}
+task.deleted {"gone":true,"id":"#98"}
+task.deleted {"gone":true,"id":"#99"}
+task.deleted {"gone":true,"id":"#100"}
 task.deleted {"gone":true,"id":"#103"}
-task.deleted {"gone":true,"id":"#106"}
-doc.deleted {"gone":true,"id":"#85"}
-notification.updated {"changes":{"archived_at":{"from":null,"to":1774170162000},"read_at":{"from":null,"to":1774170162000}},"ids":["#31","#33","#41","#49","#51","#55","#57","#70"]}
-notification.updated {"changes":{"archived_at":{"from":null,"to":0}},"ids":["#31","#33","#41","#49","#51","#55","#57","#70"]}
-epic.created {"row":{"id":"#107","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170164000,"updated_at":1774170164000,"updated_seq":220}}
-milestone.created {"row":{"id":"#108","epic_id":"#107","name":"Beta","rank":"00000000sg","created_at":1774170165000,"updated_seq":221}}
-cycle.created {"row":{"id":"#109","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170166000,"updated_seq":222}}
-epic.deleted {"changes":{"deleted_at":{"from":null,"to":1774170167000}},"id":"#107"}
-milestone.deleted {"changes":{"deleted_at":{"from":null,"to":1774170168000}},"id":"#108"}
-cycle.deleted {"changes":{"deleted_at":{"from":null,"to":1774170169000}},"id":"#109"}
-epic.restored {"row":{"id":"#107","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170164000,"updated_at":1774170164000,"updated_seq":226}}
-milestone.restored {"row":{"id":"#108","epic_id":"#107","name":"Beta","rank":"00000000sg","created_at":1774170165000,"updated_seq":227}}
-cycle.restored {"row":{"id":"#109","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170166000,"updated_seq":228}}
-task.created {"row":{"id":"#110","project_id":"#5","number":7,"key":"SVA-7","title":"Made by mistake","status_id":"#7","priority":0,"assignee_id":"#2","asked_by":"#3","rank":"00000005j4","created_by":"#3","created_at":1774170173000,"updated_at":1774170173000,"created_seq":229,"updated_seq":229,"activity_seq":229}}
-notification.created {"row":{"id":"#111","user_id":"#2","seq":230,"type":"assigned","actor_id":"#3","task_id":"#110","entity_type":"task","entity_id":"#110","title":"SVA-7 Made by mistake","created_at":1774170173000,"addressed":true}}
-notification.deleted {"gone":true,"id":"#111","undoes":"#112"}
-task.updated {"changes":{"deleted_at":{"from":0,"to":1774170174000}},"deleted":true,"id":"#110","key":"SVA-7","undoes":"#112"}
-doc.created {"blocks":[{"id":"#113","doc_id":"#114","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has three phases."}],"created_by":"#3","updated_by":"#3","created_seq":233,"updated_seq":233}],"row":{"id":"#114","kind":"page","title":"Notes","rank":"y","created_by":"#3","created_at":1774170175000,"updated_by":"#3","updated_at":1774170175000,"created_seq":233,"updated_seq":233,"content_seq":233}}
-comment.created {"row":{"id":"#115","doc_id":"#114","subject_type":"doc_block","subject_id":"#113","kind":"comment","author_id":"#3","body":"Four?","quote":"three phases","created_at":1774170176000,"created_seq":234,"updated_seq":234}}
-doc.edited {"blocks":[{"id":"#113","doc_id":"#114","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has "},{"type":"text","text":"three phases","styles":{"comment":"#115"}},{"type":"text","text":"."}],"created_by":"#3","updated_by":"#3","created_seq":233,"updated_seq":235}],"changes":{"content_seq":{"from":null,"to":235}},"deleted":null,"id":"#114"}
-comment.updated {"changes":{"detached_at":{"from":0,"to":1774170177000},"subject_id":{"from":"#113","to":"#114"},"subject_type":{"from":"doc_block","to":"doc"}},"id":"#115","key":""}
-doc.edited {"blocks":[{"id":"#113","doc_id":"#114","rank":"00000000sg","type":"paragraph","content":"The boss is gone.","created_by":"#3","updated_by":"#3","created_seq":233,"updated_seq":237}],"changes":{"content_seq":{"from":null,"to":237},"updated_at":{"from":null,"to":1774170177000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#114"}
-comment.updated {"changes":{"detached_at":{"from":1774170177000,"to":0},"subject_id":{"from":"#114","to":"#113"},"subject_type":{"from":"doc","to":"doc_block"}},"id":"#115","key":""}
-doc.edited {"blocks":[{"id":"#113","doc_id":"#114","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has "},{"type":"text","text":"three phases","styles":{"comment":"#115"}},{"type":"text","text":"."}],"created_by":"#3","updated_by":"#3","created_seq":233,"updated_seq":239}],"changes":{"content_seq":{"from":null,"to":239},"updated_at":{"from":null,"to":1774170178000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#114"}
-comment.deleted {"changes":{"deleted_at":{"from":null,"to":1774170179000}},"id":"#115","key":""}
-doc.edited {"blocks":[{"id":"#113","doc_id":"#114","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has three phases."}],"created_by":"#3","updated_by":"#3","created_seq":233,"updated_seq":241}],"changes":{"content_seq":{"from":null,"to":241}},"deleted":null,"id":"#114"}
+doc.deleted {"gone":true,"id":"#83"}
+notification.updated {"changes":{"archived_at":{"from":null,"to":1774170162000},"read_at":{"from":null,"to":1774170162000}},"ids":["#29","#31","#39","#47","#49","#53","#55","#68"]}
+notification.updated {"changes":{"archived_at":{"from":null,"to":0}},"ids":["#29","#31","#39","#47","#49","#53","#55","#68"]}
+epic.created {"row":{"id":"#104","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170164000,"updated_at":1774170164000,"updated_seq":217}}
+milestone.created {"row":{"id":"#105","epic_id":"#104","name":"Beta","rank":"00000000sg","created_at":1774170165000,"updated_seq":218}}
+cycle.created {"row":{"id":"#106","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170166000,"updated_seq":219}}
+epic.deleted {"changes":{"deleted_at":{"from":null,"to":1774170167000}},"id":"#104"}
+milestone.deleted {"changes":{"deleted_at":{"from":null,"to":1774170168000}},"id":"#105"}
+cycle.deleted {"changes":{"deleted_at":{"from":null,"to":1774170169000}},"id":"#106"}
+epic.restored {"row":{"id":"#104","project_id":"#5","name":"Stealth","state":"planned","rank":"i","created_by":"#3","created_at":1774170164000,"updated_at":1774170164000,"updated_seq":223}}
+milestone.restored {"row":{"id":"#105","epic_id":"#104","name":"Beta","rank":"00000000sg","created_at":1774170165000,"updated_seq":224}}
+cycle.restored {"row":{"id":"#106","project_id":"#5","number":4,"starts_on":"2027-01-04","ends_on":"2027-01-10","created_at":1774170166000,"updated_seq":225}}
+task.created {"row":{"id":"#107","project_id":"#5","number":7,"key":"SVA-7","title":"Made by mistake","status_id":"#7","priority":0,"assignee_id":"#2","asked_by":"#3","rank":"00000005j4","created_by":"#3","created_at":1774170173000,"updated_at":1774170173000,"created_seq":226,"updated_seq":226,"activity_seq":226}}
+notification.created {"row":{"id":"#108","user_id":"#2","seq":227,"type":"assigned","actor_id":"#3","task_id":"#107","entity_type":"task","entity_id":"#107","title":"SVA-7 Made by mistake","created_at":1774170173000,"addressed":true}}
+notification.deleted {"gone":true,"id":"#108","undoes":"#109"}
+task.updated {"changes":{"deleted_at":{"from":0,"to":1774170174000}},"deleted":true,"id":"#107","key":"SVA-7","undoes":"#109"}
+doc.created {"blocks":[{"id":"#110","doc_id":"#111","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has three phases."}],"created_by":"#3","updated_by":"#3","created_seq":230,"updated_seq":230}],"row":{"id":"#111","kind":"page","title":"Notes","rank":"y","created_by":"#3","created_at":1774170175000,"updated_by":"#3","updated_at":1774170175000,"created_seq":230,"updated_seq":230,"content_seq":230}}
+comment.created {"row":{"id":"#112","doc_id":"#111","subject_type":"doc_block","subject_id":"#110","kind":"comment","author_id":"#3","body":"Four?","quote":"three phases","created_at":1774170176000,"created_seq":231,"updated_seq":231}}
+doc.edited {"blocks":[{"id":"#110","doc_id":"#111","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has "},{"type":"text","text":"three phases","styles":{"comment":"#112"}},{"type":"text","text":"."}],"created_by":"#3","updated_by":"#3","created_seq":230,"updated_seq":232}],"changes":{"content_seq":{"from":null,"to":232}},"deleted":null,"id":"#111"}
+comment.updated {"changes":{"detached_at":{"from":0,"to":1774170177000},"subject_id":{"from":"#110","to":"#111"},"subject_type":{"from":"doc_block","to":"doc"}},"id":"#112","key":""}
+doc.edited {"blocks":[{"id":"#110","doc_id":"#111","rank":"00000000sg","type":"paragraph","content":"The boss is gone.","created_by":"#3","updated_by":"#3","created_seq":230,"updated_seq":234}],"changes":{"content_seq":{"from":null,"to":234},"updated_at":{"from":null,"to":1774170177000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#111"}
+comment.updated {"changes":{"detached_at":{"from":1774170177000,"to":0},"subject_id":{"from":"#111","to":"#110"},"subject_type":{"from":"doc","to":"doc_block"}},"id":"#112","key":""}
+doc.edited {"blocks":[{"id":"#110","doc_id":"#111","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has "},{"type":"text","text":"three phases","styles":{"comment":"#112"}},{"type":"text","text":"."}],"created_by":"#3","updated_by":"#3","created_seq":230,"updated_seq":236}],"changes":{"content_seq":{"from":null,"to":236},"updated_at":{"from":null,"to":1774170178000},"updated_by":{"from":null,"to":"#3"}},"deleted":null,"id":"#111"}
+comment.deleted {"changes":{"deleted_at":{"from":null,"to":1774170179000}},"id":"#112","key":""}
+doc.edited {"blocks":[{"id":"#110","doc_id":"#111","rank":"00000000sg","type":"paragraph","content":[{"type":"text","text":"The boss has three phases."}],"created_by":"#3","updated_by":"#3","created_seq":230,"updated_seq":238}],"changes":{"content_seq":{"from":null,"to":238}},"deleted":null,"id":"#111"}
 workspace.deleted {"gone":true,"id":"#1","slug":"events"}

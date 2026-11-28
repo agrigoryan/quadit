@@ -52,7 +52,7 @@ func (c *cx) afterTaskText(t core.Task) error {
 // stampStatus keeps the lifecycle times in step with the status category.
 func stampStatus(started, completed, canceled *int64, category string, at int64) {
 	switch category {
-	case core.CatStarted, core.CatWaiting:
+	case core.CatStarted:
 		if *started == 0 {
 			*started = at
 		}

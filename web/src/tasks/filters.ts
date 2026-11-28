@@ -201,7 +201,8 @@ export function fromQuery(q: TaskQuery | undefined, c: QuerySource): Filters {
 /**
  * What a stored query (one that normalizeQuery has been over) has to lose to
  * be good again: the values fromQuery finds nothing for, because the label,
- * status, epic or cycle was deleted or the person is no longer here. The
+ * status, epic or cycle was deleted, the person is no longer here, or the
+ * status type is no more (waiting). The
  * server refuses a list for a view that names one. Returns the fields to
  * write over the query, each with the values that are left (undefined when
  * none is), or null when nothing is gone.

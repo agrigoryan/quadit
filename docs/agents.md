@@ -445,7 +445,7 @@ API paths are under `/api/v1/w/-/`; the `-` means "the workspace of this token".
 ```
 invalid: project SVA has no status "In Progres"
   did you mean: In Progress
-  allowed: Backlog, Todo, In Progress, Waiting, Done, Canceled
+  allowed: Backlog, Todo, In Progress, Done, Canceled
 ```
 
 - A few refusals of the same code say which they are in `reason`, beside `code`, `message` and `field` in the error's JSON: `in_use` (an id, key or name asked for is already someone else's) and `number_taken` (the task number asked for is another task's). Act on the reason, not on the words of the message.

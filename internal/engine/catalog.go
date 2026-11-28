@@ -27,9 +27,10 @@ type ChangeInfo struct {
 // Surface is the version of what agents are built against: the change
 // types and their arguments, the API's paths, the MCP tools and the
 // command-line tool's commands. Within a major version things are only
-// added; anything removed or renamed raises the major version. A test holds
-// the code to this (see testdata/surface.txt).
-const Surface = "2.0"
+// added; anything removed or renamed, a value an argument took among them,
+// raises the major version. A test holds the names to this (see
+// testdata/surface.txt); a value is held to it by whoever removes it.
+const Surface = "3.0"
 
 // Catalog lists every change the engine accepts with its arguments. The
 // OpenAPI document, the MCP tool list and the command help are made from it.

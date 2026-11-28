@@ -12,8 +12,8 @@
 // server adds or changes fails the type check until it is written here.
 // Nothing here imports from outside this folder.
 
-export type Category = "backlog" | "unstarted" | "started" | "waiting" | "done" | "canceled";
-export const CATEGORIES: Category[] = ["backlog", "unstarted", "started", "waiting", "done", "canceled"];
+export type Category = "backlog" | "unstarted" | "started" | "done" | "canceled";
+export const CATEGORIES: Category[] = ["backlog", "unstarted", "started", "done", "canceled"];
 export const isOpenCategory = (c: Category | undefined) => c !== "done" && c !== "canceled";
 /** A task in a status of this category is finished, one way or the other. */
 export const isClosedCategory = (c: Category | undefined) => !isOpenCategory(c);

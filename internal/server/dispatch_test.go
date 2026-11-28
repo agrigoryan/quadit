@@ -216,6 +216,35 @@ func TestWatchedView(t *testing.T) {
 	})
 }
 
+// TestAWatchedViewOnTheWaitingTypeStillWatchesTheRest: a watched view saved
+// with the type waiting, there no more, is read as it is opened: that part
+// is left out, and a task coming into what is left is still announced.
+func TestAWatchedViewOnTheWaitingTypeStillWatchesTheRest(t *testing.T) {
+	t.Parallel()
+	testdb.Each(t, func(t *testing.T, st store.Store) {
+		s := newSite(t, st)
+		s.change(t, s.owner, "", "project.create", M{"key": "SVA", "name": "Samurai vs Alien"})
+		s.change(t, s.owner, "", "agent.create", M{"name": "Artist", "handle": "artist"})
+		var tok struct{ Token string }
+		s.call(t, s.owner, "", "POST", w+"/tokens", M{"user": "@artist"}, 201, &tok)
+		view := s.change(t, nil, tok.Token, "view.create", M{"name": "Waiting or done", "query": M{"category": []string{"done"}}})["ref"].(string)
+		if _, err := st.Update(t.Context(), "views", M{"query": []byte(`{"category":["waiting","done"]}`)}, store.Eq("id", view)); err != nil {
+			t.Fatal(err)
+		}
+		s.change(t, nil, tok.Token, "watch.set", M{"type": "view", "subject": view})
+		inbox := func() string { return s.call(t, nil, tok.Token, "GET", "/api/v1/w/-/inbox?format=text", nil, 200, nil) }
+
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss fight"})
+		s.change(t, s.owner, "", "task.create", M{"project": "SVA", "title": "Boss music", "status": "Done"})
+		eventually(t, "the view's watcher to hear of the done task", func() bool {
+			return strings.Contains(inbox(), `SVA-2 Boss music — in your view "Waiting or done"`)
+		})
+		if strings.Contains(inbox(), "SVA-1") {
+			t.Fatalf("a task outside the view was announced:\n%s", inbox())
+		}
+	})
+}
+
 // TestAFailingWebhookDoesNotHoldUpTheOthers: one webhook that cannot be
 // reached, with a backlog of thousands, takes nothing from another's queue.
 func TestAFailingWebhookDoesNotHoldUpTheOthers(t *testing.T) {

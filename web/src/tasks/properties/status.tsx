@@ -118,7 +118,7 @@ export const status = {
             .filter((s) => s.project_id === projectId)
             .sort((a, b) => (a.rank < b.rank ? -1 : 1))
             .map((s) => ({ id: s.id, title: s.name, value: s.id, category: s.category }))
-        : // Several projects: their statuses differ, the six categories do not.
+        : // Several projects: their statuses differ, the five categories do not.
           CATEGORIES.map((cat) => ({ id: cat, title: tMaybe(`category.${cat}`), value: cat, category: cat })),
     place: (task, c, has) =>
       has(task.status_id) ? [task.status_id] : [c.statuses[task.status_id]?.category ?? "backlog"],

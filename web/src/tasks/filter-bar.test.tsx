@@ -115,7 +115,7 @@ describe("FilterBar", () => {
   it.each([
     ["Assignee", ["Me", "Coder", "Unassigned"], "Coder", { assignee: ["u2"] }],
     ["Status", ["Todo", "Doing"], "Doing", { status: ["s2"] }],
-    ["Status type", ["Backlog", "To do", "In progress", "Waiting", "Done", "Canceled"], "Done", { category: ["done"] }],
+    ["Status type", ["Backlog", "To do", "In progress", "Done", "Canceled"], "Done", { category: ["done"] }],
     ["Label", ["bug", "Manage labels"], "bug", { label: ["l1"] }],
     ["Priority", ["No priority", "Urgent", "High", "Medium", "Low"], "Low", { priority: [4] }],
     ["Epic", ["No epic", "Launch"], "No epic", { epic: ["none"] }],

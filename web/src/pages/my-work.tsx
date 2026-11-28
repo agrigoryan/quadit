@@ -16,7 +16,7 @@ import { DecisionMark } from "@/ui/icons";
 import { Ago } from "@/ui/ago";
 
 /** What is being worked on comes first, then what is next, then the rest. */
-const CATEGORY_ORDER: Category[] = ["started", "waiting", "unstarted", "backlog"];
+const CATEGORY_ORDER: Category[] = ["started", "unstarted", "backlog"];
 const categoryRank = (c: Category | undefined) => {
   const i = c ? CATEGORY_ORDER.indexOf(c) : -1;
   return i < 0 ? CATEGORIES.length : i;

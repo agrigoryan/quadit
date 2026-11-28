@@ -26,9 +26,9 @@ func category(name string) string {
 		return core.CatCanceled
 	case has("done", "complete", "closed", "shipped", "merged"):
 		return core.CatDone
-	case has("wait", "blocked", "hold"):
-		return core.CatWaiting
-	case has("progress", "doing", "review", "started"):
+	case has("progress", "doing", "review", "started", "wait", "blocked", "hold"):
+		// A task waiting or blocked is one that has started; who it waits on
+		// is its waiting_on.
 		return core.CatStarted
 	case has("backlog", "icebox", "triage", "someday"):
 		return core.CatBacklog

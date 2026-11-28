@@ -34,13 +34,12 @@ type projectCreateArgs struct {
 	Settings    *core.ProjectSettings `json:"settings"`
 }
 
-// defaultStatuses is what a new project starts with. "Waiting" is its own
-// category so "who has the next move" is visible on every board.
+// defaultStatuses is what a new project starts with. Who has the next move
+// on a task is its waiting_on, shown on every board, not a status.
 var defaultStatuses = []struct{ name, category, color string }{
 	{"Backlog", core.CatBacklog, "#9ca3af"},
 	{"Todo", core.CatUnstarted, "#6b7280"},
 	{"In Progress", core.CatStarted, "#f59e0b"},
-	{"Waiting", core.CatWaiting, "#8b5cf6"},
 	{"Done", core.CatDone, "#10b981"},
 	{"Canceled", core.CatCanceled, "#ef4444"},
 }

@@ -20,8 +20,10 @@ import (
 //
 // A name that finds nothing is refused, with the names allowed and the
 // nearest one. The exception is a query read from a saved view (q.SavedAs):
-// a status, label or epic deleted since the view was saved is left out, and
-// stale says so in words for whoever opened the view; it is "" otherwise.
+// a status, label or epic deleted since the view was saved is left out, as
+// are its categories there are no more (q.GoneCategories, set apart when
+// the view was read), and stale says so in words for whoever opened the
+// view; it is "" otherwise.
 //
 // The same reading is made when a view is saved and when it is opened, when
 // a list is asked by URL and when the feed is narrowed to some tasks: this
@@ -74,6 +76,9 @@ func (r *Resolver) TaskFilter(q core.TaskQuery, readable []string) (f store.Task
 		if !core.ValidCategory(category) {
 			return f, "", &Error{Code: CodeInvalid, Field: "category", Message: "unknown category " + strconv.Quote(category), Allowed: core.Categories}
 		}
+	}
+	if len(q.GoneCategories) > 0 {
+		gone("a status type")
 	}
 	if q.Open != nil {
 		if *q.Open {

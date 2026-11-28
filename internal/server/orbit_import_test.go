@@ -146,7 +146,7 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 		// The project is new here, so its workflow is exactly Orbit's: every
 		// status, used by a task or not, in Orbit's order, each of the right
 		// kind; the statuses a new project starts with that Orbit does not
-		// have ("Waiting", "Canceled") are gone, and new tasks still start
+		// have ("Canceled") are gone, and new tasks still start
 		// in "Todo".
 		var lay struct {
 			Statuses []struct {
@@ -169,7 +169,7 @@ func TestImportFromOrbitAsItAnswers(t *testing.T) {
 				starts += st.Name
 			}
 		}
-		const want = "Backlog (backlog), Parked (unstarted), Todo (unstarted), In Progress (started), Waiting on you (waiting), Done (done), Cancelled (canceled), Duplicate (canceled), " //nolint:misspell // the name Orbit gave the status, kept
+		const want = "Backlog (backlog), Parked (unstarted), Todo (unstarted), In Progress (started), Waiting on you (started), Done (done), Cancelled (canceled), Duplicate (canceled), " //nolint:misspell // the name Orbit gave the status, kept
 		if all != want || starts != "Todo" {
 			t.Fatalf("the workflow:\n got %s\nwant %s\nnew tasks start in %q", all, want, starts)
 		}

@@ -57,7 +57,7 @@ function SingleDialog({ draft, onMany }: { draft: NewTaskDraft; onMany: () => vo
       const template = getRow("templates", patch.templateId);
       if (template?.title && !title.trim()) setTitle(template.title);
       if (template?.description && !description.trim()) setDescription(template.description);
-      patch = { ...presetOf(template, project), ...patch };
+      patch = { ...presetOf(template, project, fields), ...patch };
     }
     changeFields(patch);
   }

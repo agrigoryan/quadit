@@ -31,7 +31,7 @@ var tools = []tool{
 	{Name: "whoami", Desc: "Who am I: role, projects, what needs approval, hand-off limit, unread count, feed position. Call first in a session.", Run: readPathTool("/me")},
 	{Name: "my_work", Desc: "What waits on me, questions asked of me, tasks assigned to me, and my unread inbox. One line each.", Run: readPathTool("/my-work")},
 	{Name: "tasks", Desc: "Find tasks. All filters combine. Returns one line per task; count=true returns only the number.",
-		Props: map[string]arg{"project": text("project key"), "assignee": text("me, @handle or none"), "status": text("status name or category (backlog, unstarted, started, waiting, done, canceled)"),
+		Props: map[string]arg{"project": text("project key"), "assignee": text("me, @handle or none"), "status": text("status name or category (backlog, unstarted, started, done, canceled)"),
 			"open": flag("true for not done and not canceled"), "waiting_on": text("me or @handle"), "label": text("label name"), "epic": text("epic name, or none"), "cycle": textOrInteger("current, next, a number, or none"),
 			"priority": textOrInteger("1 urgent, 2 high, 3 medium, 4 low"), "estimate": textOrInteger("points, a T-shirt size (M) or none; comma-separated for any of them"), "has_open_decision": flag("true"), "asked": text("tasks with an open question asked of this member"),
 			"changed_since": integer("feed position: tasks with any activity after it"), "mentions": text("me or @handle"), "q": text("text in the title"), "parent": text("task key"),

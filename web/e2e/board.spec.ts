@@ -145,7 +145,16 @@ test("a status whose only task is in the trash is deleted once its tasks have a 
 
 // The mouse path. Each drag is a hand's: small steps a frame apart, so the
 // card passes over the columns between, and the drop is where the pointer is.
+// A second started status, Review, stands between In Progress and Done.
 test.describe("dragging cards with the mouse", () => {
+  test.beforeEach(async ({ project, quadit }) => {
+    await quadit.cli(
+      "do",
+      "status.create",
+      JSON.stringify({ project: project.key, name: "Review", category: "started" }),
+    );
+  });
+
   test("a card goes to the column it is dropped in, beside, across several and back to the first", async ({
     page,
     project,
@@ -160,15 +169,15 @@ test.describe("dragging cards with the mouse", () => {
 
     await drag(page, cardIn(page, "Todo", key), () => inColumn(page, "In Progress", 80), "In Progress");
     await expect.poll(async () => (await quadit.task(key)).status).toBe("In Progress");
-    await drag(page, cardIn(page, "In Progress", key), () => inColumn(page, "Waiting", 80), "Waiting");
-    await expect.poll(async () => (await quadit.task(key)).status).toBe("Waiting");
-    await drag(page, cardIn(page, "Waiting", key), () => inColumn(page, "Backlog", 80), "Backlog");
+    await drag(page, cardIn(page, "In Progress", key), () => inColumn(page, "Review", 80), "Review");
+    await expect.poll(async () => (await quadit.task(key)).status).toBe("Review");
+    await drag(page, cardIn(page, "Review", key), () => inColumn(page, "Backlog", 80), "Backlog");
     await expect.poll(async () => (await quadit.task(key)).status).toBe("Backlog");
-    await drag(page, cardIn(page, "Todo", other), () => inColumn(page, "Waiting", 80), "Waiting");
-    await expect.poll(async () => (await quadit.task(other)).status).toBe("Waiting");
+    await drag(page, cardIn(page, "Todo", other), () => inColumn(page, "Review", 80), "Review");
+    await expect.poll(async () => (await quadit.task(other)).status).toBe("Review");
     // Let go below the column's one card, it goes after it.
-    await drag(page, cardIn(page, "Backlog", key), () => inColumn(page, "Waiting", 300), "Waiting");
-    await expect.poll(async () => (await quadit.task(key)).status).toBe("Waiting");
+    await drag(page, cardIn(page, "Backlog", key), () => inColumn(page, "Review", 300), "Review");
+    await expect.poll(async () => (await quadit.task(key)).status).toBe("Review");
     expect(await inRankOrder(quadit, project)).toEqual([other, key]);
     await checkPage();
   });
@@ -176,9 +185,9 @@ test.describe("dragging cards with the mouse", () => {
   // The page used to loop (React's error #185): halfway between two columns the
   // card's neighbour in each column was nearer than the card itself, so it was
   // moved from one to the other and back with every drawing.
-  test("a card from a long Done column lands in Waiting beside it", async ({ page, project, quadit }) => {
+  test("a card from a long Done column lands in Review beside it", async ({ page, project, quadit }) => {
     const checkPage = failOnPageErrors(page);
-    for (let i = 1; i <= 2; i++) await project.newTask(`Ask about ${i}`, "status=Waiting");
+    for (let i = 1; i <= 2; i++) await project.newTask(`Ask about ${i}`, "status=Review");
     const done: string[] = [];
     for (let i = 1; i <= 25; i++) {
       const long = i % 3 === 0 ? ", with a title long enough to wrap onto a second line and more" : "";
@@ -190,8 +199,8 @@ test.describe("dragging cards with the mouse", () => {
     const key = (await top.getAttribute("aria-label"))?.split(" ")[0] ?? "";
     expect(done).toContain(key);
 
-    await drag(page, cardIn(page, "Done", key), () => inColumn(page, "Waiting", 60), "Waiting");
-    await expect.poll(async () => (await quadit.task(key)).status).toBe("Waiting");
+    await drag(page, cardIn(page, "Done", key), () => inColumn(page, "Review", 60), "Review");
+    await expect.poll(async () => (await quadit.task(key)).status).toBe("Review");
     await checkPage();
   });
 

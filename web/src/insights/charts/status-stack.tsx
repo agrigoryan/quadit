@@ -14,7 +14,6 @@ import { Tooltip } from "@/ui/tooltip";
 const STACK: { category: Category; color: string; ink: string }[] = [
   { category: "done", color: "var(--viz-done)", ink: "var(--viz-on)" },
   { category: "started", color: "var(--viz-started)", ink: "var(--viz-on)" },
-  { category: "waiting", color: "var(--viz-waiting)", ink: "var(--viz-on)" },
   { category: "unstarted", color: "var(--viz-todo)", ink: "var(--viz-on)" },
   { category: "backlog", color: "var(--viz-backlog)", ink: "var(--viz-on-backlog)" },
 ];

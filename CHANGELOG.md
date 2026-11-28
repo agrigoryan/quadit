@@ -4,9 +4,28 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+The server upgrades its database when it starts (migration 0033), copying it first; `quadit upgrade --undo` goes back ([upgrades](docs/install.md#upgrades)). It makes every status of the type waiting an ordinary started status, with its name, colour and place kept; no task moves. What named the type elsewhere is rewritten:
+
+- A template's status, and a GitHub integration's `on_open` and `on_merge`, that said `waiting` say `started`, except on a row of one project that has a status called Waiting, which it meant and still means.
+- A rule on a move into the type (`to_category: waiting`) is set to started and turned off, for an admin to look at again.
+- The feed's events of statuses say started.
+
+Saved views are left as they are. One that filtered on the Waiting type (`category: waiting`, or a status word `waiting` where no status is called Waiting) shows a note and drops that part of its filter when it is opened, like a filter on a deleted status, and the web app offers to save it without; edit such a view to name the statuses you want.
+
+Everything that already asked for started now takes in the statuses that were waiting too: an active rule on a move into started fires on a move into one of them, and a saved view, a list or a count of started tasks includes their tasks.
+
 ### Added
 
 - Picking yourself in a filter (Assignee, Waiting on) is "Me" in the list, and the page's address and a view saved from it say `me`: a shared view shows each person their own. Views saved before with your name keep it.
+
+### Changed
+
+- A new project, the Getting started samples among them, starts with Backlog, Todo, In Progress, Done and Canceled: there is no Waiting status.
+- An import makes a status named like waiting, blocked or on hold (Orbit's "Waiting on you" among them) a started status, with its name.
+
+### Removed
+
+- **Breaking for API users:** the status type `waiting` is gone. The types are `backlog`, `unstarted`, `started`, `done` and `canceled`, as in Linear; who a task waits on stays its `waiting_on`. `category=waiting` (the task list, the feed, saving a view, `quadit tasks`, the MCP `tasks` tool), `status.create` and `status.update` with `"category": "waiting"`, and a rule's `"match": {"to_category": "waiting"}` are refused as `invalid`, with the types allowed. A status word `waiting` (`status=waiting`) names only a status called that. The agent surface is 3.0.
 
 ## [0.9.0] - 2026-11-27
 

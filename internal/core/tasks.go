@@ -130,6 +130,38 @@ type TaskQuery struct {
 	// noted, where a query asked afresh is refused. It is not part of the
 	// query as stored.
 	SavedAs string `json:"-"`
+	// GoneCategories are the categories the saved view was stored with that
+	// are no more (waiting, before schema version 33): left out of Category
+	// and noted. Only a view's own query has them (View.TaskQuery); a
+	// category asked for afresh is refused.
+	GoneCategories []string `json:"-"`
+}
+
+// TaskQuery reads the view's stored query as it is run: with the view's
+// project when the query names none, marked as saved (SavedAs), and with
+// the categories there are no more set apart (GoneCategories). It fails
+// when the stored query does not read as one.
+func (v View) TaskQuery() (TaskQuery, error) {
+	var q TaskQuery
+	if len(v.Query) > 0 {
+		if err := json.Unmarshal(v.Query, &q); err != nil {
+			return q, err
+		}
+	}
+	if v.ProjectID != "" && len(q.Project) == 0 {
+		q.Project = []string{v.ProjectID}
+	}
+	q.SavedAs = v.Slug
+	kept := q.Category[:0:0]
+	for _, category := range q.Category {
+		if ValidCategory(category) {
+			kept = append(kept, category)
+		} else {
+			q.GoneCategories = append(q.GoneCategories, category)
+		}
+	}
+	q.Category = kept
+	return q, nil
 }
 
 // Task link kinds.

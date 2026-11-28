@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -189,14 +188,15 @@ func (s *Server) viewNews(ctx context.Context, ws core.Workspace, vw core.Watche
 	if there, err := store.Find(ctx, db, &m, store.Eq("user_id", vw.UserID), store.Null("removed_at")); err != nil || !there {
 		return err
 	}
-	q, ok := viewQuery(view)
-	if !ok {
-		return nil
+	// Read as it is opened: what it names that is gone is left out.
+	q, err := view.TaskQuery()
+	if err != nil {
+		return nil //nolint:nilerr // a view whose query does not read has nothing to watch
 	}
 	// Run the view's query as the watcher, narrowed to this one task.
 	f, _, err := s.viewerFor(ws, m).taskFilter(ctx, q)
 	if _, refused := errors.AsType[*engine.Error](err); refused {
-		return nil // the view names something that is gone, or out of the watcher's reach: nothing to watch
+		return nil // the view cannot be run for the watcher (it names what they may not reach): nothing to watch
 	}
 	if err != nil {
 		return err
@@ -212,21 +212,6 @@ func (s *Server) viewNews(ctx context.Context, ws core.Workspace, vw core.Watche
 		}
 		return sys.Do("notify", map[string]any{"user": vw.UserID, "task": ev.ScopeID, "message": "in your view \"" + view.Name + "\""})
 	})
-}
-
-// viewQuery reads a saved view's query, with the view's project when the
-// query names none. It reports false when the query does not read.
-func viewQuery(view core.View) (core.TaskQuery, bool) {
-	var q core.TaskQuery
-	if len(view.Query) > 0 {
-		if err := json.Unmarshal(view.Query, &q); err != nil {
-			return q, false
-		}
-	}
-	if view.ProjectID != "" && len(q.Project) == 0 {
-		q.Project = []string{view.ProjectID}
-	}
-	return q, true
 }
 
 // typeMatches checks an event type against a list where "task.*" covers a
