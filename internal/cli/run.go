@@ -653,7 +653,7 @@ func runAdd(ctx context.Context, files runFiles, host runHost, fields map[string
 		return refuse(err)
 	}
 	if !tied {
-		idx.Folders = append(idx.Folders, folderTie{Folder: canon, WorkspaceID: me.Workspace.ID, Project: p.Key})
+		idx.Folders = append(idx.Folders, folderTie{Folder: canon, WorkspaceID: me.Workspace.ID, WorkspaceName: me.Workspace.Name, Project: p.Key})
 		if err := idx.write(dir); err != nil {
 			return refuse(fmt.Errorf("added, but the folder could not be tied to %s: %w", me.Workspace.Name, err))
 		}

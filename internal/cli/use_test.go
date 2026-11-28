@@ -29,7 +29,7 @@ func TestUseTiesAFolderToAWorkspace(t *testing.T) {
 			t.Fatalf("use: %d %s", code, said)
 		}
 		idx, _ := readIndex(w.dir)
-		if len(idx.Folders) != 1 || idx.Folders[0] != (folderTie{Folder: w.work, WorkspaceID: acme.ID, Project: "WEB"}) {
+		if len(idx.Folders) != 1 || idx.Folders[0] != (folderTie{Folder: w.work, WorkspaceID: acme.ID, WorkspaceName: "Acme", Project: "WEB"}) {
 			t.Fatalf("the ties are %+v", idx.Folders)
 		}
 		c, err := choose(t, workspaceAsk{})

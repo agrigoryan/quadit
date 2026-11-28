@@ -298,9 +298,9 @@ func TestLogoutTakesAwayOneConnection(t *testing.T) {
 		}
 		c, err := choose(t, workspaceAsk{})
 		is(t, c, err, a)
-		// The site folder is still Acme's, which other tools may work in: here its commands are refused.
+		// The site folder is still Acme's, which other tools may work in: here its commands are refused, naming it.
 		t.Chdir(filepath.Join(w.work, "site"))
-		if _, err := choose(t, workspaceAsk{}); err == nil || !strings.HasPrefix(err.Error(), "this folder is tied to "+acme.ID) {
+		if _, err := choose(t, workspaceAsk{}); err == nil || !strings.HasPrefix(err.Error(), "this folder is tied to Acme, where this tool is not connected") {
 			t.Fatalf("a command in the folder of the workspace logged out of: %v", err)
 		}
 	})

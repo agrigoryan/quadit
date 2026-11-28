@@ -125,7 +125,7 @@ func TestAddingAnEntryTiesItsFolderToItsWorkspace(t *testing.T) {
 			t.Fatal(said)
 		}
 		idx, err := readIndex(filepath.Dir(rt.login))
-		if err != nil || len(idx.Folders) != 1 || idx.Folders[0] != (folderTie{Folder: rt.folder, WorkspaceID: fakeWorkspaceID, Project: "SVA"}) {
+		if err != nil || len(idx.Folders) != 1 || idx.Folders[0] != (folderTie{Folder: rt.folder, WorkspaceID: fakeWorkspaceID, WorkspaceName: "Personal", Project: "SVA"}) {
 			t.Fatalf("the ties are %+v (%v)", idx.Folders, err)
 		}
 	})

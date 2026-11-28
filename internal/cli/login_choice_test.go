@@ -160,7 +160,7 @@ func (w *toolWorld) tie(folder string, ws workspaceRef, project string) {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	idx.Folders = append(idx.Folders, folderTie{Folder: folder, WorkspaceID: ws.ID, Project: project})
+	idx.Folders = append(idx.Folders, folderTie{Folder: folder, WorkspaceID: ws.ID, WorkspaceName: ws.Name, Project: project})
 	if err := idx.write(w.dir); err != nil {
 		w.t.Fatal(err)
 	}
@@ -335,7 +335,7 @@ func TestACommandAmongSeveralWorkspacesNeverGuesses(t *testing.T) {
 		w.connected(newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b"))
 		w.tie(w.work, client, "")
 		_, err := choose(t, workspaceAsk{})
-		if err == nil || !strings.HasPrefix(err.Error(), "this folder is tied to "+client.ID+", where this tool is not connected") {
+		if err == nil || !strings.HasPrefix(err.Error(), "this folder is tied to Client, where this tool is not connected") {
 			t.Fatalf("got %v", err)
 		}
 	})
@@ -422,7 +422,7 @@ func TestAToolWithOneLoginIsAskedItsWorkspaceWhenOneIsChosen(t *testing.T) {
 	t.Run("a folder tied to another workspace by another tool is refused", func(t *testing.T) {
 		w.tie(w.work, acme, "")
 		_, err := choose(t, workspaceAsk{})
-		if err == nil || !strings.HasPrefix(err.Error(), "this folder is tied to "+acme.ID+", and this tool works in Personal only") {
+		if err == nil || !strings.HasPrefix(err.Error(), "this folder is tied to Acme, and this tool works in Personal only") {
 			t.Fatalf("got %v", err)
 		}
 	})

@@ -133,7 +133,7 @@ func tie(ctx context.Context, idx connectionIndex, base string, rules folderRule
 		project = me.Projects[i]
 	}
 	idx.Folders = slices.DeleteFunc(idx.Folders, func(f folderTie) bool { return samePath(f.Folder, canon) })
-	idx.Folders = append(idx.Folders, folderTie{Folder: canon, WorkspaceID: c.ws.ID, Project: project})
+	idx.Folders = append(idx.Folders, folderTie{Folder: canon, WorkspaceID: c.ws.ID, WorkspaceName: c.ws.Name, Project: project})
 	if ask.dry {
 		fmt.Fprint(stdout, "would be accepted: ")
 	} else if err := idx.write(filepath.Dir(base)); err != nil {

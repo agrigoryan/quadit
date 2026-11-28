@@ -41,11 +41,13 @@ type connection struct {
 // folderTie ties a folder (absolute, links resolved) and everything under
 // it to a workspace, and optionally to one of its projects (a key; "" for
 // none). It names the workspace, not a login: one tie serves every tool
-// connected there.
+// connected there. WorkspaceName is its name when the tie was made, for
+// what a command says once no connection there is left to name it.
 type folderTie struct {
-	Folder      string `json:"folder"`
-	WorkspaceID string `json:"workspace_id"`
-	Project     string `json:"project"`
+	Folder        string `json:"folder"`
+	WorkspaceID   string `json:"workspace_id"`
+	WorkspaceName string `json:"workspace_name,omitempty"`
+	Project       string `json:"project"`
 }
 
 // indexFile is the index beside the login files in dir.
@@ -113,11 +115,17 @@ func (idx connectionIndex) tieAt(dir string) (folderTie, bool) {
 }
 
 // workspaceName is how a workspace is named in what the command says: its
-// name as some connection of any tool knows it, else its id.
+// name as some connection of any tool knows it, else as a tie to it does,
+// else its id.
 func (idx connectionIndex) workspaceName(workspaceID string) string {
 	for _, c := range idx.Connections {
 		if c.WorkspaceID == workspaceID && c.WorkspaceName != "" {
 			return c.WorkspaceName
+		}
+	}
+	for _, f := range idx.Folders {
+		if f.WorkspaceID == workspaceID && f.WorkspaceName != "" {
+			return f.WorkspaceName
 		}
 	}
 	return workspaceID
