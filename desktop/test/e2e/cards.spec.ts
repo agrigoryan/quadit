@@ -63,12 +63,19 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
         ],
       };
       const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
+      // Claude Code's connection in the workspace the page is over: every call about it names it.
+      const CLAUDE_HERE = { tool: "claude", serverId: "s1", workspaceId: "w1", agentId: "u-claude" };
       (window as unknown as { quaditPages: unknown }).quaditPages = {
         planConnect: async (choice: unknown) => {
           state.planned = [...(state.planned ?? []), choice];
           return { ok: true, plan };
         },
-        applyConnect: async () => ({ ok: true, hint: "" }),
+        applyConnect: async () => ({
+          ok: true,
+          hint: "",
+          connection: { ref: CLAUDE_HERE, workspace: "E2E" },
+          added: false,
+        }),
         connectTarget: async () => {
           state.targets++;
           return {
@@ -82,7 +89,8 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
         connectState: async () => {
           await wait(state.slowMs);
           return {
-            defaultLogin: null,
+            at: { serverId: "s1", workspaceId: "w1" },
+            defaultLogin: [],
             claudePlugin: false,
             cli: {
               found: "/usr/local/bin/quadit",
@@ -105,8 +113,16 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
                 allows: true,
                 skillChangedByHand: false,
                 connected: state.connected
-                  ? { methods: ["cli"], server: "Work", workspace: "E2E", agent: "@claude-code" }
+                  ? {
+                      ref: CLAUDE_HERE,
+                      methods: ["cli"],
+                      server: "Work",
+                      workspace: "E2E",
+                      agent: "@claude-code",
+                      folders: [],
+                    }
                   : null,
+                elsewhere: [],
               },
             ],
           };
@@ -123,8 +139,8 @@ async function open(page: Page, stand: Omit<Stand, "asks" | "targets">) {
           ],
         }),
         pickFolder: async () => ({ path: "/Users/ann/devel/game", shown: "~/devel/game" }),
-        startRunning: async (id: string, project: string, folder: string) => {
-          state.started = [...(state.started ?? []), [id, project, folder]];
+        startRunning: async (ref: { tool: string }, project: string, folder: string) => {
+          state.started = [...(state.started ?? []), [ref.tool, project, folder]];
           const entry = {
             id: "e1",
             project,
@@ -188,7 +204,7 @@ test("an answer equal to the last changes no node of the card: focus and a selec
     .poll(() => page.evaluate(() => (window as unknown as { stand: Stand }).stand.asks), { timeout: 10_000 })
     .toBeGreaterThanOrEqual(asks + 2);
   expect(await page.evaluate(() => document.activeElement?.getAttribute("data-test-mark"))).toBe("copy");
-  await expect(card.locator('[data-test-mark="line"]')).toHaveText("Connect to Quadit K7QX4M");
+  await expect(card.locator('[data-test-mark="line"]')).toHaveText("Connect to Quadit K7QX4M in E2E");
 
   // A selection of the line survives too.
   await page.locator('[data-test-mark="line"]').selectText();
@@ -196,7 +212,7 @@ test("an answer equal to the last changes no node of the card: focus and a selec
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { stand: Stand }).stand.asks), { timeout: 10_000 })
     .toBeGreaterThanOrEqual(selected + 1);
-  expect(await page.evaluate(() => getSelection()?.toString())).toBe("Connect to Quadit K7QX4M");
+  expect(await page.evaluate(() => getSelection()?.toString())).toBe("Connect to Quadit K7QX4M in E2E");
 
   // An answer that changes what it shows changes the card in place: it is the same card.
   await page.evaluate(() => {
@@ -347,7 +363,7 @@ test("a card says what the app does by itself: Connecting, and why it could not"
       "Quadit could not run Claude Code by itself (it took longer than two minutes). Say this in Claude Code instead:",
     ),
   ).toBeVisible({ timeout: 10_000 });
-  await expect(card.getByText("Connect to Quadit K7QX4M")).toBeVisible();
+  await expect(card.getByText("Connect to Quadit K7QX4M in E2E")).toBeVisible();
 });
 
 test("a connected card offers Run by Quadit, chooses a project and a folder in the card, and says what each project does", async ({
@@ -429,7 +445,7 @@ test("a card says nothing of Run by Quadit for a tool Quadit cannot run, nor bef
     stand.runs = { agent: "@claude-code", entries: [] };
     stand.handshake = { state: "waiting", code: "K7QX4M" };
   });
-  await expect(card.getByText("Connect to Quadit K7QX4M")).toBeVisible({ timeout: 10_000 });
+  await expect(card.getByText("Connect to Quadit K7QX4M in E2E")).toBeVisible({ timeout: 10_000 });
   await expect(card.getByText(/^Quadit can start/)).toHaveCount(0);
 });
 

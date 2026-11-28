@@ -398,7 +398,7 @@ case "$1" in
   auth) [ "$2" = "status" ] && exit 0 ;;
   -p)
     case "$2" in
-      "Connect to Quadit "*) exec quadit connect "\${2#Connect to Quadit }" ;;
+      "Connect to Quadit "*) line="\${2#Connect to Quadit }"; exec quadit connect "\${line%% *}" ;;
     esac ;;
 esac
 exit 3

@@ -120,7 +120,7 @@ test("Connect agents opens over the server's window from the menu, sets Claude C
       mcpServers: { quadit: { type: "http", url: `${run.server}/mcp` } },
     });
     const ledger = readFileSync(join(data, "connections.json"), "utf8");
-    expect(JSON.parse(ledger).harnesses.claude.agent.handle).toBe("coder");
+    expect(JSON.parse(ledger).harnesses.claude.connections[0].agent.handle).toBe("coder");
     expect(ledger).not.toContain(login.token);
     await card.getByRole("button", { name: "More options for Claude Code" }).click();
     await expect(card.getByText(/as @coder$/)).toBeVisible();
@@ -177,10 +177,10 @@ test("a card set up from the Agents page turns Connected when the agent gives it
     await expect(connect.locator("#connect")).toHaveJSProperty("inert", false);
     await card.getByRole("button", { name: "Connect Claude Code" }).click();
 
-    const line = card.getByText(/^Connect to Quadit \S{6}$/);
+    const line = card.getByText(/^Connect to Quadit \S{6} in \S.*$/);
     await expect(line).toBeVisible({ timeout: 20_000 });
     await screen(connect, "12-connect-set-up-waiting.png");
-    const code = (await line.innerText()).split(" ").at(-1) ?? "";
+    const code = (await line.innerText()).split(" ")[3] ?? "";
 
     // In the tool, the agent gives the code back with its own login, the one Connect made for it.
     const tool = asTheTool(run, join(computer.configDir, "claude.json"));

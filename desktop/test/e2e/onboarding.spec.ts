@@ -101,7 +101,7 @@ test("the first run sets Quadit up on this computer in one window, connects the 
         "Quadit could not run Claude Code by itself (it was not found on this computer). Say this in Claude Code instead:",
       ),
     ).toBeVisible({ timeout: 20_000 });
-    await expect(card.getByText(/^Connect to Quadit \S{6}$/)).toBeVisible();
+    await expect(card.getByText(/^Connect to Quadit \S{6} in \S.*$/)).toBeVisible();
     await expect(card.getByText("Waiting for Claude Code…")).toBeVisible();
     await expect(first.getByText("Joined just now")).toBeVisible();
     // Set up is not connected: the step says so until the tool gives its code back.
@@ -121,9 +121,11 @@ test("the first run sets Quadit up on this computer in one window, connects the 
     await expect(first.getByRole("checkbox")).toHaveCount(0);
     const ledger = () =>
       JSON.parse(readFileSync(join(data, "connections.json"), "utf8")) as {
-        harnesses: Record<string, { methods: string[]; agent: { handle: string } }>;
+        harnesses: Record<string, { connections: { methods: string[]; agent: { handle: string } }[] }>;
       };
-    expect(ledger().harnesses.claude).toMatchObject({ methods: ["cli"], agent: { handle: "claude-code" } });
+    expect(ledger().harnesses.claude?.connections).toMatchObject([
+      { methods: ["cli"], agent: { handle: "claude-code" } },
+    ]);
 
     // Undo takes it all back, asking nothing; connected again, it is the same agent.
     await card.getByRole("button", { name: "Undo Claude Code" }).click();
@@ -131,7 +133,7 @@ test("the first run sets Quadit up on this computer in one window, connects the 
     expect(existsSync(skill)).toBe(false);
     expect(ledger().harnesses).toEqual({});
     await card.getByRole("button", { name: "Connect Claude Code" }).click();
-    await expect(card.getByText(/^Connect to Quadit \S{6}$/)).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByText(/^Connect to Quadit \S{6} in \S.*$/)).toBeVisible({ timeout: 20_000 });
 
     // Continue (Enter), which never waits for the tool to give its code back: the sample tasks, the third Claude
     // Code's, and the first run goes, leaving the workspace.

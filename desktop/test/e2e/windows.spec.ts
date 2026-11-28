@@ -13,7 +13,7 @@
 //     Quadit CODE" it gives nothing back: there the card falls back to the
 //     line to paste, and the test gives the code back with quadit connect.
 //   - claude.cmd (GIVES_CODE_BACK below), as npm installs a program: told
-//     `-p "Connect to Quadit CODE"`, it runs `quadit connect CODE`, finding
+//     `-p "Connect to Quadit CODE in WORKSPACE"`, it runs `quadit connect CODE`, finding
 //     quadit on the PATH it was given, as Claude Code does, and notes what
 //     it did (STANDIN_RECORD). The guard starts a .cmd through cmd.exe.
 //
@@ -166,10 +166,10 @@ async function firstRun(
   if (connect === "by-hand") {
     const card = first.getByRole("article", { name: "Claude Code" });
     await card.getByRole("button", { name: "Connect Claude Code" }).click({ timeout: 90_000 });
-    const line = card.getByText(/^Connect to Quadit \S{6}$/);
+    const line = card.getByText(/^Connect to Quadit \S{6} in \S.*$/);
     await expect(line).toBeVisible({ timeout: 60_000 });
     await screen(first, "windows-01-first-run-waiting.png");
-    const code = (await line.innerText()).split(" ").at(-1) ?? "";
+    const code = (await line.innerText()).split(" ")[3] ?? "";
     await asTheAgent(run, join(computer.configDir, "claude.json"), ["connect", code]);
     await expect(card.getByText("Connected", { exact: true })).toBeVisible({ timeout: 20_000 });
   }
