@@ -1010,7 +1010,7 @@ func TestAnAgentListensToAProjectWithTheCommand(t *testing.T) {
 			return out
 		}
 		out := run("wait", "project=sva", "for=1")
-		next := regexp.MustCompile(`(?m)^quadit wait project=SVA for=1 lease=[A-Z0-9]{8}`).FindString(out)
+		next := regexp.MustCompile(`(?m)^quadit wait project=SVA for=1 lease=[A-Z0-9]{8} --workspace=[0-9a-f-]{36}`).FindString(out)
 		if !strings.HasPrefix(out, "IDLE\n") || next == "" {
 			t.Fatalf("the first quadit wait project=sva said:\n%s", out)
 		}
