@@ -30,6 +30,7 @@ import (
 type realQuadit struct {
 	t     *testing.T
 	url   string
+	w     string // the API's address of the workspace
 	owner *http.Client
 }
 
@@ -50,9 +51,14 @@ func pageBrowser() *http.Client {
 	return &http.Client{Jar: jar, Transport: ownPage{}}
 }
 
-const realW = "/api/v1/w/games"
-
 func startRealQuadit(t *testing.T, st store.Store) *realQuadit {
+	t.Helper()
+	return startRealQuaditOf(t, st, "Games", "games")
+}
+
+// startRealQuaditOf is startRealQuadit with the owner's workspace named
+// name, which makes its slug slug.
+func startRealQuaditOf(t *testing.T, st store.Store, name, slug string) *realQuadit {
 	t.Helper()
 	dir := t.TempDir()
 	files, err := blob.NewDisk(dir + "/files")
@@ -72,9 +78,9 @@ func startRealQuadit(t *testing.T, st store.Store) *realQuadit {
 		srv.Run(ctx)
 	}()
 	t.Cleanup(func() { stop(); <-ran; hs.Close() })
-	q := &realQuadit{t: t, url: base, owner: pageBrowser()}
+	q := &realQuadit{t: t, url: base, w: "/api/v1/w/" + slug, owner: pageBrowser()}
 	q.call(q.owner, "", "POST", "/api/v1/auth/setup", map[string]any{"name": "Aram", "email": "owner@example.com",
-		"password": "correct-horse-battery", "workspace_name": "Games"}, 201, nil)
+		"password": "correct-horse-battery", "workspace_name": name}, 201, nil)
 	return q
 }
 
@@ -112,7 +118,7 @@ func (q *realQuadit) call(hc *http.Client, token, method, path string, body any,
 // change applies a change as the holder of token.
 func (q *realQuadit) change(token, typ string, args map[string]any) {
 	q.t.Helper()
-	q.call(nil, token, "POST", realW+"/changes", map[string]any{"id": id.New(), "type": typ, "args": args}, 200, nil)
+	q.call(nil, token, "POST", q.w+"/changes", map[string]any{"id": id.New(), "type": typ, "args": args}, 200, nil)
 }
 
 // token makes a token for user ("me", or an agent's handle) through the
@@ -120,7 +126,7 @@ func (q *realQuadit) change(token, typ string, args map[string]any) {
 func (q *realQuadit) token(hc *http.Client, user string) string {
 	q.t.Helper()
 	var tok struct{ Token string }
-	q.call(hc, "", "POST", realW+"/tokens", map[string]any{"user": user, "name": "test"}, 201, &tok)
+	q.call(hc, "", "POST", q.w+"/tokens", map[string]any{"user": user, "name": "test"}, 201, &tok)
 	return tok.Token
 }
 
@@ -129,7 +135,7 @@ func (q *realQuadit) token(hc *http.Client, user string) string {
 func (q *realQuadit) invited() string {
 	q.t.Helper()
 	var inv struct{ Link string }
-	q.call(q.owner, "", "POST", realW+"/invites", map[string]any{}, 201, &inv)
+	q.call(q.owner, "", "POST", q.w+"/invites", map[string]any{}, 201, &inv)
 	b := pageBrowser()
 	q.call(b, "", "POST", "/api/v1/auth/invite/"+inv.Link[strings.LastIndex(inv.Link, "/")+1:],
 		map[string]any{"name": "Mia", "email": "mia@example.com", "password": "another-long-password"}, 200, nil)
@@ -140,7 +146,7 @@ func (q *realQuadit) invited() string {
 func (q *realQuadit) runs(token, task string) []map[string]any {
 	q.t.Helper()
 	var out struct{ Sessions []map[string]any }
-	q.call(nil, token, "GET", realW+"/list/sessions?task="+task, nil, 200, &out)
+	q.call(nil, token, "GET", q.w+"/list/sessions?task="+task, nil, 200, &out)
 	slices.SortFunc(out.Sessions, func(a, b map[string]any) int { return int(a["started_at"].(float64) - b["started_at"].(float64)) })
 	return out.Sessions
 }
@@ -153,7 +159,7 @@ func (q *realQuadit) rows(token, task, typ string) []map[string]any {
 			Data struct{ Row map[string]any }
 		}
 	}
-	q.call(nil, token, "GET", realW+"/events?after=0&types="+typ+"&task="+task, nil, 200, &page)
+	q.call(nil, token, "GET", q.w+"/events?after=0&types="+typ+"&task="+task, nil, 200, &page)
 	var rows []map[string]any
 	for _, ev := range page.Events {
 		rows = append(rows, ev.Data.Row)
