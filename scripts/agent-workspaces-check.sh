@@ -12,12 +12,13 @@
 # index.json, in a folder QUADIT_CONFIG names) and ties a folder to each with
 # `quadit use NAME project=SVA`. Then:
 #
-#   1. Two chats listen at once, one in each tied folder, told "Listen to
-#      Quadit": each listens to SVA in its own workspace.
-#   2. A comment for the agent on each SVA-12: each answered once, in its own
+#   1. A chat in a folder tied to none, told "Check Quadit": it asks which
+#      workspace (or refuses), and does nothing in either.
+#   2. Two chats listen at once, one in each tied folder, told "Listen to
+#      Quadit": each listens to SVA in its own workspace. When they do not,
+#      the phases after are skipped.
+#   3. A comment for the agent on each SVA-12: each answered once, in its own
 #      workspace, every call of each chat in its own folder and workspace.
-#   3. A third chat in a folder tied to none, told "Check Quadit": it asks
-#      which workspace (or refuses), and does nothing in either.
 #   4. `quadit logout --workspace=<Acme>` while both listen: the Acme chat
 #      stops, saying why (when its wait outlasts two minutes, a comment in
 #      Acme ends the wait sooner); the Games chat goes on and answers a third
@@ -44,8 +45,11 @@
 # The tied folders are under the home folder (~/.quadit-workspaces-check.*:
 # the folder rules refuse $TMPDIR and /tmp), moved to the Trash at the end.
 # Settings: AGENT_CHECK_COMMAND (the one-prompt command, the prompt in "$1"),
-# AGENT_CHECK_STEER, AGENT_CHECK_ANSWER (seconds, default 300), QUADIT_BIN.
-# Ends with "N checks passed" and exits 0 only when no check failed.
+# AGENT_CHECK_STEER (words after every prompt), AGENT_CHECK_LISTEN (words
+# after "Listen to Quadit." alone, such as what the chat would otherwise ask
+# first), AGENT_CHECK_ANSWER (seconds, default 300), QUADIT_BIN.
+# Ends with "N checks passed, M phases skipped: …" and exits 0 only when no
+# check failed: a phase skipped is not a phase passed.
 
 # Some functions are only called through others (the trap), and each workspace's values are read through of.
 # shellcheck disable=SC2329,SC2034
@@ -204,6 +208,7 @@ EOF
 chmod +x "$wrapper"
 touch "$work/calls.log"
 steer=${AGENT_CHECK_STEER-"Use $wrapper for the quadit command."}
+listen_words=${AGENT_CHECK_LISTEN:-}
 
 # as_tool SESSION FOLDER COMMAND [ARG ...]: runs COMMAND as the tool is run, in FOLDER with this check's environment.
 as_tool() {
@@ -389,33 +394,8 @@ d = json.load(open(sys.argv[1]))
 ok = sorted(c["workspace_id"] for c in d["connections"]) == sorted(sys.argv[2:4]) and sorted((f["workspace_id"], f["project"]) for f in d["folders"]) == sorted((w, "SVA") for w in sys.argv[2:4])
 sys.exit(0 if ok else 1)' "$work/config/index.json" "$games_id" "$acme_id" && echo 0 || echo 1)" "$(cat "$work/config/index.json")"
 
-# 1. Two chats listen at once.
-echo "1. Listen to Quadit, in each tied folder"
-start games "$games_folder" "Listen to Quadit."
-games_pid=$started
-start acme "$acme_folder" "Listen to Quadit."
-acme_pid=$started
-both_listen() { listens games && listens acme; }
-check "both listen to SVA, each in its own workspace" "$(passed until_true 300 both_listen)" \
-	"Games: $(agent_api games /listening), Acme: $(agent_api acme /listening)"
-
-# 2. A comment for the agent in each.
-echo "2. A comment for the agent on each SVA-12"
-games_first=$(say games "@$handle what do 2 and 2 make? Answer here in a comment.")
-acme_first=$(say acme "@$handle what do 3 and 3 make? Answer here in a comment.")
-check "Games' comment answered" "$(passed until_true "$answer_time" answered games "$games_first" 4 four)" "$(replies games "$games_first") answers after it"
-check "Acme's comment answered" "$(passed until_true "$answer_time" answered acme "$acme_first" 6 six)" "$(replies acme "$acme_first") answers after it"
-sleep 30
-check "Games: exactly one answer, saying 4, none saying 6" "$(passed once games "$games_first" "4 four" "6 six")" "$(replies games "$games_first") answers"
-check "Acme: exactly one answer, saying 6, none saying 4" "$(passed once acme "$acme_first" "6 six" "4 four")" "$(replies acme "$acme_first") answers"
-check "each chat acknowledged its item" "$(calls games | grep -q "status=0.*	ack " && calls acme | grep -q "status=0.*	ack " && echo 0 || echo 1)"
-for ws in games acme; do
-	strays_out=$(strays "$ws" "$ws" 2>&1) || strays_out=${strays_out:-the call log could not be read}
-	check "every call of the $(of "$ws" name) chat ran in its folder and workspace" "$([ -z "$strays_out" ] && echo 0 || echo 1)" "$strays_out"
-done
-
-# 3. A folder tied to none.
-echo "3. Check Quadit, in a folder tied to none"
+# 1. A folder tied to none.
+echo "1. Check Quadit, in a folder tied to none"
 start untied "$untied_folder" "Check Quadit."
 untied_pid=$started
 check "the chat ended by itself" "$(passed until_true "$answer_time" ended "$untied_pid")"
@@ -426,37 +406,66 @@ check "it did nothing in either workspace (no command but me or use alone succee
 check "no folder was tied" "$(python3 -c 'import json,sys;sys.exit(0 if len(json.load(open(sys.argv[1]))["folders"]) == 2 else 1)' "$work/config/index.json" && echo 0 || echo 1)"
 check "it asked which workspace, naming both" "$(printf '%s' "$untied_said" | grep -qi games && printf '%s' "$untied_said" | grep -qi acme && echo 0 || echo 1)"
 
-# 4. Acme taken away while both listen.
-echo "4. quadit logout --workspace=Acme, while both listen"
-check "both still listen" "$(passed both_listen)"
-(cd "$work" && QUADIT_CONFIG=$base "$real" logout --workspace="$acme_id") >>"$work/login.txt" 2>&1
-logout_at=$(date +%s)
-# A wait that started before the logout holds on with the login it read, so the chat learns of it when that wait ends:
-# within a hold for a wait in the foreground; for a long one in the background, a comment ends it sooner.
-check "the Acme chat stopped by itself within two minutes" "$(passed until_true 120 ended "$acme_pid")" \
-	"Acme still shows it listening: $(agent_api acme /listening)"
-if ! ended "$acme_pid"; then
-	acme_late=$(say acme "@$handle what do 9 and 9 make? Answer here in a comment.")
-	check "told of a comment in Acme, the Acme chat stopped" "$(passed until_true "$answer_time" ended "$acme_pid")"
-fi
-stop "$acme_pid"
-acme_said=$(said acme)
-check "its next command in Acme was refused: not connected there" "$(calls acme | awk -F'\t' -v t="$logout_at" '$1 >= t' | grep -v "status=0" | grep -qi "not connected" && echo 0 || echo 1)"
-check "it said why it stopped" "$(printf '%s' "$acme_said" | grep -qiE "connect|logged out|log ?out|removed" && echo 0 || echo 1)"
-check "the agent stops showing as listening in Acme" "$(passed until_true 180 not_listening acme)"
-check "the Games chat still runs and listens" "$( ! ended "$games_pid" && listens games && echo 0 || echo 1)"
-games_second=$(say games "@$handle and 5 and 5? Answer here in a comment.")
-check "Games' third comment answered" "$(passed until_true "$answer_time" answered games "$games_second" 10 ten)" "$(replies games "$games_second") answers after it"
-sleep 30
-check "Games: exactly one answer, saying 10" "$(passed once games "$games_second" "10 ten" "4 four")" "$(replies games "$games_second") answers"
-check "Acme: no answer after the logout" "$([ "$(replies acme "$acme_first")" = 1 ] && echo 0 || echo 1)" "$(replies acme "$acme_first") answers after the first comment"
-# The comment the logged-out chat was told of stays unread: whatever listens there next is handed it, the companion below.
+# 2. Two chats listen at once.
+echo "2. Listen to Quadit, in each tied folder"
+start games "$games_folder" "Listen to Quadit.${listen_words:+ $listen_words}"
+games_pid=$started
+start acme "$acme_folder" "Listen to Quadit.${listen_words:+ $listen_words}"
+acme_pid=$started
+both_listen() { listens games && listens acme; }
+listening=$(passed until_true 300 both_listen)
+check "both listen to SVA, each in its own workspace" "$listening" \
+	"Games: $(agent_api games /listening), Acme: $(agent_api acme /listening); the chats said: $(said games | head -c 300) / $(said acme | head -c 300)"
+if [ "$listening" != 0 ]; then
+	skip "3 to 5 (answering, a logout, a companion)" "the chats do not both listen"
+else
 
-# 5. A companion in Acme while the Games chat listens.
-echo "5. A companion in Acme, as the skill gives it, while the Games chat listens"
-of acme token | QUADIT_CONFIG=$base "$real" login "$url" - >>"$work/login.txt"
-check "Acme is connected again" "$(python3 -c 'import json,sys;sys.exit(0 if len(json.load(open(sys.argv[1]))["connections"]) == 2 else 1)' "$work/config/index.json" && echo 0 || echo 1)"
-cat >"$work/bin/wake" <<EOF
+	# 3. A comment for the agent in each.
+	echo "3. A comment for the agent on each SVA-12"
+	games_first=$(say games "@$handle what do 2 and 2 make? Answer here in a comment.")
+	acme_first=$(say acme "@$handle what do 3 and 3 make? Answer here in a comment.")
+	check "Games' comment answered" "$(passed until_true "$answer_time" answered games "$games_first" 4 four)" "$(replies games "$games_first") answers after it"
+	check "Acme's comment answered" "$(passed until_true "$answer_time" answered acme "$acme_first" 6 six)" "$(replies acme "$acme_first") answers after it"
+	sleep 30
+	check "Games: exactly one answer, saying 4, none saying 6" "$(passed once games "$games_first" "4 four" "6 six")" "$(replies games "$games_first") answers"
+	check "Acme: exactly one answer, saying 6, none saying 4" "$(passed once acme "$acme_first" "6 six" "4 four")" "$(replies acme "$acme_first") answers"
+	check "each chat acknowledged its item" "$(calls games | grep -q "status=0.*	ack " && calls acme | grep -q "status=0.*	ack " && echo 0 || echo 1)"
+	for ws in games acme; do
+		strays_out=$(strays "$ws" "$ws" 2>&1) || strays_out=${strays_out:-the call log could not be read}
+		check "every call of the $(of "$ws" name) chat ran in its folder and workspace" "$([ -z "$strays_out" ] && echo 0 || echo 1)" "$strays_out"
+	done
+
+	# 4. Acme taken away while both listen.
+	echo "4. quadit logout --workspace=Acme, while both listen"
+	check "both still listen" "$(passed both_listen)"
+	(cd "$work" && QUADIT_CONFIG=$base "$real" logout --workspace="$acme_id") >>"$work/login.txt" 2>&1
+	logout_at=$(date +%s)
+	# A wait that started before the logout holds on with the login it read, so the chat learns of it when that wait ends:
+	# within a hold for a wait in the foreground; for a long one in the background, a comment ends it sooner.
+	check "the Acme chat stopped by itself within two minutes" "$(passed until_true 120 ended "$acme_pid")" \
+		"Acme still shows it listening: $(agent_api acme /listening)"
+	if ! ended "$acme_pid"; then
+		acme_late=$(say acme "@$handle what do 9 and 9 make? Answer here in a comment.")
+		check "told of a comment in Acme, the Acme chat stopped" "$(passed until_true "$answer_time" ended "$acme_pid")"
+	fi
+	stop "$acme_pid"
+	acme_said=$(said acme)
+	check "its next command in Acme was refused: not connected there" "$(calls acme | awk -F'\t' -v t="$logout_at" '$1 >= t' | grep -v "status=0" | grep -qi "not connected" && echo 0 || echo 1)"
+	check "it said why it stopped" "$(printf '%s' "$acme_said" | grep -qiE "connect|logged out|log ?out|removed" && echo 0 || echo 1)"
+	check "the agent stops showing as listening in Acme" "$(passed until_true 180 not_listening acme)"
+	check "the Games chat still runs and listens" "$( ! ended "$games_pid" && listens games && echo 0 || echo 1)"
+	games_second=$(say games "@$handle and 5 and 5? Answer here in a comment.")
+	check "Games' third comment answered" "$(passed until_true "$answer_time" answered games "$games_second" 10 ten)" "$(replies games "$games_second") answers after it"
+	sleep 30
+	check "Games: exactly one answer, saying 10" "$(passed once games "$games_second" "10 ten" "4 four")" "$(replies games "$games_second") answers"
+	check "Acme: no answer after the logout" "$([ "$(replies acme "$acme_first")" = 1 ] && echo 0 || echo 1)" "$(replies acme "$acme_first") answers after the first comment"
+	# The comment the logged-out chat was told of stays unread: whatever listens there next is handed it, the companion below.
+
+	# 5. A companion in Acme while the Games chat listens.
+	echo "5. A companion in Acme, as the skill gives it, while the Games chat listens"
+	of acme token | QUADIT_CONFIG=$base "$real" login "$url" - >>"$work/login.txt"
+	check "Acme is connected again" "$(python3 -c 'import json,sys;sys.exit(0 if len(json.load(open(sys.argv[1]))["connections"]) == 2 else 1)' "$work/config/index.json" && echo 0 || echo 1)"
+	cat >"$work/bin/wake" <<EOF
 #!/bin/sh
 # One run of the tool for one inbox item, with the skill's companion prompt.
 n=\$(ls "$work/runs" | wc -l | tr -d ' ')
@@ -468,44 +477,47 @@ status=\$?
 echo "run \$n: \$((\$(date +%s) - start))s, exit \$status, QUADIT_WORKSPACE=\$QUADIT_WORKSPACE, in \$(pwd -P)" >>"$work/runs.txt"
 exit \$status
 EOF
-chmod +x "$work/bin/wake"
-set -m
-AGENT_CHECK_ONE_PROMPT=$command as_tool companion "$acme_folder" "$wrapper" listen project=SVA --workspace="$acme_id" "by=the check" --exec "$work/bin/wake" >"$work/companion.log" 2>&1 &
-companion_pid=$!
-sessions+=("$companion_pid")
-set +m
-check "the companion listens in Acme, named the check" "$(passed until_true 60 names_the_check acme)" "$(agent_api acme /listening)"
-if [ -n "${acme_late:-}" ]; then
-	check "the comment the logged-out chat was told of is handed to the companion, and answered" "$(passed until_true "$answer_time" answered acme "$acme_late" 18 eighteen)"
+	chmod +x "$work/bin/wake"
+	set -m
+	AGENT_CHECK_ONE_PROMPT=$command as_tool companion "$acme_folder" "$wrapper" listen project=SVA --workspace="$acme_id" "by=the check" --exec "$work/bin/wake" >"$work/companion.log" 2>&1 &
+	companion_pid=$!
+	sessions+=("$companion_pid")
+	set +m
+	check "the companion listens in Acme, named the check" "$(passed until_true 60 names_the_check acme)" "$(agent_api acme /listening)"
+	if [ -n "${acme_late:-}" ]; then
+		check "the comment the logged-out chat was told of is handed to the companion, and answered" "$(passed until_true "$answer_time" answered acme "$acme_late" 18 eighteen)"
+	fi
+	acme_second=$(say acme "@$handle what do 7 and 7 make? Answer here in a comment.")
+	games_third=$(say games "@$handle and 8 and 8? Answer here in a comment.")
+	check "Acme's comment answered by the companion's run" "$(passed until_true "$answer_time" answered acme "$acme_second" 14 fourteen)" "$(replies acme "$acme_second") answers after it"
+	check "Games' comment answered by the Games chat" "$(passed until_true "$answer_time" answered games "$games_third" 16 sixteen)" "$(replies games "$games_third") answers after it"
+	sleep 30
+	check "Acme: exactly one answer, saying 14, none saying 16" "$(passed once acme "$acme_second" "14 fourteen" "16 sixteen")" "$(replies acme "$acme_second") answers"
+	check "Games: exactly one answer, saying 16, none saying 14" "$(passed once games "$games_third" "16 sixteen" "14 fourteen")" "$(replies games "$games_third") answers"
+	for pair in "companion acme the companion's runs" "games games the Games chat"; do
+		read -r session ws who <<<"$pair"
+		strays_out=$(strays "$session" "$ws" 2>&1) || strays_out=${strays_out:-the call log could not be read}
+		check "every call of $who ran in $(of "$ws" name)'s folder and workspace" "$([ -z "$strays_out" ] && echo 0 || echo 1)" "$strays_out"
+	done
+	stop "$companion_pid"
+	stop "$games_pid"
+	check "stopped, nothing listens in Acme" "$(passed until_true 180 not_listening acme)"
 fi
-acme_second=$(say acme "@$handle what do 7 and 7 make? Answer here in a comment.")
-games_third=$(say games "@$handle and 8 and 8? Answer here in a comment.")
-check "Acme's comment answered by the companion's run" "$(passed until_true "$answer_time" answered acme "$acme_second" 14 fourteen)" "$(replies acme "$acme_second") answers after it"
-check "Games' comment answered by the Games chat" "$(passed until_true "$answer_time" answered games "$games_third" 16 sixteen)" "$(replies games "$games_third") answers after it"
-sleep 30
-check "Acme: exactly one answer, saying 14, none saying 16" "$(passed once acme "$acme_second" "14 fourteen" "16 sixteen")" "$(replies acme "$acme_second") answers"
-check "Games: exactly one answer, saying 16, none saying 14" "$(passed once games "$games_third" "16 sixteen" "14 fourteen")" "$(replies games "$games_third") answers"
-for pair in "companion acme the companion's runs" "games games the Games chat"; do
-	read -r session ws who <<<"$pair"
-	strays_out=$(strays "$session" "$ws" 2>&1) || strays_out=${strays_out:-the call log could not be read}
-	check "every call of $who ran in $(of "$ws" name)'s folder and workspace" "$([ -z "$strays_out" ] && echo 0 || echo 1)" "$strays_out"
-done
-stop "$companion_pid"
-stop "$games_pid"
-check "stopped, nothing listens in Acme" "$(passed until_true 180 not_listening acme)"
 
 echo "6. The person's own Quadit, and the logs"
 for ws in games acme; do
 	echo "   what @$handle wrote in $(of "$ws" name), from its feed:"
 	writes "$ws" | sed 's/^/    /'
 done
-acme_answers="6 14"
-[ -z "${acme_late:-}" ] || acme_answers="6 18 14"
-games_said=$(answers_are games 4 10 16) && games_ok=0 || games_ok=1
-check "the agent's comments in Games, anywhere, are its answers there: 4, 10, 16" "$games_ok" "$games_said"
-# shellcheck disable=SC2086 # the numbers are words
-acme_said_all=$(answers_are acme $acme_answers) && acme_ok=0 || acme_ok=1
-check "the agent's comments in Acme, anywhere, are its answers there: ${acme_answers// /, }" "$acme_ok" "$acme_said_all"
+if [ "$listening" = 0 ]; then
+	acme_answers="6 14"
+	[ -z "${acme_late:-}" ] || acme_answers="6 18 14"
+	games_said=$(answers_are games 4 10 16) && games_ok=0 || games_ok=1
+	check "the agent's comments in Games, anywhere, are its answers there: 4, 10, 16" "$games_ok" "$games_said"
+	# shellcheck disable=SC2086 # the numbers are words
+	acme_said_all=$(answers_are acme $acme_answers) && acme_ok=0 || acme_ok=1
+	check "the agent's comments in Acme, anywhere, are its answers there: ${acme_answers// /, }" "$acme_ok" "$acme_said_all"
+fi
 check "no call used a login outside this check's folder" "$(awk -F'\t' -v c="$work/config/" '$2 == "start" && index($7, c) != 1' "$work/calls.log" | grep -q . && echo 1 || echo 0)"
 untraced_out=$(untraced 2>&1) || untraced_out=${untraced_out:-the transcripts could not be read}
 check "every quadit in the transcripts ran through the wrapper, and none names the person's own Quadit" "$([ -z "$untraced_out" ] && echo 0 || echo 1)" "$untraced_out"
@@ -545,5 +557,6 @@ name = sys.argv[1].rsplit("/", 1)[1][:-4]
 print("   ", ("companion run " if "/runs/" in sys.argv[1] else "") + name + ":", use)' "$log"
 done
 echo "the skill the tool was given (the tested quadit's own, sha256 $("$real" skill | shasum -a 256 | cut -c 1-12))"
-if [ "$failed" = 0 ]; then echo "$passes checks passed"; else echo "some checks failed; $passes checks passed"; fi
+summary="$passes checks passed, ${#skipped[@]} phases skipped${skipped[*]:+: ${skipped[*]}}"
+if [ "$failed" = 0 ]; then echo "$summary"; else echo "some checks failed; $summary"; fi
 exit "$failed"
