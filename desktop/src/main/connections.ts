@@ -213,7 +213,8 @@ interface OldConnection {
   methods: ConnectMethod[];
   agent: { id: string; handle: string };
   edits: Applied[];
-  token: { id: string; label: string; config: string } | null;
+  /** Its token, made in the workspace it names: absent from the oldest ledgers. */
+  token: { id: string; label: string; config: string; serverId?: string; workspaceId?: string } | null;
   member?: { id: string; handle: string } | null;
   code?: OpenCode | null;
   allowed?: boolean;
@@ -1663,7 +1664,7 @@ function isToolRecord(raw: unknown): raw is ToolRecord {
 /**
  * A tool's record from what the ledger holds: as it is, or, from a ledger
  * from before several workspaces, its one connection made the tool's only
- * one. The agent of the workspace it works as there was recorded only for
+ * one, in the workspace its token was made in. The agent of the workspace it works as there was recorded only for
  * a tool with a login of its own (made for the agent chosen there) in the
  * oldest ledgers; one on the computer's default login, which may be
  * another's, has none.
@@ -1672,20 +1673,24 @@ function toolRecordOf(id: string, raw: unknown): ToolRecord {
   if (isToolRecord(raw)) return raw;
   const old = raw as OldConnection;
   const harness = HARNESSES.find((h) => h.id === id);
+  // A tool that shared another's login (the computer's default one) was recorded for the workspace it was connected
+  // from, its token for the one it was made in: the token's is where the login works, made for that agent.
+  const made = old.token?.serverId && old.token.workspaceId ? old.token : null;
+  const moved = !!made && (made.serverId !== old.serverId || made.workspaceId !== old.workspaceId);
   return {
     edits: old.edits,
     ...(old.token ? { base: old.token.config } : {}),
     ...(old.allowed ? { allowed: true } : {}),
     connections: [
       {
-        serverId: old.serverId,
-        workspaceId: old.workspaceId,
+        serverId: moved && made?.serverId ? made.serverId : old.serverId,
+        workspaceId: moved && made?.workspaceId ? made.workspaceId : old.workspaceId,
         workspaceName: "",
         methods: old.methods,
         agent: old.agent,
         token: old.token ? { id: old.token.id, label: old.token.label } : null,
-        member: old.member !== undefined ? old.member : harness?.env ? old.agent : null,
-        code: old.code ?? null,
+        member: moved ? old.agent : old.member !== undefined ? old.member : harness?.env ? old.agent : null,
+        code: moved ? null : (old.code ?? null),
         ...(old.ran ? { ran: true as const } : {}),
         at: old.at,
       },

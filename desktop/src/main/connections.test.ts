@@ -2085,6 +2085,40 @@ posixOnly("a ledger from before several workspaces", () => {
     expect((await seen("pi", "w1"))?.agent).toBe("@mine");
   });
 
+  it("puts a tool that shared another's login in the workspace that login's token was made in, not the one it was connected from", async () => {
+    const { connections, configDir, root, ledger } = setUpSeveral();
+    mkdirSync(configDir, { recursive: true });
+    const config = join(configDir, "config.json");
+    writeFileSync(config, JSON.stringify({ url: ORIGIN, token: "qd_pi" }));
+    // pi made the default login in Personal; Copilot reused it while Acme was open.
+    const token = { id: "t1", label: "pi on mac", config, serverId: "s1", workspaceId: "w2" };
+    const at = (workspaceId: string) => ({
+      serverId: "s1",
+      workspaceId,
+      methods: ["cli"],
+      agent: { id: "p2", handle: "pi" },
+      edits: [],
+      token,
+      allowed: true,
+      at: 1,
+    });
+    const old = {
+      harnesses: { pi: { ...at("w2"), member: { id: "p2", handle: "pi" } }, copilot: { ...at("w1"), member: null } },
+    };
+    mkdirSync(join(root, "data"), { recursive: true });
+    writeFileSync(join(root, "data", "connections.json"), JSON.stringify(old));
+    await connections.refresh();
+    expect(ledger().harnesses.copilot.connections).toMatchObject([
+      { serverId: "s1", workspaceId: "w2", agent: { id: "p2" }, member: { id: "p2", handle: "pi" }, code: null },
+    ]);
+    // In Acme it is not connected, so it can be connected there as well.
+    const acme = (await connections.state({ serverId: "s1", workspaceId: "w1" })).harnesses.find(
+      (h) => h.id === "copilot",
+    );
+    expect(acme?.connected).toBeNull();
+    expect(acme?.elsewhere.map((c) => c.ref.workspaceId)).toEqual(["w2"]);
+  });
+
   it("keeps a default login's tool as it was recorded when its server cannot say who it is", async () => {
     const { connections, configDir, root, ledger } = setUpSeveral();
     mkdirSync(configDir, { recursive: true });
