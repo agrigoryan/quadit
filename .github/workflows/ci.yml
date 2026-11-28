@@ -70,7 +70,7 @@ jobs:
       # against a copy of the releases laid out as GitHub serves them.
       - name: The install script
         run: |
-          shellcheck install.sh scripts/install-test.sh scripts/agent-listen-check.sh
+          shellcheck -x install.sh scripts/install-test.sh scripts/agent-listen-check.sh scripts/agent-workspaces-check.sh
           sh scripts/install-test.sh
 
   # The server and the quadit command on Windows, on SQLite (no Postgres
