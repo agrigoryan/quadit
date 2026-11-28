@@ -65,12 +65,12 @@ export function compareVersions(a: string, b: string): number {
   const right = parseVersion(b);
   if (!left || !right) return left ? 1 : right ? -1 : 0;
   for (let i = 0; i < 3; i++) {
-    const diff = left.core[i] - right.core[i];
+    const diff = (left.core[i] ?? 0) - (right.core[i] ?? 0);
     if (diff !== 0) return Math.sign(diff);
   }
   if (!left.pre.length || !right.pre.length) return Math.sign(right.pre.length - left.pre.length);
   for (let i = 0; i < Math.min(left.pre.length, right.pre.length); i++) {
-    const diff = comparePart(left.pre[i], right.pre[i]);
+    const diff = comparePart(left.pre[i] ?? "", right.pre[i] ?? "");
     if (diff !== 0) return diff;
   }
   return Math.sign(left.pre.length - right.pre.length);
