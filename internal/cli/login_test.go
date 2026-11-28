@@ -181,6 +181,19 @@ func TestLoginInAnotherWorkspaceAddsAConnection(t *testing.T) {
 			t.Fatal(said)
 		}
 	})
+	t.Run("the same workspace reached at another address replaces its login", func(t *testing.T) {
+		w := newToolWorld(t)
+		a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
+		w.connected(a, b)
+		moved := newWorkspaceServer(t, acme, "qd_b2")
+		if code, said := loginAs(t, moved); code != 0 {
+			t.Fatal(said)
+		}
+		idx, _ := readIndex(w.dir)
+		if saved := savedIn(t, filepath.Join(w.dir, "claude-acme.json")); saved.URL != moved.url || len(idx.Connections) != 2 || idx.Connections[1].Server != moved.url {
+			t.Fatalf("saved %+v, the connections %+v", saved, idx.Connections)
+		}
+	})
 	t.Run("a new token in the workspace of a tool's one login replaces it, with no index", func(t *testing.T) {
 		w := newToolWorld(t)
 		a := newWorkspaceServer(t, personal, "qd_a")

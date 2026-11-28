@@ -77,7 +77,7 @@ func login(ctx context.Context, args []string, stdin io.Reader, stdout, stderr i
 //
 // A tool with no connections has one file, its base login: it is written
 // there when it is empty, or holds this login or another of the same
-// workspace. When it holds a login in another workspace, that login's own
+// workspace (by its id, whatever address its server was reached at). When it holds a login in another workspace, that login's own
 // GET /me says which (when it cannot be asked, nothing is changed), it
 // becomes the tool's first connection, and this one its second, in a file
 // of its own beside it. A tool with connections replaces the token of the
@@ -108,7 +108,7 @@ func saveLogin(ctx context.Context, c *Client, app *appLogin) (path, more string
 		if err != nil {
 			return "", "", err
 		}
-		if old.URL == c.URL && was.Workspace.ID == now.Workspace.ID {
+		if was.Workspace.ID == now.Workspace.ID {
 			return tool, "", writePrivate(tool, raw)
 		}
 		idx.Connections = append(idx.Connections, connectionOf(tool, tool, old.URL, was))
@@ -119,7 +119,7 @@ func saveLogin(ctx context.Context, c *Client, app *appLogin) (path, more string
 	}
 	conns := idx.of(tool)
 	i := slices.IndexFunc(idx.Connections, func(o connection) bool {
-		return samePath(o.Tool, tool) && o.Server == c.URL && o.WorkspaceID == now.Workspace.ID
+		return samePath(o.Tool, tool) && o.WorkspaceID == now.Workspace.ID
 	})
 	if i >= 0 {
 		path = idx.Connections[i].Login
