@@ -4,6 +4,8 @@ What changed in each release of Quadit, newest first. The format follows [Keep a
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-28
+
 The server upgrades its database when it starts (migrations 0033 and 0034), copying it first; `quadit upgrade --undo` goes back ([upgrades](docs/install.md#upgrades)). 0034 records when each webhook and rule was made (see Fixed). 0033 makes every status of the type waiting an ordinary started status, with its name, colour and place kept; no task moves. What named the type elsewhere is rewritten:
 
 - A template's status, and a GitHub integration's `on_open` and `on_merge`, that said `waiting` say `started`, except on a row of one project that has a status called Waiting, which it meant and still means.
@@ -247,7 +249,8 @@ The first public release.
 - A desktop app for macOS, Windows and Linux (pre-release, not signed yet): a window for each server, sign-in through the browser, answers from a notification or the menu bar, quick capture, and Connect, which sets up Claude Code, Codex and other agent harnesses to work in Quadit.
 - Install with the install script, Homebrew, Docker (`ghcr.io/agrigoryan/quadit`), `.deb` and `.rpm` packages with a systemd service, or the archives on GitHub Releases.
 
-[Unreleased]: https://github.com/agrigoryan/quadit/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/agrigoryan/quadit/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.10.0
 [0.9.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.9.0
 [0.8.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.8.0
 [0.7.0]: https://github.com/agrigoryan/quadit/releases/tag/v0.7.0
