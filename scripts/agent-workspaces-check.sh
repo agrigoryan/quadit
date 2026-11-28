@@ -338,7 +338,9 @@ print(last.strip() or "(nothing said)")' "$work/$1.log"; }
 untraced() { python3 -c 'import json,re,sys,glob,collections
 work, wrapper = sys.argv[1], sys.argv[2]
 own = re.compile(r"(?:127\.0\.0\.1|localhost):4780|Application Support/[Qq]uadit|quadit-data|\.local/bin/quadit|Quadit\.app")
-word = re.compile(r"(?:^|[\s;&|(\x27\"`])((?:\S*/)?quadit)(?=\s|$|[\x27\"])")
+# A quadit by its path (a word ending /quadit, its quotes taken off), or by its name where a command starts.
+by_path = re.compile(r"[^\s/]*(/\S*/quadit)(?![\w/.-])")
+by_name = re.compile(r"(?:^|[;&|(]|\blc\s+[\x27\"])\s*quadit(?![\w/.-])")
 ran = collections.Counter()
 bad = 0
 logs = [p for p in glob.glob(work + "/*.log") if not p.endswith(("/server.log", "/companion.log"))] + glob.glob(work + "/runs/*.log")
@@ -372,11 +374,12 @@ for path in logs:
     for id, command in commands.items():
         if id in denied:
             continue
-        for w in word.findall(command):
-            if w != "quadit" and w != wrapper:
+        for w in by_path.findall(command):
+            if w != wrapper:
                 bad = 1
                 print("    ran another quadit:", session, command[:160])
             ran[session] += 1
+        ran[session] += len(by_name.findall(command))
 logged = collections.Counter(l.split("\t")[2] for l in open(work + "/calls.log") if l.split("\t")[1:2] == ["start"])
 for session, n in ran.items():
     if n > logged[session]:
