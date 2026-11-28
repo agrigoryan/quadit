@@ -216,11 +216,13 @@ export class Runner {
   }
 
   /**
-   * The entries of the login `login` (an agent's own login file, matched by
-   * real path) and what each does now, as its card says them; null when the
+   * The entries of the agent `of.agent` of the workspace `of.workspace` on
+   * the server at `of.server` (an agent of one workspace: the entries are
+   * bound to all three), and what each does now, as its card says them;
+   * never another workspace's, whatever login file it has. Null when the
    * list cannot be read.
    */
-  async entries(login: string): Promise<RunEntryView[] | null> {
+  async entries(of: RunsOf): Promise<RunEntryView[] | null> {
     let list: RunList;
     try {
       list = await this.list();
@@ -233,7 +235,7 @@ export class Runner {
     }
     const { home } = this.parts;
     return list.entries.flatMap((e) =>
-      sameFile(e.login, login) && (e.program === "claude" || e.program === "codex")
+      isOf(e, of) && (e.program === "claude" || e.program === "codex")
         ? [
             {
               id: e.id,
@@ -308,8 +310,8 @@ export class Runner {
   }
 
   /**
-   * `quadit run remove ID` for the entry `entry`, or for each entry of the
-   * login `login` (matched by real path, as the card shows them), which
+   * `quadit run remove ID` for the entry `entry`, or for each entry of one
+   * agent of one workspace (`of`, as the card shows them: entries), which
    * stops its run, tells the server how it ended and lets the project go,
    * waiting for that. Done only when a fresh read of the registry has none
    * of them: one still there and marked removing is `pending` (the runner
@@ -317,14 +319,11 @@ export class Runner {
    * said. Then the runner is stopped if no entry is left. With no quadit of
    * the app's, the app added none: nothing to remove.
    */
-  async remove(by: { entry: string } | { login: string }): Promise<{ ok: true } | RemoveRefused> {
+  async remove(by: { entry: string } | { of: RunsOf }): Promise<{ ok: true } | RemoveRefused> {
     if (!this.available) return { ok: true };
     let ids: string[];
     try {
-      ids =
-        "entry" in by
-          ? [by.entry]
-          : (await this.readList()).entries.filter((e) => sameFile(e.login, by.login)).map((e) => e.id);
+      ids = "entry" in by ? [by.entry] : (await this.readList()).entries.filter((e) => isOf(e, by.of)).map((e) => e.id);
     } catch (err) {
       return { ok: false, error: `Quadit could not read what it runs on this computer: ${(err as Error).message}` };
     }
@@ -534,6 +533,18 @@ export class Runner {
       });
     });
   }
+}
+
+/** One agent of one workspace of one server, as the registry binds its entries: the server's address and the ids. */
+export interface RunsOf {
+  server: string;
+  workspace: string;
+  agent: string;
+}
+
+/** Whether the entry `e` is bound to the agent `of`: its server, workspace and agent. */
+function isOf(e: Listed, of: RunsOf): boolean {
+  return sameServer(e.server ?? "", of.server) && e.workspace_id === of.workspace && e.agent_id === of.agent;
 }
 
 /** Whether two server addresses are the same server's: alike but for a trailing "/". */

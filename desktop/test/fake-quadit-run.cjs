@@ -140,8 +140,8 @@ if (first === "login" && second === "--path") {
   list.push({
     id: Math.random().toString(16).slice(2, 10).padEnd(8, "0"),
     server: "https://q.example",
-    workspace_id: "w1",
-    workspace: "personal",
+    workspace_id: me.workspace_id ?? "w1",
+    workspace: me.workspace_id ?? "personal",
     agent_id: `id-${me.handle}`,
     agent: me.handle,
     login: path.resolve(a.login),

@@ -126,6 +126,10 @@ function setUp({ start, env = {} }: { start?: StartChild; env?: Record<string, s
 
 const PROJECTS = ["SVA", "GS", "ART", "WEB", "API", "DOC", "OPS", "LAB"];
 
+/** The agents the stand-in's logins are, as its entries bind them: @claude and @codex of the workspace w1. */
+const CLAUDE = { server: "https://q.example", workspace: "w1", agent: "id-@claude" };
+const CODEX = { ...CLAUDE, agent: "id-@codex" };
+
 /** An entry's status as a serving runner writes it: every field there. */
 const said = (fields: Record<string, unknown>) => ({
   state: "",
@@ -198,7 +202,7 @@ posixOnly("Runner, supervising quadit run", () => {
     await runner.add({ login, project: "SVA", folder: game, program: "claude" });
     started[0]?.end(3);
     await vi.advanceTimersByTimeAsync(0);
-    expect((await runner.entries(login))?.[0]?.status).toEqual({ state: "not_served", message: NOT_SERVED.another });
+    expect((await runner.entries(CLAUDE))?.[0]?.status).toEqual({ state: "not_served", message: NOT_SERVED.another });
     expect(NOT_SERVED.another).toBe("Another quadit run serves this computer.");
     await vi.advanceTimersByTimeAsync(5 * 60_000 - 1);
     expect(started).toHaveLength(1);
@@ -212,7 +216,7 @@ posixOnly("Runner, supervising quadit run", () => {
     await runner.add({ login, project: "GS", folder: site, program: "claude" });
     started[0]?.end(3);
     await vi.advanceTimersByTimeAsync(0);
-    const [first] = (await runner.entries(login)) ?? [];
+    const [first] = (await runner.entries(CLAUDE)) ?? [];
     expect(await runner.remove({ entry: first?.id ?? "" })).toEqual({ ok: true });
     expect(started).toHaveLength(2);
   });
@@ -223,7 +227,7 @@ posixOnly("Runner, supervising quadit run", () => {
     writeFileSync(registry, "{ not json");
     await runner.sync();
     expect(started).toHaveLength(0);
-    expect(await runner.entries(login)).toBeNull();
+    expect(await runner.entries(CLAUDE)).toBeNull();
     const failed = () => logged.filter((line) => line.startsWith("quadit run list:")).length;
     const before = failed();
     await vi.advanceTimersByTimeAsync(2_000);
@@ -241,7 +245,7 @@ posixOnly("Runner, supervising quadit run", () => {
     const { runner, started, login, game, configDir } = setUp();
     await runner.add({ login, project: "SVA", folder: game, program: "claude" });
     serving(configDir, {});
-    expect(await runner.remove({ login })).toMatchObject({ ok: false, pending: true });
+    expect(await runner.remove({ of: CLAUDE })).toMatchObject({ ok: false, pending: true });
     expect(started[0]?.stopped).toBe(false);
     // The runner lets the entry go once the server has heard.
     writeFileSync(
@@ -266,10 +270,10 @@ posixOnly("Runner, supervising quadit run", () => {
     const { runner, started, login, otherLogin, game, site } = setUp();
     await runner.add({ login, project: "SVA", folder: game, program: "claude" });
     await runner.add({ login: otherLogin, project: "GS", folder: site, program: "codex" });
-    const [entry] = (await runner.entries(login)) ?? [];
+    const [entry] = (await runner.entries(CLAUDE)) ?? [];
     expect(await runner.remove({ entry: entry?.id ?? "" })).toEqual({ ok: true });
     expect(started[0]?.stopped).toBe(false);
-    expect(await runner.remove({ login: otherLogin })).toEqual({ ok: true });
+    expect(await runner.remove({ of: CODEX })).toEqual({ ok: true });
     expect(started[0]?.stopped).toBe(true);
     // Stopped by the app: not started again.
     await vi.advanceTimersByTimeAsync(10 * 60_000);
@@ -311,11 +315,11 @@ posixOnly("Runner, its commands", () => {
     ).toEqual({ ok: false, error: "Claude Code was not found on this computer: install it, or give program_path=" });
   });
 
-  it("says what each entry of the tool's login does, as a serving runner's status says it", async () => {
+  it("says what each entry of the agent does, as a serving runner's status says it", async () => {
     const { runner, login, otherLogin, site, configDir, folderOf } = setUp();
     for (const project of PROJECTS) await runner.add({ login, project, folder: folderOf(project), program: "claude" });
     await runner.add({ login: otherLogin, project: "SVA", folder: site, program: "codex" });
-    const ids = ((await runner.entries(login)) ?? []).map((e) => e.id);
+    const ids = ((await runner.entries(CLAUDE)) ?? []).map((e) => e.id);
     expect(ids).toHaveLength(8);
     const [ready = "", working = "", paused = "", aside = "", failed = "", removing = "", unsaid = ""] = ids;
     serving(configDir, {
@@ -327,7 +331,7 @@ posixOnly("Runner, its commands", () => {
       [removing]: said({ state: "removing" }),
       [unsaid]: said({}),
     });
-    const entries = (await runner.entries(login)) ?? [];
+    const entries = (await runner.entries(CLAUDE)) ?? [];
     expect(entries.map((e) => e.status)).toEqual([
       { state: "ready" },
       { state: "working", task: "GS-3" },
@@ -352,9 +356,9 @@ posixOnly("Runner, its commands", () => {
     const { runner, login, game } = setUp();
     await runner.add({ login, project: "SVA", folder: game, program: "claude" });
     // The fake spawner's runner serves nothing: the list says none serves.
-    expect((await runner.entries(login))?.[0]?.status).toEqual({ state: "starting" });
+    expect((await runner.entries(CLAUDE))?.[0]?.status).toEqual({ state: "starting" });
     runner.quit();
-    expect((await runner.entries(login))?.[0]?.status).toEqual({ state: "not_served", message: "Not running." });
+    expect((await runner.entries(CLAUDE))?.[0]?.status).toEqual({ state: "not_served", message: "Not running." });
   });
 
   it("removes an entry, and says what remove said when the runner could not finish in time", async () => {
@@ -362,35 +366,52 @@ posixOnly("Runner, its commands", () => {
     await runner.add({ login, project: "SVA", folder: game, program: "claude" });
     // A runner serves that never drops the entry: remove gives up.
     serving(configDir, {});
-    expect(await runner.remove({ login })).toEqual({
+    expect(await runner.remove({ of: CLAUDE })).toEqual({
       ok: false,
       error: "Quadit is still telling the server how @claude's last run ended; it is removed once the server answers.",
       pending: true,
     });
-    expect((await runner.entries(login))?.[0]?.status).toEqual({ state: "removing" });
+    expect((await runner.entries(CLAUDE))?.[0]?.status).toEqual({ state: "removing" });
     writeFileSync(join(configDir, "runner", "runner.lock"), "");
-    expect(await runner.remove({ login })).toEqual({ ok: true });
-    expect(await runner.entries(login)).toEqual([]);
+    expect(await runner.remove({ of: CLAUDE })).toEqual({ ok: true });
+    expect(await runner.entries(CLAUDE)).toEqual([]);
     runner.quit();
   });
 
-  it("removes a login's entries matched by its real path, and keeps what quadit run said when it could not", async () => {
+  it("removes an agent's entries, whatever file its login was named by, and keeps what quadit run said when it could not", async () => {
     const { runner, login, game, configDir } = setUp();
     const linked = join(configDir, "linked.json");
     symlinkSync(login, linked);
     await runner.add({ login: linked, project: "SVA", folder: game, program: "claude" });
-    expect((await runner.entries(login))?.map((e) => e.project)).toEqual(["SVA"]);
+    expect((await runner.entries(CLAUDE))?.map((e) => e.project)).toEqual(["SVA"]);
     // A registry that cannot be written: not "still telling the server".
     chmodSync(configDir, 0o500);
     try {
-      const refused = await runner.remove({ login });
+      const refused = await runner.remove({ of: CLAUDE });
       expect(refused).toMatchObject({ ok: false, error: expect.stringMatching(/EACCES|permission denied/i) });
       expect(refused).not.toHaveProperty("pending");
     } finally {
       chmodSync(configDir, 0o755);
     }
-    expect(await runner.remove({ login })).toEqual({ ok: true });
-    expect(await runner.entries(login)).toEqual([]);
+    expect(await runner.remove({ of: CLAUDE })).toEqual({ ok: true });
+    expect(await runner.entries(CLAUDE)).toEqual([]);
+    runner.quit();
+  });
+
+  it("lists and removes one workspace's entries only: the same tool's agent in another workspace keeps running", async () => {
+    const { runner, login, game, site, configDir } = setUp();
+    // Claude Code's login in a second workspace, beside its first: the same handle, another workspace.
+    const acme = join(configDir, "claude-acme.json");
+    const me = { handle: "@claude", kind: "agent", projects: PROJECTS, workspace_id: "w2" };
+    writeFileSync(acme, JSON.stringify({ url: "https://q.example", token: "qd_w", me }));
+    await runner.add({ login, project: "SVA", folder: game, program: "claude" });
+    await runner.add({ login: acme, project: "GS", folder: site, program: "claude" });
+    const inAcme = { ...CLAUDE, workspace: "w2" };
+    expect((await runner.entries(CLAUDE))?.map((e) => e.project)).toEqual(["SVA"]);
+    expect((await runner.entries(inAcme))?.map((e) => e.project)).toEqual(["GS"]);
+    expect(await runner.remove({ of: inAcme })).toEqual({ ok: true });
+    expect((await runner.entries(CLAUDE))?.map((e) => e.project)).toEqual(["SVA"]);
+    expect(await runner.entries(inAcme)).toEqual([]);
     runner.quit();
   });
 
@@ -452,7 +473,7 @@ posixOnly("Runner, its commands", () => {
       expect((await runner.projectsOf(claude)).projects).toEqual(["id-SVA"]);
       vi.setSystemTime(Date.now() + 6_000);
       expect((await runner.projectsOf(claude)).projects).toEqual(["id-SVA", "id-GS"]);
-      await runner.remove({ login });
+      await runner.remove({ of: CLAUDE });
       expect((await runner.projectsOf(claude)).projects).toEqual([]);
       runner.quit();
     } finally {
@@ -484,8 +505,8 @@ posixOnly("Runner, its commands", () => {
       changed: () => {},
     });
     expect(runner.available).toBe(false);
-    expect(await runner.entries("/x.json")).toBeNull();
-    expect(await runner.remove({ login: "/x.json" })).toEqual({ ok: true });
+    expect(await runner.entries(CLAUDE)).toBeNull();
+    expect(await runner.remove({ of: CLAUDE })).toEqual({ ok: true });
     expect(await runner.add({ login: "/x.json", project: "SVA", folder: "/x", program: "claude" })).toMatchObject({
       ok: false,
     });
@@ -510,7 +531,7 @@ posixOnly("Runner, under the real guard", () => {
     expect(alive(program)).toBe(true);
     let state = "";
     await until(() => {
-      void runner.entries(login).then((entries) => (state = entries?.[0]?.status.state ?? ""));
+      void runner.entries(CLAUDE).then((entries) => (state = entries?.[0]?.status.state ?? ""));
       return state === "ready";
     });
     runner.quit();
