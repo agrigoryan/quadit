@@ -30,6 +30,7 @@ Everything that already asked for started now takes in the statuses that were wa
 ### Fixed
 
 - A webhook or a rule made while the server was still catching up on changes just made (a long batch, a busy server) could be sent those earlier events, or act on them. Each hears only what happens after it is made: migration 0034 keeps the feed's position it was made at.
+- The desktop app never said a newer version was out: every desktop build so far is a pre-release, which the check skipped, and it read 0.1.0-beta.14 and 0.1.0-beta.15 as the same version. A beta now hears of newer betas and of releases, a release only of releases, and versions are ordered as Semantic Versioning orders them. An app before this fix still says nothing: install the newer one by hand once.
 
 ## [0.9.0] - 2026-11-27
 

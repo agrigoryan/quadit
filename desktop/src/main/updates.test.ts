@@ -35,6 +35,20 @@ describe("newerRelease", () => {
     ];
     expect(newerRelease(releases, "0.1.0")).toBeNull();
   });
+
+  it("gives a beta the newer betas and releases, and a release only releases", () => {
+    const releases = [
+      release("desktop-v0.1.0-beta.15", { prerelease: true }),
+      release("desktop-v0.1.0-beta.14", { prerelease: true }),
+      release("desktop-v0.1.0-beta.9", { prerelease: true }),
+    ];
+    expect(newerRelease(releases, "0.1.0-beta.12")?.version).toBe("0.1.0-beta.15");
+    expect(newerRelease(releases, "0.1.0-beta.15")).toBeNull();
+    expect(newerRelease(releases, "0.1.0-beta.15.1")).toBeNull();
+    expect(newerRelease(releases, "0.1.0-beta.14.1")?.version).toBe("0.1.0-beta.15");
+    expect(newerRelease([...releases, release("desktop-v0.1.0")], "0.1.0-beta.15")?.version).toBe("0.1.0");
+    expect(newerRelease([...releases, release("desktop-v0.2.0-beta.1", { prerelease: true })], "0.1.0")).toBeNull();
+  });
 });
 
 describe("release pages", () => {
@@ -66,9 +80,20 @@ describe("release pages", () => {
 describe("compareVersions", () => {
   it("orders by number, not by text", () => {
     expect(compareVersions("0.10.0", "0.9.9")).toBe(1);
-    expect(compareVersions("1.0.0", "1.0.0-beta.1")).toBe(0);
     expect(compareVersions("1.2.3", "1.2.4")).toBe(-1);
     expect(compareVersions("junk", "0.0.1")).toBe(-1);
+    expect(compareVersions("0.0.1", "junk")).toBe(1);
+  });
+
+  it("puts a pre-release before its release, and orders pre-releases by their parts", () => {
+    expect(compareVersions("1.0.0", "1.0.0-beta.1")).toBe(1);
+    expect(compareVersions("0.1.0-beta.15", "0.1.0-beta.14")).toBe(1);
+    expect(compareVersions("0.1.0-beta.10", "0.1.0-beta.9")).toBe(1);
+    expect(compareVersions("0.1.0-beta.14.1", "0.1.0-beta.14")).toBe(1);
+    expect(compareVersions("0.1.0-beta.14.1", "0.1.0-beta.15")).toBe(-1);
+    expect(compareVersions("1.0.0-alpha", "1.0.0-beta")).toBe(-1);
+    expect(compareVersions("1.0.0-1", "1.0.0-beta")).toBe(-1);
+    expect(compareVersions("0.1.0-beta.15", "0.1.0-beta.15")).toBe(0);
   });
 });
 

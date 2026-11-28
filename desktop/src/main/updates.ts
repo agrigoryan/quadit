@@ -1,8 +1,7 @@
 // "A new version is out": the app never installs anything itself. At most
 // once a day it reads the project's GitHub releases, and when a desktop
 // release (tag desktop-v*) newer than itself is there, it says so once and
-// keeps a menu item pointing at the download. Updating is the package
-// manager's job (brew upgrade --cask quadit-desktop) or the person's.
+// keeps a menu item pointing at the download. Installing it is the person's.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import type { Fetch } from "@/main/probe";
@@ -36,11 +35,16 @@ interface GitHubRelease {
   prerelease?: unknown;
 }
 
-/** The newest published desktop release newer than `current`, or null. Drafts, pre-releases and the server's own tags are skipped. */
+/**
+ * The newest published desktop release newer than `current`, or null. Drafts
+ * and the server's own tags are skipped; pre-releases are skipped only by an
+ * app that is not one itself, so a beta hears of the next beta.
+ */
 export function newerRelease(releases: readonly GitHubRelease[], current: string): Release | null {
+  const takesPreReleases = isPreRelease(current);
   let best: Release | null = null;
   for (const release of releases) {
-    if (release.draft === true || release.prerelease === true) continue;
+    if (release.draft === true || (release.prerelease === true && !takesPreReleases)) continue;
     if (typeof release.tag_name !== "string" || !release.tag_name.startsWith(TAG_PREFIX)) continue;
     const version = release.tag_name.slice(TAG_PREFIX.length);
     if (!parseVersion(version) || typeof release.html_url !== "string" || !isReleasePage(release.html_url)) continue;
@@ -49,20 +53,42 @@ export function newerRelease(releases: readonly GitHubRelease[], current: string
   return best;
 }
 
-/** Orders "1.2.3" style versions; anything after a "-" (a pre-release) is ignored. An unreadable version is the oldest. */
+/**
+ * Orders versions as Semantic Versioning does: "1.2.3" by number, then a
+ * pre-release ("1.0.0-beta.2") before its release, pre-releases by their
+ * dot-separated parts (numbers by value, below words). A local build's
+ * extra part ("0.1.0-beta.14.1") sits after the beta it builds on. An
+ * unreadable version is the oldest.
+ */
 export function compareVersions(a: string, b: string): number {
-  const left = parseVersion(a) ?? [-1, -1, -1];
-  const right = parseVersion(b) ?? [-1, -1, -1];
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+  if (!left || !right) return left ? 1 : right ? -1 : 0;
   for (let i = 0; i < 3; i++) {
-    const diff = (left[i] ?? 0) - (right[i] ?? 0);
+    const diff = left.core[i] - right.core[i];
     if (diff !== 0) return Math.sign(diff);
   }
-  return 0;
+  if (!left.pre.length || !right.pre.length) return Math.sign(right.pre.length - left.pre.length);
+  for (let i = 0; i < Math.min(left.pre.length, right.pre.length); i++) {
+    const diff = comparePart(left.pre[i], right.pre[i]);
+    if (diff !== 0) return diff;
+  }
+  return Math.sign(left.pre.length - right.pre.length);
 }
 
-function parseVersion(version: string): number[] | null {
-  const match = /^(\d+)\.(\d+)\.(\d+)(?:-.*)?$/.exec(version);
-  return match ? match.slice(1, 4).map(Number) : null;
+function comparePart(a: string, b: string): number {
+  const aNumber = /^\d+$/.test(a);
+  const bNumber = /^\d+$/.test(b);
+  if (aNumber && bNumber) return Math.sign(Number(a) - Number(b));
+  if (aNumber !== bNumber) return aNumber ? -1 : 1;
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+const isPreRelease = (version: string) => (parseVersion(version)?.pre.length ?? 0) > 0;
+
+function parseVersion(version: string): { core: number[]; pre: string[] } | null {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/.exec(version);
+  return match ? { core: match.slice(1, 4).map(Number), pre: match[4]?.split(".") ?? [] } : null;
 }
 
 interface Remembered {
