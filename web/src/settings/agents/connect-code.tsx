@@ -1,13 +1,14 @@
 // An agent's connect code: a person makes one for the tool the agent runs
 // in and says the line it gives in that tool; the agent gives the code back
 // with its own login, and the page sees it used. So connecting is proven
-// without the desktop app.
+// without the desktop app. The line names the workspace: the tool may work
+// in several, and the code goes to this one's server alone.
 
 import { type FormEvent, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { t } from "@/lib/i18n";
 import { readError } from "@/data/query";
-import { useSlug } from "@/data/selectors";
+import { useSlug, useWorkspaceName } from "@/data/selectors";
 import { type AgentMember, connectCodeKey, makeConnectCode, readConnectCode } from "@/settings/agents/data";
 import { FormAlert, FormField, Note } from "@/ui/form";
 import { Card, EmptyRow, Section } from "@/ui/page-layout";
@@ -20,6 +21,7 @@ const ASK_MS = 3_000;
 
 export function AgentConnectCode({ agent, canMake }: { agent: AgentMember; canMake: boolean }) {
   const slug = useSlug();
+  const workspace = useWorkspaceName();
   // Connect names an agent after its tool, so its name is the likely answer.
   const [tool, setTool] = useState(agent.name);
   const make = useMutation({ mutationFn: (forTool: string) => makeConnectCode(slug, agent.user_id, forTool) });
@@ -54,7 +56,7 @@ export function AgentConnectCode({ agent, canMake }: { agent: AgentMember; canMa
           {made && (
             <div className="flex flex-col gap-2">
               <p className="text-sm">{t("connectCode.say", { tool: made.tool })}</p>
-              <CopyField value={t("connectCode.line", { code: made.code })} />
+              <CopyField value={t("connectCode.line", { code: made.code, workspace })} />
               <output className="block">
                 {state.data?.used ? (
                   <Note tone="ok">{t("connectCode.used", { tool: made.tool })}</Note>

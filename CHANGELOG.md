@@ -16,6 +16,8 @@ Everything that already asked for started now takes in the statuses that were wa
 
 ### Added
 
+- One tool on one computer can be an agent in several workspaces, on one server or several, at once: a chat in each project's folder works in its own ([several workspaces](docs/agents.md#several-workspaces)). `quadit login` in another workspace keeps the tool's login and adds the new one beside it (`claude-acme.json`), after asking the first login's own server which workspace it is in; `quadit use acme [project=WEB]` ties a folder to a workspace; `quadit logout [--workspace=W] [--revoke=TOKEN_ID]` takes one away. A command works in the workspace `--workspace=` names, else the folder's, else the tool's only one; among several it sends nothing and lists them. The lines `quadit wait`, `quadit listen` and a run's prompt print carry `--workspace=<id>`; the runner and a companion pass the workspace to what they start (`QUADIT_WORKSPACE`); `quadit run add` ties its folder, and `quadit run remove` takes `workspace=`. A tool with one login works as before. The skill asks once which workspace in a folder tied to none, offers to tie it, and names another only on the person's own words. MCP stays with one workspace per tool for now.
+- The connect-code line says its workspace (`Connect to Quadit K7PQ2M in Personal`), and the agent sends the code to that workspace's server alone (`quadit connect K7PQ2M --workspace=Personal`); the line that has an agent listen says it too (“listen to Quadit for SVA in Personal”).
 - Picking yourself in a filter (Assignee, Waiting on) is "Me" in the list, and the page's address and a view saved from it say `me`: a shared view shows each person their own. Views saved before with your name keep it.
 
 ### Changed

@@ -133,7 +133,7 @@ export const agentStrings = {
   "connectCode.make": "Make a connect code",
   "connectCode.again": "Make a new code",
   "connectCode.say": "In {tool}, say:",
-  "connectCode.line": "Connect to Quadit {code}",
+  "connectCode.line": "Connect to Quadit {code} in {workspace}",
   "connectCode.waiting": "Waiting for {tool}…",
   "connectCode.used": "Connected: {tool} gave the code back.",
   "connectCode.expired": "This code ran out. Make a new one.",

@@ -36,19 +36,21 @@ test("the comment box says what happens to a comment in each of the agent's stat
   await page.getByRole("button", { name: "Make a connect code" }).click();
   await expect(page.getByText("In Codex, say:")).toBeVisible();
   const line = (await page.getByRole("code").filter({ hasText: "Connect to Quadit" }).textContent()) ?? "";
-  const code = line.replace("Connect to Quadit ", "");
+  const code = line.replace("Connect to Quadit ", "").replace(` in ${WORKSPACE.name}`, "");
   expect(code).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/);
   await expect(page.getByText("Waiting for Codex…")).toBeVisible();
 
   // The agent gives it back from inside its tool, and the page sees it.
-  expect(await agent("connect", code)).toContain(`Connected as @${handle} in the workspace "${WORKSPACE.name}".`);
+  expect(await agent("connect", code, `--workspace=${WORKSPACE.name}`)).toContain(
+    `Connected as @${handle} in the workspace "${WORKSPACE.name}".`,
+  );
   await expect(page.getByText("Connected: Codex gave the code back.")).toBeVisible();
 
   await page.goto(`/${WORKSPACE.slug}/task/${key}`);
   const projectKey = key.split("-")[0] ?? "";
   await expect(
     activity.getByText(
-      `@${handle} is not listening. To have it answer here, say “listen to Quadit for ${projectKey}” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.`,
+      `@${handle} is not listening. To have it answer here, say “listen to Quadit for ${projectKey} in ${WORKSPACE.name}” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.`,
     ),
   ).toBeVisible();
 

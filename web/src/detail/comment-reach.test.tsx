@@ -41,7 +41,7 @@ function load(agent: Member, project: Record<string, unknown> = {}, others = fal
     seq: 1,
     me: ann,
     user: { id: "u1" } as User,
-    workspace: { id: "w", slug: "acme" } as Workspace,
+    workspace: { id: "w", slug: "acme", name: "Acme" } as Workspace,
     projects: [
       { id: "p1", key: "SVA", name: "Game", rank: "a", ...project },
       ...(others ? [{ id: "p2", key: "GS", name: "Getting started", rank: "b" }] : []),
@@ -105,24 +105,24 @@ describe("the line under the comment box", () => {
     show({ ...base, assignee_id: "u1", waiting_on_id: "a1" });
     expect(
       await screen.findByText(
-        "@codex is not listening. To have it answer here, say “listen to Quadit for SVA” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.",
+        "@codex is not listening. To have it answer here, say “listen to Quadit for SVA in Acme” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.",
       ),
     ).toBeTruthy();
   });
 
-  it("says plain “listen to Quadit” to an agent with one project: it then listens to everything, a project added later too", async () => {
+  it("says plain “listen to Quadit in Acme” to an agent with one project: it then listens to everything, a project added later too", async () => {
     agents(false, "Codex");
     show({ ...base, assignee_id: "a1" });
     expect(
       await screen.findByText(
-        "@codex is not listening. To have it answer here, say “listen to Quadit” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.",
+        "@codex is not listening. To have it answer here, say “listen to Quadit in Acme” in Codex. Until then it sees this when you next ask it, for example “check Quadit”.",
       ),
     ).toBeTruthy();
     cleanup();
     // Several projects in the workspace, but the agent may work in one of them only.
     load({ ...codex, connected_at: 1700000000000, scope: { projects: ["p1"] } }, {}, true);
     show({ ...base, assignee_id: "a1" });
-    expect(await screen.findByText(/say “listen to Quadit” in Codex\./)).toBeTruthy();
+    expect(await screen.findByText(/say “listen to Quadit in Acme” in Codex\./)).toBeTruthy();
   });
 
   it("says when the agent listens only to other projects, and the line that has it listen to this one", async () => {
@@ -130,7 +130,7 @@ describe("the line under the comment box", () => {
     show({ ...base, assignee_id: "a1" });
     expect(
       await screen.findByText(
-        "@codex is listening to other projects, not to this one. To have it answer here, say “listen to Quadit for SVA” to it in a chat in this project’s folder. Until then it sees this when you next ask it, for example “check Quadit”.",
+        "@codex is listening to other projects, not to this one. To have it answer here, say “listen to Quadit for SVA in Acme” to it in a chat in this project’s folder. Until then it sees this when you next ask it, for example “check Quadit”.",
       ),
     ).toBeTruthy();
   });
@@ -139,10 +139,10 @@ describe("the line under the comment box", () => {
     load({ ...codex, connected_at: 1700000000000 }, { archived_at: 1 }, true);
     agents(false, "Codex");
     show({ ...base, assignee_id: "a1" });
-    expect(await screen.findByText(/say “listen to Quadit for SVA” in Codex\./)).toBeTruthy();
+    expect(await screen.findByText(/say “listen to Quadit for SVA in Acme” in Codex\./)).toBeTruthy();
     cleanup();
     show({ ...base, project_id: "gone", assignee_id: "a1" });
-    expect(await screen.findByText(/say “listen to Quadit” in Codex\./)).toBeTruthy();
+    expect(await screen.findByText(/say “listen to Quadit in Acme” in Codex\./)).toBeTruthy();
   });
 
   it("names no tool for an agent whose tool is not known", async () => {
@@ -150,7 +150,7 @@ describe("the line under the comment box", () => {
     show({ ...base, assignee_id: "a1" });
     expect(
       await screen.findByText(
-        "@codex is not listening. To have it answer here, say “listen to Quadit” to it in a chat. Until then it sees this when you next ask it to check Quadit.",
+        "@codex is not listening. To have it answer here, say “listen to Quadit in Acme” to it in a chat. Until then it sees this when you next ask it to check Quadit.",
       ),
     ).toBeTruthy();
   });

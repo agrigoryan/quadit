@@ -19,7 +19,7 @@ import { exact, parseWhen } from "@/lib/time";
 import { useConnection, type Connection } from "@/data/listening";
 import { mayBeGivenWork } from "@/data/access";
 import { useRunOutlook } from "@/data/run-outlook";
-import { useMe, useMembers, useProjects, useRowEvenIfGone, useRows } from "@/data/selectors";
+import { useMe, useMembers, useProjects, useRowEvenIfGone, useRows, useWorkspaceName } from "@/data/selectors";
 import { EMPTY_DRAFT, useDrafts, type Draft } from "@/detail/comment-actions";
 import { isOpenSession, type Member, type Task } from "@/types/core";
 import type { RunOutlook } from "@/types/dashboard";
@@ -186,8 +186,10 @@ function AgentReach({ agent, task }: { agent: Member; task: Task }) {
         .map((p) => p.id),
       task.project_id,
     ]).size > 1;
+  // The workspace is named too: the agent's tool may work in several, and the folder it is said in may be tied to none.
+  const workspace = useWorkspaceName();
   const line = (key: string | undefined) =>
-    key ? t("comment.reach.line", { project: key }) : t("comment.reach.lineAny");
+    key ? t("comment.reach.line", { project: key, workspace }) : t("comment.reach.lineAny", { workspace });
   if (!reach) return null;
   const { connection, tool, elsewhere } = reach;
   const handle = agent.handle;

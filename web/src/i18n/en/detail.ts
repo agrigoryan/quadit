@@ -199,8 +199,8 @@ export const detail = {
     "@{handle} is not listening. To have it answer here, say {line} to it in a chat. Until then it sees this when you next ask it to check Quadit.",
   "comment.reach.elsewhere":
     "@{handle} is listening to other projects, not to this one. To have it answer here, say {line} to it in a chat in this project’s folder. Until then it sees this when you next ask it, for example “check Quadit”.",
-  "comment.reach.line": "“listen to Quadit for {project}”",
-  "comment.reach.lineAny": "“listen to Quadit”",
+  "comment.reach.line": "“listen to Quadit for {project} in {workspace}”",
+  "comment.reach.lineAny": "“listen to Quadit in {workspace}”",
   "comment.reach.notConnected": "@{handle} has not connected yet.",
   "comment.reach.listeningMany":
     "{handles} is listening and will see this. | {handles} are listening and will see this.",
