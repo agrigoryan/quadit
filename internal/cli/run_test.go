@@ -406,6 +406,24 @@ func TestQuaditRunWithSecretIsStillTheSecretsRunner(t *testing.T) {
 	}
 }
 
+// TestARunWithSecretsGivesItsCommandItsWorkspace: the command run with a
+// secret of a workspace named works there too, whatever the folder is tied
+// to, as the command that started it did.
+func TestARunWithSecretsGivesItsCommandItsWorkspace(t *testing.T) {
+	w := newToolWorld(t)
+	a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
+	w.connected(a, b)
+	w.tie(w.work, personal, "")
+	command := []string{"sh", "-c", `echo "$QUADIT_WORKSPACE $QUADIT_CONFIG"`}
+	if runtime.GOOS == "windows" {
+		command = []string{"cmd", "/c", "echo %QUADIT_WORKSPACE% %QUADIT_CONFIG%"}
+	}
+	code, out, errs := runCLI(t, append([]string{"run", "--workspace=acme", "--secret", "KEY", "--"}, command...)...)
+	if code != 0 || strings.TrimSpace(out) != acme.ID+" "+filepath.Join(w.dir, "claude-acme.json") {
+		t.Fatalf("exit %d, printed %q %q", code, out, errs)
+	}
+}
+
 // serveFakeSecrets answers POST /secrets/env with one secret.
 func serveFakeSecrets(t *testing.T) string {
 	t.Helper()

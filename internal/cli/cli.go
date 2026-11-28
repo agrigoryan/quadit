@@ -52,7 +52,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	case "login":
 		return login(ctx, rest, os.Stdin, stdout, stderr)
 	case "logout":
-		return logout(ctx, rest, askOf(sw, false), stdout, stderr)
+		return logout(ctx, rest, namedWorkspace(sw), sw.dry, stdout, stderr)
 	case "use":
 		return use(ctx, rest, sw, stdout, stderr)
 	case "skill":
@@ -67,7 +67,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	// A connect code goes to the workspace its line names, never to the
 	// folder's: sent to another server, it would be a code given away.
-	c, chosen, err := openLogin(ctx, askOf(sw, cmd != "connect"))
+	c, chosen, err := openLogin(ctx, workspaceAsk{named: namedWorkspace(sw), sendsCode: cmd == "connect"})
 	if err != nil {
 		var several errSeveral
 		if errors.As(err, &several) && (cmd == "me" || cmd == "whoami" || cmd == "connect" && len(rest) == 0) {

@@ -127,14 +127,24 @@ func (idx connectionIndex) workspaceName(workspaceID string) string {
 // any case as the same name: macOS's and Windows'.
 var foldsCase = runtime.GOOS == "darwin" || runtime.GOOS == "windows"
 
-// samePath reports whether two absolute paths name the same file by their
-// spelling, cleaned, in any case where the system takes them so.
+// samePath reports whether two paths name the same file by their
+// spelling, made absolute and clean, in any case where the system takes
+// them so.
 func samePath(a, b string) bool {
-	a, b = filepath.Clean(a), filepath.Clean(b)
+	a, b = absPath(a), absPath(b)
 	if foldsCase {
 		return strings.EqualFold(a, b)
 	}
 	return a == b
+}
+
+// absPath is a path made absolute and clean; one that cannot be made
+// absolute, clean.
+func absPath(path string) string {
+	if abs, err := filepath.Abs(path); err == nil {
+		return abs
+	}
+	return filepath.Clean(path)
 }
 
 // realFolder is a folder as ties are compared: absolute, its links

@@ -96,15 +96,24 @@ func saveLogin(ctx context.Context, c *Client, app *appLogin) (path, more string
 	raw, _ := json.MarshalIndent(savedConfig{URL: c.URL, Token: c.Token, App: app}, "", "  ")
 	if len(idx.of(tool)) == 0 {
 		old, err := fileClient(tool)
-		if err != nil || (old.URL == c.URL && old.Token == c.Token) {
-			// No login there, one that cannot be read, or this one again: written as it always was.
+		switch {
+		case errors.Is(err, errNotConnected) || err == nil && old.URL == c.URL && old.Token == c.Token:
+			// No login there, or this one again: written as it always was.
 			return tool, "", writePrivate(tool, raw)
+		case err != nil:
+			return "", "", fmt.Errorf("this tool's login cannot be read, so nothing was changed: %w\n  when it is a login no longer used, remove the file and log in again", err)
 		}
 		was, err := old.me(ctx)
+		if err == nil && was.Workspace.ID == "" {
+			err = errNoWorkspaceID
+		}
 		if err != nil {
 			return "", "", fmt.Errorf("this tool's login (%s) could not be asked which workspace it is in, so nothing was changed: %w\n  when it is a login no longer used, quadit logout removes it", tool, err)
 		}
 		now, err := c.me(ctx)
+		if err == nil && now.Workspace.ID == "" {
+			err = errNoWorkspaceID
+		}
 		if err != nil {
 			return "", "", err
 		}
@@ -114,6 +123,9 @@ func saveLogin(ctx context.Context, c *Client, app *appLogin) (path, more string
 		idx.Connections = append(idx.Connections, connectionOf(tool, tool, old.URL, was))
 	}
 	now, err := c.me(ctx)
+	if err == nil && now.Workspace.ID == "" {
+		err = errNoWorkspaceID
+	}
 	if err != nil {
 		return "", "", err
 	}
@@ -174,11 +186,13 @@ func newLoginFile(tool, slug string, idx connectionIndex) string {
 
 // logout takes away the tool's login in a workspace: with --revoke=ID it
 // first revokes that token with the login itself (a revocation that fails
-// changes nothing), then removes its file and its connection, and the
-// folder ties of a workspace no tool is connected to any more. Which
-// login is chosen as a command chooses one, but never by the folder: the
-// one named, or the only one.
-func logout(ctx context.Context, args []string, ask workspaceAsk, stdout, stderr io.Writer) int {
+// changes nothing), then removes its file and its connection. Folder ties
+// stay: they name a workspace, which other tools may still work in, and
+// in a folder tied to a workspace a tool is not connected to its commands
+// are refused (quadit use --clear unties it). The login is the workspace
+// named, or the tool's only one, never the folder's. A dry run says what
+// would be taken away, and takes nothing.
+func logout(ctx context.Context, args []string, named string, dry bool, stdout, stderr io.Writer) int {
 	revoke := ""
 	for _, a := range args {
 		v, ok := strings.CutPrefix(a, "--revoke=")
@@ -188,7 +202,7 @@ func logout(ctx context.Context, args []string, ask workspaceAsk, stdout, stderr
 		}
 		revoke = v
 	}
-	if err := logoutWith(ctx, ask, revoke, stdout); err != nil {
+	if err := logoutWith(ctx, named, revoke, dry, stdout); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
@@ -196,7 +210,7 @@ func logout(ctx context.Context, args []string, ask workspaceAsk, stdout, stderr
 }
 
 // logoutWith is logout, once its arguments are read.
-func logoutWith(ctx context.Context, ask workspaceAsk, revoke string, stdout io.Writer) error {
+func logoutWith(ctx context.Context, named, revoke string, dry bool, stdout io.Writer) error {
 	base := configPath()
 	dir := filepath.Dir(base)
 	idx, err := readIndex(dir)
@@ -216,29 +230,29 @@ func logoutWith(ctx context.Context, ask workspaceAsk, revoke string, stdout io.
 		if err != nil {
 			return err
 		}
-		if ask.named != "" {
+		if named != "" {
 			w, err := c.workspace(ctx)
 			if err != nil {
 				return fmt.Errorf("cannot check which workspace this tool's login is in (%w): quadit logout without --workspace takes it away", err)
 			}
-			if !w.named(ask.named) {
-				return fmt.Errorf("this tool works in %s only, not in %q", w.Name, ask.named)
+			if !w.named(named) {
+				return fmt.Errorf("this tool works in %s only, not in %q", w.Name, named)
 			}
 		}
-	case ask.named != "":
+	case named != "":
 		var matches []connection
 		for _, o := range conns {
-			if o.ref().named(ask.named) {
+			if o.ref().named(named) {
 				matches = append(matches, o)
 			}
 		}
 		switch len(matches) {
 		case 0:
-			return notConnectedThere(ask.named, false, conns)
+			return notConnectedThere(named, false, conns)
 		case 1:
 			conn = &matches[0]
 		default:
-			return fmt.Errorf("%q names %d workspaces this tool works in; name one by its id:\n%s", ask.named, len(matches), connectionLines(matches, true))
+			return fmt.Errorf("%q names %d workspaces this tool works in; name one by its id:\n%s", named, len(matches), connectionLines(matches, true))
 		}
 	case len(conns) == 1:
 		conn = &conns[0]
@@ -251,6 +265,21 @@ func logoutWith(ctx context.Context, ask workspaceAsk, revoke string, stdout io.
 		}
 	}
 
+	login, name := base, "its workspace"
+	switch {
+	case conn != nil:
+		login, name = conn.Login, conn.WorkspaceName
+	case c.ws.Name != "":
+		name = c.ws.Name
+	}
+	if dry {
+		revoked := ""
+		if revoke != "" {
+			revoked = ", and its token revoked"
+		}
+		fmt.Fprintf(stdout, "would be accepted: Logged out of %s: %s would be removed%s.\n", name, login, revoked)
+		return nil
+	}
 	revoked := ""
 	if revoke != "" {
 		if c == nil {
@@ -261,21 +290,11 @@ func logoutWith(ctx context.Context, ask workspaceAsk, revoke string, stdout io.
 		}
 		revoked = ", and its token is revoked"
 	}
-	login, name := base, "its workspace"
-	switch {
-	case conn != nil:
-		login, name = conn.Login, conn.WorkspaceName
-	case c.ws.Name != "":
-		name = c.ws.Name
-	}
 	if err := os.Remove(login); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 	if conn != nil {
 		idx.Connections = slices.DeleteFunc(idx.Connections, func(o connection) bool { return samePath(o.Login, conn.Login) })
-		if !slices.ContainsFunc(idx.Connections, func(o connection) bool { return o.WorkspaceID == conn.WorkspaceID }) {
-			idx.Folders = slices.DeleteFunc(idx.Folders, func(f folderTie) bool { return f.WorkspaceID == conn.WorkspaceID })
-		}
 		if err := idx.write(dir); err != nil {
 			return err
 		}

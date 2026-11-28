@@ -167,6 +167,16 @@ func TestFieldsInOrderKeepsTheOrderTyped(t *testing.T) {
 	}
 }
 
+// TestTheSwitchesOfACommandToRunAreItsOwn: after --exec or --, a switch is
+// the command's: listen --workspace=acme --exec npm run job
+// --workspace=frontend listens in acme and runs npm with its own.
+func TestTheSwitchesOfACommandToRunAreItsOwn(t *testing.T) {
+	sw, rest := takeSwitches([]string{"listen", "--workspace=acme", "--exec", "npm", "run", "job", "--workspace=frontend", "--json"})
+	if sw != (switches{workspace: "acme"}) || !reflect.DeepEqual(rest, []string{"listen", "--exec", "npm", "run", "job", "--workspace=frontend", "--json"}) {
+		t.Fatalf("switches %+v, rest %q", sw, rest)
+	}
+}
+
 func TestTakeSwitches(t *testing.T) {
 	sw, rest := takeSwitches([]string{"--json", "update", "--id=abc", "SVA-1", "--for=@ann", "--dry-run", "status=done", "--", "--json"})
 	want := switches{json: true, dry: true, changeID: "abc", actFor: "@ann"}

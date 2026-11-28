@@ -165,6 +165,20 @@ func TestRemovingByWorkspaceKeepsTheOthers(t *testing.T) {
 	}
 }
 
+// TestRemovingAnEntryOfAnotherWorkspaceIsRefused: run remove ENTRY_ID
+// workspace=W, for an entry of another workspace, removes nothing.
+func TestRemovingAnEntryOfAnotherWorkspaceIsRefused(t *testing.T) {
+	rt := newRunTest(t, core.ProgramClaude)
+	var out bytes.Buffer
+	code := runRemove(context.Background(), rt.files, rt.host(), []string{rt.entry.ID}, map[string][]string{"workspace": {acme.ID}}, &out, &out)
+	if code != 1 || !strings.Contains(out.String(), "in another workspace than "+acme.ID+": nothing was removed") {
+		t.Fatalf("remove: %d %s", code, out.String())
+	}
+	if reg, _ := readRegistry(rt.files.registry); len(reg.Entries) != 1 || reg.Entries[0].Removing {
+		t.Fatalf("the registry holds %+v", reg.Entries)
+	}
+}
+
 func TestALoginOfAnotherWorkspaceOrReadOnlyIsAnEntryError(t *testing.T) {
 	t.Run("add refuses a read-only login and a person's", func(t *testing.T) {
 		rt := newRunTest(t, core.ProgramClaude)

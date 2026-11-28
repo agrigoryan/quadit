@@ -80,9 +80,9 @@ func (r *runner) wake(command, secrets []string, it wakeItem, limit time.Duratio
 // listen's own, its Quadit login made the companion's, whatever the
 // command inherited. A login from a file is passed by QUADIT_CONFIG, and
 // QUADIT_URL and QUADIT_TOKEN are dropped; one from those two keeps them.
-// QUADIT_WORKSPACE names the workspace, by its id: a quadit command the
-// item's command runs works where the companion listens, in whatever
-// folder it runs.
+// QUADIT_WORKSPACE names the workspace, by its id (when known): a quadit
+// command the item's command runs works where the companion listens, in
+// whatever folder it runs.
 func childEnv(base []string, c *Client, workspace string) []string {
 	env := make([]string, 0, len(base)+2)
 	for _, kv := range base {
@@ -100,7 +100,10 @@ func childEnv(base []string, c *Client, workspace string) []string {
 	if c.login != "" {
 		env = append(env, "QUADIT_CONFIG="+c.login)
 	}
-	return append(env, "QUADIT_WORKSPACE="+workspace)
+	if workspace != "" {
+		env = append(env, "QUADIT_WORKSPACE="+workspace)
+	}
+	return env
 }
 
 // listenEvents reports what listen does, one JSON object a line, to a file

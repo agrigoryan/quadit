@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"slices"
 	"strings"
 	"unicode"
@@ -22,15 +21,8 @@ import (
 // made it alone.
 func (r *runner) connect(in input) error {
 	if len(in.pos) == 0 {
-		raw, err := r.c.JSON(r.ctx, "/me", url.Values{})
+		me, err := r.c.me(r.ctx)
 		if err != nil {
-			return err
-		}
-		var me struct {
-			Handle, Kind string
-			Workspace    struct{ Name string }
-		}
-		if err := json.Unmarshal(raw, &me); err != nil {
 			return err
 		}
 		if me.Kind != "agent" {

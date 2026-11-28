@@ -674,7 +674,7 @@ func runAdd(ctx context.Context, files runFiles, host runHost, fields map[string
 func runRemove(ctx context.Context, files runFiles, host runHost, pos []string, fields map[string][]string, stdout, stderr io.Writer) int {
 	login, project, workspace := firstValue(fields["login"]), firstValue(fields["project"]), firstValue(fields["workspace"])
 	if (len(pos) == 0) == (login == "") {
-		fmt.Fprintln(stderr, "usage: quadit run remove ENTRY_ID | login=PATH [project=KEY] [workspace=ID]")
+		fmt.Fprintln(stderr, "usage: quadit run remove ENTRY_ID [workspace=ID] | login=PATH [project=KEY] [workspace=ID]")
 		return exitFailed
 	}
 	if login != "" {
@@ -684,6 +684,18 @@ func runRemove(ctx context.Context, files runFiles, host runHost, pos []string, 
 			return exitFailed
 		}
 		login = abs
+	}
+	if len(pos) > 0 && workspace != "" {
+		// An entry named by its id and a workspace it is not of is a mistake: nothing is removed.
+		reg, err := readRegistry(files.registry)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return exitFailed
+		}
+		if i := slices.IndexFunc(reg.Entries, func(e regEntry) bool { return e.ID == pos[0] }); i >= 0 && reg.Entries[i].WorkspaceID != workspace {
+			fmt.Fprintf(stderr, "entry %s is %s's in another workspace than %s: nothing was removed\n", pos[0], reg.Entries[i].Agent, workspace)
+			return exitFailed
+		}
 	}
 	matches := func(e regEntry) bool {
 		if len(pos) > 0 {

@@ -209,6 +209,35 @@ func TestLoginInAnotherWorkspaceAddsAConnection(t *testing.T) {
 			t.Fatal("logging in again made an index")
 		}
 	})
+	t.Run("a first login that cannot be read changes nothing", func(t *testing.T) {
+		w := newToolWorld(t)
+		if err := os.WriteFile(w.base, []byte("{not json"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		code, said := loginAs(t, newWorkspaceServer(t, acme, "qd_b"))
+		if code != 1 || !strings.Contains(said, "this tool's login cannot be read, so nothing was changed") {
+			t.Fatalf("login: %d %s", code, said)
+		}
+		if raw, _ := os.ReadFile(w.base); string(raw) != "{not json" {
+			t.Fatal("the unreadable login was overwritten")
+		}
+	})
+	t.Run("a relative QUADIT_CONFIG is the same tool as its absolute spelling", func(t *testing.T) {
+		w := newToolWorld(t)
+		a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
+		t.Chdir(w.dir)
+		t.Setenv("QUADIT_CONFIG", "claude.json")
+		for _, s := range []*workspaceServer{a, b} {
+			if code, said := loginAs(t, s); code != 0 {
+				t.Fatal(said)
+			}
+		}
+		t.Setenv("QUADIT_CONFIG", w.base)
+		t.Chdir(w.work)
+		if _, err := choose(t, workspaceAsk{}); !errors.As(err, new(errSeveral)) {
+			t.Fatalf("the absolute spelling of the tool's file chose by itself: %v", err)
+		}
+	})
 	t.Run("a first login that cannot say its workspace changes nothing", func(t *testing.T) {
 		w := newToolWorld(t)
 		a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
@@ -246,7 +275,7 @@ func TestLogoutTakesAwayOneConnection(t *testing.T) {
 		code, out, errs := runCLI(t, append([]string{"logout"}, args...)...)
 		return code, out + errs
 	}
-	t.Run("it revokes the token with itself, removes its file, its connection and its workspace's ties", func(t *testing.T) {
+	t.Run("it revokes the token with itself, removes its file and its connection, and leaves the folder ties", func(t *testing.T) {
 		w := newToolWorld(t)
 		a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
 		w.connected(a, b)
@@ -264,11 +293,31 @@ func TestLogoutTakesAwayOneConnection(t *testing.T) {
 			t.Fatal("the login file is still there")
 		}
 		idx, _ := readIndex(w.dir)
-		if len(idx.Connections) != 1 || idx.Connections[0].WorkspaceID != personal.ID || len(idx.Folders) != 1 || idx.Folders[0].WorkspaceID != personal.ID {
+		if len(idx.Connections) != 1 || idx.Connections[0].WorkspaceID != personal.ID || len(idx.Folders) != 2 {
 			t.Fatalf("the index is %+v", idx)
 		}
-		c, err := choose(t, workspaceAsk{byFolder: true})
+		c, err := choose(t, workspaceAsk{})
 		is(t, c, err, a)
+		// The site folder is still Acme's, which other tools may work in: here its commands are refused.
+		t.Chdir(filepath.Join(w.work, "site"))
+		if _, err := choose(t, workspaceAsk{}); err == nil || !strings.HasPrefix(err.Error(), "this folder is tied to "+acme.ID) {
+			t.Fatalf("a command in the folder of the workspace logged out of: %v", err)
+		}
+	})
+	t.Run("a dry run says what it would take away, and revokes and removes nothing", func(t *testing.T) {
+		w := newToolWorld(t)
+		a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
+		w.connected(a, b)
+		code, said := logoutRun(t, "--dry-run", "--workspace=acme", "--revoke=0199eeee-0000-7000-8000-000000000001")
+		if code != 0 || !strings.HasPrefix(said, "would be accepted: Logged out of Acme: ") || len(b.sent()) != 0 {
+			t.Fatalf("logout --dry-run: %d %s, sent %v", code, said, b.sent())
+		}
+		if idx, _ := readIndex(w.dir); len(idx.Connections) != 2 {
+			t.Fatal("a dry run took the connection away")
+		}
+		if _, err := os.Stat(filepath.Join(w.dir, "claude-acme.json")); err != nil {
+			t.Fatal(err)
+		}
 	})
 	t.Run("a revocation that fails takes nothing away", func(t *testing.T) {
 		w := newToolWorld(t)

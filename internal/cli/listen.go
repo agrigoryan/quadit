@@ -262,8 +262,13 @@ func giveUp(workspace string, seq int64, lease string) string {
 // inWorkspace is a command the listener prints, to be run as printed,
 // with the workspace it works in (by its id): a line printed before its
 // tool worked in a second workspace still works in its own, and one copied
-// into another folder too.
+// into another folder too. A login whose server does not say its
+// workspace's id (an older one) is a tool's only login: its lines need
+// none, and carry none.
 func inWorkspace(command, workspace string) string {
+	if workspace == "" {
+		return command
+	}
 	return command + " --workspace=" + workspace
 }
 

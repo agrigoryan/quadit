@@ -20,16 +20,19 @@ import (
 )
 
 // workspaceAsk is what a command was told about the workspace it works
-// in: a workspace named (by id, slug or name), and whether the folder's
-// tie counts.
+// in: a workspace named (by id, slug or name), and whether it sends a
+// connect code. A code goes only to a workspace named or to the tool's
+// only one: neither the folder's tie nor QUADIT_URL and QUADIT_TOKEN
+// settle it, since sent to another server it would be a code given away.
 type workspaceAsk struct {
-	named    string
-	byFolder bool
+	named     string
+	sendsCode bool
 }
 
-// askOf is what a command was told: --workspace=, else QUADIT_WORKSPACE.
-func askOf(sw switches, byFolder bool) workspaceAsk {
-	return workspaceAsk{named: cmp.Or(sw.workspace, os.Getenv("QUADIT_WORKSPACE")), byFolder: byFolder}
+// namedWorkspace is the workspace a command was told: --workspace=, else
+// QUADIT_WORKSPACE.
+func namedWorkspace(sw switches) string {
+	return cmp.Or(sw.workspace, os.Getenv("QUADIT_WORKSPACE"))
 }
 
 // chosenLogin is what the choice was made from, for a command that says
@@ -62,7 +65,7 @@ func openLogin(ctx context.Context, ask workspaceAsk) (*Client, chosenLogin, err
 		return nil, chosenLogin{}, err
 	}
 	chosen := chosenLogin{conns: idx.of(idx.toolOf(base))}
-	if ask.named == "" && ask.byFolder && len(idx.Folders) > 0 {
+	if ask.named == "" && !ask.sendsCode && len(idx.Folders) > 0 {
 		here, err := os.Getwd()
 		if err == nil {
 			here, err = realFolder(here)
@@ -87,17 +90,33 @@ func openLogin(ctx context.Context, ask workspaceAsk) (*Client, chosenLogin, err
 		wanted, wantedName = func(w workspaceRef) bool { return w.ID == tied }, idx.workspaceName(tied)
 	}
 	if wanted == nil {
-		switch {
-		case env != nil:
+		if env != nil && !ask.sendsCode {
 			return env, chosen, nil
-		case len(chosen.conns) == 0:
-			c, err := fileClient(base)
-			return c, chosen, err
-		case len(chosen.conns) == 1:
-			c, err := connectionClient(chosen.conns[0])
+		}
+		if len(chosen.conns) > 1 {
+			return nil, chosen, errSeveral{conns: chosen.conns, byFolder: !ask.sendsCode}
+		}
+		var c *Client
+		var err error
+		if len(chosen.conns) == 1 {
+			c, err = connectionClient(chosen.conns[0])
+		} else {
+			c, err = fileClient(base)
+		}
+		if env == nil {
 			return c, chosen, err
 		}
-		return nil, chosen, errSeveral{conns: chosen.conns, byFolder: ask.byFolder}
+		// A code, with QUADIT_URL and QUADIT_TOKEN set: they must be the tool's one login.
+		if errors.Is(err, errNotConnected) {
+			return env, chosen, nil
+		}
+		if err != nil {
+			return nil, chosen, err
+		}
+		if env.URL != c.URL || env.Token != c.Token {
+			return nil, chosen, errors.New("QUADIT_URL and QUADIT_TOKEN are set for another login than this tool's: unset them here, or name the workspace the code is for: --workspace=NAME")
+		}
+		return c, chosen, nil
 	}
 
 	var matches []connection
@@ -132,6 +151,9 @@ func openLogin(ctx context.Context, ask workspaceAsk) (*Client, chosenLogin, err
 		}
 	}
 	w, err := c.workspace(ctx)
+	if err == nil && w.ID == "" {
+		err = errNoWorkspaceID
+	}
 	if err != nil {
 		return nil, chosen, fmt.Errorf("cannot check which workspace this login is in: %w", err)
 	}
@@ -279,8 +301,15 @@ type whoAmI struct {
 	Projects    []string     `json:"projects"`
 }
 
-// me asks the login who it is. A server that does not name the workspace
-// is older than this quadit.
+// errNoWorkspaceID refuses what needs to know a login's workspace when its
+// server does not say (one older than 0.7 names no workspace id in GET
+// /me). A tool with one login needs none of it.
+var errNoWorkspaceID = errors.New("the server does not say which workspace this login is in: it is older than this quadit, update it")
+
+// me asks the login who it is. A workspace id not of its form is taken as
+// none (an older server's). When the index named the login's workspace and
+// the server names another, the login file holds another login than the
+// index says, and it is refused.
 func (c *Client) me(ctx context.Context) (whoAmI, error) {
 	raw, err := c.JSON(ctx, "/me", url.Values{})
 	if err != nil {
@@ -291,18 +320,27 @@ func (c *Client) me(ctx context.Context) (whoAmI, error) {
 		return whoAmI{}, err
 	}
 	if !pageForm.MatchString(me.Workspace.ID) {
-		return whoAmI{}, errors.New("the server did not say which workspace this login is in: it is older than this quadit, update it")
+		me.Workspace.ID = ""
 	}
-	c.ws = me.Workspace
+	switch {
+	case c.ws.ID != "" && me.Workspace.ID != "" && me.Workspace.ID != c.ws.ID:
+		return whoAmI{}, fmt.Errorf("%s holds a login in %s, not in %s as this tool's connections say: log in to %s again", c.login, me.Workspace.Name, c.ws.Name, c.ws.Name)
+	case me.Workspace.ID != "":
+		c.ws = me.Workspace
+	}
 	return me, nil
 }
 
 // workspace is the workspace the client's login is in: as the index has
-// it, else as its GET /me says, asked once.
+// it, else as its GET /me says, asked once. Its ID is "" when the server
+// does not say.
 func (c *Client) workspace(ctx context.Context) (workspaceRef, error) {
 	if c.ws.ID != "" {
 		return c.ws, nil
 	}
-	_, err := c.me(ctx)
-	return c.ws, err
+	me, err := c.me(ctx)
+	if err != nil {
+		return workspaceRef{}, err
+	}
+	return me.Workspace, nil
 }

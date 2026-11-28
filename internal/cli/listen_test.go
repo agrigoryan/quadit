@@ -979,3 +979,29 @@ func testCommand(name string, args []string) int {
 	}
 	return 2
 }
+
+// TestAListenerOfOneLoginWorksWithAServerThatNamesNoWorkspace: a server
+// older than the workspace's id in GET /me still serves a tool's only
+// login; what wait prints then carries no --workspace, which that login
+// needs none of.
+func TestAListenerOfOneLoginWorksWithAServerThatNamesNoWorkspace(t *testing.T) {
+	srv := &listenServer{item: `{"seq":42,"type":"mentioned","by":"@ann","task":"SVA-12","snippet":"Look"}`}
+	c := testClient(t, srv)
+	c.ws = workspaceRef{} // a tool's one login, whose workspace the index does not hold
+	out := &bytes.Buffer{}
+	r := &runner{ctx: context.Background(), c: c, out: out}
+	if err := r.wait(input{f: map[string][]string{"for": {"30"}}}); err != nil {
+		t.Fatal(err)
+	}
+	want := `ITEM #42 mentioned SVA-12 from @ann: "Look"
+quadit show SVA-12   # read it
+quadit ack 42 listen lease=KQ7MX4PA   # once it is handled
+quadit wait for=30 lease=KQ7MX4PA   # then go on listening
+`
+	if out.String() != want {
+		t.Fatalf("wait printed:\n%s\nwant:\n%s", out, want)
+	}
+	if env := childEnv([]string{"PATH=/bin"}, &Client{login: "/q/config.json"}, ""); !slices.Equal(env, []string{"PATH=/bin", "QUADIT_CONFIG=/q/config.json"}) {
+		t.Fatalf("a companion's command of such a login gets %q", env)
+	}
+}

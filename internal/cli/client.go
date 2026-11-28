@@ -57,10 +57,12 @@ type savedConfig struct {
 }
 
 // configPath is where `quadit login` saves the server and token:
-// QUADIT_CONFIG, or quadit/config.json in the user's config folder.
+// QUADIT_CONFIG, or quadit/config.json in the user's config folder. It is
+// absolute and clean, as the index holds the tools' files, so that two
+// spellings of one file are one tool.
 func configPath() string {
 	if p := os.Getenv("QUADIT_CONFIG"); p != "" {
-		return p
+		return absPath(p)
 	}
 	dir, err := os.UserConfigDir()
 	if err != nil {

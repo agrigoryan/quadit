@@ -106,7 +106,8 @@ func (r *runner) runWithSecrets(in input) error {
 	if err != nil {
 		return err
 	}
-	cmd, out := r.secretCommand(r.ctx, command, os.Environ(), env)
+	// The command works as this one does, in its workspace, as a companion's does.
+	cmd, out := r.secretCommand(r.ctx, command, childEnv(os.Environ(), r.c, r.c.ws.ID), env)
 	cmd.Stdin = os.Stdin
 	err = cmd.Run()
 	if flushErr := out.Flush(); err == nil {

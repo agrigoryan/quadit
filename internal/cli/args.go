@@ -27,8 +27,9 @@ type switches struct {
 // takeSwitches splits the switches from everything else that was typed.
 func takeSwitches(args []string) (sw switches, rest []string) {
 	for i, a := range args {
-		// After "--" (run --secret X -- command) everything is the command's.
-		if a == "--" {
+		// After "--" (run --secret X -- command) or "--exec" (listen --exec
+		// command) everything is the command's, its own switches too.
+		if a == "--" || a == "--exec" {
 			rest = append(rest, args[i:]...)
 			break
 		}

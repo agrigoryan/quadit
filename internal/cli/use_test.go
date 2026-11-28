@@ -32,8 +32,25 @@ func TestUseTiesAFolderToAWorkspace(t *testing.T) {
 		if len(idx.Folders) != 1 || idx.Folders[0] != (folderTie{Folder: w.work, WorkspaceID: acme.ID, Project: "WEB"}) {
 			t.Fatalf("the ties are %+v", idx.Folders)
 		}
-		c, err := choose(t, workspaceAsk{byFolder: true})
+		c, err := choose(t, workspaceAsk{})
 		is(t, c, err, b)
+	})
+	t.Run("a dry run ties and unties nothing", func(t *testing.T) {
+		w := newToolWorld(t)
+		w.connected(newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b"))
+		if code, said := useIn(t, w.dir, "--dry-run", "acme"); code != 0 || !strings.HasPrefix(said, "would be accepted: Tied ") {
+			t.Fatalf("use --dry-run: %d %s", code, said)
+		}
+		if idx, _ := readIndex(w.dir); len(idx.Folders) != 0 {
+			t.Fatalf("a dry run tied %+v", idx.Folders)
+		}
+		useIn(t, w.dir, "acme")
+		if code, said := useIn(t, w.dir, "--dry-run", "--clear"); code != 0 || !strings.HasPrefix(said, "would be accepted: Untied ") {
+			t.Fatalf("use --dry-run --clear: %d %s", code, said)
+		}
+		if idx, _ := readIndex(w.dir); len(idx.Folders) != 1 {
+			t.Fatal("a dry run untied the folder")
+		}
 	})
 	t.Run("tied again, the folder's tie is replaced", func(t *testing.T) {
 		w := newToolWorld(t)

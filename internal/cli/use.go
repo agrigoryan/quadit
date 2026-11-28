@@ -21,7 +21,8 @@ const useUsage = "usage: quadit use [WORKSPACE [project=KEY]] [folder=PATH]  or 
 // folder must pass the rules a folder Quadit runs an agent in passes (not
 // the home folder, nothing above it, no system folder). Alone it says the
 // tie in effect and the tool's connections; --clear unties the folder of
-// the tie in effect.
+// the tie in effect. A dry run says what it would tie or untie, and
+// writes nothing.
 func use(ctx context.Context, args []string, sw switches, stdout, stderr io.Writer) int {
 	host, err := systemHost()
 	if err != nil {
@@ -64,11 +65,11 @@ func useWith(ctx context.Context, rules folderRules, args []string, sw switches,
 	if err == nil {
 		switch {
 		case untying:
-			err = untie(idx, dir, rules, folder, stdout)
+			err = untie(idx, dir, rules, folder, sw.dry, stdout)
 		case workspace == "":
 			err = showTie(idx, base, rules, folder, stdout)
 		default:
-			err = tie(ctx, idx, base, rules, folder, workspace, firstValue(fields["project"]), stdout)
+			err = tie(ctx, idx, base, rules, tieAsk{folder: folder, workspace: workspace, project: firstValue(fields["project"]), dry: sw.dry}, stdout)
 		}
 	}
 	if err != nil {
@@ -78,11 +79,19 @@ func useWith(ctx context.Context, rules folderRules, args []string, sw switches,
 	return 0
 }
 
-// tie ties folder to the workspace named, of the tool's connections (or,
-// for a tool with none, its one login's), with project when given: a
-// project the tool's agent there may work in.
-func tie(ctx context.Context, idx connectionIndex, base string, rules folderRules, folder, workspace, project string, stdout io.Writer) error {
-	canon, label, err := rules.check(folder)
+// tieAsk is what use was asked to tie: the folder, the workspace named,
+// the project (or ""), and whether it is a dry run.
+type tieAsk struct {
+	folder, workspace, project string
+	dry                        bool
+}
+
+// tie ties the folder to the workspace named, of the tool's connections
+// (or, for a tool with none, its one login's), with the project when given:
+// one the tool's agent there may work in.
+func tie(ctx context.Context, idx connectionIndex, base string, rules folderRules, ask tieAsk, stdout io.Writer) error {
+	workspace, project := ask.workspace, ask.project
+	canon, label, err := rules.check(ask.folder)
 	if err != nil {
 		return err
 	}
@@ -94,6 +103,9 @@ func tie(ctx context.Context, idx connectionIndex, base string, rules folderRule
 			return err
 		}
 		w, err := c.workspace(ctx)
+		if err == nil && w.ID == "" {
+			err = errNoWorkspaceID
+		}
 		if err != nil {
 			return fmt.Errorf("cannot check which workspace this tool's login is in: %w", err)
 		}
@@ -122,7 +134,9 @@ func tie(ctx context.Context, idx connectionIndex, base string, rules folderRule
 	}
 	idx.Folders = slices.DeleteFunc(idx.Folders, func(f folderTie) bool { return samePath(f.Folder, canon) })
 	idx.Folders = append(idx.Folders, folderTie{Folder: canon, WorkspaceID: c.ws.ID, Project: project})
-	if err := idx.write(filepath.Dir(base)); err != nil {
+	if ask.dry {
+		fmt.Fprint(stdout, "would be accepted: ")
+	} else if err := idx.write(filepath.Dir(base)); err != nil {
 		return err
 	}
 	of := ""
@@ -134,8 +148,8 @@ func tie(ctx context.Context, idx connectionIndex, base string, rules folderRule
 }
 
 // untie takes away the tie in effect in folder: its own, or that of the
-// nearest folder above it with one.
-func untie(idx connectionIndex, dir string, rules folderRules, folder string, stdout io.Writer) error {
+// nearest folder above it with one; in a dry run it only says so.
+func untie(idx connectionIndex, dir string, rules folderRules, folder string, dry bool, stdout io.Writer) error {
 	here, err := realFolder(folder)
 	if err != nil {
 		return fmt.Errorf("%s: %w", rules.shown(folder), err)
@@ -146,7 +160,9 @@ func untie(idx connectionIndex, dir string, rules folderRules, folder string, st
 		return nil
 	}
 	idx.Folders = slices.DeleteFunc(idx.Folders, func(f folderTie) bool { return samePath(f.Folder, tied.Folder) })
-	if err := idx.write(dir); err != nil {
+	if dry {
+		fmt.Fprint(stdout, "would be accepted: ")
+	} else if err := idx.write(dir); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "Untied %s from %s.\n", rules.shown(tied.Folder), idx.workspaceName(tied.WorkspaceID))

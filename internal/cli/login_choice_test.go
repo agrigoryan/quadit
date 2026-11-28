@@ -189,7 +189,7 @@ func TestACommandWorksInTheWorkspaceItIsToldElseTheFoldersElseTheOnly(t *testing
 		w := newToolWorld(t)
 		a := newWorkspaceServer(t, personal, "qd_a")
 		w.login(w.base, a)
-		c, err := choose(t, workspaceAsk{byFolder: true})
+		c, err := choose(t, workspaceAsk{})
 		is(t, c, err, a)
 		if len(a.sent()) != 0 {
 			t.Fatalf("choosing the only login asked the server %v", a.sent())
@@ -199,7 +199,7 @@ func TestACommandWorksInTheWorkspaceItIsToldElseTheFoldersElseTheOnly(t *testing
 		w := newToolWorld(t)
 		a := newWorkspaceServer(t, personal, "qd_a")
 		w.connected(a)
-		c, err := choose(t, workspaceAsk{byFolder: true})
+		c, err := choose(t, workspaceAsk{})
 		is(t, c, err, a)
 		if c.ws != personal {
 			t.Fatalf("the workspace is not known from the index: %+v", c.ws)
@@ -210,7 +210,7 @@ func TestACommandWorksInTheWorkspaceItIsToldElseTheFoldersElseTheOnly(t *testing
 		a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
 		w.connected(a, b)
 		for _, name := range []string{acme.ID, "acme", "ACME", "Acme"} {
-			c, err := choose(t, workspaceAsk{named: name, byFolder: true})
+			c, err := choose(t, workspaceAsk{named: name})
 			is(t, c, err, b)
 		}
 		if len(a.sent())+len(b.sent()) != 0 {
@@ -228,12 +228,12 @@ func TestACommandWorksInTheWorkspaceItIsToldElseTheFoldersElseTheOnly(t *testing
 			t.Fatal(err)
 		}
 		t.Chdir(deep)
-		c, err := choose(t, workspaceAsk{byFolder: true})
+		c, err := choose(t, workspaceAsk{})
 		is(t, c, err, b)
 		link := filepath.Join(w.dir, "site-link")
 		symlink(t, site, link)
 		t.Chdir(link)
-		c, err = choose(t, workspaceAsk{byFolder: true})
+		c, err = choose(t, workspaceAsk{})
 		is(t, c, err, b)
 	})
 	t.Run("on macOS and Windows a tie is found in another case", func(t *testing.T) {
@@ -249,7 +249,7 @@ func TestACommandWorksInTheWorkspaceItIsToldElseTheFoldersElseTheOnly(t *testing
 			t.Fatal(err)
 		}
 		t.Chdir(site)
-		c, err := choose(t, workspaceAsk{byFolder: true})
+		c, err := choose(t, workspaceAsk{})
 		is(t, c, err, b)
 	})
 	t.Run("a workspace named wins over the folder's tie, for that command", func(t *testing.T) {
@@ -257,7 +257,7 @@ func TestACommandWorksInTheWorkspaceItIsToldElseTheFoldersElseTheOnly(t *testing
 		a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
 		w.connected(a, b)
 		w.tie(w.work, acme, "")
-		c, err := choose(t, workspaceAsk{named: "personal", byFolder: true})
+		c, err := choose(t, workspaceAsk{named: "personal"})
 		is(t, c, err, a)
 	})
 	t.Run("QUADIT_WORKSPACE names one, and --workspace= wins over it", func(t *testing.T) {
@@ -265,9 +265,9 @@ func TestACommandWorksInTheWorkspaceItIsToldElseTheFoldersElseTheOnly(t *testing
 		a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
 		w.connected(a, b)
 		t.Setenv("QUADIT_WORKSPACE", acme.ID)
-		c, err := choose(t, askOf(switches{}, true))
+		c, err := choose(t, workspaceAsk{named: namedWorkspace(switches{})})
 		is(t, c, err, b)
-		c, err = choose(t, askOf(switches{workspace: "personal"}, true))
+		c, err = choose(t, workspaceAsk{named: namedWorkspace(switches{workspace: "personal"})})
 		is(t, c, err, a)
 	})
 	t.Run("a tie leaves the folder's commands alone where it is not", func(t *testing.T) {
@@ -275,7 +275,7 @@ func TestACommandWorksInTheWorkspaceItIsToldElseTheFoldersElseTheOnly(t *testing
 		a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
 		w.connected(a, b)
 		w.tie(filepath.Join(w.work, "site"), acme, "")
-		_, err := choose(t, workspaceAsk{byFolder: true})
+		_, err := choose(t, workspaceAsk{})
 		if !errors.As(err, new(errSeveral)) {
 			t.Fatalf("a tie beside the folder chose for it: %v", err)
 		}
@@ -287,7 +287,7 @@ func TestACommandAmongSeveralWorkspacesNeverGuesses(t *testing.T) {
 		w := newToolWorld(t)
 		a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
 		w.connected(a, b)
-		_, err := choose(t, workspaceAsk{byFolder: true})
+		_, err := choose(t, workspaceAsk{})
 		want := "This folder is tied to no Quadit workspace, and this tool works in 2:\n" +
 			"  personal  @claude in Personal (" + serverHost(a.url) + ")\n" +
 			"  acme      @claude in Acme (" + serverHost(b.url) + ")\n" +
@@ -315,7 +315,7 @@ func TestACommandAmongSeveralWorkspacesNeverGuesses(t *testing.T) {
 	t.Run("a name none of them has is refused with the list", func(t *testing.T) {
 		w := newToolWorld(t)
 		w.connected(newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b"))
-		_, err := choose(t, workspaceAsk{named: "client", byFolder: true})
+		_, err := choose(t, workspaceAsk{named: "client"})
 		if err == nil || !strings.HasPrefix(err.Error(), `this tool is not connected to a workspace named "client"; it works in:`) {
 			t.Fatalf("got %v", err)
 		}
@@ -325,7 +325,7 @@ func TestACommandAmongSeveralWorkspacesNeverGuesses(t *testing.T) {
 		other := acme
 		other.ID = "0199aaaa-0000-7000-8000-00000000000d"
 		w.connected(newWorkspaceServer(t, acme, "qd_a"), newWorkspaceServer(t, other, "qd_b"))
-		_, err := choose(t, workspaceAsk{named: "acme", byFolder: true})
+		_, err := choose(t, workspaceAsk{named: "acme"})
 		if err == nil || !strings.Contains(err.Error(), `"acme" names 2 workspaces this tool works in; name one by its id:`) || !strings.Contains(err.Error(), other.ID) {
 			t.Fatalf("got %v", err)
 		}
@@ -334,7 +334,7 @@ func TestACommandAmongSeveralWorkspacesNeverGuesses(t *testing.T) {
 		w := newToolWorld(t)
 		w.connected(newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b"))
 		w.tie(w.work, client, "")
-		_, err := choose(t, workspaceAsk{byFolder: true})
+		_, err := choose(t, workspaceAsk{})
 		if err == nil || !strings.HasPrefix(err.Error(), "this folder is tied to "+client.ID+", where this tool is not connected") {
 			t.Fatalf("got %v", err)
 		}
@@ -355,7 +355,7 @@ func TestACommandAmongSeveralWorkspacesNeverGuesses(t *testing.T) {
 		if err := os.Remove(gone); err != nil {
 			t.Fatal(err)
 		}
-		_, err := choose(t, workspaceAsk{byFolder: true})
+		_, err := choose(t, workspaceAsk{})
 		if err == nil || !strings.HasPrefix(err.Error(), "cannot tell which folder this command runs in") || len(a.sent())+len(b.sent()) != 0 {
 			t.Fatalf("got %v", err)
 		}
@@ -369,7 +369,7 @@ func TestTheEnvironmentsLoginMustBeTheOneChosen(t *testing.T) {
 		w.connected(a, b)
 		t.Setenv("QUADIT_URL", c.url)
 		t.Setenv("QUADIT_TOKEN", c.token)
-		got, err := choose(t, workspaceAsk{byFolder: true})
+		got, err := choose(t, workspaceAsk{})
 		is(t, got, err, c)
 	})
 	t.Run("a tie or a name that chooses another login is refused", func(t *testing.T) {
@@ -379,7 +379,7 @@ func TestTheEnvironmentsLoginMustBeTheOneChosen(t *testing.T) {
 		t.Setenv("QUADIT_URL", a.url)
 		t.Setenv("QUADIT_TOKEN", a.token)
 		w.tie(w.work, acme, "")
-		_, err := choose(t, workspaceAsk{byFolder: true})
+		_, err := choose(t, workspaceAsk{})
 		if err == nil || err.Error() != "QUADIT_URL and QUADIT_TOKEN are set for another login than Acme's: unset them here" {
 			t.Fatalf("got %v", err)
 		}
@@ -387,7 +387,7 @@ func TestTheEnvironmentsLoginMustBeTheOneChosen(t *testing.T) {
 		if err == nil || !strings.HasPrefix(err.Error(), "QUADIT_URL and QUADIT_TOKEN are set for another login than Acme's") {
 			t.Fatalf("got %v", err)
 		}
-		got, err := choose(t, workspaceAsk{named: "personal", byFolder: true})
+		got, err := choose(t, workspaceAsk{named: "personal"})
 		is(t, got, err, a)
 	})
 	t.Run("a login the index does not know is asked its workspace, and must be the one chosen", func(t *testing.T) {
@@ -396,9 +396,9 @@ func TestTheEnvironmentsLoginMustBeTheOneChosen(t *testing.T) {
 		w.connected(a, b)
 		t.Setenv("QUADIT_URL", c.url)
 		t.Setenv("QUADIT_TOKEN", c.token)
-		got, err := choose(t, workspaceAsk{named: client.ID, byFolder: true})
+		got, err := choose(t, workspaceAsk{named: client.ID})
 		is(t, got, err, c)
-		_, err = choose(t, workspaceAsk{named: "nowhere", byFolder: true})
+		_, err = choose(t, workspaceAsk{named: "nowhere"})
 		if err == nil || err.Error() != `QUADIT_URL and QUADIT_TOKEN are set for a login in Client, not in nowhere: unset them here` {
 			t.Fatalf("got %v", err)
 		}
@@ -410,18 +410,18 @@ func TestAToolWithOneLoginIsAskedItsWorkspaceWhenOneIsChosen(t *testing.T) {
 	a := newWorkspaceServer(t, personal, "qd_a")
 	w.login(w.base, a)
 	t.Run("a printed line of its own workspace works", func(t *testing.T) {
-		c, err := choose(t, workspaceAsk{named: personal.ID, byFolder: true})
+		c, err := choose(t, workspaceAsk{named: personal.ID})
 		is(t, c, err, a)
 	})
 	t.Run("another workspace is refused", func(t *testing.T) {
-		_, err := choose(t, workspaceAsk{named: acme.ID, byFolder: true})
+		_, err := choose(t, workspaceAsk{named: acme.ID})
 		if err == nil || err.Error() != `this tool works in Personal only, not in "`+acme.ID+`"` {
 			t.Fatalf("got %v", err)
 		}
 	})
 	t.Run("a folder tied to another workspace by another tool is refused", func(t *testing.T) {
 		w.tie(w.work, acme, "")
-		_, err := choose(t, workspaceAsk{byFolder: true})
+		_, err := choose(t, workspaceAsk{})
 		if err == nil || !strings.HasPrefix(err.Error(), "this folder is tied to "+acme.ID+", and this tool works in Personal only") {
 			t.Fatalf("got %v", err)
 		}
@@ -459,6 +459,45 @@ func TestConnectSendsTheCodeOnlyToTheWorkspaceItsLineNames(t *testing.T) {
 			t.Fatalf("connect: %d %q %q", code, out, errs)
 		}
 	})
+}
+
+func TestAConnectCodeIsNotSettledByTheEnvironment(t *testing.T) {
+	t.Run("several connections: refused with the list, though QUADIT_URL and QUADIT_TOKEN are set", func(t *testing.T) {
+		w := newToolWorld(t)
+		a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
+		w.connected(a, b)
+		t.Setenv("QUADIT_URL", a.url)
+		t.Setenv("QUADIT_TOKEN", a.token)
+		code, _, errs := runCLI(t, "connect", "K7PQ2M")
+		if code != 2 || !strings.HasPrefix(errs, "This tool works in 2 Quadit workspaces:") || len(a.sent())+len(b.sent()) != 0 {
+			t.Fatalf("connect: %d %q, sent %v %v", code, errs, a.sent(), b.sent())
+		}
+	})
+	t.Run("one login: QUADIT_URL and QUADIT_TOKEN of another are refused", func(t *testing.T) {
+		w := newToolWorld(t)
+		a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
+		w.login(w.base, a)
+		t.Setenv("QUADIT_URL", b.url)
+		t.Setenv("QUADIT_TOKEN", b.token)
+		code, _, errs := runCLI(t, "connect", "K7PQ2M")
+		if code != 2 || !strings.HasPrefix(errs, "QUADIT_URL and QUADIT_TOKEN are set for another login than this tool's") || len(a.sent())+len(b.sent()) != 0 {
+			t.Fatalf("connect: %d %q", code, errs)
+		}
+	})
+}
+
+// TestALoginFileOfAnotherWorkspaceThanTheIndexSaysIsRefused: when a login
+// file was replaced by another workspace's, the GET /me a command makes
+// anyway says so, and nothing more is sent.
+func TestALoginFileOfAnotherWorkspaceThanTheIndexSaysIsRefused(t *testing.T) {
+	w := newToolWorld(t)
+	a, b := newWorkspaceServer(t, personal, "qd_a"), newWorkspaceServer(t, acme, "qd_b")
+	w.connected(a, b)
+	w.login(filepath.Join(w.dir, "claude-acme.json"), a) // Personal's login, where Acme's was
+	code, out, errs := runCLI(t, "connect", "--workspace=acme")
+	if code != 1 || !strings.Contains(errs, "holds a login in Personal, not in Acme") {
+		t.Fatalf("connect: %d %q %q", code, out, errs)
+	}
 }
 
 // runCLI runs quadit with args, as the command line does.
