@@ -8,39 +8,68 @@ function later<T>() {
   return { promise, settle };
 }
 
+/**
+ * A draw as Connect agents makes one: the tools as seen from the workspace
+ * the window shows when it asks (`answer`), then where each stands
+ * (`handshake`); what it would draw goes into `drawn`, if it still counts.
+ */
+async function draw(
+  draws: Draws,
+  drawn: string[],
+  answer: Promise<string>,
+  handshake: Promise<string> = Promise.resolve("its cards"),
+) {
+  const d = draws.begin();
+  const workspace = await answer;
+  d.isFor(workspace);
+  if (!d.counts()) return;
+  const stands = await handshake;
+  if (d.counts()) drawn.push(`${workspace}: ${stands}`);
+}
+
 describe("Draws", () => {
-  it("drops a draw for A whose answer comes after the window turned to B and B was drawn", async () => {
+  it("drops a draw for A whose handshake answers after the window turned to B and B was drawn", async () => {
     const draws = new Draws();
+    draws.show("A");
     const drawn: string[] = [];
     const handshakes = { A: later<string>(), B: later<string>() };
-    // A draw as Connect agents makes one: the tools as seen from the workspace, then where each stands.
-    const draw = async (workspace: "A" | "B") => {
-      const d = draws.begin();
-      d.isFor(workspace);
-      const stands = await handshakes[workspace].promise;
-      if (d.counts()) drawn.push(`${workspace}: ${stands}`);
-    };
-
-    const a = draw("A");
+    const a = draw(draws, drawn, Promise.resolve("A"), handshakes.A.promise);
+    await Promise.resolve();
+    await Promise.resolve();
     // The window turns to B before A's handshake answered: B is to be drawn.
-    expect(draws.stale("B")).toBe(true);
-    const b = draw("B");
+    expect(draws.show("B")).toBe(true);
+    const b = draw(draws, drawn, Promise.resolve("B"), handshakes.B.promise);
     handshakes.B.settle("B's card");
     await b;
     handshakes.A.settle("A's code");
     await a;
     expect(drawn).toEqual(["B: B's card"]);
-    expect(draws.stale("B")).toBe(false);
+    expect(draws.show("B")).toBe(false);
   });
 
-  it("asks for no new draw before the first knows its workspace, nor for the one it is for", () => {
+  it("drops A's tools that answer after the window turned to B while they were asked, and asks for B's", async () => {
     const draws = new Draws();
-    expect(draws.stale("A")).toBe(false);
-    const d = draws.begin();
-    expect(draws.stale("A")).toBe(false);
-    d.isFor("A");
-    expect(draws.stale("A")).toBe(false);
-    expect(draws.stale("")).toBe(true);
-    expect(d.counts()).toBe(true);
+    draws.show("A");
+    const drawn: string[] = [];
+    const tools = later<string>();
+    const a = draw(draws, drawn, tools.promise);
+    // The window turns while A's tools are still being asked: no draw is for any workspace yet.
+    expect(draws.show("B")).toBe(true);
+    // Even before B's draw begins, A's late answer is not drawn.
+    tools.settle("A");
+    await a;
+    expect(drawn).toEqual([]);
+    await draw(draws, drawn, Promise.resolve("B"));
+    expect(drawn).toEqual(["B: its cards"]);
+  });
+
+  it("asks for no new draw before any began, nor for the workspace the last is for", async () => {
+    const draws = new Draws();
+    expect(draws.show("A")).toBe(false);
+    const drawn: string[] = [];
+    await draw(draws, drawn, Promise.resolve("A"));
+    expect(draws.show("A")).toBe(false);
+    expect(drawn).toEqual(["A: its cards"]);
+    expect(draws.show("")).toBe(true);
   });
 });

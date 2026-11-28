@@ -496,8 +496,9 @@ function optionsForm(h: HarnessView): { form: HTMLFormElement; fill: () => void 
 async function render() {
   const draw = draws.begin();
   const view = await api.connectState();
-  if (!draw.counts()) return;
+  // An answer for a workspace the window no longer shows, or a draw begun after this one: not drawn.
   draw.isFor(workspaceKey(view.at));
+  if (!draw.counts()) return;
   defaultLogin = view.defaultLogin;
   element("cli").textContent = describeCli(view);
   element("notices").replaceChildren(
@@ -631,6 +632,10 @@ async function showTarget() {
   const now = targetKey(target);
   // Another workspace: what a page asked for the one before (an agent of its own, a Connect as it) is not this one's.
   if (was && now !== was) {
+    // The cards were the workspace before's: none of their controls is left to press until this one's are drawn.
+    for (const shown of shownCards.values()) shown.card.element.remove();
+    shownCards.clear();
+    say("");
     sheet = null;
     connectAs = null;
     disconnecting = null;
@@ -638,8 +643,8 @@ async function showTarget() {
     element("focus-line").hidden = true;
     arrange();
   }
-  // The tools were drawn as seen from another workspace: they are drawn again, from this one.
-  if (draws.stale(now)) void render();
+  // The tools were drawn, or are being drawn, as seen from another workspace: they are drawn again, from this one.
+  if (draws.show(now)) void render();
   const at = chosen();
   element("where").textContent = at ? `For ${at.summary.workspace.name} on ${target?.serverName ?? ""}.` : "";
   const openedBy = element("opened-by");
