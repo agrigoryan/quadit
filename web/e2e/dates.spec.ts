@@ -25,11 +25,14 @@ async function rows<T>(page: Page, kind: "epics" | "cycles"): Promise<T[]> {
   return ((await answer.json()) as Record<string, T[] | undefined>)[kind] ?? [];
 }
 
-/** Today in this computer's time zone, which the browser shares, and a number of days on. */
-function daysOn(n: number): string {
-  const day = new Date();
-  day.setDate(day.getDate() + n);
-  return `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+/**
+ * Stops the page's clock at a moment, so what it counts from is known. It is
+ * set once the app has loaded: Playwright's stand-in for Date, there before
+ * the app's code, is no class a subclass of Date can extend, and the date
+ * library's own (TZDate) would count in the zone.
+ */
+async function stopClockAt(page: Page, moment: Date) {
+  await page.clock.setFixedTime(moment);
 }
 
 /** Types words into the open date picker's box. */
@@ -45,6 +48,8 @@ test("a due date typed in words on the task's panel, and cleared from the list's
 }) => {
   const key = await project.newTask("Paint the fence");
   await page.goto(`/e2e/p/${project.key}/tasks`);
+  // Noon on 29 November in this computer's time zone, which the browser shares: three days on is in December.
+  await stopClockAt(page, new Date(2026, 10, 29, 12));
   await page.getByRole("link", { name: `Open ${key}` }).click();
   const panel = page.getByRole("complementary", { name: key });
   await panel.getByRole("button", { name: "Due date: No due date" }).click();
@@ -58,7 +63,7 @@ test("a due date typed in words on the task's panel, and cleared from the list's
   await typeDay(picker, "in 3 days");
   await page.keyboard.press("Enter");
   await expect(picker).toBeHidden();
-  await expect.poll(() => dueOf(quadit, key)).toBe(daysOn(3));
+  await expect.poll(() => dueOf(quadit, key)).toBe("2026-12-02");
 
   // The row shows it too, and its date opens the picker there.
   await page.keyboard.press("Escape");
@@ -142,10 +147,7 @@ for (const moment of moments) {
       });
       const page = await context.newPage();
       await page.goto(`/e2e/p/${project.key}/tasks`);
-      // The clock is set once the app has loaded: Playwright's stand-in for
-      // Date, there before the app's code, is no class a subclass of Date can
-      // extend, and the date library's own (TZDate) would count in the zone.
-      await page.clock.setFixedTime(new Date(moment));
+      await stopClockAt(page, new Date(moment));
       await page.getByRole("link", { name: `Open ${key}` }).click();
       await page
         .getByRole("complementary", { name: key })
@@ -162,13 +164,19 @@ for (const moment of moments) {
         );
       };
       const zoneToday = new Intl.DateTimeFormat("en-CA", { timeZone: timezoneId }).format(new Date(moment));
-      await expect(picker.getByRole("grid"), timezoneId).toHaveAccessibleName(
-        months.format(new Date(`${zoneToday}T00:00:00Z`)),
-      );
+      /** The month `n` months from the zone's today's, as the grid is named. */
+      const monthOn = (n: number) => {
+        const today = new Date(`${zoneToday}T00:00:00Z`);
+        return months.format(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + n, 1)));
+      };
+      await expect(picker.getByRole("grid"), timezoneId).toHaveAccessibleName(monthOn(0));
       await expect(picker.locator("[data-today]"), timezoneId).toHaveAttribute("data-day", zoneToday);
       expect(await inStep(), timezoneId).toBe(true);
+      let shown = 0;
       for (const step of ["Next month", "Next month", "Previous month", "Previous month", "Previous month"]) {
         await picker.getByRole("button", { name: step }).click();
+        shown += step === "Next month" ? 1 : -1;
+        await expect(picker.getByRole("grid"), `${timezoneId}, ${step}`).toHaveAccessibleName(monthOn(shown));
         expect(await inStep(), `${timezoneId}, ${step}`).toBe(true);
       }
       await context.close();
