@@ -289,9 +289,9 @@ describe("toQuery and fromQuery", () => {
 
   it("count a status type there is no more (waiting) as gone, like a deleted status, word or type", () => {
     const saved = { category: ["waiting", "done"], status: ["waiting", "Doing"], label: ["bug"] };
-    expect(goneFromQuery(saved, source, "u1", "2026-11-27")).toEqual({ category: ["done"], status: ["Doing"] });
-    expect(goneFromQuery({ category: ["waiting"] }, source, "u1", "2026-11-27")).toEqual({ category: undefined });
-    expect(goneFromQuery({ category: ["started"] }, source, "u1", "2026-11-27")).toBeNull();
+    expect(goneFromQuery(saved, source)).toEqual({ category: ["done"], status: ["Doing"] });
+    expect(goneFromQuery({ category: ["waiting"] }, source)).toEqual({ category: undefined });
+    expect(goneFromQuery({ category: ["started"] }, source)).toBeNull();
   });
 
   it("read an estimate a view stores as numbers or as one word", () => {
