@@ -5,16 +5,21 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"unicode"
 )
 
 // connect gives back a connect code with this login and says what to tell
 // the person. It starts no wait: listening is for the person to ask.
-// Without a code it says who this login is and how to prove it.
+// Without a code it says who this login is and how to prove it. The login
+// is the one of the workspace the code's line names (--workspace=), or the
+// tool's only one, never the folder's: a code is sent to the server that
+// made it alone.
 func (r *runner) connect(in input) error {
 	if len(in.pos) == 0 {
 		raw, err := r.c.JSON(r.ctx, "/me", url.Values{})
@@ -34,6 +39,10 @@ func (r *runner) connect(in input) error {
 		}
 		fmt.Fprintf(r.out, "You are %s in %s. A code from the person proves the connection: quadit connect CODE\n", me.Handle, me.Workspace.Name)
 		return nil
+	}
+	// "Connect to Quadit K7PQ2M in Acme" names its workspace; the code alone is sent.
+	if slices.ContainsFunc(in.pos, func(word string) bool { return strings.EqualFold(word, "in") }) {
+		return errors.New("name the workspace with --workspace=, not in the code: quadit connect CODE --workspace=NAME")
 	}
 	// As a person may have said it: in lower case, with spaces or a dash.
 	code := strings.ToUpper(strings.NewReplacer(" ", "", "-", "").Replace(strings.Join(in.pos, "")))

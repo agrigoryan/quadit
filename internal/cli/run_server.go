@@ -126,21 +126,6 @@ func (api entryAPI) hold(ctx context.Context, ask holdAsk) (held, error) {
 	return answer, json.Unmarshal(raw, &answer)
 }
 
-// whoAmI is what GET /me says of the login.
-type whoAmI struct {
-	Handle      string `json:"handle"`
-	Kind        string `json:"kind"`
-	UserID      string `json:"user_id"`
-	ReadOnly    bool   `json:"read_only"`
-	Responsible string `json:"responsible"`
-	Seq         int64  `json:"seq"`
-	Workspace   struct {
-		ID   string `json:"id"`
-		Slug string `json:"slug"`
-	} `json:"workspace"`
-	Projects []string `json:"projects"`
-}
-
 func (api entryAPI) me(ctx context.Context) (whoAmI, error) {
 	var me whoAmI
 	raw, err := api.client().JSON(ctx, "/me", nil)

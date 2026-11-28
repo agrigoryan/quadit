@@ -8,7 +8,9 @@
 //	args.go       switches, field=value arguments and their values
 //	help.go       the help texts
 //	client.go     the API client: requests, changes, uploads
-//	login.go      saving the server's address and a token
+//	login.go      saving the server's address and a token; logout; use
+//	connections.go, login_choice.go   the workspaces a tool works in, the
+//	              folders tied to one, and which a command works as
 //	cmd_*.go      what the commands do, by the groups the help gives them:
 //	              read (orient, find), follow, task, comments, decision,
 //	              files, do, docs, secrets
@@ -49,6 +51,10 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	switch cmd {
 	case "login":
 		return login(ctx, rest, os.Stdin, stdout, stderr)
+	case "logout":
+		return logout(ctx, rest, askOf(sw, false), stdout, stderr)
+	case "use":
+		return use(ctx, rest, sw, stdout, stderr)
 	case "skill":
 		return skill(rest, stdout, stderr)
 	case "run":
@@ -59,13 +65,20 @@ func Run(args []string, stdout, stderr io.Writer) int {
 			return runnerForm(ctx, rest, sw, stdout, stderr)
 		}
 	}
-	c, err := NewClient()
+	// A connect code goes to the workspace its line names, never to the
+	// folder's: sent to another server, it would be a code given away.
+	c, chosen, err := openLogin(ctx, askOf(sw, cmd != "connect"))
 	if err != nil {
+		var several errSeveral
+		if errors.As(err, &several) && (cmd == "me" || cmd == "whoami" || cmd == "connect" && len(rest) == 0) {
+			fmt.Fprintln(stdout, several.Error()) // asked who it is, a tool of several workspaces lists them
+			return 0
+		}
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
 	c.ChangeID, c.For = sw.changeID, sw.actFor
-	r := &runner{ctx: ctx, c: c, out: stdout, json: sw.json, dry: sw.dry}
+	r := &runner{ctx: ctx, c: c, chosen: chosen, out: stdout, json: sw.json, dry: sw.dry}
 	if err := r.run(cmd, rest); err != nil {
 		fmt.Fprintln(stderr, err)
 		var ae *APIError
@@ -80,11 +93,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 // runner is one run of a command: the server it talks to, where it prints,
 // and the switches it was given. Being one run, it holds the run's context.
 type runner struct {
-	ctx  context.Context
-	c    *Client
-	out  io.Writer
-	json bool
-	dry  bool
+	ctx context.Context
+	c   *Client
+	// chosen is how the login was chosen, for the command that says so.
+	chosen chosenLogin
+	out    io.Writer
+	json   bool
+	dry    bool
 }
 
 // run finds a command by its name and runs it on what was typed after it.

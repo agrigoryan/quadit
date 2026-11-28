@@ -297,16 +297,7 @@ func systemRoots() []string {
 // its label for servers (the home folder written ~), or refuses it in the
 // words a person reads.
 func (rules folderRules) check(path string) (canon, label string, err error) {
-	if runtime.GOOS == "windows" {
-		// A path in its long form is the plain one: \\?\C:\x is C:\x, and
-		// \\?\UNC\server\share is \\server\share.
-		if rest, ok := strings.CutPrefix(path, `\\?\`); ok {
-			if share, ok := strings.CutPrefix(rest, `UNC\`); ok {
-				rest = `\\` + share
-			}
-			path = rest
-		}
-	}
+	path = plainPath(path)
 	if !filepath.IsAbs(path) {
 		return "", "", errors.New("folder= must be an absolute path")
 	}
@@ -349,6 +340,23 @@ func (rules folderRules) check(path string) (canon, label string, err error) {
 		}
 	}
 	return canon, rules.label(canon), nil
+}
+
+// plainPath is a path in its plain form: on Windows, a path in its long
+// form is the plain one (\\?\C:\x is C:\x, and \\?\UNC\server\share is
+// \\server\share); elsewhere every path is plain.
+func plainPath(path string) string {
+	if runtime.GOOS != "windows" {
+		return path
+	}
+	rest, ok := strings.CutPrefix(path, `\\?\`)
+	if !ok {
+		return path
+	}
+	if share, ok := strings.CutPrefix(rest, `UNC\`); ok {
+		return `\\` + share
+	}
+	return rest
 }
 
 // identitiesUp are the identities of a folder and of each folder above

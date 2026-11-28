@@ -19,6 +19,9 @@ type switches struct {
 	dry      bool   // --dry-run: check a write without making it
 	changeID string // --id=UUID: the id the change is sent with
 	actFor   string // --for=@WHO: the member the change is made for
+	// workspace is --workspace=W: the workspace the command works in, of
+	// those the tool is connected to (login_choice.go).
+	workspace string
 }
 
 // takeSwitches splits the switches from everything else that was typed.
@@ -38,6 +41,8 @@ func takeSwitches(args []string) (sw switches, rest []string) {
 			sw.changeID = strings.TrimPrefix(a, "--id=")
 		case strings.HasPrefix(a, "--for="):
 			sw.actFor = strings.TrimPrefix(a, "--for=")
+		case strings.HasPrefix(a, "--workspace="):
+			sw.workspace = strings.TrimPrefix(a, "--workspace=")
 		default:
 			rest = append(rest, a)
 		}

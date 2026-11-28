@@ -26,11 +26,11 @@ type command struct {
 }
 
 // commands is every command that talks to a server, in the order the help
-// gives them. (help, login, skill and the runner's forms of run are not
-// here: they are answered before there is a default server to talk to.)
+// gives them. (help, login, logout, use, skill and the runner's forms of
+// run are not here: they are answered before a login is chosen.)
 var commands = []command{
 	// orient (cmd_read.go)
-	{names: []string{"me", "whoami"}, run: readCommand("/me")},
+	{names: []string{"me", "whoami"}, run: (*runner).me},
 	{names: []string{"work"}, run: readCommand("/my-work")},
 	{names: []string{"layout"}, args: 1, usage: "layout PROJECT", run: readCommand("/projects/%s/layout")},
 	{names: []string{"dashboard"}, run: readsWithFilters("/dashboard")},

@@ -37,6 +37,33 @@ func address(path string, in input) string {
 	return fmt.Sprintf(path, url.PathEscape(in.pos[0]))
 }
 
+// me says who the login is, as the server says it; then, from a tool in
+// several workspaces, the folder's tie that chose this one and the others
+// it is in.
+func (r *runner) me(input) error {
+	if err := r.printRead("/me", nil); err != nil || r.json {
+		return err
+	}
+	if tie := r.chosen.tie; tie != nil {
+		project := ""
+		if tie.Project != "" {
+			project = ", project " + tie.Project
+		}
+		fmt.Fprintf(r.out, "This folder is tied to this workspace (%s%s): quadit commands in it work here.\n", tie.Folder, project)
+	}
+	conns := r.chosen.conns
+	var others []string
+	for _, c := range conns {
+		if c.WorkspaceID != r.c.ws.ID {
+			others = append(others, fmt.Sprintf("%s (%s in %s)", connectionRef(c, conns), c.Agent, c.WorkspaceName))
+		}
+	}
+	if len(conns) > 1 && len(others) > 0 {
+		fmt.Fprintf(r.out, "This tool is also connected to: %s. A command works there only when the person names it: --workspace=NAME.\n", strings.Join(others, ", "))
+	}
+	return nil
+}
+
 // search looks for the words given, all of them as one text.
 func (r *runner) search(in input) error {
 	q := readFilters(in.f)

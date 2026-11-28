@@ -288,7 +288,7 @@ func TestLoginMarksALoginTheAppMakes(t *testing.T) {
 		if code := login(context.Background(), args, strings.NewReader("qd_secret"), &out, &errs); code != 0 {
 			t.Fatalf("exit %d: %s", code, errs.String())
 		}
-		c, err := NewClient()
+		c, _, err := openLogin(context.Background(), workspaceAsk{})
 		if err != nil {
 			t.Fatal(err)
 		}

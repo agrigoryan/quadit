@@ -360,7 +360,7 @@ func (f *fakeQuadit) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		seq := f.seq
 		f.mu.Unlock()
 		_ = json.NewEncoder(w).Encode(map[string]any{"handle": who.Handle, "kind": who.Kind, "user_id": who.UserID, "read_only": who.ReadOnly,
-			"responsible": who.Responsible, "seq": seq, "workspace": map[string]any{"id": fakeWorkspaceID, "slug": "personal"}, "projects": []string{"SVA"}})
+			"responsible": who.Responsible, "seq": seq, "workspace": map[string]any{"id": fakeWorkspaceID, "slug": "personal", "name": "Personal"}, "projects": []string{"SVA"}})
 	case r.Method == http.MethodGet && path == "/list/projects":
 		_, _ = io.WriteString(w, `{"projects":[{"id":"`+fakeProjectID+`","key":"SVA","name":"Samurai"}]}`)
 	case r.Method == http.MethodGet && path == "/list/sessions":

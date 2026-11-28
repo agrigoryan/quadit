@@ -49,8 +49,12 @@ func testClient(t *testing.T, h http.Handler) *Client {
 	t.Helper()
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &Client{URL: srv.URL, Token: "t", HTTP: &http.Client{Timeout: requestTimeout}}
+	return &Client{URL: srv.URL, Token: "t", HTTP: &http.Client{Timeout: requestTimeout}, ws: testWorkspace}
 }
+
+// testWorkspace is the workspace of a testClient's login, as the index
+// would hold it.
+var testWorkspace = workspaceRef{ID: fakeWorkspaceID, Slug: "personal", Name: "Personal"}
 
 func answerChange(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -149,7 +153,7 @@ func TestABrokenConfigFileIsSaid(t *testing.T) {
 	t.Setenv("QUADIT_CONFIG", path)
 	t.Setenv("QUADIT_URL", "")
 	t.Setenv("QUADIT_TOKEN", "")
-	_, err := NewClient()
+	_, _, err := openLogin(context.Background(), workspaceAsk{})
 	var syntax *json.SyntaxError
 	if !errors.As(err, &syntax) || !strings.Contains(err.Error(), path) {
 		t.Fatalf("err = %v, want the config file's syntax error", err)
@@ -176,7 +180,7 @@ func TestTheServerAndTokenComeAsAPair(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("QUADIT_URL", tc.url)
 			t.Setenv("QUADIT_TOKEN", tc.token)
-			c, err := NewClient()
+			c, _, err := openLogin(context.Background(), workspaceAsk{})
 			if err != nil {
 				t.Fatal(err)
 			}

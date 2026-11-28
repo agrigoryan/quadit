@@ -41,6 +41,11 @@ type Client struct {
 	// app starts the desktop app when its server on this computer is not
 	// running; nil for a login the app did not make.
 	app *appStart
+	// login is the file the login was read from; "" for one given in
+	// QUADIT_URL and QUADIT_TOKEN.
+	login string
+	// ws is the workspace of the login, once known (workspace).
+	ws workspaceRef
 }
 
 // savedConfig is the file `quadit login` writes. App is there when the
@@ -64,31 +69,6 @@ func configPath() string {
 	return filepath.Join(dir, "quadit", "config.json")
 }
 
-// NewClient reads the server address and token from the environment when
-// both are set (QUADIT_URL, QUADIT_TOKEN), otherwise from the file `quadit
-// login` wrote. The two are never mixed: a token saved for one server is
-// not sent to another.
-func NewClient() (*Client, error) {
-	c := &Client{URL: os.Getenv("QUADIT_URL"), Token: os.Getenv("QUADIT_TOKEN"), HTTP: &http.Client{Timeout: requestTimeout}}
-	if c.URL == "" || c.Token == "" {
-		var sc savedConfig
-		if raw, err := os.ReadFile(configPath()); err == nil {
-			if err := json.Unmarshal(raw, &sc); err != nil {
-				return nil, fmt.Errorf("%s: %w", configPath(), err)
-			}
-		}
-		c.URL, c.Token = sc.URL, sc.Token
-		if sc.App != nil {
-			c.app = &appStart{login: *sc.App, dir: filepath.Dir(configPath()), starter: systemStarter{}, within: appStartWithin, stderr: os.Stderr}
-		}
-	}
-	if c.URL == "" || c.Token == "" {
-		return nil, errors.New("not connected: set QUADIT_URL and QUADIT_TOKEN, or run: quadit login <url> <token>")
-	}
-	c.URL = strings.TrimRight(c.URL, "/")
-	return c, nil
-}
-
 // loginClient is a client of one login file alone, as `quadit run` uses
 // for each entry: QUADIT_URL, QUADIT_TOKEN and QUADIT_CONFIG are not read,
 // and a server that is not running is waited for, never started (the
@@ -103,14 +83,24 @@ func loginClient(path string) (*Client, error) {
 
 // loginClientOf is loginClient of a login file's bytes, read from path.
 func loginClientOf(raw []byte, path string) (*Client, error) {
+	sc, err := readLogin(raw, path)
+	if err != nil {
+		return nil, err
+	}
+	return &Client{URL: strings.TrimRight(sc.URL, "/"), Token: sc.Token, HTTP: &http.Client{Timeout: requestTimeout}, login: path}, nil
+}
+
+// readLogin reads a login file's bytes, read from path: one with no
+// server or no token is refused.
+func readLogin(raw []byte, path string) (savedConfig, error) {
 	var sc savedConfig
 	if err := json.Unmarshal(raw, &sc); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
+		return savedConfig{}, fmt.Errorf("%s: %w", path, err)
 	}
 	if sc.URL == "" || sc.Token == "" {
-		return nil, fmt.Errorf("%s holds no server and token: connect the agent again", path)
+		return savedConfig{}, fmt.Errorf("%s holds no server and token: connect the agent again", path)
 	}
-	return &Client{URL: strings.TrimRight(sc.URL, "/"), Token: sc.Token, HTTP: &http.Client{Timeout: requestTimeout}}, nil
+	return sc, nil
 }
 
 // madeChangeID is the change id made from text: a UUID's form, the same

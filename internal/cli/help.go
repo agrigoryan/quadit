@@ -67,6 +67,12 @@ A write takes --id=UUID (send it again with the same id and it happens once)
 and --for=@WHO (it runs with that member's access).
 Connect with QUADIT_URL and QUADIT_TOKEN (both, or neither is used), or: quadit login URL
 TOKEN (TOKEN "-" reads it from stdin); quadit login --path says where the login is kept (QUADIT_CONFIG sets it)
+A tool can be an agent in several workspaces: quadit login in another adds it beside the first.
+Then a command works in the one --workspace=W names (an id, slug or name; QUADIT_WORKSPACE from
+a process Quadit started), else in the one its folder is tied to, else it lists them and stops.
+  use W [project=KEY] [folder=PATH]   tie the folder (and those inside it) to W
+  use [--clear] [folder=PATH]         the tie in effect and this tool's workspaces; --clear unties
+  logout [--workspace=W] [--revoke=TOKEN_ID]  remove a login (revoking its token first, when asked)
 Teach an agent to use this: quadit skill install (puts the skill where Claude Code,
 Codex, Cursor, Gemini CLI, Antigravity CLI, Copilot, opencode and pi look; quadit skill prints it)
 `
